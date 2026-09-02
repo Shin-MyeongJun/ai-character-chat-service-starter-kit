@@ -1,0 +1,49 @@
+# dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.mypy_cache/
+**/.mypy_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+**/*.egg-info/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# next
+.next/
+**/.next/
+out/
+*.tsbuildinfo
+
+# logs
+*.log
+logs/
+
+# docker/db
+postgres-data/
+redis-data/
+
+# IDE
+.idea/
+.vscode/
+
+# generated contracts
+contracts/openapi.json
+
+# local reference notes
+references_document/
