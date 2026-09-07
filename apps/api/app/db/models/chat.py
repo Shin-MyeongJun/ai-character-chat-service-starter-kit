@@ -31,11 +31,17 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
         Index("ix_conversations_user_id_created_at", "user_id", "created_at"),
+        Index("ix_conversations_product_id_created_at", "product_id", "created_at"),
     )
 
     user_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="RESTRICT"),
         nullable=False,
     )
     title: Mapped[str | None] = mapped_column(Text)

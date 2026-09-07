@@ -112,6 +112,18 @@ class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
         ),
         CheckConstraint(
             (
+                "activation_type <> 'keyword' OR "
+                "is_enabled = false OR "
+                "(key_triggers IS NOT NULL AND cardinality(key_triggers) > 0)"
+            ),
+            name="ck_lorebook_entries_keyword_triggers",
+        ),
+        CheckConstraint(
+            "token_budget IS NULL OR token_budget >= 0",
+            name="ck_lorebook_entries_token_budget",
+        ),
+        CheckConstraint(
+            (
                 "placement IN ("
                 "'system_top', 'before_memory', 'after_memory', "
                 "'before_history', 'near_user_message'"
@@ -144,7 +156,7 @@ class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
     activation_type: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-        server_default=LorebookEntryActivationType.KEYWORD.value,
+        server_default=LorebookEntryActivationType.ALWAYS.value,
     )
     key_triggers: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     match_mode: Mapped[str] = mapped_column(
@@ -152,14 +164,18 @@ class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
         nullable=False,
         server_default=LorebookEntryMatchMode.CONTAINS.value,
     )
-    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     token_budget: Mapped[int | None] = mapped_column(Integer)
     placement: Mapped[str] = mapped_column(
         Text,
         nullable=False,
         server_default=LorebookEntryPlacement.BEFORE_HISTORY.value,
     )
-    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
     metadata_: Mapped[dict] = mapped_column(
         "metadata",
         JSONB,

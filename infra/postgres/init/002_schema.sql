@@ -89,9 +89,95 @@ CREATE TABLE IF NOT EXISTS character_assets (
 CREATE INDEX IF NOT EXISTS ix_character_assets_character_id
     ON character_assets (character_id);
 
+CREATE TABLE IF NOT EXISTS lorebooks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    visibility TEXT NOT NULL DEFAULT 'private'
+        CONSTRAINT ck_lorebooks_visibility
+        CHECK (visibility IN ('private', 'public', 'unlisted')),
+    status TEXT NOT NULL DEFAULT 'draft'
+        CONSTRAINT ck_lorebooks_status
+        CHECK (status IN ('draft', 'approved', 'rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_lorebooks_owner_id
+    ON lorebooks (owner_id);
+
+CREATE TABLE IF NOT EXISTS lorebook_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lorebook_id UUID NOT NULL REFERENCES lorebooks(id) ON DELETE CASCADE,
+    title TEXT,
+    content TEXT NOT NULL,
+    entry_type TEXT NOT NULL DEFAULT 'world'
+        CONSTRAINT ck_lorebook_entries_entry_type
+        CHECK (entry_type IN (
+            'author_note', 'world', 'genre', 'rule', 'location', 'faction',
+            'character_relation', 'event', 'term', 'secret'
+        )),
+    activation_type TEXT NOT NULL DEFAULT 'always'
+        CONSTRAINT ck_lorebook_entries_activation_type
+        CHECK (activation_type IN ('always', 'keyword', 'semantic', 'manual')),
+    key_triggers TEXT[],
+    match_mode TEXT NOT NULL DEFAULT 'contains'
+        CONSTRAINT ck_lorebook_entries_match_mode
+        CHECK (match_mode IN ('exact', 'contains', 'regex')),
+    priority INT NOT NULL DEFAULT 0,
+    token_budget INT
+        CONSTRAINT ck_lorebook_entries_token_budget
+        CHECK (token_budget IS NULL OR token_budget >= 0),
+    placement TEXT NOT NULL DEFAULT 'before_history'
+        CONSTRAINT ck_lorebook_entries_placement
+        CHECK (placement IN (
+            'system_top', 'before_memory', 'after_memory',
+            'before_history', 'near_user_message'
+        )),
+    is_enabled BOOLEAN NOT NULL DEFAULT true,
+    CONSTRAINT ck_lorebook_entries_keyword_triggers
+        CHECK (
+            activation_type <> 'keyword'
+            OR is_enabled = false
+            OR (key_triggers IS NOT NULL AND cardinality(key_triggers) > 0)
+        ),
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    embedding vector(1536),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_lorebook_entries_lorebook_id
+    ON lorebook_entries (lorebook_id);
+
+CREATE INDEX IF NOT EXISTS ix_lorebook_entries_embedding
+    ON lorebook_entries
+    USING ivfflat (embedding vector_cosine_ops)
+    WITH (lists = 100);
+
+CREATE TABLE IF NOT EXISTS products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    opening_message TEXT,
+    visibility TEXT NOT NULL DEFAULT 'private'
+        CONSTRAINT ck_products_visibility CHECK (visibility IN ('private', 'public', 'unlisted')),
+    status TEXT NOT NULL DEFAULT 'draft'
+        CONSTRAINT ck_products_status CHECK (status IN ('draft', 'approved', 'rejected')),
+    default_model_id UUID REFERENCES models(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_products_owner_id
+    ON products (owner_id);
+
 CREATE TABLE IF NOT EXISTS conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     title TEXT,
     is_group BOOLEAN NOT NULL DEFAULT false,
     active_model_id UUID REFERENCES models(id) ON DELETE SET NULL,
@@ -101,6 +187,9 @@ CREATE TABLE IF NOT EXISTS conversations (
 
 CREATE INDEX IF NOT EXISTS ix_conversations_user_id_created_at
     ON conversations (user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS ix_conversations_product_id_created_at
+    ON conversations (product_id, created_at);
 
 CREATE TABLE IF NOT EXISTS conversation_characters (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -135,24 +224,6 @@ CREATE INDEX IF NOT EXISTS ix_messages_conversation_id_created_at
 
 CREATE INDEX IF NOT EXISTS ix_messages_model_id_created_at
     ON messages (model_id, created_at);
-
-CREATE TABLE IF NOT EXISTS lorebook_entries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
-    key_trigger TEXT[],
-    content TEXT NOT NULL,
-    embedding vector(1536),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS ix_lorebook_entries_character_id
-    ON lorebook_entries (character_id);
-
-CREATE INDEX IF NOT EXISTS ix_lorebook_entries_embedding
-    ON lorebook_entries
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
 
 CREATE TABLE IF NOT EXISTS conversation_memories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
