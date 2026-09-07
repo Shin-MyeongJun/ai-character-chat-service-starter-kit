@@ -41,7 +41,4 @@ class ConversationMemory(TimestampMixin, UuidPkMixin, Base):
     memory_type: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
-    source_message_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("messages.id", ondelete="SET NULL"),
-    )
+

@@ -14,12 +14,20 @@ from app.db.models.memory import ConversationMemory
 from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
+from app.db.models.snapshot import (
+    CharacterSnapshot,
+    LorebookSnapshot,
+    ProductSnapshot,
+    ProductSnapshotCharacter,
+    ProductSnapshotLorebook,
+)
 
 __all__ = [
     "AuditLog",
     "Character",
     "CharacterAsset",
     "CharacterImage",
+    "CharacterSnapshot",
     "Conversation",
     "ConversationCharacter",
     "ConversationMemory",
@@ -27,6 +35,7 @@ __all__ = [
     "CreditTransaction",
     "Lorebook",
     "LorebookEntry",
+    "LorebookSnapshot",
     "Message",
     "Model",
     "ModerationFlag",
@@ -34,6 +43,9 @@ __all__ = [
     "Product",
     "ProductCharacter",
     "ProductLorebook",
+    "ProductSnapshot",
+    "ProductSnapshotCharacter",
+    "ProductSnapshotLorebook",
     "Provider",
     "SubscriptionPlan",
     "UsageLog",
