@@ -1,5 +1,7 @@
 """Override with shared identity/DB dependencies at application composition time."""
+
 from uuid import UUID
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 

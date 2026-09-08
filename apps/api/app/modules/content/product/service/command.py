@@ -1,4 +1,5 @@
 """Commands own transactions; owner_id must come from trusted authentication."""
+
 from dataclasses import asdict
 from uuid import UUID
 
@@ -21,14 +22,22 @@ def validate_profile(value: types.ProductWrite):
             raise ValueError("Text exceeds 20000 characters.")
 
 
-async def create_product(session: AsyncSession, *, owner_id: UUID, value: types.ProductWrite):
+async def create_product(
+    session: AsyncSession, *, owner_id: UUID, value: types.ProductWrite
+):
     validate_profile(value)
     async with session.begin():
         entity = Product(owner_id=owner_id, status="draft", **asdict(value))
         return to_info(await repository.save(session, entity))
 
 
-async def update_product(session: AsyncSession, *, product_id: UUID, owner_id: UUID, value: types.ProductWrite):
+async def update_product(
+    session: AsyncSession,
+    *,
+    product_id: UUID,
+    owner_id: UUID,
+    value: types.ProductWrite,
+):
     validate_profile(value)
     async with session.begin():
         entity = await repository.owned(session, product_id, owner_id, lock=True)
@@ -40,6 +49,8 @@ async def update_product(session: AsyncSession, *, product_id: UUID, owner_id: U
 async def delete_product(session: AsyncSession, *, product_id: UUID, owner_id: UUID):
     async with session.begin():
         entity = await repository.owned(session, product_id, owner_id, lock=True)
-        if await session.scalar(select(exists().where(ProductSnapshot.product_id == product_id))):
+        if await session.scalar(
+            select(exists().where(ProductSnapshot.product_id == product_id))
+        ):
             raise ValueError("Published products must be retired, not deleted.")
         await session.delete(entity)

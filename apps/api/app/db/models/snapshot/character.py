@@ -1,6 +1,14 @@
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Text, UniqueConstraint, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,10 +42,21 @@ class CharacterSnapshot(SnapshotMixin, UuidPkMixin, Base):
 class CharacterSnapshotImage(UuidPkMixin, Base):
     __tablename__ = "character_snapshot_images"
     __table_args__ = (
-        UniqueConstraint('character_snapshot_id', 'emotion_tag', name='uq_snapshot_image_emotion'),
-        Index('uq_snapshot_image_default', 'character_snapshot_id', unique=True, postgresql_where=text('is_default = true')),
+        UniqueConstraint(
+            "character_snapshot_id", "emotion_tag", name="uq_snapshot_image_emotion"
+        ),
+        Index(
+            "uq_snapshot_image_default",
+            "character_snapshot_id",
+            unique=True,
+            postgresql_where=text("is_default = true"),
+        ),
     )
-    character_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey('character_snapshots.id', ondelete='CASCADE'), nullable=False)
+    character_snapshot_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     source_image_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     emotion_tag: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
@@ -47,10 +66,16 @@ class CharacterSnapshotImage(UuidPkMixin, Base):
 class CharacterSnapshotAsset(UuidPkMixin, Base):
     __tablename__ = "character_snapshot_assets"
     __table_args__ = (
-        CheckConstraint("asset_type IN ('image','audio','video')", name='ck_snapshot_asset_type'),
-        Index('ix_snapshot_assets_parent', 'character_snapshot_id'),
+        CheckConstraint(
+            "asset_type IN ('image','audio','video')", name="ck_snapshot_asset_type"
+        ),
+        Index("ix_snapshot_assets_parent", "character_snapshot_id"),
     )
-    character_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey('character_snapshots.id', ondelete='CASCADE'), nullable=False)
+    character_snapshot_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     source_asset_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     asset_type: Mapped[str] = mapped_column(Text, nullable=False)
     purpose: Mapped[str] = mapped_column(Text, nullable=False)

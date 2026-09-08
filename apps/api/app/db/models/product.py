@@ -12,8 +12,8 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,7 +42,12 @@ class ProductLorebookRole(StrEnum):
 class Product(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "products"
     __table_args__ = (
-        ForeignKeyConstraint(['id','latest_snapshot_id'], ['product_snapshots.product_id','product_snapshots.id'], name='fk_product_latest_snapshot', use_alter=True),
+        ForeignKeyConstraint(
+            ["id", "latest_snapshot_id"],
+            ["product_snapshots.product_id", "product_snapshots.id"],
+            name="fk_product_latest_snapshot",
+            use_alter=True,
+        ),
         CheckConstraint(
             "visibility IN ('private', 'public', 'unlisted')",
             name="ck_products_visibility",
@@ -77,15 +82,21 @@ class Product(TimestampMixin, UuidPkMixin, Base):
         ForeignKey("models.id", ondelete="SET NULL"),
     )
     reasoning_effort: Mapped[str | None] = mapped_column(Text)
-    replacement_policy: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    replacement_policy: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
     latest_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
 
 class ProductCharacter(UuidPkMixin, Base):
     __tablename__ = "product_characters"
     __table_args__ = (
-        UniqueConstraint("product_id", "id", name="uq_product_characters_product_identity"),
-        UniqueConstraint("product_id", "character_id", name="uq_product_characters_pair"),
+        UniqueConstraint(
+            "product_id", "id", name="uq_product_characters_product_identity"
+        ),
+        UniqueConstraint(
+            "product_id", "character_id", name="uq_product_characters_pair"
+        ),
         Index("ix_product_characters_product_id", "product_id"),
         Index(
             "uq_product_characters_primary_per_product",
@@ -105,16 +116,24 @@ class ProductCharacter(UuidPkMixin, Base):
         ForeignKey("characters.id", ondelete="CASCADE"),
         nullable=False,
     )
-    role_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    role_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     role_name: Mapped[str | None] = mapped_column(Text)
-    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    is_primary: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
 
 class ProductLorebook(UuidPkMixin, Base):
     __tablename__ = "product_lorebooks"
     __table_args__ = (
-        UniqueConstraint("product_id", "id", name="uq_product_lorebooks_product_identity"),
-        CheckConstraint("scope IN ('all', 'selected')", name="ck_product_lorebooks_scope"),
+        UniqueConstraint(
+            "product_id", "id", name="uq_product_lorebooks_product_identity"
+        ),
+        CheckConstraint(
+            "scope IN ('all', 'selected')", name="ck_product_lorebooks_scope"
+        ),
         CheckConstraint(
             "role IN ('main', 'detail', 'rule', 'optional')",
             name="ck_product_lorebooks_role",
@@ -138,27 +157,51 @@ class ProductLorebook(UuidPkMixin, Base):
         nullable=False,
         server_default=ProductLorebookRole.DETAIL.value,
     )
-    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    priority: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    is_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
     scope: Mapped[str] = mapped_column(Text, nullable=False, server_default="all")
 
 
 class ProductLorebookCharacter(Base):
     __tablename__ = "product_lorebook_characters"
     __table_args__ = (
-        ForeignKeyConstraint(["product_id", "product_character_id"], ["product_characters.product_id", "product_characters.id"], ondelete="CASCADE"),
-        ForeignKeyConstraint(["product_id", "product_lorebook_id"], ["product_lorebooks.product_id", "product_lorebooks.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(
+            ["product_id", "product_character_id"],
+            ["product_characters.product_id", "product_characters.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["product_id", "product_lorebook_id"],
+            ["product_lorebooks.product_id", "product_lorebooks.id"],
+            ondelete="CASCADE",
+        ),
     )
     product_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    product_character_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
-    product_lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    product_character_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True
+    )
+    product_lorebook_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True
+    )
 
 
 class ProductStartSet(UuidPkMixin, Base):
     __tablename__ = "product_start_sets"
     __table_args__ = (
-        ForeignKeyConstraint(["product_id", "lorebook_id"], ["product_lorebooks.product_id", "product_lorebooks.lorebook_id"], ondelete="CASCADE"),
-        ForeignKeyConstraint(["lorebook_id", "entry_id"], ["lorebook_entries.lorebook_id", "lorebook_entries.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(
+            ["product_id", "lorebook_id"],
+            ["product_lorebooks.product_id", "product_lorebooks.lorebook_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["lorebook_id", "entry_id"],
+            ["lorebook_entries.lorebook_id", "lorebook_entries.id"],
+            ondelete="CASCADE",
+        ),
         UniqueConstraint("product_id", "entry_id", name="uq_product_start_sets_entry"),
     )
     product_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)

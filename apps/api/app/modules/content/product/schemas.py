@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.modules.content.product.types import Visibility
 
 

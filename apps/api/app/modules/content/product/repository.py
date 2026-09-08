@@ -17,12 +17,19 @@ async def owned(session: AsyncSession, product_id: UUID, owner_id: UUID, *, lock
 
 
 async def list_owned(session: AsyncSession, owner_id: UUID, *, offset=0, limit=50):
-    return list(await session.scalars(select(Product).where(Product.owner_id == owner_id)
-        .order_by(Product.created_at.desc(), Product.id.desc())
-        .offset(offset).limit(limit)))
+    return list(
+        await session.scalars(
+            select(Product)
+            .where(Product.owner_id == owner_id)
+            .order_by(Product.created_at.desc(), Product.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    )
 
 
 async def save(session: AsyncSession, entity):
     session.add(entity)
     await session.flush()
+    await session.refresh(entity)
     return entity

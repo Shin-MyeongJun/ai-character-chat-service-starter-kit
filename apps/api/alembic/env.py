@@ -1,10 +1,11 @@
 import asyncio
 import os
-from alembic import context
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import pool
-from app.db.base import Base
+
 import app.db.models  # noqa: F401
+from alembic import context
+from app.db.base import Base
+from sqlalchemy import pool
+from sqlalchemy.ext.asyncio import create_async_engine
 
 
 def migrate(connection):
@@ -14,14 +15,14 @@ def migrate(connection):
 
 
 async def online():
-    engine = create_async_engine(os.environ['DATABASE_URL'], poolclass=pool.NullPool)
+    engine = create_async_engine(os.environ["DATABASE_URL"], poolclass=pool.NullPool)
     async with engine.connect() as connection:
         await connection.run_sync(migrate)
     await engine.dispose()
 
 
 if context.is_offline_mode():
-    context.configure(url='postgresql://', literal_binds=True)
+    context.configure(url="postgresql://", literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 else:

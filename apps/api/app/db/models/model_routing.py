@@ -1,5 +1,5 @@
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
@@ -24,13 +24,17 @@ class Provider(UuidPkMixin, Base):
     __tablename__ = "providers"
 
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
 
 
 class Model(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "models"
     __table_args__ = (
-        UniqueConstraint("provider_id", "model_name", name="uq_models_provider_model_name"),
+        UniqueConstraint(
+            "provider_id", "model_name", name="uq_models_provider_model_name"
+        ),
     )
 
     provider_id: Mapped[UUID] = mapped_column(
@@ -48,16 +52,35 @@ class Model(TimestampMixin, UuidPkMixin, Base):
         nullable=False,
         server_default=text("'{}'::jsonb"),
     )
-    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
-    retirement_announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    retirement_announced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     shutdown_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ModelReplacement(UuidPkMixin, Base):
-    __tablename__='model_replacements'
-    __table_args__=(UniqueConstraint('product_snapshot_id','from_model_id','to_model_id',name='uq_model_replacement'),)
-    product_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshots.id'),nullable=False)
-    from_model_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('models.id'),nullable=False)
-    to_model_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('models.id'),nullable=False)
-    reasoning_effort: Mapped[str] = mapped_column(Text,nullable=False)
-    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=False)
+    __tablename__ = "model_replacements"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_snapshot_id",
+            "from_model_id",
+            "to_model_id",
+            name="uq_model_replacement",
+        ),
+    )
+    product_snapshot_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("product_snapshots.id"), nullable=False
+    )
+    from_model_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("models.id"), nullable=False
+    )
+    to_model_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("models.id"), nullable=False
+    )
+    reasoning_effort: Mapped[str] = mapped_column(Text, nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
