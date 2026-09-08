@@ -14,6 +14,7 @@ from app.db.models.memory import ConversationMemory
 from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
+from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision
 from app.db.models.snapshot import (
     CharacterSnapshot,
     LorebookSnapshot,
@@ -23,6 +24,8 @@ from app.db.models.snapshot import (
 )
 
 __all__ = [
+    "ProductReleaseNote",
+    "ProductReleaseNoteRevision",
     "AuditLog",
     "Character",
     "CharacterAsset",

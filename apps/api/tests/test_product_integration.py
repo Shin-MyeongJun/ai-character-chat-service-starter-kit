@@ -149,3 +149,21 @@ async def test_atomic_publication_and_original_edits(db):
         assert second.version == 2
         assert second.snapshot_data['content_digest'] != (await db.get(ProductSnapshot,first_id)).snapshot_data['content_digest']
         assert len(list(await db.scalars(select(ProductSnapshotStartSet).where(ProductSnapshotStartSet.product_snapshot_id == second.id)))) == 1
+
+
+async def test_release_policy_and_typo_correction(db):
+    from app.modules.content.product.service.releases import publish, correct_note, ReleaseRequest
+    from app.db.models.product_release import ProductReleaseNoteRevision
+    owner,c,b,p,model,entry=await ready_product(db)
+    first=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('First','Initial release',True))
+    assert first.update_policy == 'choice'
+    media=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('Media','No content change',True))
+    assert media.update_policy == 'automatic'
+    async with db.begin():
+        c.persona_prompt='Changed'
+    changed=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('Changes','Content changed',True))
+    assert changed.change_kind == 'content' and changed.update_policy == 'choice'
+    corrected=await correct_note(db,product_id=p.id,snapshot_id=changed.snapshot_id,owner_id=owner.id,summary='Corrected',body='Typo corrected')
+    assert corrected.update_policy == 'choice'
+    async with db.begin():
+        assert len(list(await db.scalars(select(ProductReleaseNoteRevision)))) == 1

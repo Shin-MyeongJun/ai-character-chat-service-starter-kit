@@ -110,5 +110,34 @@ CREATE TABLE product_snapshot_start_sets (
 );
 
 
+-- Running upgrade 0006 -> 0007
+
+CREATE TABLE product_release_notes (
+    product_snapshot_id UUID NOT NULL, 
+    summary TEXT NOT NULL, 
+    body TEXT NOT NULL, 
+    change_kind TEXT NOT NULL, 
+    update_policy TEXT NOT NULL, 
+    corrected_at TIMESTAMP WITH TIME ZONE, 
+    PRIMARY KEY (product_snapshot_id), 
+    CONSTRAINT ck_release_kind CHECK (change_kind IN ('initial','media','content')), 
+    CONSTRAINT ck_release_policy CHECK (update_policy IN ('automatic','choice')), 
+    CONSTRAINT ck_release_content_choice CHECK (change_kind = 'media' OR update_policy = 'choice'), 
+    FOREIGN KEY(product_snapshot_id) REFERENCES product_snapshots (id) ON DELETE CASCADE
+);
+
+CREATE TABLE product_release_note_revisions (
+    product_snapshot_id UUID NOT NULL, 
+    editor_id UUID, 
+    previous_summary TEXT NOT NULL, 
+    previous_body TEXT NOT NULL, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    FOREIGN KEY(product_snapshot_id) REFERENCES product_release_notes (product_snapshot_id) ON DELETE CASCADE, 
+    FOREIGN KEY(editor_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+
 COMMIT;
 

@@ -13,6 +13,7 @@ from app.modules.content.product.types import ProductInfo
 from app.modules.content.product.types import Composition
 from app.modules.content.product.service import composition
 from app.modules.content.product.service import settings
+from app.modules.content.product.service import releases
 
 router = APIRouter(prefix="/products", tags=["products"])
 Session = Annotated[AsyncSession, Depends(get_product_session)]
@@ -74,3 +75,17 @@ async def read_composition(product_id: UUID, session: Session, owner: Owner):
 async def put_settings(product_id: UUID, body: settings.Settings, session: Session, owner: Owner):
     with errors():
         return await settings.set_settings(session, product_id=product_id, owner_id=owner, value=body)
+
+
+@router.post("/{product_id}/releases", response_model=releases.ReleaseInfo, status_code=201)
+async def publish(product_id: UUID, body: releases.ReleaseRequest, session: Session, owner: Owner):
+    with errors():
+        return await releases.publish(session,product_id=product_id,owner_id=owner,value=body)
+
+
+@router.patch("/{product_id}/releases/{snapshot_id}/note", response_model=releases.ReleaseInfo)
+async def correct_note(product_id: UUID, snapshot_id: UUID, body: releases.ReleaseRequest, session: Session, owner: Owner):
+    with errors():
+        if body.auto_apply_media:
+            raise HTTPException(422,'Patch corrections cannot change update policy.')
+        return await releases.correct_note(session,product_id=product_id,snapshot_id=snapshot_id,owner_id=owner,summary=body.summary,body=body.body)
