@@ -32,7 +32,7 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
         ForeignKeyConstraint(['product_id','product_snapshot_id'], ['product_snapshots.product_id','product_snapshots.id']),
-        ForeignKeyConstraint(['product_snapshot_id','start_set_id'], ['product_snapshot_start_sets.product_snapshot_id','product_snapshot_start_sets.id']),
+        ForeignKeyConstraint(['initial_snapshot_id','start_set_id'], ['product_snapshot_start_sets.product_snapshot_id','product_snapshot_start_sets.id']),
         Index("ix_conversations_user_id_created_at", "user_id", "created_at"),
         Index("ix_conversations_product_id_created_at", "product_id", "created_at"),
     )
@@ -55,6 +55,7 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
     )
     product_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     start_set_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    initial_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey('product_snapshots.id'))
 
 
 class ConversationCharacter(UuidPkMixin, Base):
@@ -132,3 +133,16 @@ class Message(UuidPkMixin, Base):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class ConversationVersionChange(UuidPkMixin, Base):
+    __tablename__ = 'conversation_version_changes'
+    __table_args__ = (
+        UniqueConstraint('conversation_id','to_snapshot_id',name='uq_conversation_version_change'),
+        CheckConstraint("mode IN ('automatic','choice')",name='ck_conversation_version_change_mode'),
+    )
+    conversation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('conversations.id',ondelete='CASCADE'),nullable=False)
+    from_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshots.id'),nullable=False)
+    to_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshots.id'),nullable=False)
+    mode: Mapped[str] = mapped_column(Text,nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())

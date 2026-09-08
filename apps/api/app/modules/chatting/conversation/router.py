@@ -24,3 +24,15 @@ async def updates(conversation_id:UUID,session:Session,owner:Owner):
     from app.modules.content.product.service.notices import pending_updates
     with errors():
         return await pending_updates(session,conversation_id=conversation_id,user_id=owner)
+
+
+class SwitchRequest(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    target_snapshot_id: UUID
+
+
+@router.post('/{conversation_id}/version')
+async def switch(conversation_id:UUID,body:SwitchRequest,session:Session,owner:Owner):
+    from app.modules.chatting.conversation.versions import switch_version
+    with errors():
+        return await switch_version(session,conversation_id=conversation_id,user_id=owner,target_snapshot_id=body.target_snapshot_id)

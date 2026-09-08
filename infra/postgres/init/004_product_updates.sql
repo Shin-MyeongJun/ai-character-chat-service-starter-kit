@@ -160,5 +160,31 @@ ALTER TABLE messages DROP CONSTRAINT ck_messages_character_sender_has_character;
 ALTER TABLE messages ADD CONSTRAINT ck_messages_character_sender_has_character CHECK (product_snapshot_id IS NULL OR sender_type <> 'character' OR product_character_id IS NOT NULL);
 
 
+-- Running upgrade 0008 -> 0010
+
+ALTER TABLE conversations ADD COLUMN initial_snapshot_id UUID REFERENCES product_snapshots(id);
+
+UPDATE conversations SET initial_snapshot_id = product_snapshot_id WHERE product_snapshot_id IS NOT NULL;
+
+ALTER TABLE conversations DROP CONSTRAINT conversations_product_snapshot_id_start_set_id_fkey;
+
+ALTER TABLE conversations ADD FOREIGN KEY (initial_snapshot_id,start_set_id) REFERENCES product_snapshot_start_sets(product_snapshot_id,id);
+
+CREATE TABLE conversation_version_changes (
+    conversation_id UUID NOT NULL, 
+    from_snapshot_id UUID NOT NULL, 
+    to_snapshot_id UUID NOT NULL, 
+    mode TEXT NOT NULL, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT uq_conversation_version_change UNIQUE (conversation_id, to_snapshot_id), 
+    CONSTRAINT ck_conversation_version_change_mode CHECK (mode IN ('automatic','choice')), 
+    FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE, 
+    FOREIGN KEY(from_snapshot_id) REFERENCES product_snapshots (id), 
+    FOREIGN KEY(to_snapshot_id) REFERENCES product_snapshots (id)
+);
+
+
 COMMIT;
 

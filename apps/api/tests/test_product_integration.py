@@ -187,3 +187,32 @@ async def test_conversation_keeps_published_context(db):
         assert context['lorebooks'][0]['entries']==[]
         with pytest.raises(LookupError):
             await runtime_context(db,conversation_id=conversation['id'],user_id=uuid4())
+
+
+async def test_version_switch_requires_consent_and_rejects_stale_generation(db):
+    from app.modules.content.product.service.releases import publish, ReleaseRequest
+    from app.modules.chatting.conversation.service import start_conversation
+    from app.modules.chatting.conversation.versions import switch_version, append_generated_message
+    from app.db.models.chat import Conversation, ConversationVersionChange, Message
+    owner,c,b,p,model,entry=await ready_product(db)
+    first=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('First','First'))
+    conversation=await start_conversation(db,product_id=p.id,user_id=owner.id)
+    async with db.begin():
+        c.persona_prompt='Changed'
+    await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('Content','Content'))
+    latest=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('Media','Media',True))
+    with pytest.raises(ValueError,match='consent'):
+        await switch_version(db,conversation_id=conversation['id'],user_id=owner.id,target_snapshot_id=latest.snapshot_id,automatic=True)
+    # Rollback expires ORM objects; use immutable owner ID from the returned product seed.
+    async with db.begin():
+        product=await db.get(Product,p.id)
+        uid=product.owner_id
+    await switch_version(db,conversation_id=conversation['id'],user_id=uid,target_snapshot_id=latest.snapshot_id)
+    async with db.begin():
+        saved=await db.get(Conversation,conversation['id'])
+        assert saved.initial_snapshot_id==first.snapshot_id
+        assert saved.start_set_id==conversation['start_set_id']
+        assert len(list(await db.scalars(select(Message).where(Message.conversation_id==saved.id))))==1
+        assert len(list(await db.scalars(select(ConversationVersionChange))))==1
+    with pytest.raises(ValueError,match='during generation'):
+        await append_generated_message(db,conversation_id=conversation['id'],user_id=uid,expected_snapshot_id=first.snapshot_id,product_character_id=uuid4(),content='stale',model_id=None)

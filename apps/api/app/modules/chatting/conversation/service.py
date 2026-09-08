@@ -35,7 +35,7 @@ async def start_conversation(session, *, product_id, user_id, start_set_id=None)
         primary=next((c for c in characters if c.is_primary),None)
         if primary is None:
             raise ValueError('Version has no primary character.')
-        conversation=Conversation(id=uuid4(),user_id=user_id,product_id=product_id,product_snapshot_id=snapshot.id,start_set_id=start_set_id,is_group=len(characters)>1,title=snapshot.snapshot_data['title'])
+        conversation=Conversation(id=uuid4(),user_id=user_id,product_id=product_id,product_snapshot_id=snapshot.id,initial_snapshot_id=snapshot.id,start_set_id=start_set_id,is_group=len(characters)>1,title=snapshot.snapshot_data['title'])
         session.add(conversation)
         await session.flush()
         for c in characters:
