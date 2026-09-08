@@ -122,3 +122,30 @@ async def test_snapshot_media_survives_source_deletion(db):
         assert saved.snapshot_data['persona_prompt'] == 'P'
         assert await media_is_referenced(db,'immutable/image/v1')
         assert (await db.scalar(select(CharacterSnapshotImage).where(CharacterSnapshotImage.character_snapshot_id == sid))).is_default
+
+
+async def test_atomic_publication_and_original_edits(db):
+    from app.modules.content.product.service.publication import build_publication
+    from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter, ProductSnapshotStartSet
+    from app.db.models.snapshot.character import CharacterSnapshot
+    owner,c,b,p,model,entry = await ready_product(db)
+    async with db.begin():
+        first=await build_publication(db,product_id=p.id,owner_id=owner.id)
+        first_id=first.id
+    async with db.begin():
+        c.persona_prompt='New persona'
+    with pytest.raises(RuntimeError):
+        async with db.begin():
+            await build_publication(db,product_id=p.id,owner_id=owner.id)
+            raise RuntimeError('simulate publication failure')
+    async with db.begin():
+        db.expire_all()
+        product=await db.get(Product,p.id)
+        assert product.latest_snapshot_id == first_id
+        assert len(list(await db.scalars(select(ProductSnapshot).where(ProductSnapshot.product_id == p.id)))) == 1
+        link=await db.scalar(select(ProductSnapshotCharacter).where(ProductSnapshotCharacter.product_snapshot_id == first_id))
+        assert (await db.get(CharacterSnapshot,link.character_snapshot_id)).snapshot_data['persona_prompt'] == 'P'
+        second=await build_publication(db,product_id=p.id,owner_id=product.owner_id)
+        assert second.version == 2
+        assert second.snapshot_data['content_digest'] != (await db.get(ProductSnapshot,first_id)).snapshot_data['content_digest']
+        assert len(list(await db.scalars(select(ProductSnapshotStartSet).where(ProductSnapshotStartSet.product_snapshot_id == second.id)))) == 1

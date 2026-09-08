@@ -42,6 +42,7 @@ class ProductLorebookRole(StrEnum):
 class Product(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "products"
     __table_args__ = (
+        ForeignKeyConstraint(['id','latest_snapshot_id'], ['product_snapshots.product_id','product_snapshots.id'], name='fk_product_latest_snapshot', use_alter=True),
         CheckConstraint(
             "visibility IN ('private', 'public', 'unlisted')",
             name="ck_products_visibility",
@@ -77,6 +78,7 @@ class Product(TimestampMixin, UuidPkMixin, Base):
     )
     reasoning_effort: Mapped[str | None] = mapped_column(Text)
     replacement_policy: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    latest_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
 
 class ProductCharacter(UuidPkMixin, Base):

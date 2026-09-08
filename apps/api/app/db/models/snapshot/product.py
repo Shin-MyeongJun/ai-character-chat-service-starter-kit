@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Text,
@@ -21,6 +22,7 @@ from app.db.models.snapshot._mixins import SnapshotMixin
 class ProductSnapshot(SnapshotMixin, UuidPkMixin, Base):
     __tablename__ = "product_snapshots"
     __table_args__ = (
+        UniqueConstraint('product_id','id', name='uq_product_snapshot_identity'),
         UniqueConstraint("product_id", "version", name="uq_product_snapshots_version"),
         CheckConstraint("version > 0", name="ck_product_snapshots_version"),
         CheckConstraint(
@@ -41,6 +43,7 @@ class ProductSnapshot(SnapshotMixin, UuidPkMixin, Base):
 class ProductSnapshotCharacter(UuidPkMixin, Base):
     __tablename__ = "product_snapshot_characters"
     __table_args__ = (
+        UniqueConstraint('product_snapshot_id','id', name='uq_snapshot_character_identity'),
         UniqueConstraint(
             "product_snapshot_id",
             "character_snapshot_id",
@@ -77,6 +80,8 @@ class ProductSnapshotCharacter(UuidPkMixin, Base):
 class ProductSnapshotLorebook(UuidPkMixin, Base):
     __tablename__ = "product_snapshot_lorebooks"
     __table_args__ = (
+        UniqueConstraint('product_snapshot_id','id', name='uq_snapshot_lorebook_identity'),
+        CheckConstraint("scope IN ('all','selected')", name='ck_snapshot_lorebook_scope'),
         UniqueConstraint(
             "product_snapshot_id",
             "lorebook_snapshot_id",
@@ -106,3 +111,30 @@ class ProductSnapshotLorebook(UuidPkMixin, Base):
     is_required: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
+    scope: Mapped[str] = mapped_column(Text, nullable=False, server_default='all')
+
+
+class ProductSnapshotLorebookCharacter(Base):
+    __tablename__ = 'product_snapshot_lorebook_characters'
+    __table_args__ = (
+        ForeignKeyConstraint(['product_snapshot_id','product_character_id'], ['product_snapshot_characters.product_snapshot_id','product_snapshot_characters.id'], ondelete='CASCADE'),
+        ForeignKeyConstraint(['product_snapshot_id','product_lorebook_id'], ['product_snapshot_lorebooks.product_snapshot_id','product_snapshot_lorebooks.id'], ondelete='CASCADE'),
+    )
+    product_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    product_character_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    product_lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+
+
+class ProductSnapshotStartSet(UuidPkMixin, Base):
+    __tablename__ = 'product_snapshot_start_sets'
+    __table_args__ = (
+        UniqueConstraint('product_snapshot_id','id', name='uq_snapshot_start_identity'),
+        UniqueConstraint('product_snapshot_id','source_entry_id', name='uq_snapshot_start_entry'),
+        ForeignKeyConstraint(['product_snapshot_id','product_lorebook_id'], ['product_snapshot_lorebooks.product_snapshot_id','product_snapshot_lorebooks.id'], ondelete='CASCADE'),
+    )
+    product_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    product_lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    source_entry_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    title: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
