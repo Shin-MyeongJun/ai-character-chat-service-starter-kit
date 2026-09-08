@@ -139,5 +139,26 @@ CREATE TABLE product_release_note_revisions (
 );
 
 
+-- Running upgrade 0007 -> 0008
+
+ALTER TABLE conversations ADD COLUMN product_snapshot_id UUID, ADD COLUMN start_set_id UUID;
+
+ALTER TABLE conversations ADD FOREIGN KEY (product_id,product_snapshot_id) REFERENCES product_snapshots(product_id,id), ADD FOREIGN KEY (product_snapshot_id,start_set_id) REFERENCES product_snapshot_start_sets(product_snapshot_id,id);
+
+ALTER TABLE conversation_characters ADD COLUMN product_character_id UUID REFERENCES product_snapshot_characters(id), ALTER COLUMN character_id DROP NOT NULL;
+
+ALTER TABLE conversation_characters DROP CONSTRAINT conversation_characters_character_id_fkey;
+
+ALTER TABLE conversation_characters ADD FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE SET NULL, ADD CONSTRAINT uq_conversation_snapshot_character UNIQUE (conversation_id,product_character_id);
+
+ALTER TABLE messages ADD COLUMN product_snapshot_id UUID REFERENCES product_snapshots(id), ADD COLUMN product_character_id UUID;
+
+ALTER TABLE messages ADD FOREIGN KEY (product_snapshot_id,product_character_id) REFERENCES product_snapshot_characters(product_snapshot_id,id);
+
+ALTER TABLE messages DROP CONSTRAINT ck_messages_character_sender_has_character;
+
+ALTER TABLE messages ADD CONSTRAINT ck_messages_character_sender_has_character CHECK (product_snapshot_id IS NULL OR sender_type <> 'character' OR product_character_id IS NOT NULL);
+
+
 COMMIT;
 

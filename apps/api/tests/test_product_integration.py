@@ -167,3 +167,23 @@ async def test_release_policy_and_typo_correction(db):
     assert corrected.update_policy == 'choice'
     async with db.begin():
         assert len(list(await db.scalars(select(ProductReleaseNoteRevision)))) == 1
+
+
+async def test_conversation_keeps_published_context(db):
+    from app.modules.content.product.service.releases import publish, ReleaseRequest
+    from app.modules.chatting.conversation.service import start_conversation, runtime_context
+    owner,c,b,p,model,entry=await ready_product(db)
+    first=await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('First','First'))
+    conversation=await start_conversation(db,product_id=p.id,user_id=owner.id)
+    async with db.begin():
+        c.persona_prompt='new content'
+        entry.content='new starting point'
+    await publish(db,product_id=p.id,owner_id=owner.id,value=ReleaseRequest('Update','Update'))
+    async with db.begin():
+        context=await runtime_context(db,conversation_id=conversation['id'],user_id=owner.id)
+        assert context['product_snapshot_id']==str(first.snapshot_id)
+        assert context['characters'][0]['data']['persona_prompt']=='P'
+        assert context['start']['content']=='Begin at home'
+        assert context['lorebooks'][0]['entries']==[]
+        with pytest.raises(LookupError):
+            await runtime_context(db,conversation_id=conversation['id'],user_id=uuid4())

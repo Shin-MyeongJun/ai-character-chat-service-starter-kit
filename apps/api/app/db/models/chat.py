@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Text,
@@ -30,6 +31,8 @@ class SenderType(StrEnum):
 class Conversation(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
+        ForeignKeyConstraint(['product_id','product_snapshot_id'], ['product_snapshots.product_id','product_snapshots.id']),
+        ForeignKeyConstraint(['product_snapshot_id','start_set_id'], ['product_snapshot_start_sets.product_snapshot_id','product_snapshot_start_sets.id']),
         Index("ix_conversations_user_id_created_at", "user_id", "created_at"),
         Index("ix_conversations_product_id_created_at", "product_id", "created_at"),
     )
@@ -50,11 +53,14 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
         PGUUID(as_uuid=True),
         ForeignKey("models.id", ondelete="SET NULL"),
     )
+    product_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    start_set_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
 
 class ConversationCharacter(UuidPkMixin, Base):
     __tablename__ = "conversation_characters"
     __table_args__ = (
+        UniqueConstraint('conversation_id','product_character_id',name='uq_conversation_snapshot_character'),
         UniqueConstraint(
             "conversation_id",
             "character_id",
@@ -68,11 +74,11 @@ class ConversationCharacter(UuidPkMixin, Base):
         ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
-    character_id: Mapped[UUID] = mapped_column(
+    character_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("characters.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("characters.id", ondelete="SET NULL"),
     )
+    product_character_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshot_characters.id'))
     role_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -84,12 +90,13 @@ class ConversationCharacter(UuidPkMixin, Base):
 class Message(UuidPkMixin, Base):
     __tablename__ = "messages"
     __table_args__ = (
+        ForeignKeyConstraint(['product_snapshot_id','product_character_id'], ['product_snapshot_characters.product_snapshot_id','product_snapshot_characters.id']),
         CheckConstraint(
             "sender_type IN ('user', 'character', 'system')",
             name="ck_messages_sender_type",
         ),
         CheckConstraint(
-            "(sender_type <> 'character') OR (character_id IS NOT NULL)",
+            "product_snapshot_id IS NULL OR sender_type <> 'character' OR product_character_id IS NOT NULL",
             name="ck_messages_character_sender_has_character",
         ),
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
@@ -107,6 +114,8 @@ class Message(UuidPkMixin, Base):
         ForeignKey("characters.id", ondelete="SET NULL"),
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    product_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshots.id'))
+    product_character_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     emotion_tag: Mapped[str | None] = mapped_column(Text)
     token_count: Mapped[int | None] = mapped_column(Integer)
     model_id: Mapped[UUID | None] = mapped_column(
