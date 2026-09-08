@@ -1,7 +1,9 @@
 from uuid import UUID
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    DateTime,
     CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
@@ -38,6 +40,18 @@ class ProductSnapshot(SnapshotMixin, UuidPkMixin, Base):
         PGUUID(as_uuid=True),
         ForeignKey("products.id", ondelete="SET NULL"),
     )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expiry_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class ProductSnapshotPolicyChange(UuidPkMixin, Base):
+    __tablename__='product_snapshot_policy_changes'
+    product_snapshot_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True),ForeignKey('product_snapshots.id'),nullable=False)
+    actor_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),ForeignKey('users.id',ondelete='SET NULL'))
+    old_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    new_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str] = mapped_column(Text,nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=False,server_default=text('now()'))
 
 
 class ProductSnapshotCharacter(UuidPkMixin, Base):

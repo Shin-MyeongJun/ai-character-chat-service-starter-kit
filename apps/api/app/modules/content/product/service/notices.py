@@ -23,5 +23,5 @@ async def pending_updates(session, *, conversation_id, user_id):
     current=await session.get(ProductSnapshot,conversation.product_snapshot_id)
     product=await session.get(Product,conversation.product_id)
     rows=await session.execute(select(ProductSnapshot,ProductReleaseNote).join(ProductReleaseNote,ProductReleaseNote.product_snapshot_id==ProductSnapshot.id).where(ProductSnapshot.product_id==conversation.product_id,ProductSnapshot.version>current.version).order_by(ProductSnapshot.version))
-    updates=[{'snapshot_id':s.id,'version':s.version,'summary':n.summary,'body':n.body,'change_kind':n.change_kind,'update_policy':n.update_policy} for s,n in rows]
-    return {'current_snapshot_id':current.id,'latest_snapshot_id':product.latest_snapshot_id,'updates':updates}
+    updates=[{'snapshot_id':s.id,'version':s.version,'summary':n.summary,'body':n.body,'change_kind':n.change_kind,'update_policy':n.update_policy,'expires_at':s.expires_at} for s,n in rows]
+    return {'current_snapshot_id':current.id,'current_expires_at':current.expires_at,'expiry_reason':current.expiry_reason,'latest_snapshot_id':product.latest_snapshot_id,'updates':updates}

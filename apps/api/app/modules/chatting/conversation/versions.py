@@ -1,4 +1,5 @@
 from sqlalchemy import delete, select
+from app.modules.governance.admin.product_policy import ensure_available
 from app.db.models.chat import ConversationCharacter, ConversationVersionChange, Message
 from app.db.models.product_release import ProductReleaseNote
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter
@@ -17,6 +18,7 @@ async def switch_version(session, *, conversation_id, user_id, target_snapshot_i
         target=await session.scalar(select(ProductSnapshot).where(ProductSnapshot.id==target_snapshot_id,ProductSnapshot.product_id==conversation.product_id))
         if target is None:
             raise LookupError('Version not found.')
+        await ensure_available(session,target.id)
         if target.version<=current.version:
             raise ValueError('Only forward version transitions are supported.')
         # Every intermediate release must permit automatic application.
@@ -49,6 +51,7 @@ async def append_generated_message(session, *, conversation_id, user_id, expecte
         conversation=await owned_conversation(session,conversation_id,user_id,lock=True)
         if conversation.product_snapshot_id!=expected_snapshot_id:
             raise ValueError('Version changed during generation; discard stale completion.')
+        await ensure_available(session,expected_snapshot_id)
         character=await session.scalar(select(ProductSnapshotCharacter).where(ProductSnapshotCharacter.id==product_character_id,ProductSnapshotCharacter.product_snapshot_id==expected_snapshot_id))
         if character is None:
             raise ValueError('Character is not part of the execution version.')

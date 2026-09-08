@@ -1,5 +1,6 @@
 """Conversation commands own transactions. Runtime context is internal, not an HTTP DTO."""
 from uuid import uuid4
+from app.modules.governance.admin.product_policy import ensure_available
 from sqlalchemy import select
 from app.db.models.chat import Conversation, ConversationCharacter, Message
 from app.db.models.product import Product
@@ -25,7 +26,7 @@ async def start_conversation(session, *, product_id, user_id, start_set_id=None)
             raise LookupError('Product not found.')
         if not product.latest_snapshot_id:
             raise ValueError('Product has no published version.')
-        snapshot=await session.get(ProductSnapshot,product.latest_snapshot_id)
+        snapshot=await ensure_available(session,product.latest_snapshot_id)
         starts=list(await session.scalars(select(ProductSnapshotStartSet).where(ProductSnapshotStartSet.product_snapshot_id==snapshot.id).order_by(ProductSnapshotStartSet.sort_order)))
         if start_set_id is None and len(starts)==1:
             start_set_id=starts[0].id
@@ -51,7 +52,7 @@ async def runtime_context(session, *, conversation_id, user_id):
     conversation=await owned_conversation(session,conversation_id,user_id)
     if conversation.product_snapshot_id is None:
         raise ValueError('Legacy conversation requires verified version mapping.')
-    snapshot=await session.get(ProductSnapshot,conversation.product_snapshot_id)
+    snapshot=await ensure_available(session,conversation.product_snapshot_id)
     start=await session.get(ProductSnapshotStartSet,conversation.start_set_id)
     chars=list(await session.scalars(select(ProductSnapshotCharacter).where(ProductSnapshotCharacter.product_snapshot_id==snapshot.id).order_by(ProductSnapshotCharacter.role_order)))
     books=list(await session.scalars(select(ProductSnapshotLorebook).where(ProductSnapshotLorebook.product_snapshot_id==snapshot.id).order_by(ProductSnapshotLorebook.priority.desc())))

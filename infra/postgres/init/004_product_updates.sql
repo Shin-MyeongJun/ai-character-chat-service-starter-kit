@@ -186,5 +186,23 @@ CREATE TABLE conversation_version_changes (
 );
 
 
+-- Running upgrade 0010 -> 0011
+
+ALTER TABLE product_snapshots ADD COLUMN expires_at TIMESTAMPTZ, ADD COLUMN expiry_reason TEXT;
+
+CREATE TABLE product_snapshot_policy_changes (
+    product_snapshot_id UUID NOT NULL, 
+    actor_id UUID, 
+    old_expires_at TIMESTAMP WITH TIME ZONE, 
+    new_expires_at TIMESTAMP WITH TIME ZONE, 
+    reason TEXT NOT NULL, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    FOREIGN KEY(product_snapshot_id) REFERENCES product_snapshots (id), 
+    FOREIGN KEY(actor_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+
 COMMIT;
 
