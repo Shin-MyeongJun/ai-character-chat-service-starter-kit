@@ -37,17 +37,32 @@ async def replace_composition(session, *, product_id, owner_id, value: types.Com
             found = list(await session.scalars(select(entity.id).where(entity.id.in_(ids), entity.owner_id == owner_id).order_by(entity.id).with_for_update()))
             if len(found) != len(ids):
                 raise LookupError("Owned component not found.")
-        await session.execute(delete(ProductLorebook).where(ProductLorebook.product_id == product_id))
-        await session.execute(delete(ProductCharacter).where(ProductCharacter.product_id == product_id))
+        existing_chars = {c.character_id: c for c in await session.scalars(select(ProductCharacter).where(ProductCharacter.product_id == product_id))}
+        existing_books = {b.lorebook_id: b for b in await session.scalars(select(ProductLorebook).where(ProductLorebook.product_id == product_id))}
+        await session.execute(delete(ProductLorebookCharacter).where(ProductLorebookCharacter.product_id == product_id))
+        for cid, row in existing_chars.items():
+            row.is_primary = False
+            if cid not in {c.character_id for c in value.characters}:
+                await session.delete(row)
+        for bid, row in existing_books.items():
+            if bid not in {b.lorebook_id for b in value.lorebooks}:
+                await session.delete(row)
+        await session.flush()
         character_map = {}
         for order, c in enumerate(value.characters):
-            row = ProductCharacter(id=uuid4(), product_id=product_id, character_id=c.character_id, is_primary=c.is_primary, role_order=order, role_name=c.role_name)
-            session.add(row)
+            row = existing_chars.get(c.character_id)
+            if row is None:
+                row = ProductCharacter(id=uuid4(), product_id=product_id, character_id=c.character_id)
+                session.add(row)
+            row.is_primary, row.role_order, row.role_name = c.is_primary, order, c.role_name
             character_map[c.character_id] = row.id
         books = []
         for b in value.lorebooks:
-            row = ProductLorebook(id=uuid4(), product_id=product_id, lorebook_id=b.lorebook_id, scope=b.scope, role=b.role, priority=b.priority, is_required=b.is_required)
-            session.add(row)
+            row = existing_books.get(b.lorebook_id)
+            if row is None:
+                row = ProductLorebook(id=uuid4(), product_id=product_id, lorebook_id=b.lorebook_id)
+                session.add(row)
+            row.scope, row.role, row.priority, row.is_required = b.scope, b.role, b.priority, b.is_required
             books.append((row, b))
         await session.flush()
         for row, b in books:

@@ -68,3 +68,36 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
     assert len(entries) == 1
     assert entries[0].content == 'World'
     assert len(await lore_repo.list_start_sets(db, b.id)) == 1
+
+
+async def ready_product(db):
+    from app.db.models.model_routing import Model, Provider
+    from app.modules.content.product.service.settings import Settings, set_settings
+    owner,c,b = await seed(db)
+    async with db.begin():
+        provider = Provider(id=uuid4(), name=str(uuid4()))
+        db.add(provider)
+        await db.flush()
+        model = Model(id=uuid4(), provider_id=provider.id, model_name='model-v1', display_name='test', context_window=32000, input_price=1, output_price=1, capabilities={'reasoning_efforts':['low','high'], 'model_family':'test'})
+        entry = LorebookEntry(id=uuid4(), lorebook_id=b.id, title='Home', content='Begin at home', entry_type='start_set')
+        db.add_all([model,entry])
+    p = await command.create_product(db, owner_id=owner.id, value=ProductWrite('P', opening_message='Hello'))
+    value = Composition((CharacterSelection(c.id,True),),(LorebookSelection(b.id),))
+    await composition.replace_composition(db, product_id=p.id, owner_id=owner.id, value=value)
+    await set_settings(db, product_id=p.id, owner_id=owner.id, value=Settings(model.id,'low',(entry.id,)))
+    return owner,c,b,p,model,entry
+
+
+async def test_settings_and_composition_preserve_start_selection(db):
+    from app.db.models.product import ProductStartSet
+    from app.modules.content.product.service.settings import Settings, set_settings, validate_publication
+    owner,c,b,p,model,entry = await ready_product(db)
+    await composition.replace_composition(db, product_id=p.id, owner_id=owner.id, value=Composition((CharacterSelection(c.id,True),),(LorebookSelection(b.id),)))
+    async with db.begin():
+        row = await db.get(Product,p.id)
+        await validate_publication(db,row)
+        assert len(list(await db.scalars(select(ProductStartSet).where(ProductStartSet.product_id == p.id)))) == 1
+    with pytest.raises(ValueError, match='reasoning'):
+        await set_settings(db,product_id=p.id,owner_id=owner.id,value=Settings(model.id,'max',(entry.id,)))
+    with pytest.raises(ValueError, match='start_set'):
+        await set_settings(db,product_id=p.id,owner_id=owner.id,value=Settings(model.id,'low',(uuid4(),)))

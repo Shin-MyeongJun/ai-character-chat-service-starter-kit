@@ -2,7 +2,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -94,6 +94,7 @@ class Lorebook(TimestampMixin, UuidPkMixin, Base):
 class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "lorebook_entries"
     __table_args__ = (
+        UniqueConstraint("lorebook_id", "id", name="uq_lorebook_entries_identity"),
         CheckConstraint(
             (
                 "entry_type IN ("

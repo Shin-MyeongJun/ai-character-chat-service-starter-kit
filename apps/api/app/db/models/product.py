@@ -13,6 +13,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -74,6 +75,8 @@ class Product(TimestampMixin, UuidPkMixin, Base):
         PGUUID(as_uuid=True),
         ForeignKey("models.id", ondelete="SET NULL"),
     )
+    reasoning_effort: Mapped[str | None] = mapped_column(Text)
+    replacement_policy: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
 
 class ProductCharacter(UuidPkMixin, Base):
@@ -147,3 +150,16 @@ class ProductLorebookCharacter(Base):
     product_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     product_character_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
     product_lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+
+
+class ProductStartSet(UuidPkMixin, Base):
+    __tablename__ = "product_start_sets"
+    __table_args__ = (
+        ForeignKeyConstraint(["product_id", "lorebook_id"], ["product_lorebooks.product_id", "product_lorebooks.lorebook_id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["lorebook_id", "entry_id"], ["lorebook_entries.lorebook_id", "lorebook_entries.id"], ondelete="CASCADE"),
+        UniqueConstraint("product_id", "entry_id", name="uq_product_start_sets_entry"),
+    )
+    product_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    entry_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)

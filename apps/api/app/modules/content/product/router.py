@@ -12,6 +12,7 @@ from app.modules.content.product.service import command, query
 from app.modules.content.product.types import ProductInfo
 from app.modules.content.product.types import Composition
 from app.modules.content.product.service import composition
+from app.modules.content.product.service import settings
 
 router = APIRouter(prefix="/products", tags=["products"])
 Session = Annotated[AsyncSession, Depends(get_product_session)]
@@ -67,3 +68,9 @@ async def put_composition(product_id: UUID, body: Composition, session: Session,
 async def read_composition(product_id: UUID, session: Session, owner: Owner):
     with errors():
         return await composition.get_composition(session, product_id=product_id, owner_id=owner)
+
+
+@router.put("/{product_id}/settings", response_model=settings.Settings)
+async def put_settings(product_id: UUID, body: settings.Settings, session: Session, owner: Owner):
+    with errors():
+        return await settings.set_settings(session, product_id=product_id, owner_id=owner, value=body)
