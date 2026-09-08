@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+import anthropic
+
 from app.modules.llm.adapters.base import BaseLLMAdapter
 from app.modules.llm.types import (
+    LLMErrorKind,
     LLMProvider,
     LLMResult,
     ReasoningEffort,
@@ -51,13 +54,7 @@ class AnthropicAdapter(BaseLLMAdapter):
             default_max_output_tokens=default_max_output_tokens,
         )
         if client is None:
-            try:
-                from anthropic import AsyncAnthropic
-            except ImportError as exc:
-                raise RuntimeError(
-                    "AnthropicAdapter requires the 'anthropic' package."
-                ) from exc
-            client = AsyncAnthropic(
+            client = anthropic.AsyncAnthropic(
                 api_key=api_key,
                 timeout=timeout,
                 max_retries=max_retries,
@@ -81,6 +78,22 @@ class AnthropicAdapter(BaseLLMAdapter):
             params["output_config"] = {"effort": reasoning_effort.value}
         try:
             response = await self._client.messages.create(**params)
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.AUTHENTICATION, retryable=False
+            ) from exc
+        except anthropic.RateLimitError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.RATE_LIMIT, retryable=True
+            ) from exc
+        except anthropic.APITimeoutError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.TIMEOUT, retryable=True
+            ) from exc
+        except anthropic.APIConnectionError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.CONNECTION, retryable=True
+            ) from exc
         except Exception as exc:
             raise self._map_error(exc, model) from exc
 

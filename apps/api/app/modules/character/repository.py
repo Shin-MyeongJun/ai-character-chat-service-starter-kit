@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import Select, and_, or_, select, update
+from sqlalchemy import Select, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.character import (
@@ -9,48 +9,11 @@ from app.db.models.character import (
     CharacterImage,
     CharacterVisibility,
 )
+from app.db.pagination import fetch_cursor_page
 from app.modules.character.types import CharacterCursor, CharacterPage
 
 DEFAULT_CHARACTER_LIST_LIMIT = 50
 MAX_CHARACTER_LIST_LIMIT = 100
-
-
-def _normalize_character_list_limit(limit: int) -> int:
-    return min(max(limit, 1), MAX_CHARACTER_LIST_LIMIT)
-
-
-def _apply_character_cursor(
-    stmt: Select[tuple[Character]],
-    cursor: CharacterCursor | None,
-) -> Select[tuple[Character]]:
-    if cursor is None:
-        return stmt
-
-    return stmt.where(
-        or_(
-            Character.created_at < cursor.created_at,
-            and_(
-                Character.created_at == cursor.created_at,
-                Character.id < cursor.id,
-            ),
-        )
-    )
-
-
-def _build_character_page(
-    characters: list[Character],
-    limit: int,
-) -> CharacterPage[Character]:
-    items = characters[:limit]
-    next_cursor = None
-    if len(characters) > limit and items:
-        last_character = items[-1]
-        next_cursor = CharacterCursor(
-            created_at=last_character.created_at,
-            id=last_character.id,
-        )
-
-    return CharacterPage(items=items, next_cursor=next_cursor)
 
 
 async def _fetch_character_page(
@@ -60,15 +23,16 @@ async def _fetch_character_page(
     cursor: CharacterCursor | None,
     limit: int,
 ) -> CharacterPage[Character]:
-    normalized_limit = _normalize_character_list_limit(limit)
-    stmt = (
-        _apply_character_cursor(stmt, cursor)
-        .order_by(Character.created_at.desc(), Character.id.desc())
-        .limit(normalized_limit + 1)
+    return await fetch_cursor_page(
+        session, stmt,
+        created_at=Character.created_at,
+        id_column=Character.id,
+        cursor=cursor,
+        limit=limit,
+        max_limit=MAX_CHARACTER_LIST_LIMIT,
+        cursor_factory=CharacterCursor,
+        page_factory=CharacterPage,
     )
-
-    result = await session.scalars(stmt)
-    return _build_character_page(list(result.all()), normalized_limit)
 
 
 # Character

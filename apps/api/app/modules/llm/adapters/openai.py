@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+import openai
+
 from app.modules.llm.adapters.base import BaseLLMAdapter
 from app.modules.llm.types import (
+    LLMErrorKind,
     LLMProvider,
     LLMResult,
     ReasoningEffort,
@@ -52,13 +55,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             default_max_output_tokens=default_max_output_tokens,
         )
         if client is None:
-            try:
-                from openai import AsyncOpenAI
-            except ImportError as exc:
-                raise RuntimeError(
-                    "OpenAIAdapter requires the 'openai' package."
-                ) from exc
-            client = AsyncOpenAI(
+            client = openai.AsyncOpenAI(
                 api_key=api_key,
                 timeout=timeout,
                 max_retries=max_retries,
@@ -83,6 +80,22 @@ class OpenAIAdapter(BaseLLMAdapter):
             params["reasoning"] = {"effort": reasoning_effort.value}
         try:
             response = await self._client.responses.create(**params)
+        except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.AUTHENTICATION, retryable=False
+            ) from exc
+        except openai.RateLimitError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.RATE_LIMIT, retryable=True
+            ) from exc
+        except openai.APITimeoutError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.TIMEOUT, retryable=True
+            ) from exc
+        except openai.APIConnectionError as exc:
+            raise self._map_error(
+                exc, model, kind=LLMErrorKind.CONNECTION, retryable=True
+            ) from exc
         except Exception as exc:
             raise self._map_error(exc, model) from exc
 

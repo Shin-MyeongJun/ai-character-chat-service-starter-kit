@@ -1,10 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import anthropic
+import httpx
+import openai
 import pytest
 from anthropic.types import Message
-from openai.types.responses import Response
-
 from app.modules.llm import (
     LLMError,
     LLMErrorKind,
@@ -15,6 +16,7 @@ from app.modules.llm import (
     UnsupportedReasoningEffortError,
 )
 from app.modules.llm.adapters import AnthropicAdapter, OpenAIAdapter
+from openai.types.responses import Response
 
 pytestmark = pytest.mark.asyncio
 
@@ -282,3 +284,75 @@ async def test_current_sdk_response_models_match_adapter_extraction():
     assert openai_result.usage.cached_input_tokens == 3
     assert anthropic_result.content == "anthropic"
     assert anthropic_result.usage.total_tokens == 12
+
+
+@pytest.mark.parametrize(
+    "sdk,adapter_class,client_factory,model,provider",
+    [
+        (openai, OpenAIAdapter, openai_client, "gpt-test", LLMProvider.OPENAI),
+        (anthropic, AnthropicAdapter, anthropic_client, "claude-test", LLMProvider.ANTHROPIC),
+    ],
+)
+@pytest.mark.parametrize(
+    "error_name,status,kind,retryable",
+    [
+        ("AuthenticationError", 401, LLMErrorKind.AUTHENTICATION, False),
+        ("PermissionDeniedError", 403, LLMErrorKind.AUTHENTICATION, False),
+        ("RateLimitError", 429, LLMErrorKind.RATE_LIMIT, True),
+        ("APITimeoutError", None, LLMErrorKind.TIMEOUT, True),
+        ("APIConnectionError", None, LLMErrorKind.CONNECTION, True),
+        ("BadRequestError", 400, LLMErrorKind.INVALID_REQUEST, False),
+        ("NotFoundError", 404, LLMErrorKind.INVALID_REQUEST, False),
+        ("UnprocessableEntityError", 422, LLMErrorKind.INVALID_REQUEST, False),
+        ("InternalServerError", 500, LLMErrorKind.PROVIDER, True),
+    ],
+)
+async def test_real_sdk_errors_and_subclasses(
+    sdk, adapter_class, client_factory, model, provider,
+    error_name, status, kind, retryable,
+):
+    # A differently named subclass must retain the SDK parent's classification.
+    class CustomSDKError(getattr(sdk, error_name)):
+        pass
+
+    request = httpx.Request("POST", "https://example.test")
+    if status is None:
+        error = CustomSDKError(request=request)
+    else:
+        response = httpx.Response(
+            status, request=request, headers={"x-request-id": "req_sdk", "request-id": "req_sdk"}
+        )
+        error = CustomSDKError("provider failure", response=response, body=None)
+    client = client_factory(None)
+    create = client.responses.create if sdk is openai else client.messages.create
+    create.side_effect = error
+
+    with pytest.raises(LLMError) as caught:
+        await adapter_class(client=client).generate("{}", model=model)
+
+    assert caught.value.kind is kind
+    assert caught.value.retryable is retryable
+    assert caught.value.provider is provider
+    assert caught.value.model == model
+    assert caught.value.status_code == status
+    assert caught.value.request_id == ("req_sdk" if status is not None else None)
+    assert caught.value.__cause__ is error
+    create.assert_awaited_once()
+
+
+@pytest.mark.parametrize("adapter_class,client_factory,model", [
+    (OpenAIAdapter, openai_client, "gpt-test"),
+    (AnthropicAdapter, anthropic_client, "claude-test"),
+])
+async def test_unrelated_error_name_does_not_impersonate_sdk(
+    adapter_class, client_factory, model,
+):
+    class APITimeoutError(Exception):
+        pass
+
+    client = client_factory(None)
+    create = getattr(client, "responses", getattr(client, "messages", None)).create
+    create.side_effect = APITimeoutError("unrelated failure")
+    with pytest.raises(LLMError) as caught:
+        await adapter_class(client=client).generate("{}", model=model)
+    assert caught.value.kind is LLMErrorKind.PROVIDER

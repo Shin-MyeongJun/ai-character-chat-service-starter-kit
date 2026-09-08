@@ -5,11 +5,12 @@ from math import isfinite
 from typing import get_args
 from uuid import UUID
 
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat import Conversation
 from app.db.models.memory import ConversationMemory
+from app.db.pagination import fetch_cursor_page
 from app.modules.memory import types
 
 DEFAULT_MEMORY_LIST_LIMIT = 50
@@ -108,31 +109,19 @@ async def list_memories(
 ) -> types.MemoryPage[ConversationMemory]:
     """Newest first; None selects all types and an empty sequence selects none."""
     validate_memory_types(memory_types)
-    limit = min(max(limit, 1), MAX_MEMORY_LIST_LIMIT)
     stmt = _scoped_select(conversation_id, owner_id)
     if memory_types is not None:
         stmt = stmt.where(ConversationMemory.memory_type.in_(memory_types))
-    if cursor is not None:
-        stmt = stmt.where(
-            or_(
-                ConversationMemory.created_at < cursor.created_at,
-                and_(
-                    ConversationMemory.created_at == cursor.created_at,
-                    ConversationMemory.id < cursor.id,
-                ),
-            )
-        )
-    stmt = stmt.order_by(
-        ConversationMemory.created_at.desc(),
-        ConversationMemory.id.desc(),
-    ).limit(limit + 1)
-    rows = list((await session.scalars(stmt)).all())
-    items = rows[:limit]
-    next_cursor = None
-    if len(rows) > limit:
-        last = items[-1]
-        next_cursor = types.MemoryCursor(created_at=last.created_at, id=last.id)
-    return types.MemoryPage(items=items, next_cursor=next_cursor)
+    return await fetch_cursor_page(
+        session, stmt,
+        created_at=ConversationMemory.created_at,
+        id_column=ConversationMemory.id,
+        cursor=cursor,
+        limit=limit,
+        max_limit=MAX_MEMORY_LIST_LIMIT,
+        cursor_factory=types.MemoryCursor,
+        page_factory=types.MemoryPage,
+    )
 
 
 async def get_latest_summary(

@@ -124,26 +124,27 @@ class BaseLLMAdapter(ABC):
     async def aclose(self) -> None:
         return None
 
-    def _map_error(self, exc: Exception, model: str) -> LLMError:
-        name = type(exc).__name__
+    def _map_error(
+        self,
+        exc: Exception,
+        model: str,
+        *,
+        kind: LLMErrorKind | None = None,
+        retryable: bool = False,
+    ) -> LLMError:
+        """Build the shared error envelope; adapters classify SDK exceptions."""
         status_code = getattr(exc, "status_code", None)
         request_id = getattr(exc, "request_id", None)
-        if name in {"AuthenticationError", "PermissionDeniedError"} or status_code in {
-            401,
-            403,
-        }:
-            kind, retryable = LLMErrorKind.AUTHENTICATION, False
-        elif name == "RateLimitError" or status_code == 429:
-            kind, retryable = LLMErrorKind.RATE_LIMIT, True
-        elif name == "APITimeoutError":
-            kind, retryable = LLMErrorKind.TIMEOUT, True
-        elif name == "APIConnectionError":
-            kind, retryable = LLMErrorKind.CONNECTION, True
-        elif status_code is not None and 400 <= status_code < 500:
-            kind, retryable = LLMErrorKind.INVALID_REQUEST, False
-        else:
-            kind = LLMErrorKind.PROVIDER
-            retryable = status_code is None or status_code >= 500
+        if kind is None:
+            if status_code in {401, 403}:
+                kind, retryable = LLMErrorKind.AUTHENTICATION, False
+            elif status_code == 429:
+                kind, retryable = LLMErrorKind.RATE_LIMIT, True
+            elif status_code is not None and 400 <= status_code < 500:
+                kind, retryable = LLMErrorKind.INVALID_REQUEST, False
+            else:
+                kind = LLMErrorKind.PROVIDER
+                retryable = status_code is None or status_code >= 500
         return LLMError(
             str(exc),
             kind=kind,

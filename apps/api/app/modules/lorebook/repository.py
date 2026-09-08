@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.lorebook import Lorebook, LorebookEntry
+from app.db.pagination import fetch_cursor_page
 from app.modules.lorebook.types import (
     LorebookCursor,
     LorebookEntryPage,
@@ -15,68 +16,6 @@ DEFAULT_LOREBOOK_LIST_LIMIT = 50
 MAX_LOREBOOK_LIST_LIMIT = 100
 
 
-def _normalize_list_limit(limit: int) -> int:
-    return min(max(limit, 1), MAX_LOREBOOK_LIST_LIMIT)
-
-
-def _apply_lorebook_cursor(
-    stmt: Select[tuple[Lorebook]],
-    cursor: LorebookCursor | None,
-) -> Select[tuple[Lorebook]]:
-    if cursor is None:
-        return stmt
-    return stmt.where(
-        or_(
-            Lorebook.created_at < cursor.created_at,
-            and_(
-                Lorebook.created_at == cursor.created_at,
-                Lorebook.id < cursor.id,
-            ),
-        )
-    )
-
-
-def _apply_entry_cursor(
-    stmt: Select[tuple[LorebookEntry]],
-    cursor: LorebookCursor | None,
-) -> Select[tuple[LorebookEntry]]:
-    if cursor is None:
-        return stmt
-    return stmt.where(
-        or_(
-            LorebookEntry.created_at < cursor.created_at,
-            and_(
-                LorebookEntry.created_at == cursor.created_at,
-                LorebookEntry.id < cursor.id,
-            ),
-        )
-    )
-
-
-def _build_lorebook_page(
-    items: list[Lorebook],
-    limit: int,
-) -> LorebookPage[Lorebook]:
-    page_items = items[:limit]
-    next_cursor = None
-    if len(items) > limit and page_items:
-        last = page_items[-1]
-        next_cursor = LorebookCursor(created_at=last.created_at, id=last.id)
-    return LorebookPage(items=page_items, next_cursor=next_cursor)
-
-
-def _build_entry_page(
-    items: list[LorebookEntry],
-    limit: int,
-) -> LorebookEntryPage[LorebookEntry]:
-    page_items = items[:limit]
-    next_cursor = None
-    if len(items) > limit and page_items:
-        last = page_items[-1]
-        next_cursor = LorebookCursor(created_at=last.created_at, id=last.id)
-    return LorebookEntryPage(items=page_items, next_cursor=next_cursor)
-
-
 async def _fetch_lorebook_page(
     session: AsyncSession,
     stmt: Select[tuple[Lorebook]],
@@ -84,14 +23,16 @@ async def _fetch_lorebook_page(
     cursor: LorebookCursor | None,
     limit: int,
 ) -> LorebookPage[Lorebook]:
-    normalized_limit = _normalize_list_limit(limit)
-    stmt = (
-        _apply_lorebook_cursor(stmt, cursor)
-        .order_by(Lorebook.created_at.desc(), Lorebook.id.desc())
-        .limit(normalized_limit + 1)
+    return await fetch_cursor_page(
+        session, stmt,
+        created_at=Lorebook.created_at,
+        id_column=Lorebook.id,
+        cursor=cursor,
+        limit=limit,
+        max_limit=MAX_LOREBOOK_LIST_LIMIT,
+        cursor_factory=LorebookCursor,
+        page_factory=LorebookPage,
     )
-    result = await session.scalars(stmt)
-    return _build_lorebook_page(list(result.all()), normalized_limit)
 
 
 async def _fetch_entry_page(
@@ -101,14 +42,16 @@ async def _fetch_entry_page(
     cursor: LorebookCursor | None,
     limit: int,
 ) -> LorebookEntryPage[LorebookEntry]:
-    normalized_limit = _normalize_list_limit(limit)
-    stmt = (
-        _apply_entry_cursor(stmt, cursor)
-        .order_by(LorebookEntry.created_at.desc(), LorebookEntry.id.desc())
-        .limit(normalized_limit + 1)
+    return await fetch_cursor_page(
+        session, stmt,
+        created_at=LorebookEntry.created_at,
+        id_column=LorebookEntry.id,
+        cursor=cursor,
+        limit=limit,
+        max_limit=MAX_LOREBOOK_LIST_LIMIT,
+        cursor_factory=LorebookCursor,
+        page_factory=LorebookEntryPage,
     )
-    result = await session.scalars(stmt)
-    return _build_entry_page(list(result.all()), normalized_limit)
 
 
 async def create_lorebook(
