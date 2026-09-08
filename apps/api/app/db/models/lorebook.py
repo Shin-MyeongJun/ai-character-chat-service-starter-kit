@@ -34,6 +34,7 @@ class LorebookEntryType(StrEnum):
     EVENT = "event"
     TERM = "term"
     SECRET = "secret"
+    START_SET = "start_set"
 
 
 class LorebookEntryActivationType(StrEnum):
@@ -97,7 +98,7 @@ class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
             (
                 "entry_type IN ("
                 "'author_note', 'world', 'genre', 'rule', 'location', 'faction', "
-                "'character_relation', 'event', 'term', 'secret'"
+                "'character_relation', 'event', 'term', 'secret', 'start_set'"
                 ")"
             ),
             name="ck_lorebook_entries_entry_type",

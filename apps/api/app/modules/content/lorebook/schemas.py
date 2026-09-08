@@ -19,6 +19,7 @@ LorebookEntryTypeDto: TypeAlias = Literal[
     "event",
     "term",
     "secret",
+    "start_set",
 ]
 LorebookEntryActivationTypeDto: TypeAlias = Literal[
     "always", "keyword", "semantic", "manual"

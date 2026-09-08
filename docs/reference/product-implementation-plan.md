@@ -174,3 +174,5 @@
 - [LLM 모델 등록 정보](../../apps/api/app/db/models/model_routing.py)
 - [billing 모델](../../apps/api/app/db/models/billing.py)
 - [모듈 구조 규칙](structure.md)
+
+진행 추가: C03 구현 완료(start_set CRUD 타입/DB 허용, 전용 조회, 일반 활성화 제외). 179 passed, DB 통합 3개는 환경 대기. 다음 C04.

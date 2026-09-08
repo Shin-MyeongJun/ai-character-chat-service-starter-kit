@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.models.identity import User
 from app.db.models.character import Character
 from app.db.models.lorebook import Lorebook
+from app.db.models.lorebook import LorebookEntry
 from app.db.models.product import Product, ProductCharacter, ProductLorebook, ProductLorebookCharacter
 from app.modules.content.product.service import command, composition
 from app.modules.content.product.types import ProductWrite, Composition, CharacterSelection, LorebookSelection
@@ -52,3 +53,18 @@ async def test_foreign_content_cannot_be_added(db):
     p = await command.create_product(db, owner_id=other.id, value=ProductWrite('P'))
     with pytest.raises(LookupError):
         await composition.replace_composition(db, product_id=p.id, owner_id=other.id, value=Composition((CharacterSelection(c.id),), ()))
+
+
+async def test_start_sets_do_not_activate_as_regular_lore(db):
+    from app.modules.content.lorebook import repository as lore_repo
+    from app.modules.content.lorebook.service import query
+    owner,c,b = await seed(db)
+    async with db.begin():
+        db.add_all([
+            LorebookEntry(lorebook_id=b.id, content='Begin at home', entry_type='start_set', activation_type='always'),
+            LorebookEntry(lorebook_id=b.id, content='World', entry_type='world', activation_type='always'),
+        ])
+    entries = await query.get_always_entries(db, lorebook_ids=[b.id])
+    assert len(entries) == 1
+    assert entries[0].content == 'World'
+    assert len(await lore_repo.list_start_sets(db, b.id)) == 1

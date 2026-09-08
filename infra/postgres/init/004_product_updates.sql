@@ -18,5 +18,12 @@ CREATE TABLE product_lorebook_characters (
     );
 
 
+-- Running upgrade 0002 -> 0003
+
+ALTER TABLE lorebook_entries DROP CONSTRAINT ck_lorebook_entries_entry_type;
+
+ALTER TABLE lorebook_entries ADD CONSTRAINT ck_lorebook_entries_entry_type CHECK (entry_type IN ('author_note','world','genre','rule','location','faction','character_relation','event','term','secret','start_set'));
+
+
 COMMIT;
 

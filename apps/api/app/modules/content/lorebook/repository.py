@@ -174,6 +174,7 @@ async def list_enabled_entries_by_activation_type(
             LorebookEntry.lorebook_id.in_(lorebook_ids),
             LorebookEntry.is_enabled.is_(True),
             LorebookEntry.activation_type == activation_type,
+            LorebookEntry.entry_type != "start_set",
         )
         .order_by(
             LorebookEntry.priority.desc(),
@@ -201,3 +202,11 @@ async def delete_lorebook_entry(
 ) -> None:
     await session.delete(entry)
     await session.flush()
+
+
+async def list_start_sets(session: AsyncSession, lorebook_id: UUID) -> list[LorebookEntry]:
+    return list(await session.scalars(select(LorebookEntry).where(
+        LorebookEntry.lorebook_id == lorebook_id,
+        LorebookEntry.entry_type == 'start_set',
+        LorebookEntry.is_enabled.is_(True),
+    ).order_by(LorebookEntry.priority.desc(), LorebookEntry.id)))
