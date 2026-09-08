@@ -14,6 +14,7 @@ from app.modules.content.product.types import Composition
 from app.modules.content.product.service import composition
 from app.modules.content.product.service import settings
 from app.modules.content.product.service import releases
+from app.modules.content.product.service import notices
 
 router = APIRouter(prefix="/products", tags=["products"])
 Session = Annotated[AsyncSession, Depends(get_product_session)]
@@ -89,3 +90,9 @@ async def correct_note(product_id: UUID, snapshot_id: UUID, body: releases.Relea
         if body.auto_apply_media:
             raise HTTPException(422,'Patch corrections cannot change update policy.')
         return await releases.correct_note(session,product_id=product_id,snapshot_id=snapshot_id,owner_id=owner,summary=body.summary,body=body.body)
+
+
+@router.get('/{product_id}')
+async def published(product_id:UUID,session:Session,owner:Owner):
+    with errors():
+        return await notices.published_product(session,product_id=product_id,user_id=owner)

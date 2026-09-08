@@ -17,3 +17,10 @@ class StartRequest(BaseModel):
 async def start(body:StartRequest,session:Session,owner:Owner):
     with errors():
         return await start_conversation(session,product_id=body.product_id,user_id=owner,start_set_id=body.start_set_id)
+
+
+@router.get('/{conversation_id}/updates')
+async def updates(conversation_id:UUID,session:Session,owner:Owner):
+    from app.modules.content.product.service.notices import pending_updates
+    with errors():
+        return await pending_updates(session,conversation_id=conversation_id,user_id=owner)
