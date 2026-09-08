@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Text,
@@ -78,6 +79,7 @@ class Product(TimestampMixin, UuidPkMixin, Base):
 class ProductCharacter(UuidPkMixin, Base):
     __tablename__ = "product_characters"
     __table_args__ = (
+        UniqueConstraint("product_id", "id", name="uq_product_characters_product_identity"),
         UniqueConstraint("product_id", "character_id", name="uq_product_characters_pair"),
         Index("ix_product_characters_product_id", "product_id"),
         Index(
@@ -106,6 +108,8 @@ class ProductCharacter(UuidPkMixin, Base):
 class ProductLorebook(UuidPkMixin, Base):
     __tablename__ = "product_lorebooks"
     __table_args__ = (
+        UniqueConstraint("product_id", "id", name="uq_product_lorebooks_product_identity"),
+        CheckConstraint("scope IN ('all', 'selected')", name="ck_product_lorebooks_scope"),
         CheckConstraint(
             "role IN ('main', 'detail', 'rule', 'optional')",
             name="ck_product_lorebooks_role",
@@ -131,3 +135,15 @@ class ProductLorebook(UuidPkMixin, Base):
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    scope: Mapped[str] = mapped_column(Text, nullable=False, server_default="all")
+
+
+class ProductLorebookCharacter(Base):
+    __tablename__ = "product_lorebook_characters"
+    __table_args__ = (
+        ForeignKeyConstraint(["product_id", "product_character_id"], ["product_characters.product_id", "product_characters.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["product_id", "product_lorebook_id"], ["product_lorebooks.product_id", "product_lorebooks.id"], ondelete="CASCADE"),
+    )
+    product_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    product_character_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    product_lorebook_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
