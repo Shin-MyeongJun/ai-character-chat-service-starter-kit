@@ -10,8 +10,8 @@ and honors the caller's session autoflush setting for pending changes.
 from typing import get_args
 from uuid import UUID
 
-from app.modules.character import repository, types
-from app.modules.character.mapper import persistence
+from app.modules.content.character import repository, types
+from app.modules.content.character.mapper import persistence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Router-oriented queries

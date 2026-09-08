@@ -10,7 +10,7 @@ from app.db.models.character import (
     CharacterVisibility,
 )
 from app.db.pagination import fetch_cursor_page
-from app.modules.character.types import CharacterCursor, CharacterPage
+from app.modules.content.character.types import CharacterCursor, CharacterPage
 
 DEFAULT_CHARACTER_LIST_LIMIT = 50
 MAX_CHARACTER_LIST_LIMIT = 100

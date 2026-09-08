@@ -1,7 +1,7 @@
 from typing import cast
 
 from app.db.models import lorebook as lorebook_models
-from app.modules.lorebook import types
+from app.modules.content.lorebook import types
 
 
 def lorebook_create_to_entity(

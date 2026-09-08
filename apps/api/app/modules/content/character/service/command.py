@@ -4,8 +4,8 @@ from typing import get_args
 from uuid import UUID
 
 from app.db.models.character import Character as CharacterEntity
-from app.modules.character import repository, types
-from app.modules.character.mapper import persistence
+from app.modules.content.character import repository, types
+from app.modules.content.character.mapper import persistence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

@@ -6,8 +6,8 @@ from uuid import UUID
 
 import pytest
 from app.db.models.character import Character, CharacterAsset, CharacterImage
-from app.modules.character import repository, types
-from app.modules.character.service import query
+from app.modules.content.character import repository, types
+from app.modules.content.character.service import query
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session

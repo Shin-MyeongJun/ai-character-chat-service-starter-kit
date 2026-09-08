@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.pagination import fetch_cursor_page
-from app.modules.lorebook.types import (
+from app.modules.content.lorebook.types import (
     LorebookCursor,
     LorebookEntryPage,
     LorebookPage,

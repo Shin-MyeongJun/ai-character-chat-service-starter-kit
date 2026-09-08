@@ -1,7 +1,7 @@
 from typing import cast
 
 from app.db.models.memory import ConversationMemory
-from app.modules.memory import types
+from app.modules.chatting.memory import types
 
 
 def memory_create_to_entity(command: types.CreateMemoryCommand) -> ConversationMemory:

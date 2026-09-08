@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from app.modules.lorebook import schemas, types
+from app.modules.content.lorebook import schemas, types
 
 
 class LorebookSchemaMapper:

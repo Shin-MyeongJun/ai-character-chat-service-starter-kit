@@ -10,8 +10,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.lorebook import matching, repository, types
-from app.modules.lorebook.mapper import persistence
+from app.modules.content.lorebook import matching, repository, types
+from app.modules.content.lorebook.mapper import persistence
 
 
 async def list_lorebooks(

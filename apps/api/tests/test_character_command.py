@@ -7,8 +7,8 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from app.db.models.character import Character, CharacterAsset, CharacterImage
-from app.modules.character import repository, types
-from app.modules.character.service import command as service
+from app.modules.content.character import repository, types
+from app.modules.content.character.service import command as service
 from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession

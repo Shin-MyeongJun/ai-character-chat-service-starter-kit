@@ -8,15 +8,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.character import schemas
-from app.modules.character.dependencies import (
+from app.modules.content.character import schemas
+from app.modules.content.character.dependencies import (
     get_character_session,
     get_current_owner_id,
     require_character_admin,
     require_character_moderator,
 )
-from app.modules.character.mapper.schema import CharacterSchemaMapper
-from app.modules.character.service import command, query
+from app.modules.content.character.mapper.schema import CharacterSchemaMapper
+from app.modules.content.character.service import command, query
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 

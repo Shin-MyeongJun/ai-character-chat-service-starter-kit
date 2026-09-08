@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from app.modules.lorebook import schemas, types
-from app.modules.lorebook.mapper.schema import LorebookSchemaMapper
-from app.modules.lorebook.router import router
+from app.modules.content.lorebook import schemas, types
+from app.modules.content.lorebook.mapper.schema import LorebookSchemaMapper
+from app.modules.content.lorebook.router import router
 from pydantic import ValidationError
 
 

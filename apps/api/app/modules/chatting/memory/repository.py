@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.chat import Conversation
 from app.db.models.memory import ConversationMemory
 from app.db.pagination import fetch_cursor_page
-from app.modules.memory import types
+from app.modules.chatting.memory import types
 
 DEFAULT_MEMORY_LIST_LIMIT = 50
 MAX_MEMORY_LIST_LIMIT = 100

@@ -6,8 +6,8 @@ from uuid import UUID
 import pytest
 from app.db.models.chat import Conversation
 from app.db.models.memory import ConversationMemory
-from app.modules.memory import repository, types
-from app.modules.memory.service import query
+from app.modules.chatting.memory import repository, types
+from app.modules.chatting.memory.service import query
 from sqlalchemy import create_engine
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session

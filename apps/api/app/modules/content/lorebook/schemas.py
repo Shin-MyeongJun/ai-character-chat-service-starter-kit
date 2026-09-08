@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.modules.lorebook import constraints
+from app.modules.content.lorebook import constraints
 
 LorebookVisibilityDto: TypeAlias = Literal["private", "public", "unlisted"]
 LorebookStatusDto: TypeAlias = Literal["draft", "approved", "rejected"]

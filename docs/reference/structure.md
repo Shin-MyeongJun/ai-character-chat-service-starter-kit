@@ -2,10 +2,43 @@
 
 This project keeps each domain module small at first, then splits files only when a boundary becomes useful.
 
+## Module Groups
+
+Related domain modules are grouped one level below `app.modules`:
+
+```text
+apps/api/app/
+    modules/
+        content/
+            character/
+            lorebook/
+            product/
+        chatting/
+            chat/
+            conversation/
+            memory/
+        commerce/
+            billing/
+            credit/
+        governance/
+            admin/
+            moderation/
+        identity/
+        llm/
+    db/
+        models/
+```
+
+Each group has an empty `__init__.py` and is a regular Python package. Import
+modules through their grouped paths, for example
+`from app.modules.content.character.service import query`. Groups organize
+domains without merging their services or changing their internal boundaries.
+Database models remain under `app.db.models`.
+
 ## Character Module
 
 ```text
-apps/api/app/modules/character/
+apps/api/app/modules/content/character/
     schemas.py
     types.py
     repository.py
@@ -102,7 +135,7 @@ types -> schemas
 Lorebook follows the same application boundaries as character:
 
 ```text
-apps/api/app/modules/lorebook/
+apps/api/app/modules/content/lorebook/
     schemas.py
     types.py
     repository.py

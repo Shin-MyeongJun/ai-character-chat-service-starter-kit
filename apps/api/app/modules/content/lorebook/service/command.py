@@ -12,8 +12,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.lorebook import Lorebook, LorebookEntry
-from app.modules.lorebook import constraints, matching, repository, types
-from app.modules.lorebook.mapper import persistence
+from app.modules.content.lorebook import constraints, matching, repository, types
+from app.modules.content.lorebook.mapper import persistence
 
 
 def _validate_lorebook_profile(

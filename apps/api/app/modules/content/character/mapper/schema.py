@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from app.modules.character import schemas, types
+from app.modules.content.character import schemas, types
 
 
 class CharacterSchemaMapper:

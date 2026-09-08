@@ -7,8 +7,8 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from app.db.models.lorebook import Lorebook, LorebookEntry
-from app.modules.lorebook import constraints, repository, types
-from app.modules.lorebook.service import command as service
+from app.modules.content.lorebook import constraints, repository, types
+from app.modules.content.lorebook.service import command as service
 from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession

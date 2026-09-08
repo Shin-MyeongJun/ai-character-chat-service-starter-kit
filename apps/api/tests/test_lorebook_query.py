@@ -5,8 +5,8 @@ from uuid import UUID
 
 import pytest
 from app.db.models.lorebook import Lorebook, LorebookEntry
-from app.modules.lorebook import repository, types
-from app.modules.lorebook.service import query
+from app.modules.content.lorebook import repository, types
+from app.modules.content.lorebook.service import query
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable

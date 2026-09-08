@@ -1,7 +1,7 @@
 from typing import cast
 
 from app.db.models import character as character_models
-from app.modules.character import types
+from app.modules.content.character import types
 
 # Command type -> SQLAlchemy entity
 

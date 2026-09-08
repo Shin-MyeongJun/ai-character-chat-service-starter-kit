@@ -7,8 +7,8 @@ records return None for singular reads and empty results for collections.
 from collections.abc import Awaitable, Callable, Sequence
 from uuid import UUID
 
-from app.modules.memory import repository, types
-from app.modules.memory.mapper import persistence
+from app.modules.chatting.memory import repository, types
+from app.modules.chatting.memory.mapper import persistence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 EmbedQuery = Callable[[str], Awaitable[Sequence[float]]]

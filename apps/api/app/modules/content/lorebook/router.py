@@ -8,15 +8,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.lorebook import schemas
-from app.modules.lorebook.dependencies import (
+from app.modules.content.lorebook import schemas
+from app.modules.content.lorebook.dependencies import (
     get_current_owner_id,
     get_lorebook_session,
     require_lorebook_admin,
     require_lorebook_moderator,
 )
-from app.modules.lorebook.mapper.schema import LorebookSchemaMapper
-from app.modules.lorebook.service import command, query
+from app.modules.content.lorebook.mapper.schema import LorebookSchemaMapper
+from app.modules.content.lorebook.service import command, query
 
 router = APIRouter(prefix="/lorebooks", tags=["lorebooks"])
 

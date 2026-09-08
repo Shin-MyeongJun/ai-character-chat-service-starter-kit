@@ -27,19 +27,19 @@
 
 | 영역 | 코드에서 확인한 상태 | 필요한 보완 | 근거 |
 | --- | --- | --- | --- |
-| 캐릭터 | 이름·소개·`persona_prompt`·기본 모델, CRUD·조회·HTTP 라우터 있음 | 성격/시나리오/예시/제작자 메모를 가져올 때의 매핑 정책 | [모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/character.py:38), [command](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/character/service/command.py:45) |
-| 감정 이미지·에셋 | 캐릭터에 종속된 테이블과 조회 함수 있음. 이미지/에셋 추가 서비스는 `NotImplementedError` | 공통 저장소·연결·업로드·표시 흐름 | [미디어 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/character.py:76), [추가 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/character/service/command.py:100) |
+| 캐릭터 | 이름·소개·`persona_prompt`·기본 모델, CRUD·조회·HTTP 라우터 있음 | 성격/시나리오/예시/제작자 메모를 가져올 때의 매핑 정책 | [모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/character.py:38), [command](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/command.py:45) |
+| 감정 이미지·에셋 | 캐릭터에 종속된 테이블과 조회 함수 있음. 이미지/에셋 추가 서비스는 `NotImplementedError` | 공통 저장소·연결·업로드·표시 흐름 | [미디어 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/character.py:76), [추가 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/command.py:100) |
 | 유저 페르소나 | 계정 `display_name`은 있으나 유저 역할 프로필·대화 연결은 없음 | 별도 역할 프로필과 대화별 선택값 | [identity 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/identity.py:23) |
 | 로어 정의 | 장소·사건·규칙 등 타입, 활성화 방식·키워드·우선순위·배치·개별 예산·벡터 컬럼 있음 | 묶음 전체 예산·검색 깊이·적용 범위 | [로어 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/lorebook.py:93) |
-| 로어 실행 | 상시 항목 조회, exact/contains/regex 키워드 매칭 구현 | 최종 예산 적용·스냅샷 입력·semantic/manual 실행 정책 | [활성화 코드](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/lorebook/service/query.py:150) |
+| 로어 실행 | 상시 항목 조회, exact/contains/regex 키워드 매칭 구현 | 최종 예산 적용·스냅샷 입력·semantic/manual 실행 정책 | [활성화 코드](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/service/query.py:150) |
 | 로어 적용 대상 | 상품↔로어북 관계 있음 | 캐릭터/페르소나/대화별 연결 또는 대화 구성에 이를 반영하는 resolver | [ProductLorebook](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/product.py:106) |
-| 상품·시나리오 | 상품 제목·소개·첫 메시지, 캐릭터/로어 N:M 모델 있음. 서비스·repository·schemas·router는 빈 파일 | 실행용 상황 설명, 시작 상태, 구성 조회·발행 흐름 | [상품 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/product.py:40), [빈 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/product/service.py) |
-| 대화 | `product_id` 필수, 캐릭터 연결·모델 선택 컬럼 있음. 실행 서비스는 빈 파일 | 버전 고정·페르소나·대화별 상태와 설정 | [Conversation](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/chat.py:30), [빈 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/conversation/service.py) |
+| 상품·시나리오 | 상품 제목·소개·첫 메시지, 캐릭터/로어 N:M 모델 있음. 서비스·repository·schemas·router는 빈 파일 | 실행용 상황 설명, 시작 상태, 구성 조회·발행 흐름 | [상품 모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/product.py:40), [빈 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service.py) |
+| 대화 | `product_id` 필수, 캐릭터 연결·모델 선택 컬럼 있음. 실행 서비스는 빈 파일 | 버전 고정·페르소나·대화별 상태와 설정 | [Conversation](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/chat.py:30), [빈 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/conversation/service.py) |
 | 스냅샷 | 상품·캐릭터·로어 스냅샷과 연결 모델, SQL 있음 | 발행 트랜잭션·검증·대화 고정·파일 보존 | [스냅샷 설명](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/snapshot/README.md:3) |
-| 메모리 | summary/fact/event, 소유권과 대화 범위 조회, 최신 요약·벡터 검색 인터페이스 있음 | 자동 추출·요약 갱신·수동 고정·출처와 무효화·임베딩 공급자 | [모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/memory.py:19), [query](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/memory/service/query.py:70) |
-| 프롬프트·채팅 | chat 서비스·stream·repository·schemas·types가 빈 파일 | 전체 조립·생성·저장 실행 경로 | [chat 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chat/service.py) |
+| 메모리 | summary/fact/event, 소유권과 대화 범위 조회, 최신 요약·벡터 검색 인터페이스 있음 | 자동 추출·요약 갱신·수동 고정·출처와 무효화·임베딩 공급자 | [모델](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/memory.py:19), [query](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/memory/service/query.py:70) |
+| 프롬프트·채팅 | chat 서비스·stream·repository·schemas·types가 빈 파일 | 전체 조립·생성·저장 실행 경로 | [chat 서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/service.py) |
 | LLM | 공급자 선택·결과/사용량/오류 정규화 있음. 입력은 문자열 `request_json` | 역할과 콘텐츠 블록을 보존하는 입력 계약 | [서비스](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/llm/service.py:56) |
-| 앱 통합 | character/lorebook 인증·DB 의존성은 기본적으로 503. `apps/web`와 alembic에 파일 없음 | 앱 엔트리·인증·세션·마이그레이션·화면 연결 | [character 의존성](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/character/dependencies.py:14), [lorebook 의존성](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/lorebook/dependencies.py:13) |
+| 앱 통합 | character/lorebook 인증·DB 의존성은 기본적으로 503. `apps/web`와 alembic에 파일 없음 | 앱 엔트리·인증·세션·마이그레이션·화면 연결 | [character 의존성](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/dependencies.py:14), [lorebook 의존성](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/dependencies.py:13) |
 
 ### 구조를 확정하기 전에 정리할 불일치
 
@@ -292,7 +292,7 @@ LLM 호출 동안 긴 DB 트랜잭션을 유지하지 않는다. 짧은 트랜�
 | CCv3 `assets` | Asset + 목적/키/대상 binding | 매체와 용도를 나누고 URI를 내부 불변 참조로 매핑 |
 | RisuAI 또는 ST 전용 regex/트리거/스크립트 | 지원 능력 검사 후 선택적으로 변환 | 조용한 삭제·자동 실행 금지. 원문 보존 + 미지원 목록 |
 
-특히 현재 `exact`는 전달된 **문자열 전체**와 키워드를 비교하며, 단어 경계 일치가 아니다. `regex`는 pydantic-core의 Rust 기반 엔진으로 처리한다. 외부 JavaScript 정규식의 `/.../flags`·lookaround·backreference 등을 그대로 동일 동작이라고 간주할 수 없다. [현재 매칭](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/lorebook/service/query.py:150), [정규식 구현](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/lorebook/matching.py:10)
+특히 현재 `exact`는 전달된 **문자열 전체**와 키워드를 비교하며, 단어 경계 일치가 아니다. `regex`는 pydantic-core의 Rust 기반 엔진으로 처리한다. 외부 JavaScript 정규식의 `/.../flags`·lookaround·backreference 등을 그대로 동일 동작이라고 간주할 수 없다. [현재 매칭](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/service/query.py:150), [정규식 구현](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/matching.py:10)
 
 가져오기 결과는 생성된 내부 ID, 원본 포맷/버전, 매핑된 필드, 미지원 기능, 누락 파일, 변환 경고를 반환해야 한다. ‘가져오기 성공’과 ‘동일 동작 재현’을 구분한다. 처음부터 RisuAI/SillyTavern 전체 호환을 목표로 선언하지 않는다.
 
