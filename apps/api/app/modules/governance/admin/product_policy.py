@@ -40,7 +40,7 @@ async def moderate_product(session, *, product_id, actor_id, status):
 
 
 async def ensure_available(session, snapshot_id, *, now=None):
-    snapshot=await session.scalar(select(ProductSnapshot).where(ProductSnapshot.id==snapshot_id).with_for_update(read=True).execution_options(populate_existing=True))
+    snapshot=await session.scalar(select(ProductSnapshot).where(ProductSnapshot.id==snapshot_id).execution_options(populate_existing=True))
     if snapshot is None:
         raise LookupError('Version not found.')
     if snapshot.expires_at is not None and snapshot.expires_at <= (now or datetime.now(UTC)):

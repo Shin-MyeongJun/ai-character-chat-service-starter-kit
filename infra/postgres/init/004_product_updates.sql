@@ -204,5 +204,24 @@ CREATE TABLE product_snapshot_policy_changes (
 );
 
 
+-- Running upgrade 0011 -> 0012
+
+ALTER TABLE models ADD COLUMN retirement_announced_at TIMESTAMPTZ, ADD COLUMN shutdown_at TIMESTAMPTZ;
+
+CREATE TABLE model_replacements (
+    product_snapshot_id UUID NOT NULL, 
+    from_model_id UUID NOT NULL, 
+    to_model_id UUID NOT NULL, 
+    reasoning_effort TEXT NOT NULL, 
+    effective_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT uq_model_replacement UNIQUE (product_snapshot_id, from_model_id, to_model_id), 
+    FOREIGN KEY(product_snapshot_id) REFERENCES product_snapshots (id), 
+    FOREIGN KEY(from_model_id) REFERENCES models (id), 
+    FOREIGN KEY(to_model_id) REFERENCES models (id)
+);
+
+
 COMMIT;
 

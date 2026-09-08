@@ -64,4 +64,6 @@ async def runtime_context(session, *, conversation_id, user_id):
     for b in books:
         data=(await session.get(LorebookSnapshot,b.lorebook_snapshot_id)).snapshot_data
         book_data.append({'id':str(b.id),'scope':b.scope,'targets':[str(t.product_character_id) for t in targets if t.product_lorebook_id==b.id], 'entries':[e for e in data['entries'] if e['entry_type']!='start_set' and e['is_enabled']]})
-    return {'product_snapshot_id':str(snapshot.id),'settings':snapshot.snapshot_data,'start':{'title':start.title,'content':start.content},'characters':character_data,'lorebooks':book_data}
+    from app.modules.llm.replacement import resolve_execution
+    execution=await resolve_execution(session,snapshot_id=snapshot.id)
+    return {'execution':execution,'product_snapshot_id':str(snapshot.id),'settings':snapshot.snapshot_data,'start':{'title':start.title,'content':start.content},'characters':character_data,'lorebooks':book_data}
