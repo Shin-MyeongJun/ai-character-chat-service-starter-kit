@@ -101,3 +101,24 @@ async def test_settings_and_composition_preserve_start_selection(db):
         await set_settings(db,product_id=p.id,owner_id=owner.id,value=Settings(model.id,'max',(entry.id,)))
     with pytest.raises(ValueError, match='start_set'):
         await set_settings(db,product_id=p.id,owner_id=owner.id,value=Settings(model.id,'low',(uuid4(),)))
+
+
+async def test_snapshot_media_survives_source_deletion(db):
+    from app.db.models.character import CharacterImage, CharacterAsset
+    from app.db.models.snapshot.character import CharacterSnapshot, CharacterSnapshotImage
+    from app.modules.content.product.service.snapshots import freeze_character, media_is_referenced
+    owner,c,b = await seed(db)
+    async with db.begin():
+        db.add_all([CharacterImage(character_id=c.id, emotion_tag='normal', image_url='immutable/image/v1', is_default=True), CharacterAsset(character_id=c.id, asset_type='audio', purpose='voice', file_url='immutable/audio/v1')])
+        await db.flush()
+        snapshot = await freeze_character(db,c)
+        sid=snapshot.id
+    async with db.begin():
+        await db.delete(c)
+    async with db.begin():
+        db.expire_all()
+        saved=await db.get(CharacterSnapshot,sid)
+        assert saved.character_id is None
+        assert saved.snapshot_data['persona_prompt'] == 'P'
+        assert await media_is_referenced(db,'immutable/image/v1')
+        assert (await db.scalar(select(CharacterSnapshotImage).where(CharacterSnapshotImage.character_snapshot_id == sid))).is_default

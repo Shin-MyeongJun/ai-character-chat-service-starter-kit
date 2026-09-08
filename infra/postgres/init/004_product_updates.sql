@@ -41,5 +41,36 @@ CREATE TABLE product_start_sets (
         FOREIGN KEY (lorebook_id,entry_id) REFERENCES lorebook_entries(lorebook_id,id) ON DELETE CASCADE);
 
 
+-- Running upgrade 0004 -> 0005
+
+CREATE TABLE character_snapshot_images (
+    character_snapshot_id UUID NOT NULL, 
+    source_image_id UUID NOT NULL, 
+    emotion_tag TEXT NOT NULL, 
+    image_url TEXT NOT NULL, 
+    is_default BOOLEAN NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT uq_snapshot_image_emotion UNIQUE (character_snapshot_id, emotion_tag), 
+    FOREIGN KEY(character_snapshot_id) REFERENCES character_snapshots (id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX uq_snapshot_image_default ON character_snapshot_images (character_snapshot_id) WHERE is_default = true;
+
+CREATE TABLE character_snapshot_assets (
+    character_snapshot_id UUID NOT NULL, 
+    source_asset_id UUID NOT NULL, 
+    asset_type TEXT NOT NULL, 
+    purpose TEXT NOT NULL, 
+    file_url TEXT NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT ck_snapshot_asset_type CHECK (asset_type IN ('image','audio','video')), 
+    FOREIGN KEY(character_snapshot_id) REFERENCES character_snapshots (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_snapshot_assets_parent ON character_snapshot_assets (character_snapshot_id);
+
+
 COMMIT;
 
