@@ -1,6 +1,6 @@
 from sqlalchemy import delete, select
 
-from app.db.models.chat import ConversationCharacter, ConversationVersionChange, Message
+from app.db.models.chat import ConversationCharacter, ConversationVersionChange
 from app.db.models.product_release import ProductReleaseNote
 from app.db.models.snapshot.character import CharacterSnapshot
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter
@@ -88,49 +88,3 @@ async def switch_version(
         # Initial context, messages and memory remain untouched, including removed characters.
         await session.flush()
         return {"snapshot_id": target.id, "changed": True}
-
-
-async def append_generated_message(
-    session,
-    *,
-    conversation_id,
-    user_id,
-    expected_snapshot_id,
-    product_character_id,
-    content,
-    model_id,
-):
-    """Chat orchestration supplies the version captured before calling the LLM."""
-    if not content.strip() or len(content) > 200000:
-        raise ValueError("Invalid generated content.")
-    async with session.begin():
-        conversation = await owned_conversation(
-            session, conversation_id, user_id, lock=True
-        )
-        if conversation.product_snapshot_id != expected_snapshot_id:
-            raise ValueError(
-                "Version changed during generation; discard stale completion."
-            )
-        await ensure_available(session, expected_snapshot_id)
-        character = await session.scalar(
-            select(ProductSnapshotCharacter).where(
-                ProductSnapshotCharacter.id == product_character_id,
-                ProductSnapshotCharacter.product_snapshot_id == expected_snapshot_id,
-            )
-        )
-        if character is None:
-            raise ValueError("Character is not part of the execution version.")
-        source = await session.get(CharacterSnapshot, character.character_snapshot_id)
-        message = Message(
-            conversation_id=conversation.id,
-            product_snapshot_id=expected_snapshot_id,
-            product_character_id=character.id,
-            character_id=source.character_id,
-            sender_type="character",
-            content=content,
-            model_id=model_id,
-            generated_by_ai=True,
-        )
-        session.add(message)
-        await session.flush()
-        return message.id

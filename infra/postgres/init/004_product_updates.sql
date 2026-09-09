@@ -228,5 +228,72 @@ CREATE TABLE model_replacements (
 ALTER TABLE conversation_memories ADD COLUMN IF NOT EXISTS source_message_id UUID REFERENCES messages(id) ON DELETE SET NULL;
 
 
+-- Running upgrade 0012a -> 0013
+
+CREATE TABLE product_generations (
+    user_id UUID NOT NULL, 
+    conversation_id UUID NOT NULL, 
+    product_id UUID NOT NULL, 
+    product_snapshot_id UUID NOT NULL, 
+    model_id UUID NOT NULL, 
+    model_name TEXT NOT NULL, 
+    reasoning_effort TEXT NOT NULL, 
+    request_key TEXT NOT NULL, 
+    input_digest TEXT NOT NULL, 
+    result_digest TEXT, 
+    status TEXT DEFAULT 'pending' NOT NULL, 
+    message_count INTEGER DEFAULT '0' NOT NULL, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    finished_at TIMESTAMP WITH TIME ZONE, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT uq_generation_request UNIQUE (user_id, request_key), 
+    CONSTRAINT uq_generation_version UNIQUE (id, product_snapshot_id), 
+    FOREIGN KEY(product_id, product_snapshot_id) REFERENCES product_snapshots (product_id, id), 
+    CONSTRAINT ck_generation_status CHECK (status IN ('pending','succeeded','failed','cancelled','stale')), 
+    CONSTRAINT ck_generation_messages CHECK (message_count >= 0), 
+    FOREIGN KEY(user_id) REFERENCES users (id), 
+    FOREIGN KEY(conversation_id) REFERENCES conversations (id), 
+    FOREIGN KEY(product_id) REFERENCES products (id), 
+    FOREIGN KEY(model_id) REFERENCES models (id)
+);
+
+CREATE INDEX ix_generation_product_finished ON product_generations (product_id, finished_at);
+
+CREATE TABLE product_payment_events (
+    payment_id UUID NOT NULL, 
+    sale_id UUID, 
+    product_id UUID NOT NULL, 
+    product_snapshot_id UUID NOT NULL, 
+    event_key TEXT NOT NULL, 
+    kind TEXT NOT NULL, 
+    amount NUMERIC(20, 2) NOT NULL, 
+    currency TEXT NOT NULL, 
+    occurred_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+    attributed_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    id UUID DEFAULT gen_random_uuid() NOT NULL, 
+    PRIMARY KEY (id), 
+    CONSTRAINT uq_product_payment_event_key UNIQUE (event_key), 
+    FOREIGN KEY(product_id, product_snapshot_id) REFERENCES product_snapshots (product_id, id), 
+    CONSTRAINT ck_product_payment_kind CHECK (kind IN ('sale','refund')), 
+    CONSTRAINT ck_product_payment_parent CHECK ((kind='sale' AND sale_id IS NULL) OR (kind='refund' AND sale_id IS NOT NULL)), 
+    CONSTRAINT ck_product_payment_amount CHECK (amount > 0), 
+    FOREIGN KEY(payment_id) REFERENCES payments (id), 
+    FOREIGN KEY(sale_id) REFERENCES product_payment_events (id), 
+    FOREIGN KEY(product_id) REFERENCES products (id)
+);
+
+CREATE INDEX ix_product_payment_period ON product_payment_events (product_id, attributed_at);
+
+ALTER TABLE usage_logs ADD COLUMN generation_id UUID, ADD COLUMN product_id UUID, ADD COLUMN product_snapshot_id UUID, ADD COLUMN reasoning_effort TEXT;
+
+ALTER TABLE usage_logs ADD CONSTRAINT uq_usage_generation UNIQUE (generation_id), ADD FOREIGN KEY (generation_id,product_snapshot_id) REFERENCES product_generations(id,product_snapshot_id), ADD FOREIGN KEY (product_id,product_snapshot_id) REFERENCES product_snapshots(product_id,id);
+
+ALTER TABLE usage_logs ADD CONSTRAINT ck_usage_nonnegative CHECK (input_tokens >= 0 AND output_tokens >= 0 AND cost_credit >= 0) NOT VALID;
+
+ALTER TABLE messages ADD COLUMN generation_id UUID, ADD FOREIGN KEY (generation_id,product_snapshot_id) REFERENCES product_generations(id,product_snapshot_id);
+
+
 COMMIT;
 

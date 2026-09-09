@@ -226,3 +226,5 @@ DB 환경 메모: Docker Desktop 시작이 Windows 임시 Unix 소켓 오류로 
 추가 점검: 상품 update 후 DB가 계산한 updated_at을 명시 refresh하여 AsyncSession의 암묵 IO를 방지했다. 스냅샷 불변성은 현재 서비스 경로에서 지키며 DB 트리거 강제는 아직 없음.
 
 2026-09-09 재개 검증: Docker 정상 시작, PostgreSQL 통합 9개 실제 통과. 신규 초기화 SQL의 product_characters/product_lorebooks 누락을 보완하고 memory.source_message_id를 모델·0012a 마이그레이션에 보존 반영. 초기화/Alembic/ORM 구조 비교 및 legacy 대화 보존 검사 포함 195 passed, skip 없음. 다음 C13/C14.
+
+2026-09-09 C13 구현: product_generations와 usage_logs 상품/버전 귀속, 메시지+사용량 원자 저장, 동시 재시도 멱등성, stale/실패 비용 보존. 명시적 결제 배분·부분 환불 이벤트와 원버전 귀속/초과 방지. 기존 append_generated_message 우회 경로는 제거하고 begin_generation/finish_generation으로 통합. PostgreSQL 동시 재시도/환불/마이그레이션 테스트 통과.

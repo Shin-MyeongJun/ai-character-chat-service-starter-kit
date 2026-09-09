@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 import sys
@@ -57,7 +58,8 @@ async def test_fresh_init_and_alembic_match_models(db):
             await connection.execute(f"CREATE SCHEMA {name}")
         # Real legacy baseline, with a row whose version cannot be inferred.
         await connection.execute(f"SET search_path TO {names[0]}, public")
-        sql = subprocess.check_output(
+        sql = await asyncio.to_thread(
+            subprocess.check_output,
             [
                 sys.executable,
                 "-m",
@@ -86,7 +88,8 @@ async def test_fresh_init_and_alembic_match_models(db):
             uid,
             pid,
         )
-        upgrade = subprocess.check_output(
+        upgrade = await asyncio.to_thread(
+            subprocess.check_output,
             [
                 sys.executable,
                 "-m",

@@ -399,11 +399,10 @@ async def test_conversation_keeps_published_context(db):
             )
 
 
-async def test_version_switch_requires_consent_and_rejects_stale_generation(db):
+async def test_version_switch_requires_consent_and_preserves_initial_context(db):
     from app.db.models.chat import Conversation, ConversationVersionChange, Message
     from app.modules.chatting.conversation.service import start_conversation
     from app.modules.chatting.conversation.versions import (
-        append_generated_message,
         switch_version,
     )
     from app.modules.content.product.service.releases import ReleaseRequest, publish
@@ -460,13 +459,3 @@ async def test_version_switch_requires_consent_and_rejects_stale_generation(db):
             == 1
         )
         assert len(list(await db.scalars(select(ConversationVersionChange)))) == 1
-    with pytest.raises(ValueError, match="during generation"):
-        await append_generated_message(
-            db,
-            conversation_id=conversation["id"],
-            user_id=uid,
-            expected_snapshot_id=first.snapshot_id,
-            product_character_id=uuid4(),
-            content="stale",
-            model_id=None,
-        )

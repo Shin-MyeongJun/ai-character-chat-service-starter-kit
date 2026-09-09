@@ -113,6 +113,10 @@ class Message(UuidPkMixin, Base):
     __tablename__ = "messages"
     __table_args__ = (
         ForeignKeyConstraint(
+            ["generation_id", "product_snapshot_id"],
+            ["product_generations.id", "product_generations.product_snapshot_id"],
+        ),
+        ForeignKeyConstraint(
             ["product_snapshot_id", "product_character_id"],
             [
                 "product_snapshot_characters.product_snapshot_id",
@@ -144,6 +148,7 @@ class Message(UuidPkMixin, Base):
         ForeignKey("characters.id", ondelete="SET NULL"),
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    generation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     product_snapshot_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product_snapshots.id")
     )

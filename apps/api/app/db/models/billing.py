@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -83,7 +84,9 @@ class CreditTransaction(UuidPkMixin, Base):
         ),
         # Same chat request retried with the same key can insert only once.
         # The UNIQUE constraint turns duplicate credit debit attempts into a DB error.
-        UniqueConstraint("idempotency_key", name="uq_credit_transactions_idempotency_key"),
+        UniqueConstraint(
+            "idempotency_key", name="uq_credit_transactions_idempotency_key"
+        ),
         Index("ix_credit_transactions_user_id_created_at", "user_id", "created_at"),
     )
 
@@ -106,8 +109,23 @@ class CreditTransaction(UuidPkMixin, Base):
 class UsageLog(UuidPkMixin, Base):
     __tablename__ = "usage_logs"
     __table_args__ = (
+        UniqueConstraint("generation_id", name="uq_usage_generation"),
+        ForeignKeyConstraint(
+            ["generation_id", "product_snapshot_id"],
+            ["product_generations.id", "product_generations.product_snapshot_id"],
+        ),
+        ForeignKeyConstraint(
+            ["product_id", "product_snapshot_id"],
+            ["product_snapshots.product_id", "product_snapshots.id"],
+        ),
+        CheckConstraint(
+            "input_tokens >= 0 AND output_tokens >= 0 AND cost_credit >= 0",
+            name="ck_usage_nonnegative",
+        ),
         Index("ix_usage_logs_user_id_created_at", "user_id", "created_at"),
-        Index("ix_usage_logs_conversation_id_created_at", "conversation_id", "created_at"),
+        Index(
+            "ix_usage_logs_conversation_id_created_at", "conversation_id", "created_at"
+        ),
     )
 
     user_id: Mapped[UUID] = mapped_column(
@@ -125,6 +143,10 @@ class UsageLog(UuidPkMixin, Base):
         nullable=False,
     )
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    generation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    product_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    product_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    reasoning_effort: Mapped[str | None] = mapped_column(Text)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     cost_credit: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -148,7 +170,9 @@ class SubscriptionPlan(UuidPkMixin, Base):
     monthly_credit: Mapped[int] = mapped_column(BigInteger, nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     billing_cycle: Mapped[str] = mapped_column(Text, nullable=False)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
 
 
 class UserSubscription(TimestampMixin, UuidPkMixin, Base):
@@ -172,8 +196,12 @@ class UserSubscription(TimestampMixin, UuidPkMixin, Base):
         nullable=False,
     )
     status: Mapped[str] = mapped_column(Text, nullable=False)
-    current_period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    current_period_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    current_period_end: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class Payment(UuidPkMixin, Base):
