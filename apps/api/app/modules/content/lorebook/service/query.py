@@ -201,7 +201,12 @@ async def activate_keyword_entries(
 
 
 async def list_start_sets(session, *, lorebook_id, owner_id):
-    parent = await repository.get_lorebook_by_id_and_owner_id(session, lorebook_id, owner_id)
+    parent = await repository.get_lorebook_by_id_and_owner_id(
+        session, lorebook_id, owner_id
+    )
     if parent is None:
-        raise LookupError('Lorebook not found.')
-    return [persistence.lorebook_entry_entity_to_info(e) for e in await repository.list_start_sets(session, lorebook_id)]
+        raise LookupError("Lorebook not found.")
+    return [
+        persistence.lorebook_entry_entity_to_info(e)
+        for e in await repository.list_start_sets(session, lorebook_id)
+    ]

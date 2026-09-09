@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -32,7 +33,9 @@ async def validate_model(session, model_id, effort):
             Provider.is_enabled.is_(True),
         )
     )
-    if model is None:
+    if model is None or (
+        model.shutdown_at is not None and model.shutdown_at <= datetime.now(UTC)
+    ):
         raise ValueError("Model is unavailable.")
     efforts = model.capabilities.get("reasoning_efforts", [])
     if effort not in efforts:

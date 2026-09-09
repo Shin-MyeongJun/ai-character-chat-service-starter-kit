@@ -170,3 +170,13 @@ async def statistics(
             date_to=date_to,
             snapshot_id=snapshot_id,
         )
+
+
+@router.get("/{product_id}/releases/{snapshot_id}/availability")
+async def version_availability(
+    product_id: UUID, snapshot_id: UUID, session: Session, owner: Owner
+):
+    with errors():
+        return await notices.version_availability(
+            session, product_id=product_id, snapshot_id=snapshot_id, owner_id=owner
+        )

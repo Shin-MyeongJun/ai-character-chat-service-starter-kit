@@ -24,7 +24,8 @@ async def _fetch_lorebook_page(
     limit: int,
 ) -> LorebookPage[Lorebook]:
     return await fetch_cursor_page(
-        session, stmt,
+        session,
+        stmt,
         created_at=Lorebook.created_at,
         id_column=Lorebook.id,
         cursor=cursor,
@@ -43,7 +44,8 @@ async def _fetch_entry_page(
     limit: int,
 ) -> LorebookEntryPage[LorebookEntry]:
     return await fetch_cursor_page(
-        session, stmt,
+        session,
+        stmt,
         created_at=LorebookEntry.created_at,
         id_column=LorebookEntry.id,
         cursor=cursor,
@@ -204,9 +206,17 @@ async def delete_lorebook_entry(
     await session.flush()
 
 
-async def list_start_sets(session: AsyncSession, lorebook_id: UUID) -> list[LorebookEntry]:
-    return list(await session.scalars(select(LorebookEntry).where(
-        LorebookEntry.lorebook_id == lorebook_id,
-        LorebookEntry.entry_type == 'start_set',
-        LorebookEntry.is_enabled.is_(True),
-    ).order_by(LorebookEntry.priority.desc(), LorebookEntry.id)))
+async def list_start_sets(
+    session: AsyncSession, lorebook_id: UUID
+) -> list[LorebookEntry]:
+    return list(
+        await session.scalars(
+            select(LorebookEntry)
+            .where(
+                LorebookEntry.lorebook_id == lorebook_id,
+                LorebookEntry.entry_type == "start_set",
+                LorebookEntry.is_enabled.is_(True),
+            )
+            .order_by(LorebookEntry.priority.desc(), LorebookEntry.id)
+        )
+    )

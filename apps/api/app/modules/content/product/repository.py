@@ -9,7 +9,7 @@ from app.db.models.product import Product
 async def owned(session: AsyncSession, product_id: UUID, owner_id: UUID, *, lock=False):
     stmt = select(Product).where(Product.id == product_id, Product.owner_id == owner_id)
     if lock:
-        stmt = stmt.with_for_update()
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
     result = await session.scalar(stmt)
     if result is None:
         raise LookupError("Product not found.")

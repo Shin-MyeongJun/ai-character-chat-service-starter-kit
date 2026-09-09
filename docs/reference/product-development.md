@@ -42,12 +42,59 @@ FastAPI 앱에 포함한다. `product.dependencies.get_product_session`은 요�
 않도록 한다. 미설정 상태는 503으로 거부한다. 클라이언트 owner_id를 신뢰하지
 않는다. 관리자 기능은 DB의 활성 admin 역할도 검사한다.
 
-대화의 `runtime_context`는 내부 실행 계약이며 HTTP로 반환하지 않는다.
-호출자가 트랜잭션을 관리하고, 모델 대체 계획 기록이 포함되므로 성공 시
-커밋한다. 반환값의 `execution`을 실제 모델 호출에 사용한다. 생성 전에 얻은
-버전을 `append_generated_message`에 전달하여 버전 전환 중 나온 과거 응답을
-저장하지 않도록 한다. 해당 메시지 저장은 C13의 사용 기록과 아직 통합되지
-않았으며 호출 재시도 멱등성도 C13에서 함께 완성해야 한다.
+대화 생성은 `conversation.generation.begin_generation`으로 먼저 예약한다.
+사용자별 request_key와 입력 해시가 같으면 기존 실행을 돌려준다. 반환값의
+`created`가 false이면 제공사를 다시 호출하지 않는다. pending 실행의 대사와
+프로세스 중단 복구는 실제 제공사 오케스트레이터에서 처리해야 한다.
+
+`runtime_context`는 서버 내부용이며 HTTP로 반환하지 않는다. 별도 트랜잭션에서
+읽고 버전이 예약의 product_snapshot_id와 같은지 확인한다. 다르면 제공사를
+호출하지 않고 예약을 cancelled로 마감한다. 실제 제공사 호출에는 예약에
+고정된 model_id/model_name/reasoning_effort를 사용한다. 컨텍스트 조회에는
+모델 대체 계획 기록이 포함될 수 있으므로 성공 시 커밋한다.
+
+제공사 응답/실패/취소 후 `finish_generation`에 GenerationResult를 전달한다.
+메시지, 실제 토큰/비용, 종료 상태를 한 트랜잭션으로 저장한다. 같은 결과의
+재전송은 중복 저장하지 않는다. 생성 도중 버전 전환/만료가 발생하면 stale로
+기록하고 AI 메시지는 저장하지 않으며 발생한 비용은 보존한다. 제거된
+append_generated_message 경로 대신 이 완료 인터페이스를 사용한다.
+
+`billing.attribution.record_sale/record_refund`는 검증된 billing 내부 호출만
+허용하는 계약이다. 공개 HTTP로 노출하지 않는다. 결제별 귀속 합계는 원결제
+이하, 부분 환불 합계는 원귀속 이하로 제한하며 event_key로 중복을 막는다.
+한 결제의 여러 배분은 같은 결제 완료 시각을 전달한다. 실제 결제 실행과
+크레딧 잔액 변경은 별도 billing 작업이다.
+
+## 통계 실행
+
+성공 턴은 저장 완료된 생성 실행 1회다. 여러 캐릭터 메시지 수와 구분한다.
+실패/취소/stale의 실제 비용도 포함한다. 시각은 UTC로 저장하고 Asia/Seoul
+일자를 집계한다. 기간 고유 사용자는 일별 활동에서 DISTINCT로 계산한다.
+매출과 환불은 통화별 Decimal 문자열이며 늦은 환불도 원거래 일자를 갱신한다.
+
+운영 스케줄러에서 다음 CLI를 시간별 실행하고, 매일 --repair-recent로 당일과
+이전 7일을 재집계 대상으로 등록한다. 한 번에 최대 limit개 일자를 처리하므로
+대기량이 크면 반복 실행한다. 실제 스케줄러 등록은 아직 하지 않았다.
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path apps/api).Path
+# DATABASE_URL은 배포 환경의 DB 연결 설정을 사용한다.
+.\.venv\Scripts\python.exe -m app.modules.content.product.statistics_job --limit 100
+.\.venv\Scripts\python.exe -m app.modules.content.product.statistics_job --repair-recent --limit 1000
+```
+
+이벤트와 재집계 큐 등록은 같은 트랜잭션이다. 작업자는 FOR UPDATE SKIP LOCKED로
+일자를 가져오고 실패하면 큐를 보존한다. 기간 조회는 소유자 전용
+GET /products/{product_id}/statistics?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD이며
+snapshot_id로 버전을 필터링한다. pending_days가 있으면 해당 날짜는 아직
+최신 이벤트를 반영하지 않은 상태다. 분석 데이터 자동 삭제는 구현하지 않았다.
+
+LLM 종료 안내는 상품 소개/대화 업데이트 조회의 model_notice 및 제작자 전용
+GET /products/{product_id}/releases/{snapshot_id}/availability로 읽는다. 조회는
+대체 실행을 발생시키지 않는다. 제공사 공지 수집·정기 준비 작업·alarm 전달은
+별도 연결해야 한다.
+
+## 파일 보존
 
 이미지·에셋의 URL은 불변 저장소 객체를 가리켜야 한다. DB에서 URL 문자열을
 복사하는 것만으로 실제 파일의 덮어쓰기/삭제를 방지할 수는 없다. 저장소

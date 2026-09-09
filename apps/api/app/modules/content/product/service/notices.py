@@ -4,6 +4,8 @@ from app.db.models.product import Product
 from app.db.models.product_release import ProductReleaseNote
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotStartSet
 from app.modules.chatting.conversation.service import owned_conversation
+from app.modules.content.product import repository
+from app.modules.llm.replacement import execution_notice
 
 
 async def published_product(session, *, product_id, user_id):
@@ -30,6 +32,7 @@ async def published_product(session, *, product_id, user_id):
         "title": snapshot.snapshot_data["title"],
         "description": snapshot.snapshot_data["description"],
         "start_options": [{"id": s.id, "title": s.title} for s in starts],
+        "model_notice": await execution_notice(session, snapshot),
     }
 
 
@@ -69,4 +72,22 @@ async def pending_updates(session, *, conversation_id, user_id):
         "expiry_reason": current.expiry_reason,
         "latest_snapshot_id": product.latest_snapshot_id,
         "updates": updates,
+        "model_notice": await execution_notice(session, current),
+    }
+
+
+async def version_availability(session, *, product_id, snapshot_id, owner_id):
+    await repository.owned(session, product_id, owner_id)
+    snapshot = await session.scalar(
+        select(ProductSnapshot).where(
+            ProductSnapshot.id == snapshot_id, ProductSnapshot.product_id == product_id
+        )
+    )
+    if snapshot is None:
+        raise LookupError("Version not found.")
+    return {
+        "snapshot_id": snapshot.id,
+        "expires_at": snapshot.expires_at,
+        "expiry_reason": snapshot.expiry_reason,
+        "model_notice": await execution_notice(session, snapshot),
     }
