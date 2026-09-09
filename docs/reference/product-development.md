@@ -2,6 +2,29 @@
 
 진행 상태와 미완료 항목은 [작업 계획](product-implementation-plan.md)을 기준으로 한다.
 
+## Schema·type·mapper 경계
+
+기존 character/lorebook과 동일하게 HTTP 입출력은 `schemas.py`의 Pydantic DTO,
+서비스 명령·조회·결과는 `types.py`의 dataclass로 분리한다. schemas와 types는
+서로 import하지 않는다. `ProductSchemaMapper`, `ConversationSchemaMapper`,
+`AdminSchemaMapper`가 요청/조회 DTO를 application type으로, 서비스 결과를
+응답 DTO로 변환한다. ORM 결과 변환은 `mapper/persistence.py`에서 수행한다.
+
+상품 설정 타입은 `product.types.Settings`, 발행 명령은 `product.types.ReleasePublish`,
+발행 결과는 `product.types.ReleaseInfo`를 사용한다. 서비스 파일에서 타입을
+가져오지 않는다. 서비스가 HTTP 요청 DTO를 직접 받거나 application dataclass를
+FastAPI request/response_model로 등록하지 않는다.
+
+상품 소개·업데이트 안내·통계, 대화 생성/버전 전환/생성 예약, LLM 실행 및
+종료 안내 결과는 dataclass다. 내부 호출자는 `result.created`, `result.totals`,
+`context.execution`처럼 속성으로 접근한다. GenerationResult와 GeneratedMessage는
+`conversation.types`에서 import한다. HTTP 응답은 mapper가 UUID·날짜·중첩 결과를
+직렬화 가능한 DTO로 변환한다. 내부 스냅샷 JSON 및 집계 계산용 딕셔너리는
+HTTP 응답 타입으로 사용하지 않는다.
+
+`test_product_boundaries.py`는 HTTP DTO의 중첩 변환, 미허용 필드 거부, 신뢰한
+사용자 ID 전달, 조회 파라미터 검증, 응답 직렬화와 계층 간 import 방향을 검증한다.
+
 ## 테스트
 
 프로젝트 루트 PowerShell에서 실행한다.
@@ -48,7 +71,8 @@ FastAPI 앱에 포함한다. `product.dependencies.get_product_session`은 요�
 프로세스 중단 복구는 실제 제공사 오케스트레이터에서 처리해야 한다.
 
 `runtime_context`는 서버 내부용이며 HTTP로 반환하지 않는다. 별도 트랜잭션에서
-읽고 버전이 예약의 product_snapshot_id와 같은지 확인한다. 다르면 제공사를
+읽고 `UUID(context.product_snapshot_id) == reservation.product_snapshot_id`인지
+확인한다. 다르면 제공사를
 호출하지 않고 예약을 cancelled로 마감한다. 실제 제공사 호출에는 예약에
 고정된 model_id/model_name/reasoning_effort를 사용한다. 컨텍스트 조회에는
 모델 대체 계획 기록이 포함될 수 있으므로 성공 시 커밋한다.

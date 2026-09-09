@@ -1,7 +1,4 @@
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
-from uuid import UUID
 
 from sqlalchemy import delete, select
 
@@ -9,18 +6,7 @@ from app.db.models.lorebook import LorebookEntry
 from app.db.models.model_routing import Model, Provider
 from app.db.models.product import ProductCharacter, ProductLorebook, ProductStartSet
 from app.modules.content.product import repository
-
-
-@dataclass(frozen=True, slots=True)
-class Settings:
-    model_id: UUID
-    reasoning_effort: str
-    start_entry_ids: tuple[UUID, ...]
-    replacement_scope: Literal["same_family", "same_provider", "allowlist"] = (
-        "same_family"
-    )
-    replacement_model_ids: tuple[UUID, ...] = ()
-    unavailable_policy: Literal["pause", "use_original_until_shutdown"] = "pause"
+from app.modules.content.product.types import Settings
 
 
 async def validate_model(session, model_id, effort):
@@ -43,7 +29,7 @@ async def validate_model(session, model_id, effort):
     return model
 
 
-async def set_settings(session, *, product_id, owner_id, value: Settings):
+async def set_settings(session, *, product_id, owner_id, value: Settings) -> Settings:
     if value.replacement_scope not in (
         "same_family",
         "same_provider",

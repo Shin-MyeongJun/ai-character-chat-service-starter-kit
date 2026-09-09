@@ -12,15 +12,15 @@ from app.db.models.product_usage import ProductGeneration
 from app.db.models.snapshot.product import ProductSnapshotCharacter
 from app.db.product_stats_queue import day_bounds, mark_dirty, statistics_day
 from app.modules.chatting.conversation.generation import (
-    GeneratedMessage,
-    GenerationResult,
     begin_generation,
     finish_generation,
 )
+from app.modules.chatting.conversation.types import GeneratedMessage, GenerationResult
 from app.modules.chatting.conversation.versions import switch_version
 from app.modules.commerce.billing.attribution import record_refund, record_sale
 from app.modules.content.product.service import statistics
-from app.modules.content.product.service.releases import ReleaseRequest, publish
+from app.modules.content.product.service.releases import publish
+from app.modules.content.product.types import ReleasePublish
 from sqlalchemy import func, select, update
 from test_product_usage import scenario
 
@@ -48,7 +48,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     )
     await finish_generation(
         db,
-        generation_id=first["id"],
+        generation_id=first.id,
         user_id=owner.id,
         value=GenerationResult(
             10, 4, 3, (GeneratedMessage(charid, "One"), GeneratedMessage(charid, "Two"))
@@ -58,7 +58,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Next", "Media", True),
+        value=ReleasePublish("Next", "Media", True),
     )
     await switch_version(
         db, conversation_id=cid, user_id=owner.id, target_snapshot_id=latest.snapshot_id
@@ -78,7 +78,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     )
     await finish_generation(
         db,
-        generation_id=second["id"],
+        generation_id=second.id,
         user_id=owner.id,
         value=GenerationResult(7, 2, 1, (GeneratedMessage(charid2, "New"),)),
     )
@@ -88,17 +88,11 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         report = await statistics.get_statistics(
             db, product_id=p.id, owner_id=owner.id, date_from=today, date_to=today
         )
-        assert report["pending_days"] == []
-        assert report["totals"]["active_users"] == 1
-        assert report["totals"]["succeeded"] == 2 and report["totals"]["messages"] == 3
-        assert (
-            report["totals"]["input_tokens"] == 17
-            and report["totals"]["cost_credit"] == 4
-        )
-        assert (
-            report["totals"]["conversations"] == 1
-            and report["totals"]["transitions"] == 1
-        )
+        assert report.pending_days == []
+        assert report.totals.active_users == 1
+        assert report.totals.succeeded == 2 and report.totals.messages == 3
+        assert report.totals.input_tokens == 17 and report.totals.cost_credit == 4
+        assert report.totals.conversations == 1 and report.totals.transitions == 1
         versions = list(
             await db.scalars(
                 select(ProductVersionDailyStats).where(
@@ -113,7 +107,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         again = await statistics.get_statistics(
             db, product_id=p.id, owner_id=owner.id, date_from=today, date_to=today
         )
-        assert again["totals"] == report["totals"]
+        assert again.totals == report.totals
         with pytest.raises(LookupError):
             await statistics.get_statistics(
                 db, product_id=p.id, owner_id=uuid4(), date_from=today, date_to=today
@@ -123,12 +117,12 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     async with db.begin():
         await db.execute(
             update(ProductGeneration)
-            .where(ProductGeneration.id == first["id"])
+            .where(ProductGeneration.id == first.id)
             .values(finished_at=yesterday_start)
         )
         await db.execute(
             update(UsageLog)
-            .where(UsageLog.generation_id == first["id"])
+            .where(UsageLog.generation_id == first.id)
             .values(created_at=yesterday_start)
         )
         await mark_dirty(db, p.id, yesterday_start)
@@ -143,8 +137,8 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
             date_to=today,
         )
         assert (
-            period["totals"]["active_users"] == 1
-            and sum(d["active_users"] for d in period["days"]) == 2
+            period.totals.active_users == 1
+            and sum(d.active_users for d in period.days) == 2
         )
 
 
@@ -198,10 +192,10 @@ async def test_late_refund_rebuilds_original_day_and_keeps_currency_separate(db)
             date_from=statistics_day(old),
             date_to=statistics_day(now),
         )
-        assert Decimal(report["totals"]["revenue"]["KRW"]["net"]) == 50
-        assert Decimal(report["totals"]["revenue"]["USD"]["net"]) == 20
-        assert report["totals"]["revenue"]["KRW"]["sale_count"] == 1
-        assert report["totals"]["revenue"]["KRW"]["refund_count"] == 1
+        assert Decimal(report.totals.revenue["KRW"].net) == 50
+        assert Decimal(report.totals.revenue["USD"].net) == 20
+        assert report.totals.revenue["KRW"].sale_count == 1
+        assert report.totals.revenue["KRW"].refund_count == 1
 
 
 @pytest.mark.asyncio

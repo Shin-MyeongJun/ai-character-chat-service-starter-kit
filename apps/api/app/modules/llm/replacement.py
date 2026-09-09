@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.models.model_routing import Model, ModelReplacement, Provider
 from app.db.models.snapshot.product import ProductSnapshot
 from app.modules.governance.admin.product_policy import require_admin
+from app.modules.llm.types import ExecutionInfo, ModelNotice
 
 EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
@@ -68,7 +69,7 @@ def choose_replacement(original, candidates, policy, effort, *, now):
 
 async def announce_retirement(
     session, *, actor_id, model_id, announced_at, shutdown_at
-):
+) -> None:
     for instant in (announced_at, shutdown_at):
         if instant.tzinfo is None or instant.utcoffset() is None:
             raise ValueError("Retirement dates require timezones.")
@@ -84,13 +85,13 @@ async def announce_retirement(
         await session.flush()
 
 
-async def execution_notice(session, snapshot, *, now=None):
+async def execution_notice(session, snapshot, *, now=None) -> ModelNotice | None:
     """Read-only availability for customers and creators; never expose prompts."""
     now = now or datetime.now(UTC)
     configuration = snapshot.snapshot_data["model"]
     model = await session.get(Model, UUID(configuration["id"]))
     if model is None:
-        return {"state": "paused", "reason": "model_missing"}
+        return ModelNotice(state="paused", reason="model_missing")
     provider = await session.get(Provider, model.provider_id)
     available = (
         model.is_enabled
@@ -121,23 +122,23 @@ async def execution_notice(session, snapshot, *, now=None):
     continuing = available and (
         now < deadline or policy.get("unavailable") == "use_original_until_shutdown"
     )
-    return {
-        "state": ("scheduled" if now < effective_at else "replacement_ready")
+    return ModelNotice(
+        state=("scheduled" if now < effective_at else "replacement_ready")
         if choice
         else ("replacement_unavailable" if continuing else "paused"),
-        "model_id": model.id,
-        "model_name": model.model_name,
-        "announced_at": model.retirement_announced_at,
-        "shutdown_at": model.shutdown_at,
-        "transition_deadline": deadline,
-        "replacement_model_id": choice[0].id if choice else None,
-        "replacement_model_name": choice[0].model_name if choice else None,
-        "replacement_reasoning_effort": choice[1] if choice else None,
-        "unavailable_policy": policy.get("unavailable", "pause"),
-    }
+        model_id=model.id,
+        model_name=model.model_name,
+        announced_at=model.retirement_announced_at,
+        shutdown_at=model.shutdown_at,
+        transition_deadline=deadline,
+        replacement_model_id=choice[0].id if choice else None,
+        replacement_model_name=choice[0].model_name if choice else None,
+        replacement_reasoning_effort=choice[1] if choice else None,
+        unavailable_policy=policy.get("unavailable", "pause"),
+    )
 
 
-async def resolve_execution(session, *, snapshot_id, now=None):
+async def resolve_execution(session, *, snapshot_id, now=None) -> ExecutionInfo:
     """Caller transaction; locks version to make replacement selection idempotent.
 
     Can run at announcement time to prepare a plan, and on every generation. An
@@ -163,14 +164,14 @@ async def resolve_execution(session, *, snapshot_id, now=None):
         and now >= model.retirement_announced_at
     )
     if not announced and original_available:
-        return {
-            "model_id": model.id,
-            "provider": provider.name,
-            "model": model.model_name,
-            "reasoning_effort": effort,
-            "replacement": False,
-            "scheduled_at": None,
-        }
+        return ExecutionInfo(
+            model_id=model.id,
+            provider=provider.name,
+            model=model.model_name,
+            reasoning_effort=effort,
+            replacement=False,
+            scheduled_at=None,
+        )
     deadline = (
         max(model.retirement_announced_at, model.shutdown_at - timedelta(days=1))
         if announced and model.shutdown_at
@@ -195,15 +196,15 @@ async def resolve_execution(session, *, snapshot_id, now=None):
             or snapshot.snapshot_data.get("replacement_policy", {}).get("unavailable")
             == "use_original_until_shutdown"
         ):
-            return {
-                "model_id": model.id,
-                "provider": provider.name,
-                "model": model.model_name,
-                "reasoning_effort": effort,
-                "replacement": False,
-                "scheduled_at": deadline,
-                "replacement_unavailable": True,
-            }
+            return ExecutionInfo(
+                model_id=model.id,
+                provider=provider.name,
+                model=model.model_name,
+                reasoning_effort=effort,
+                replacement=False,
+                scheduled_at=deadline,
+                replacement_unavailable=True,
+            )
         raise ValueError(
             "No permitted replacement available; generation paused, history retained."
         )
@@ -227,21 +228,21 @@ async def resolve_execution(session, *, snapshot_id, now=None):
         )
         await session.flush()
     if now < effective_at:
-        return {
-            "model_id": model.id,
-            "provider": provider.name,
-            "model": model.model_name,
-            "reasoning_effort": effort,
-            "replacement": False,
-            "scheduled_at": effective_at,
-            "planned_model_id": target.id,
-        }
+        return ExecutionInfo(
+            model_id=model.id,
+            provider=provider.name,
+            model=model.model_name,
+            reasoning_effort=effort,
+            replacement=False,
+            scheduled_at=effective_at,
+            planned_model_id=target.id,
+        )
     target_provider = await session.get(Provider, target.provider_id)
-    return {
-        "model_id": target.id,
-        "provider": target_provider.name,
-        "model": target.model_name,
-        "reasoning_effort": target_effort,
-        "replacement": True,
-        "scheduled_at": effective_at,
-    }
+    return ExecutionInfo(
+        model_id=target.id,
+        provider=target_provider.name,
+        model=target.model_name,
+        reasoning_effort=target_effort,
+        replacement=True,
+        scheduled_at=effective_at,
+    )

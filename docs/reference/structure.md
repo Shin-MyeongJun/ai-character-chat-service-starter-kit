@@ -130,6 +130,21 @@ db.models -> types
 types -> schemas
 ```
 
+Product, conversation, and the product/model administration adapters follow the
+same schema/type split. HTTP DTOs live in each module's `schemas.py`; application
+commands, queries, and result dataclasses live in `types.py`. A service file must
+not define a request DTO or act as the canonical import location for a result type.
+Do not register application dataclasses directly as FastAPI request bodies or
+response models. Routers use the module's SchemaMapper class for both directions.
+Product list/statistics query parameters also use request DTOs.
+
+Public application queries return named result types, including nested notices,
+statistics metrics, and conversation execution results. Internal dictionaries used
+for snapshot JSON or intermediate aggregation remain implementation details.
+Entity-to-result conversion belongs in `mapper/persistence.py`. Product HTTP
+dependency aliases and error translation live in `product/http.py`, so related
+adapters do not import another router to reuse these helpers.
+
 ## Lorebook Module
 
 Lorebook follows the same application boundaries as character:

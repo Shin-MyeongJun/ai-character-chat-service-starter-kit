@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.db.models.identity import User
 from app.db.models.product import Product
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotPolicyChange
+from app.modules.governance.admin.types import ExpiryChanged
 
 
 async def require_admin(session, actor_id):
@@ -13,7 +14,9 @@ async def require_admin(session, actor_id):
         raise LookupError("Administrative operation unavailable.")
 
 
-async def set_expiry(session, *, snapshot_id, actor_id, expires_at, reason):
+async def set_expiry(
+    session, *, snapshot_id, actor_id, expires_at, reason
+) -> ExpiryChanged:
     if not reason.strip() or len(reason) > 2000:
         raise ValueError("Reason must contain 1–2000 characters.")
     if expires_at is not None and (
@@ -36,10 +39,12 @@ async def set_expiry(session, *, snapshot_id, actor_id, expires_at, reason):
         )
         snapshot.expires_at, snapshot.expiry_reason = expires_at, reason
         await session.flush()
-        return {"snapshot_id": snapshot_id, "expires_at": expires_at, "reason": reason}
+        return ExpiryChanged(
+            snapshot_id=snapshot_id, expires_at=expires_at, reason=reason
+        )
 
 
-async def moderate_product(session, *, product_id, actor_id, status):
+async def moderate_product(session, *, product_id, actor_id, status) -> None:
     if status not in ("approved", "rejected", "draft"):
         raise ValueError("Invalid product status.")
     async with session.begin():

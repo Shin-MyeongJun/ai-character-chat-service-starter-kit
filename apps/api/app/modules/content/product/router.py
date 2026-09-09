@@ -1,17 +1,11 @@
-from contextlib import contextmanager
-from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 
-from app.modules.content.product.dependencies import (
-    get_current_owner_id,
-    get_product_session,
-)
-from app.modules.content.product.mapper.schema import to_write
-from app.modules.content.product.schemas import ProductRequest
+from app.modules.content.product import schemas
+from app.modules.content.product.http import Owner, Session, errors
+from app.modules.content.product.mapper.schema import ProductSchemaMapper
 from app.modules.content.product.service import (
     command,
     composition,
@@ -20,56 +14,58 @@ from app.modules.content.product.service import (
     releases,
     settings,
 )
-from app.modules.content.product.types import Composition, ProductInfo
 
 router = APIRouter(prefix="/products", tags=["products"])
-Session = Annotated[AsyncSession, Depends(get_product_session)]
-Owner = Annotated[UUID, Depends(get_current_owner_id)]
 
 
-@contextmanager
-def errors():
-    try:
-        yield
-    except LookupError as exc:
-        raise HTTPException(404, str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from exc
-
-
-@router.get("/mine", response_model=list[ProductInfo])
+@router.get("/mine", response_model=list[schemas.ProductInfoResponseDto])
 async def list_mine(
     session: Session,
     owner: Owner,
-    offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    request: Annotated[schemas.ListProductsRequestDto, Query()],
 ):
-    return await query.list_products(
-        session, owner_id=owner, offset=offset, limit=limit
-    )
+    value = ProductSchemaMapper.to_list_query(request)
+    return [
+        ProductSchemaMapper.product_response(result)
+        for result in await query.list_products(
+            session, owner_id=owner, offset=value.offset, limit=value.limit
+        )
+    ]
 
 
-@router.post("", response_model=ProductInfo, status_code=201)
-async def create(body: ProductRequest, session: Session, owner: Owner):
+@router.post("", response_model=schemas.ProductInfoResponseDto, status_code=201)
+async def create(body: schemas.ProductWriteRequestDto, session: Session, owner: Owner):
     with errors():
-        return await command.create_product(
-            session, owner_id=owner, value=to_write(body)
+        return ProductSchemaMapper.product_response(
+            await command.create_product(
+                session, owner_id=owner, value=ProductSchemaMapper.to_write(body)
+            )
         )
 
 
-@router.get("/{product_id}/draft", response_model=ProductInfo)
+@router.get("/{product_id}/draft", response_model=schemas.ProductInfoResponseDto)
 async def get_draft(product_id: UUID, session: Session, owner: Owner):
     with errors():
-        return await query.get_product(session, product_id=product_id, owner_id=owner)
+        return ProductSchemaMapper.product_response(
+            await query.get_product(session, product_id=product_id, owner_id=owner)
+        )
 
 
-@router.put("/{product_id}/draft", response_model=ProductInfo)
+@router.put("/{product_id}/draft", response_model=schemas.ProductInfoResponseDto)
 async def update(
-    product_id: UUID, body: ProductRequest, session: Session, owner: Owner
+    product_id: UUID,
+    body: schemas.ProductWriteRequestDto,
+    session: Session,
+    owner: Owner,
 ):
     with errors():
-        return await command.update_product(
-            session, product_id=product_id, owner_id=owner, value=to_write(body)
+        return ProductSchemaMapper.product_response(
+            await command.update_product(
+                session,
+                product_id=product_id,
+                owner_id=owner,
+                value=ProductSchemaMapper.to_write(body),
+            )
         )
 
 
@@ -79,104 +75,140 @@ async def delete(product_id: UUID, session: Session, owner: Owner):
         await command.delete_product(session, product_id=product_id, owner_id=owner)
 
 
-@router.put("/{product_id}/composition", response_model=Composition)
+@router.put("/{product_id}/composition", response_model=schemas.CompositionResponseDto)
 async def put_composition(
-    product_id: UUID, body: Composition, session: Session, owner: Owner
+    product_id: UUID,
+    body: schemas.CompositionRequestDto,
+    session: Session,
+    owner: Owner,
 ):
     with errors():
-        return await composition.replace_composition(
-            session, product_id=product_id, owner_id=owner, value=body
+        return ProductSchemaMapper.composition_response(
+            await composition.replace_composition(
+                session,
+                product_id=product_id,
+                owner_id=owner,
+                value=ProductSchemaMapper.to_composition(body),
+            )
         )
 
 
-@router.get("/{product_id}/composition", response_model=Composition)
+@router.get("/{product_id}/composition", response_model=schemas.CompositionResponseDto)
 async def read_composition(product_id: UUID, session: Session, owner: Owner):
     with errors():
-        return await composition.get_composition(
-            session, product_id=product_id, owner_id=owner
+        return ProductSchemaMapper.composition_response(
+            await composition.get_composition(
+                session, product_id=product_id, owner_id=owner
+            )
         )
 
 
-@router.put("/{product_id}/settings", response_model=settings.Settings)
+@router.put("/{product_id}/settings", response_model=schemas.SettingsResponseDto)
 async def put_settings(
-    product_id: UUID, body: settings.Settings, session: Session, owner: Owner
+    product_id: UUID, body: schemas.SettingsRequestDto, session: Session, owner: Owner
 ):
     with errors():
-        return await settings.set_settings(
-            session, product_id=product_id, owner_id=owner, value=body
+        return ProductSchemaMapper.settings_response(
+            await settings.set_settings(
+                session,
+                product_id=product_id,
+                owner_id=owner,
+                value=ProductSchemaMapper.to_settings(body),
+            )
         )
 
 
 @router.post(
-    "/{product_id}/releases", response_model=releases.ReleaseInfo, status_code=201
+    "/{product_id}/releases",
+    response_model=schemas.ReleaseInfoResponseDto,
+    status_code=201,
 )
 async def publish(
-    product_id: UUID, body: releases.ReleaseRequest, session: Session, owner: Owner
+    product_id: UUID, body: schemas.ReleaseRequestDto, session: Session, owner: Owner
 ):
     with errors():
-        return await releases.publish(
-            session, product_id=product_id, owner_id=owner, value=body
+        return ProductSchemaMapper.release_response(
+            await releases.publish(
+                session,
+                product_id=product_id,
+                owner_id=owner,
+                value=ProductSchemaMapper.to_release(body),
+            )
         )
 
 
 @router.patch(
-    "/{product_id}/releases/{snapshot_id}/note", response_model=releases.ReleaseInfo
+    "/{product_id}/releases/{snapshot_id}/note",
+    response_model=schemas.ReleaseInfoResponseDto,
 )
 async def correct_note(
     product_id: UUID,
     snapshot_id: UUID,
-    body: releases.ReleaseRequest,
+    body: schemas.ReleaseRequestDto,
     session: Session,
     owner: Owner,
 ):
+    value = ProductSchemaMapper.to_release(body)
     with errors():
-        if body.auto_apply_media:
+        if value.auto_apply_media:
             raise HTTPException(422, "Patch corrections cannot change update policy.")
-        return await releases.correct_note(
-            session,
-            product_id=product_id,
-            snapshot_id=snapshot_id,
-            owner_id=owner,
-            summary=body.summary,
-            body=body.body,
+        return ProductSchemaMapper.release_response(
+            await releases.correct_note(
+                session,
+                product_id=product_id,
+                snapshot_id=snapshot_id,
+                owner_id=owner,
+                summary=value.summary,
+                body=value.body,
+            )
         )
 
 
-@router.get("/{product_id}")
+@router.get("/{product_id}", response_model=schemas.PublishedProductInfoResponseDto)
 async def published(product_id: UUID, session: Session, owner: Owner):
     with errors():
-        return await notices.published_product(
-            session, product_id=product_id, user_id=owner
+        return ProductSchemaMapper.published_response(
+            await notices.published_product(
+                session, product_id=product_id, user_id=owner
+            )
         )
 
 
-@router.get("/{product_id}/statistics")
+@router.get(
+    "/{product_id}/statistics", response_model=schemas.StatisticsInfoResponseDto
+)
 async def statistics(
     product_id: UUID,
-    date_from: date,
-    date_to: date,
+    request: Annotated[schemas.ProductStatisticsRequestDto, Query()],
     session: Session,
     owner: Owner,
-    snapshot_id: UUID | None = None,
 ):
     from app.modules.content.product.service.statistics import get_statistics
 
+    value = ProductSchemaMapper.to_statistics_query(request)
     with errors():
-        return await get_statistics(
-            session,
-            product_id=product_id,
-            owner_id=owner,
-            date_from=date_from,
-            date_to=date_to,
-            snapshot_id=snapshot_id,
+        return ProductSchemaMapper.statistics_response(
+            await get_statistics(
+                session,
+                product_id=product_id,
+                owner_id=owner,
+                date_from=value.date_from,
+                date_to=value.date_to,
+                snapshot_id=value.snapshot_id,
+            )
         )
 
 
-@router.get("/{product_id}/releases/{snapshot_id}/availability")
+@router.get(
+    "/{product_id}/releases/{snapshot_id}/availability",
+    response_model=schemas.VersionAvailabilityInfoResponseDto,
+)
 async def version_availability(
     product_id: UUID, snapshot_id: UUID, session: Session, owner: Owner
 ):
     with errors():
-        return await notices.version_availability(
-            session, product_id=product_id, snapshot_id=snapshot_id, owner_id=owner
+        return ProductSchemaMapper.availability_response(
+            await notices.version_availability(
+                session, product_id=product_id, snapshot_id=snapshot_id, owner_id=owner
+            )
         )

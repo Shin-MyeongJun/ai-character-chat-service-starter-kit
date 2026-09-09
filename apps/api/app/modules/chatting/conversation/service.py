@@ -15,6 +15,13 @@ from app.db.models.snapshot.product import (
     ProductSnapshotStartSet,
 )
 from app.db.product_stats_queue import mark_dirty
+from app.modules.chatting.conversation.types import (
+    ConversationStarted,
+    RuntimeCharacter,
+    RuntimeContext,
+    RuntimeLorebook,
+    RuntimeStart,
+)
 from app.modules.governance.admin.product_policy import ensure_available
 
 
@@ -30,7 +37,9 @@ async def owned_conversation(session, conversation_id, user_id, *, lock=False):
     return conversation
 
 
-async def start_conversation(session, *, product_id, user_id, start_set_id=None):
+async def start_conversation(
+    session, *, product_id, user_id, start_set_id=None
+) -> ConversationStarted:
     async with session.begin():
         product = await session.scalar(
             select(Product).where(Product.id == product_id).with_for_update(read=True)
@@ -100,14 +109,14 @@ async def start_conversation(session, *, product_id, user_id, start_set_id=None)
         )
         await session.flush()
         await mark_dirty(session, product_id, conversation.created_at)
-        return {
-            "id": conversation.id,
-            "product_snapshot_id": snapshot.id,
-            "start_set_id": start_set_id,
-        }
+        return ConversationStarted(
+            id=conversation.id,
+            product_snapshot_id=snapshot.id,
+            start_set_id=start_set_id,
+        )
 
 
-async def runtime_context(session, *, conversation_id, user_id):
+async def runtime_context(session, *, conversation_id, user_id) -> RuntimeContext:
     conversation = await owned_conversation(session, conversation_id, user_id)
     if conversation.product_snapshot_id is None:
         raise ValueError("Legacy conversation requires verified version mapping.")
@@ -137,14 +146,14 @@ async def runtime_context(session, *, conversation_id, user_id):
     character_data = []
     for c in chars:
         character_data.append(
-            {
-                "id": str(c.id),
-                "snapshot_id": str(c.character_snapshot_id),
-                "primary": c.is_primary,
-                "data": (
+            RuntimeCharacter(
+                id=str(c.id),
+                snapshot_id=str(c.character_snapshot_id),
+                primary=c.is_primary,
+                data=(
                     await session.get(CharacterSnapshot, c.character_snapshot_id)
                 ).snapshot_data,
-            }
+            )
         )
     book_data = []
     for b in books:
@@ -152,29 +161,29 @@ async def runtime_context(session, *, conversation_id, user_id):
             await session.get(LorebookSnapshot, b.lorebook_snapshot_id)
         ).snapshot_data
         book_data.append(
-            {
-                "id": str(b.id),
-                "scope": b.scope,
-                "targets": [
+            RuntimeLorebook(
+                id=str(b.id),
+                scope=b.scope,
+                targets=[
                     str(t.product_character_id)
                     for t in targets
                     if t.product_lorebook_id == b.id
                 ],
-                "entries": [
+                entries=[
                     e
                     for e in data["entries"]
                     if e["entry_type"] != "start_set" and e["is_enabled"]
                 ],
-            }
+            )
         )
     from app.modules.llm.replacement import resolve_execution
 
     execution = await resolve_execution(session, snapshot_id=snapshot.id)
-    return {
-        "execution": execution,
-        "product_snapshot_id": str(snapshot.id),
-        "settings": snapshot.snapshot_data,
-        "start": {"title": start.title, "content": start.content},
-        "characters": character_data,
-        "lorebooks": book_data,
-    }
+    return RuntimeContext(
+        execution=execution,
+        product_snapshot_id=str(snapshot.id),
+        settings=snapshot.snapshot_data,
+        start=RuntimeStart(title=start.title, content=start.content),
+        characters=character_data,
+        lorebooks=book_data,
+    )

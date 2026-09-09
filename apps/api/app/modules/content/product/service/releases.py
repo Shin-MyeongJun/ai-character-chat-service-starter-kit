@@ -1,6 +1,4 @@
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy import select
 
@@ -12,23 +10,7 @@ from app.db.models.snapshot.character import (
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter
 from app.modules.content.product import repository
 from app.modules.content.product.service.publication import build_publication
-
-
-@dataclass(frozen=True, slots=True)
-class ReleaseRequest:
-    summary: str
-    body: str
-    auto_apply_media: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class ReleaseInfo:
-    snapshot_id: UUID
-    version: int
-    summary: str
-    body: str
-    change_kind: str
-    update_policy: str
+from app.modules.content.product.types import ReleaseInfo, ReleasePublish
 
 
 def validate_note(summary, body):
@@ -63,7 +45,9 @@ async def media_manifest(session, sid):
     return result
 
 
-async def publish(session, *, product_id, owner_id, value: ReleaseRequest):
+async def publish(
+    session, *, product_id, owner_id, value: ReleasePublish
+) -> ReleaseInfo:
     validate_note(value.summary, value.body)
     async with session.begin():
         product = await repository.owned(session, product_id, owner_id, lock=True)
@@ -101,7 +85,9 @@ async def publish(session, *, product_id, owner_id, value: ReleaseRequest):
         )
 
 
-async def correct_note(session, *, product_id, snapshot_id, owner_id, summary, body):
+async def correct_note(
+    session, *, product_id, snapshot_id, owner_id, summary, body
+) -> ReleaseInfo:
     validate_note(summary, body)
     async with session.begin():
         await repository.owned(session, product_id, owner_id, lock=True)

@@ -2,10 +2,9 @@
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import UTC, datetime
-from typing import Literal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy import select
 
@@ -16,25 +15,14 @@ from app.db.models.product_usage import ProductGeneration
 from app.db.models.snapshot.character import CharacterSnapshot
 from app.db.models.snapshot.product import ProductSnapshotCharacter
 from app.db.product_stats_queue import mark_dirty
+from app.modules.chatting.conversation.mapper.persistence import generation_to_info
 from app.modules.chatting.conversation.service import owned_conversation
+from app.modules.chatting.conversation.types import (
+    GenerationInfo,
+    GenerationResult,
+)
 from app.modules.governance.admin.product_policy import ensure_available
 from app.modules.llm.replacement import resolve_execution
-
-
-@dataclass(frozen=True, slots=True)
-class GeneratedMessage:
-    product_character_id: UUID
-    content: str
-
-
-@dataclass(frozen=True, slots=True)
-class GenerationResult:
-    input_tokens: int
-    output_tokens: int
-    cost_credit: int
-    messages: tuple[GeneratedMessage, ...] = ()
-    outcome: Literal["succeeded", "failed", "cancelled"] = "succeeded"
-    latency_ms: int | None = None
 
 
 def result_digest(value):
@@ -64,22 +52,9 @@ def result_digest(value):
     ).hexdigest()
 
 
-def info(run, *, created=False):
-    return {
-        "id": run.id,
-        "created": created,
-        "status": run.status,
-        "product_snapshot_id": run.product_snapshot_id,
-        "model_id": run.model_id,
-        "model_name": run.model_name,
-        "reasoning_effort": run.reasoning_effort,
-        "message_count": run.message_count,
-    }
-
-
 async def begin_generation(
     session, *, conversation_id, user_id, request_key, input_text
-):
+) -> GenerationInfo:
     if (
         not request_key.strip()
         or len(request_key) > 128
@@ -102,7 +77,7 @@ async def begin_generation(
                 or existing.input_digest != digest
             ):
                 raise ValueError("Request key was already used with different input.")
-            return info(existing)
+            return generation_to_info(existing)
         conversation = await owned_conversation(
             session, conversation_id, user_id, lock=True
         )
@@ -118,9 +93,9 @@ async def begin_generation(
             conversation_id=conversation.id,
             product_id=conversation.product_id,
             product_snapshot_id=conversation.product_snapshot_id,
-            model_id=execution["model_id"],
-            model_name=execution["model"],
-            reasoning_effort=execution["reasoning_effort"],
+            model_id=execution.model_id,
+            model_name=execution.model,
+            reasoning_effort=execution.reasoning_effort,
             request_key=request_key,
             input_digest=digest,
             status="pending",
@@ -139,12 +114,12 @@ async def begin_generation(
             )
         )
         await session.flush()
-        return info(run, created=True)
+        return generation_to_info(run, created=True)
 
 
 async def finish_generation(
     session, *, generation_id, user_id, value: GenerationResult
-):
+) -> GenerationInfo:
     fingerprint = result_digest(value)
     async with session.begin():
         run = await session.scalar(
@@ -161,7 +136,7 @@ async def finish_generation(
         if run.status != "pending":
             if run.result_digest != fingerprint:
                 raise ValueError("Generation already finished with different output.")
-            return info(run)
+            return generation_to_info(run)
         conversation = await owned_conversation(
             session, run.conversation_id, user_id, lock=True
         )
@@ -225,4 +200,4 @@ async def finish_generation(
         run.message_count = len(value.messages) if status == "succeeded" else 0
         await session.flush()
         await mark_dirty(session, run.product_id, now)
-        return info(run)
+        return generation_to_info(run)

@@ -1,3 +1,9 @@
+from app.modules.content.product.mapper.persistence import (
+    to_statistics_day,
+    to_statistics_metrics,
+)
+from app.modules.content.product.types import StatisticsInfo
+
 """Rebuild affected days from facts, never increment cached totals blindly."""
 
 from collections import defaultdict
@@ -216,7 +222,7 @@ async def rebuild_day(session, *, product_id, day):
     await session.flush()
 
 
-async def process_pending(session, *, limit=100):
+async def process_pending(session, *, limit=100) -> int:
     if not 1 <= limit <= 1000:
         raise ValueError("Batch limit must be 1–1000.")
     processed = 0
@@ -240,7 +246,7 @@ async def process_pending(session, *, limit=100):
     return processed
 
 
-async def enqueue_recent(session, *, days=7, now=None):
+async def enqueue_recent(session, *, days=7, now=None) -> None:
     """Nightly repair alongside the normal event-driven dirty queue."""
     if not 1 <= days <= 31:
         raise ValueError("Repair range must be 1–31 days.")
@@ -259,7 +265,7 @@ async def enqueue_recent(session, *, days=7, now=None):
 
 async def get_statistics(
     session, *, product_id, owner_id, date_from, date_to, snapshot_id=None
-):
+) -> StatisticsInfo:
     if date_to < date_from or (date_to - date_from).days > 730:
         raise ValueError("Statistics range must be ordered and at most 731 days.")
     await repository.owned(session, product_id, owner_id)
@@ -325,22 +331,13 @@ async def get_statistics(
             .order_by(ProductStatsDirtyDay.day)
         )
     )
-    return {
-        "product_id": product_id,
-        "snapshot_id": snapshot_id,
-        "timezone": "Asia/Seoul",
-        "date_from": date_from,
-        "date_to": date_to,
-        "totals": total,
-        "pending_days": pending,
-        "days": [
-            {
-                "day": r.day,
-                "updated_at": r.updated_at,
-                **{field: getattr(r, field) for field in COUNTERS},
-                "active_users": r.active_users,
-                "revenue": r.revenue,
-            }
-            for r in rows
-        ],
-    }
+    return StatisticsInfo(
+        product_id=product_id,
+        snapshot_id=snapshot_id,
+        timezone="Asia/Seoul",
+        date_from=date_from,
+        date_to=date_to,
+        totals=to_statistics_metrics(total),
+        pending_days=pending,
+        days=[to_statistics_day(row) for row in rows],
+    )

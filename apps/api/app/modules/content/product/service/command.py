@@ -24,7 +24,7 @@ def validate_profile(value: types.ProductWrite):
 
 async def create_product(
     session: AsyncSession, *, owner_id: UUID, value: types.ProductWrite
-):
+) -> types.ProductInfo:
     validate_profile(value)
     async with session.begin():
         entity = Product(owner_id=owner_id, status="draft", **asdict(value))
@@ -37,7 +37,7 @@ async def update_product(
     product_id: UUID,
     owner_id: UUID,
     value: types.ProductWrite,
-):
+) -> types.ProductInfo:
     validate_profile(value)
     async with session.begin():
         entity = await repository.owned(session, product_id, owner_id, lock=True)
@@ -46,7 +46,9 @@ async def update_product(
         return to_info(await repository.save(session, entity))
 
 
-async def delete_product(session: AsyncSession, *, product_id: UUID, owner_id: UUID):
+async def delete_product(
+    session: AsyncSession, *, product_id: UUID, owner_id: UUID
+) -> None:
     async with session.begin():
         entity = await repository.owned(session, product_id, owner_id, lock=True)
         if await session.scalar(

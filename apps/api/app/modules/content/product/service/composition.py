@@ -10,6 +10,7 @@ from app.db.models.product import (
     ProductLorebookCharacter,
 )
 from app.modules.content.product import repository, types
+from app.modules.content.product.mapper.persistence import composition_to_info
 
 
 def validate(value: types.Composition):
@@ -49,7 +50,7 @@ def validate(value: types.Composition):
 
 async def replace_composition(
     session, *, product_id, owner_id, value: types.Composition
-):
+) -> types.Composition:
     validate(value)
     async with session.begin():
         await repository.owned(session, product_id, owner_id, lock=True)
@@ -137,7 +138,7 @@ async def replace_composition(
         return value
 
 
-async def get_composition(session, *, product_id, owner_id):
+async def get_composition(session, *, product_id, owner_id) -> types.Composition:
     await repository.owned(session, product_id, owner_id)
     characters = list(
         await session.scalars(
@@ -160,25 +161,4 @@ async def get_composition(session, *, product_id, owner_id):
             )
         )
     )
-    ids = {c.id: c.character_id for c in characters}
-    return types.Composition(
-        tuple(
-            types.CharacterSelection(c.character_id, c.is_primary, c.role_name)
-            for c in characters
-        ),
-        tuple(
-            types.LorebookSelection(
-                b.lorebook_id,
-                b.scope,
-                tuple(
-                    ids[t.product_character_id]
-                    for t in links
-                    if t.product_lorebook_id == b.id
-                ),
-                b.role,
-                b.priority,
-                b.is_required,
-            )
-            for b in books
-        ),
-    )
+    return composition_to_info(characters, books, links)

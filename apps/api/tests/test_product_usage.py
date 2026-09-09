@@ -9,15 +9,15 @@ from app.db.models.chat import Message
 from app.db.models.product_usage import ProductGeneration, ProductPaymentEvent
 from app.db.models.snapshot.product import ProductSnapshotCharacter
 from app.modules.chatting.conversation.generation import (
-    GeneratedMessage,
-    GenerationResult,
     begin_generation,
     finish_generation,
 )
 from app.modules.chatting.conversation.service import start_conversation
+from app.modules.chatting.conversation.types import GeneratedMessage, GenerationResult
 from app.modules.chatting.conversation.versions import switch_version
 from app.modules.commerce.billing.attribution import record_refund, record_sale
-from app.modules.content.product.service.releases import ReleaseRequest, publish
+from app.modules.content.product.service.releases import publish
+from app.modules.content.product.types import ReleasePublish
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_product_integration import ready_product
@@ -28,7 +28,7 @@ pytestmark = pytest.mark.asyncio
 async def scenario(db):
     owner, _c, _b, p, _model, _entry = await ready_product(db)
     release = await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleaseRequest("First", "First")
+        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("First", "First")
     )
     conversation = await start_conversation(db, product_id=p.id, user_id=owner.id)
     async with db.begin():
@@ -37,7 +37,7 @@ async def scenario(db):
                 ProductSnapshotCharacter.product_snapshot_id == release.snapshot_id
             )
         )
-    return owner, p, release, conversation["id"], character_id
+    return owner, p, release, conversation.id, character_id
 
 
 async def test_concurrent_generation_retries_and_atomic_usage(db):
@@ -54,7 +54,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
             )
 
     a, b = await asyncio.gather(reserve(), reserve())
-    assert a["id"] == b["id"] and sum(r["created"] for r in (a, b)) == 1
+    assert a.id == b.id and sum(r.created for r in (a, b)) == 1
     output = GenerationResult(
         100,
         30,
@@ -68,11 +68,11 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
     async def finish():
         async with AsyncSession(db.bind, expire_on_commit=False) as session:
             return await finish_generation(
-                session, generation_id=a["id"], user_id=owner.id, value=output
+                session, generation_id=a.id, user_id=owner.id, value=output
             )
 
     first, second = await asyncio.gather(finish(), finish())
-    assert first["status"] == second["status"] == "succeeded"
+    assert first.status == second.status == "succeeded"
     async with db.begin():
         assert await db.scalar(select(func.count()).select_from(UsageLog)) == 1
         assert (
@@ -100,7 +100,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
     with pytest.raises(ValueError, match="different output"):
         await finish_generation(
             db,
-            generation_id=a["id"],
+            generation_id=a.id,
             user_id=owner.id,
             value=GenerationResult(100, 30, 8, output.messages),
         )
@@ -119,20 +119,20 @@ async def test_stale_generation_retains_cost_and_old_version(db):
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Media", "Media", True),
+        value=ReleasePublish("Media", "Media", True),
     )
     await switch_version(
         db, conversation_id=cid, user_id=owner.id, target_snapshot_id=latest.snapshot_id
     )
     result = await finish_generation(
         db,
-        generation_id=run["id"],
+        generation_id=run.id,
         user_id=owner.id,
         value=GenerationResult(
             12, 3, 2, (GeneratedMessage(character_id, "Old response"),)
         ),
     )
-    assert result["status"] == "stale" and result["message_count"] == 0
+    assert result.status == "stale" and result.message_count == 0
     async with db.begin():
         usage = await db.scalar(select(UsageLog))
         assert (
@@ -160,7 +160,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
     with pytest.raises(ValueError, match="character"):
         await finish_generation(
             db,
-            generation_id=run["id"],
+            generation_id=run.id,
             user_id=owner.id,
             value=GenerationResult(
                 1,
@@ -173,7 +173,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
             ),
         )
     async with db.begin():
-        assert (await db.get(ProductGeneration, run["id"])).status == "pending"
+        assert (await db.get(ProductGeneration, run.id)).status == "pending"
         assert await db.scalar(select(func.count()).select_from(UsageLog)) == 0
         assert (
             await db.scalar(
@@ -185,14 +185,14 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
         )
     await finish_generation(
         db,
-        generation_id=run["id"],
+        generation_id=run.id,
         user_id=owner.id,
         value=GenerationResult(1, 0, 1, outcome="failed"),
     )
     with pytest.raises(LookupError):
         await finish_generation(
             db,
-            generation_id=run["id"],
+            generation_id=run.id,
             user_id=uuid4(),
             value=GenerationResult(1, 0, 1, outcome="failed"),
         )

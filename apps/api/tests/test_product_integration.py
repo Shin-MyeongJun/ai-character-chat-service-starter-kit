@@ -121,7 +121,8 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
 
 async def ready_product(db):
     from app.db.models.model_routing import Model, Provider
-    from app.modules.content.product.service.settings import Settings, set_settings
+    from app.modules.content.product.service.settings import set_settings
+    from app.modules.content.product.types import Settings
 
     owner, c, b = await seed(db)
     async with db.begin():
@@ -165,10 +166,10 @@ async def ready_product(db):
 async def test_settings_and_composition_preserve_start_selection(db):
     from app.db.models.product import ProductStartSet
     from app.modules.content.product.service.settings import (
-        Settings,
         set_settings,
         validate_publication,
     )
+    from app.modules.content.product.types import Settings
 
     owner, c, b, p, model, entry = await ready_product(db)
     await composition.replace_composition(
@@ -324,25 +325,22 @@ async def test_atomic_publication_and_original_edits(db):
 
 async def test_release_policy_and_typo_correction(db):
     from app.db.models.product_release import ProductReleaseNoteRevision
-    from app.modules.content.product.service.releases import (
-        ReleaseRequest,
-        correct_note,
-        publish,
-    )
+    from app.modules.content.product.service.releases import correct_note, publish
+    from app.modules.content.product.types import ReleasePublish
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
     first = await publish(
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("First", "Initial release", True),
+        value=ReleasePublish("First", "Initial release", True),
     )
     assert first.update_policy == "choice"
     media = await publish(
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Media", "No content change", True),
+        value=ReleasePublish("Media", "No content change", True),
     )
     assert media.update_policy == "automatic"
     async with db.begin():
@@ -351,7 +349,7 @@ async def test_release_policy_and_typo_correction(db):
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Changes", "Content changed", True),
+        value=ReleasePublish("Changes", "Content changed", True),
     )
     assert changed.change_kind == "content" and changed.update_policy == "choice"
     corrected = await correct_note(
@@ -372,31 +370,30 @@ async def test_conversation_keeps_published_context(db):
         runtime_context,
         start_conversation,
     )
-    from app.modules.content.product.service.releases import ReleaseRequest, publish
+    from app.modules.content.product.service.releases import publish
+    from app.modules.content.product.types import ReleasePublish
 
     owner, c, _b, p, _model, entry = await ready_product(db)
     first = await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleaseRequest("First", "First")
+        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("First", "First")
     )
     conversation = await start_conversation(db, product_id=p.id, user_id=owner.id)
     async with db.begin():
         c.persona_prompt = "new content"
         entry.content = "new starting point"
     await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleaseRequest("Update", "Update")
+        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("Update", "Update")
     )
     async with db.begin():
         context = await runtime_context(
-            db, conversation_id=conversation["id"], user_id=owner.id
+            db, conversation_id=conversation.id, user_id=owner.id
         )
-        assert context["product_snapshot_id"] == str(first.snapshot_id)
-        assert context["characters"][0]["data"]["persona_prompt"] == "P"
-        assert context["start"]["content"] == "Begin at home"
-        assert context["lorebooks"][0]["entries"] == []
+        assert context.product_snapshot_id == str(first.snapshot_id)
+        assert context.characters[0].data["persona_prompt"] == "P"
+        assert context.start.content == "Begin at home"
+        assert context.lorebooks[0].entries == []
         with pytest.raises(LookupError):
-            await runtime_context(
-                db, conversation_id=conversation["id"], user_id=uuid4()
-            )
+            await runtime_context(db, conversation_id=conversation.id, user_id=uuid4())
 
 
 async def test_version_switch_requires_consent_and_preserves_initial_context(db):
@@ -405,11 +402,12 @@ async def test_version_switch_requires_consent_and_preserves_initial_context(db)
     from app.modules.chatting.conversation.versions import (
         switch_version,
     )
-    from app.modules.content.product.service.releases import ReleaseRequest, publish
+    from app.modules.content.product.service.releases import publish
+    from app.modules.content.product.types import ReleasePublish
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
     first = await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleaseRequest("First", "First")
+        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("First", "First")
     )
     conversation = await start_conversation(db, product_id=p.id, user_id=owner.id)
     async with db.begin():
@@ -418,18 +416,18 @@ async def test_version_switch_requires_consent_and_preserves_initial_context(db)
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Content", "Content"),
+        value=ReleasePublish("Content", "Content"),
     )
     latest = await publish(
         db,
         product_id=p.id,
         owner_id=owner.id,
-        value=ReleaseRequest("Media", "Media", True),
+        value=ReleasePublish("Media", "Media", True),
     )
     with pytest.raises(ValueError, match="consent"):
         await switch_version(
             db,
-            conversation_id=conversation["id"],
+            conversation_id=conversation.id,
             user_id=owner.id,
             target_snapshot_id=latest.snapshot_id,
             automatic=True,
@@ -440,14 +438,14 @@ async def test_version_switch_requires_consent_and_preserves_initial_context(db)
         uid = product.owner_id
     await switch_version(
         db,
-        conversation_id=conversation["id"],
+        conversation_id=conversation.id,
         user_id=uid,
         target_snapshot_id=latest.snapshot_id,
     )
     async with db.begin():
-        saved = await db.get(Conversation, conversation["id"])
+        saved = await db.get(Conversation, conversation.id)
         assert saved.initial_snapshot_id == first.snapshot_id
-        assert saved.start_set_id == conversation["start_set_id"]
+        assert saved.start_set_id == conversation.start_set_id
         assert (
             len(
                 list(

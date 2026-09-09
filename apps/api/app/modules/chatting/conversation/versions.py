@@ -8,12 +8,13 @@ from app.db.models.snapshot.character import CharacterSnapshot
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter
 from app.db.product_stats_queue import mark_dirty
 from app.modules.chatting.conversation.service import owned_conversation
+from app.modules.chatting.conversation.types import VersionSwitched
 from app.modules.governance.admin.product_policy import ensure_available
 
 
 async def switch_version(
     session, *, conversation_id, user_id, target_snapshot_id, automatic=False
-):
+) -> VersionSwitched:
     async with session.begin():
         conversation = await owned_conversation(
             session, conversation_id, user_id, lock=True
@@ -21,7 +22,7 @@ async def switch_version(
         if not conversation.product_snapshot_id:
             raise ValueError("Legacy version is not verified.")
         if conversation.product_snapshot_id == target_snapshot_id:
-            return {"snapshot_id": target_snapshot_id, "changed": False}
+            return VersionSwitched(snapshot_id=target_snapshot_id, changed=False)
         current = await session.get(ProductSnapshot, conversation.product_snapshot_id)
         target = await session.scalar(
             select(ProductSnapshot).where(
@@ -93,4 +94,4 @@ async def switch_version(
         # Initial context, messages and memory remain untouched, including removed characters.
         await session.flush()
         await mark_dirty(session, conversation.product_id, changed_at)
-        return {"snapshot_id": target.id, "changed": True}
+        return VersionSwitched(snapshot_id=target.id, changed=True)

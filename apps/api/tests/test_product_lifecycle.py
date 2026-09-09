@@ -13,7 +13,8 @@ from app.modules.content.product.service.notices import (
     pending_updates,
     version_availability,
 )
-from app.modules.content.product.service.releases import ReleaseRequest, publish
+from app.modules.content.product.service.releases import publish
+from app.modules.content.product.types import ReleasePublish
 from app.modules.governance.admin.product_policy import set_expiry
 from app.modules.llm.replacement import announce_retirement, resolve_execution
 from sqlalchemy import func, select
@@ -37,7 +38,7 @@ async def test_concurrent_publication_serializes_versions_and_refreshes_cached_p
                 session,
                 product_id=p.id,
                 owner_id=owner.id,
-                value=ReleaseRequest("Concurrent", "Concurrent"),
+                value=ReleasePublish("Concurrent", "Concurrent"),
             )
 
     a, b = await asyncio.gather(publish_once(), publish_once())
@@ -115,9 +116,9 @@ async def test_model_retirement_plans_before_deadline_and_switches_once(db):
         creator = await version_availability(
             db, product_id=p.id, snapshot_id=release.snapshot_id, owner_id=owner.id
         )
-        assert customer["model_notice"] == creator["model_notice"]
-        assert customer["model_notice"]["state"] == "scheduled"
-        assert customer["model_notice"]["replacement_model_id"] == replacement_id
+        assert customer.model_notice == creator.model_notice
+        assert customer.model_notice.state == "scheduled"
+        assert customer.model_notice.replacement_model_id == replacement_id
         assert await db.scalar(select(func.count()).select_from(ModelReplacement)) == 0
         with pytest.raises(LookupError):
             await version_availability(
@@ -125,15 +126,15 @@ async def test_model_retirement_plans_before_deadline_and_switches_once(db):
             )
         planned = await resolve_execution(db, snapshot_id=release.snapshot_id, now=now)
         assert (
-            planned["model_id"] == original_id
-            and planned["planned_model_id"] == replacement_id
+            planned.model_id == original_id
+            and planned.planned_model_id == replacement_id
         )
-        assert planned["scheduled_at"] == shutdown - timedelta(days=1)
+        assert planned.scheduled_at == shutdown - timedelta(days=1)
     async with db.begin():
         executed = await resolve_execution(
             db, snapshot_id=release.snapshot_id, now=shutdown - timedelta(days=1)
         )
-        assert executed["model_id"] == replacement_id and executed["replacement"]
+        assert executed.model_id == replacement_id and executed.replacement
         assert await db.scalar(select(func.count()).select_from(ModelReplacement)) == 1
         assert (await db.get(ProductSnapshot, release.snapshot_id)).snapshot_data[
             "model"
