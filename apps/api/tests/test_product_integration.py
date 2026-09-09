@@ -56,7 +56,11 @@ async def test_composition_ownership_and_cross_product_fk(db):
         foreign = Product(id=uuid4(), owner_id=owner.id, title="foreign")
         db.add(foreign)
         await db.flush()
-        other = ProductCharacter(id=uuid4(), product_id=foreign.id, character_id=c.id)
+        other = ProductCharacter(
+            id=uuid4(),
+            product_id=foreign.id,
+            character_id=value.characters[0].character_id,
+        )
         db.add(other)
         await db.flush()
         target = await db.scalar(

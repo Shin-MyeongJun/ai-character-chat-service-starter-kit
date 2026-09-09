@@ -367,3 +367,38 @@ CREATE INDEX IF NOT EXISTS ix_audit_logs_admin_id_created_at
 
 CREATE INDEX IF NOT EXISTS ix_audit_logs_action_created_at
     ON audit_logs (action, created_at);
+
+
+-- Product composition baseline (also present in Alembic 0001).
+CREATE TABLE IF NOT EXISTS product_characters (
+	product_id UUID NOT NULL, 
+	character_id UUID NOT NULL, 
+	role_order INTEGER DEFAULT 0 NOT NULL, 
+	role_name TEXT, 
+	is_primary BOOLEAN DEFAULT false NOT NULL, 
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_product_characters_pair UNIQUE (product_id, character_id), 
+	FOREIGN KEY(product_id) REFERENCES products (id) ON DELETE CASCADE, 
+	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_product_characters_primary_per_product ON product_characters (product_id) WHERE is_primary = true;
+
+CREATE INDEX IF NOT EXISTS ix_product_characters_product_id ON product_characters (product_id);
+
+CREATE TABLE IF NOT EXISTS product_lorebooks (
+	product_id UUID NOT NULL, 
+	lorebook_id UUID NOT NULL, 
+	role TEXT DEFAULT 'detail' NOT NULL, 
+	priority INTEGER DEFAULT 0 NOT NULL, 
+	is_required BOOLEAN DEFAULT true NOT NULL, 
+	id UUID DEFAULT gen_random_uuid() NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_product_lorebooks_role CHECK (role IN ('main', 'detail', 'rule', 'optional')), 
+	CONSTRAINT uq_product_lorebooks_pair UNIQUE (product_id, lorebook_id), 
+	FOREIGN KEY(product_id) REFERENCES products (id) ON DELETE CASCADE, 
+	FOREIGN KEY(lorebook_id) REFERENCES lorebooks (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_product_lorebooks_product_id ON product_lorebooks (product_id);

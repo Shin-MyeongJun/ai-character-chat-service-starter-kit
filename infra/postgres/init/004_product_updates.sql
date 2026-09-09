@@ -223,5 +223,10 @@ CREATE TABLE model_replacements (
 );
 
 
+-- Running upgrade 0012 -> 0012a
+
+ALTER TABLE conversation_memories ADD COLUMN IF NOT EXISTS source_message_id UUID REFERENCES messages(id) ON DELETE SET NULL;
+
+
 COMMIT;
 

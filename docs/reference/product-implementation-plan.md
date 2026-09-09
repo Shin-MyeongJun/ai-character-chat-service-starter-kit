@@ -224,3 +224,5 @@ DB 환경 메모: Docker Desktop 시작이 Windows 임시 Unix 소켓 오류로 
 진행 추가: C12 제작자 허용 범위·동일계열 우선·추론 근사·종료 24시간 전 예약·대체불가 중지/종료까지유지 정책과 실행 해석 연결. 182 passed / DB 9 skipped. 공지 입력은 관리자 API이며 제공사 공지 수집·정기 예약 실행·alarm 전달은 미연동.
 
 추가 점검: 상품 update 후 DB가 계산한 updated_at을 명시 refresh하여 AsyncSession의 암묵 IO를 방지했다. 스냅샷 불변성은 현재 서비스 경로에서 지키며 DB 트리거 강제는 아직 없음.
+
+2026-09-09 재개 검증: Docker 정상 시작, PostgreSQL 통합 9개 실제 통과. 신규 초기화 SQL의 product_characters/product_lorebooks 누락을 보완하고 memory.source_message_id를 모델·0012a 마이그레이션에 보존 반영. 초기화/Alembic/ORM 구조 비교 및 legacy 대화 보존 검사 포함 195 passed, skip 없음. 다음 C13/C14.
