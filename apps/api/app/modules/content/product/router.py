@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -146,4 +147,26 @@ async def published(product_id: UUID, session: Session, owner: Owner):
     with errors():
         return await notices.published_product(
             session, product_id=product_id, user_id=owner
+        )
+
+
+@router.get("/{product_id}/statistics")
+async def statistics(
+    product_id: UUID,
+    date_from: date,
+    date_to: date,
+    session: Session,
+    owner: Owner,
+    snapshot_id: UUID | None = None,
+):
+    from app.modules.content.product.service.statistics import get_statistics
+
+    with errors():
+        return await get_statistics(
+            session,
+            product_id=product_id,
+            owner_id=owner,
+            date_from=date_from,
+            date_to=date_to,
+            snapshot_id=snapshot_id,
         )

@@ -228,3 +228,5 @@ DB 환경 메모: Docker Desktop 시작이 Windows 임시 Unix 소켓 오류로 
 2026-09-09 재개 검증: Docker 정상 시작, PostgreSQL 통합 9개 실제 통과. 신규 초기화 SQL의 product_characters/product_lorebooks 누락을 보완하고 memory.source_message_id를 모델·0012a 마이그레이션에 보존 반영. 초기화/Alembic/ORM 구조 비교 및 legacy 대화 보존 검사 포함 195 passed, skip 없음. 다음 C13/C14.
 
 2026-09-09 C13 구현: product_generations와 usage_logs 상품/버전 귀속, 메시지+사용량 원자 저장, 동시 재시도 멱등성, stale/실패 비용 보존. 명시적 결제 배분·부분 환불 이벤트와 원버전 귀속/초과 방지. 기존 append_generated_message 우회 경로는 제거하고 begin_generation/finish_generation으로 통합. PostgreSQL 동시 재시도/환불/마이그레이션 테스트 통과.
+
+2026-09-09 C14 구현: 상품/버전 일별 집계, 사용자별 활동, 재집계 일자 큐를 추가했다. 성공 턴·메시지·실패/취소/stale·토큰·실제 비용·대화/전환·통화별 매출/환불을 집계한다. 기간 고유 이용자는 DISTINCT로 계산하며 지연 환불은 원거래 일자를 다시 계산한다. 이벤트 저장과 큐 등록은 같은 트랜잭션이며 집계 실패 시 재시도할 수 있다. 제작자 전용 통계 API와 실행용 CLI 제공. 외부 스케줄러 등록은 앱 배포 시 연결한다.

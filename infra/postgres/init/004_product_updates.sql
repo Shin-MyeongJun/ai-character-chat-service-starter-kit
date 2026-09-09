@@ -295,5 +295,87 @@ ALTER TABLE usage_logs ADD CONSTRAINT ck_usage_nonnegative CHECK (input_tokens >
 ALTER TABLE messages ADD COLUMN generation_id UUID, ADD FOREIGN KEY (generation_id,product_snapshot_id) REFERENCES product_generations(id,product_snapshot_id);
 
 
+-- Running upgrade 0013 -> 0014
+
+CREATE TABLE product_daily_stats (
+    product_id UUID NOT NULL, 
+    day DATE NOT NULL, 
+    active_users BIGINT DEFAULT '0' NOT NULL, 
+    succeeded BIGINT DEFAULT '0' NOT NULL, 
+    failed BIGINT DEFAULT '0' NOT NULL, 
+    cancelled BIGINT DEFAULT '0' NOT NULL, 
+    stale BIGINT DEFAULT '0' NOT NULL, 
+    messages BIGINT DEFAULT '0' NOT NULL, 
+    conversations BIGINT DEFAULT '0' NOT NULL, 
+    transitions BIGINT DEFAULT '0' NOT NULL, 
+    input_tokens BIGINT DEFAULT '0' NOT NULL, 
+    output_tokens BIGINT DEFAULT '0' NOT NULL, 
+    cost_credit BIGINT DEFAULT '0' NOT NULL, 
+    revenue JSONB DEFAULT '{}'::jsonb NOT NULL, 
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    PRIMARY KEY (product_id, day), 
+    FOREIGN KEY(product_id) REFERENCES products (id)
+);
+
+CREATE TABLE product_version_daily_stats (
+    product_id UUID NOT NULL, 
+    product_snapshot_id UUID NOT NULL, 
+    day DATE NOT NULL, 
+    active_users BIGINT DEFAULT '0' NOT NULL, 
+    succeeded BIGINT DEFAULT '0' NOT NULL, 
+    failed BIGINT DEFAULT '0' NOT NULL, 
+    cancelled BIGINT DEFAULT '0' NOT NULL, 
+    stale BIGINT DEFAULT '0' NOT NULL, 
+    messages BIGINT DEFAULT '0' NOT NULL, 
+    conversations BIGINT DEFAULT '0' NOT NULL, 
+    transitions BIGINT DEFAULT '0' NOT NULL, 
+    input_tokens BIGINT DEFAULT '0' NOT NULL, 
+    output_tokens BIGINT DEFAULT '0' NOT NULL, 
+    cost_credit BIGINT DEFAULT '0' NOT NULL, 
+    revenue JSONB DEFAULT '{}'::jsonb NOT NULL, 
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    PRIMARY KEY (product_snapshot_id, day), 
+    FOREIGN KEY(product_id, product_snapshot_id) REFERENCES product_snapshots (product_id, id)
+);
+
+CREATE INDEX ix_product_version_daily_stats_product_id ON product_version_daily_stats (product_id);
+
+CREATE TABLE product_user_daily_activity (
+    product_id UUID NOT NULL, 
+    day DATE NOT NULL, 
+    user_id UUID NOT NULL, 
+    PRIMARY KEY (product_id, day, user_id), 
+    FOREIGN KEY(product_id) REFERENCES products (id), 
+    FOREIGN KEY(user_id) REFERENCES users (id)
+);
+
+CREATE TABLE product_version_user_daily_activity (
+    product_id UUID NOT NULL, 
+    product_snapshot_id UUID NOT NULL, 
+    day DATE NOT NULL, 
+    user_id UUID NOT NULL, 
+    PRIMARY KEY (product_snapshot_id, day, user_id), 
+    FOREIGN KEY(product_id, product_snapshot_id) REFERENCES product_snapshots (product_id, id), 
+    FOREIGN KEY(user_id) REFERENCES users (id)
+);
+
+CREATE INDEX ix_product_version_user_daily_activity_product_id ON product_version_user_daily_activity (product_id);
+
+CREATE TABLE product_stats_dirty_days (
+    product_id UUID NOT NULL, 
+    day DATE NOT NULL, 
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
+    PRIMARY KEY (product_id, day), 
+    FOREIGN KEY(product_id) REFERENCES products (id)
+);
+
+INSERT INTO product_stats_dirty_days(product_id,day)
+SELECT product_id,(finished_at AT TIME ZONE 'Asia/Seoul')::date FROM product_generations WHERE finished_at IS NOT NULL
+UNION SELECT product_id,(attributed_at AT TIME ZONE 'Asia/Seoul')::date FROM product_payment_events
+UNION SELECT product_id,(created_at AT TIME ZONE 'Asia/Seoul')::date FROM conversations WHERE initial_snapshot_id IS NOT NULL
+UNION SELECT c.product_id,(v.created_at AT TIME ZONE 'Asia/Seoul')::date FROM conversation_version_changes v JOIN conversations c ON c.id=v.conversation_id
+ON CONFLICT DO NOTHING;
+
+
 COMMIT;
 

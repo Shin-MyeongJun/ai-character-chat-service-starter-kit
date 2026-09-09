@@ -12,6 +12,7 @@ from app.db.idempotency import lock_key
 from app.db.models.billing import Payment
 from app.db.models.product_usage import ProductPaymentEvent
 from app.db.models.snapshot.product import ProductSnapshot
+from app.db.product_stats_queue import mark_dirty
 
 
 def validate(event_key, amount, occurred_at):
@@ -60,6 +61,18 @@ async def record_sale(
         payment = await session.get(Payment, payment_id, with_for_update=True)
         if payment is None or payment.status not in ("succeeded", "refunded"):
             raise ValueError("A settled payment is required.")
+        first_allocation = await session.scalar(
+            select(ProductPaymentEvent.occurred_at)
+            .where(
+                ProductPaymentEvent.payment_id == payment_id,
+                ProductPaymentEvent.kind == "sale",
+            )
+            .limit(1)
+        )
+        if first_allocation is not None and first_allocation != occurred_at:
+            raise ValueError(
+                "Allocations of one payment must share its settlement timestamp."
+            )
         snapshot = await session.get(ProductSnapshot, snapshot_id)
         if snapshot is None or snapshot.product_id is None:
             raise LookupError("Product version not found.")
@@ -84,6 +97,7 @@ async def record_sale(
         )
         session.add(row)
         await session.flush()
+        await mark_dirty(session, row.product_id, row.attributed_at)
         return row.id
 
 
@@ -131,4 +145,5 @@ async def record_refund(session, *, sale_id, event_key, amount, occurred_at):
         )
         session.add(row)
         await session.flush()
+        await mark_dirty(session, row.product_id, row.attributed_at)
         return row.id

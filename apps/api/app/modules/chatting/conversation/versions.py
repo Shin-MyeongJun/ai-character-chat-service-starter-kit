@@ -1,9 +1,12 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import delete, select
 
 from app.db.models.chat import ConversationCharacter, ConversationVersionChange
 from app.db.models.product_release import ProductReleaseNote
 from app.db.models.snapshot.character import CharacterSnapshot
 from app.db.models.snapshot.product import ProductSnapshot, ProductSnapshotCharacter
+from app.db.product_stats_queue import mark_dirty
 from app.modules.chatting.conversation.service import owned_conversation
 from app.modules.governance.admin.product_policy import ensure_available
 
@@ -74,8 +77,10 @@ async def switch_version(
                     role_order=c.role_order,
                 )
             )
+        changed_at = datetime.now(UTC)
         session.add(
             ConversationVersionChange(
+                created_at=changed_at,
                 conversation_id=conversation.id,
                 from_snapshot_id=current.id,
                 to_snapshot_id=target.id,
@@ -87,4 +92,5 @@ async def switch_version(
         conversation.active_model_id = None
         # Initial context, messages and memory remain untouched, including removed characters.
         await session.flush()
+        await mark_dirty(session, conversation.product_id, changed_at)
         return {"snapshot_id": target.id, "changed": True}

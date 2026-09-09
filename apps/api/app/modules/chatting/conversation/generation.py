@@ -15,6 +15,7 @@ from app.db.models.chat import Message
 from app.db.models.product_usage import ProductGeneration
 from app.db.models.snapshot.character import CharacterSnapshot
 from app.db.models.snapshot.product import ProductSnapshotCharacter
+from app.db.product_stats_queue import mark_dirty
 from app.modules.chatting.conversation.service import owned_conversation
 from app.modules.governance.admin.product_policy import ensure_available
 from app.modules.llm.replacement import resolve_execution
@@ -223,4 +224,5 @@ async def finish_generation(
         run.status, run.result_digest, run.finished_at = status, fingerprint, now
         run.message_count = len(value.messages) if status == "succeeded" else 0
         await session.flush()
+        await mark_dirty(session, run.product_id, now)
         return info(run)

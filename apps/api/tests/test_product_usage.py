@@ -26,7 +26,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def scenario(db):
-    owner, c, b, p, model, entry = await ready_product(db)
+    owner, _c, _b, p, _model, _entry = await ready_product(db)
     release = await publish(
         db, product_id=p.id, owner_id=owner.id, value=ReleaseRequest("First", "First")
     )

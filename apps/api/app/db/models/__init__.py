@@ -15,6 +15,13 @@ from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
 from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision
+from app.db.models.product_statistics import (
+    ProductDailyStats,
+    ProductStatsDirtyDay,
+    ProductUserDailyActivity,
+    ProductVersionDailyStats,
+    ProductVersionUserDailyActivity,
+)
 from app.db.models.product_usage import ProductGeneration, ProductPaymentEvent
 from app.db.models.snapshot import (
     CharacterSnapshot,
@@ -44,6 +51,7 @@ __all__ = [
     "Payment",
     "Product",
     "ProductCharacter",
+    "ProductDailyStats",
     "ProductGeneration",
     "ProductLorebook",
     "ProductPaymentEvent",
@@ -52,6 +60,10 @@ __all__ = [
     "ProductSnapshot",
     "ProductSnapshotCharacter",
     "ProductSnapshotLorebook",
+    "ProductStatsDirtyDay",
+    "ProductUserDailyActivity",
+    "ProductVersionDailyStats",
+    "ProductVersionUserDailyActivity",
     "Provider",
     "SubscriptionPlan",
     "UsageLog",

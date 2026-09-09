@@ -14,6 +14,7 @@ from app.db.models.snapshot.product import (
     ProductSnapshotLorebookCharacter,
     ProductSnapshotStartSet,
 )
+from app.db.product_stats_queue import mark_dirty
 from app.modules.governance.admin.product_policy import ensure_available
 
 
@@ -98,6 +99,7 @@ async def start_conversation(session, *, product_id, user_id, start_set_id=None)
             )
         )
         await session.flush()
+        await mark_dirty(session, product_id, conversation.created_at)
         return {
             "id": conversation.id,
             "product_snapshot_id": snapshot.id,
