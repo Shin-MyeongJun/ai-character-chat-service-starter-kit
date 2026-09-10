@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.chatting.chat.router import router as MessagesRouter
 from app.modules.chatting.conversation.router import router as Router1
 from app.modules.content.character.router import router as Router3
 from app.modules.content.lorebook.router import router as Router4
@@ -34,3 +35,4 @@ router.include_router(Router9)
 router.include_router(Router11)
 
 router.include_router(Router12)
+router.include_router(MessagesRouter)

@@ -88,6 +88,16 @@ async def test_fresh_init_and_alembic_match_models(db):
             uid,
             pid,
         )
+        # A populated legacy history with tied timestamps must retain a stable
+        # deterministic order, and newly generated positions must follow it.
+        message_ids = [uuid4() for _ in range(3)]
+        for message_id in sorted(message_ids, reverse=True):
+            await connection.execute(
+                "INSERT INTO messages(id,conversation_id,sender_type,content,created_at) "
+                "VALUES($1,$2,'user','Legacy','2026-01-01T00:00:00Z')",
+                message_id,
+                cid,
+            )
         upgrade = await asyncio.to_thread(
             subprocess.check_output,
             [
@@ -109,6 +119,17 @@ async def test_fresh_init_and_alembic_match_models(db):
             "SELECT product_id,product_snapshot_id FROM conversations WHERE id=$1", cid
         )
         assert legacy["product_id"] == pid and legacy["product_snapshot_id"] is None
+        ordered = await connection.fetch(
+            "SELECT id,position,revision FROM messages WHERE conversation_id=$1 ORDER BY position",
+            cid,
+        )
+        assert [row["id"] for row in ordered] == sorted(message_ids)
+        assert [row["revision"] for row in ordered] == [1, 1, 1]
+        new_position = await connection.fetchval(
+            "INSERT INTO messages(conversation_id,sender_type,content) VALUES($1,'user','New') RETURNING position",
+            cid,
+        )
+        assert new_position > ordered[-1]["position"]
         await connection.execute(f"SET search_path TO {names[1]}, public")
         for path in sorted((ROOT / "infra/postgres/init").glob("*.sql")):
             await connection.execute(path.read_text(encoding="utf-8-sig"))

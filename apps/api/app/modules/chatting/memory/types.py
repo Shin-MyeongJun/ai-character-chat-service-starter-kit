@@ -95,3 +95,9 @@ class ListMemoriesCommand:
 class GetLatestSummaryCommand:
     conversation_id: UUID
     owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InvalidateConversationMemoriesCommand:
+    conversation_id: UUID
+    owner_id: UUID

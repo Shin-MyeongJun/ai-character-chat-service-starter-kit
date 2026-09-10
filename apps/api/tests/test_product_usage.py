@@ -8,14 +8,14 @@ from app.db.models.billing import Payment, UsageLog
 from app.db.models.chat import Message
 from app.db.models.product_usage import ProductGeneration, ProductPaymentEvent
 from app.db.models.snapshot.product import ProductSnapshotCharacter
-from app.modules.chatting.conversation import types as ConversationTypes
-from app.modules.chatting.conversation.service import start_conversation
-from app.modules.chatting.conversation.service.command.generation import (
+from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service.command.generation import (
     begin_generation,
     finish_generation,
 )
+from app.modules.chatting.chat.types import GeneratedMessage, GenerationResult
+from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service.command.versions import switch_version
-from app.modules.chatting.conversation.types import GeneratedMessage, GenerationResult
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.commerce.billing.service.command.attribution import (
     record_refund,
@@ -24,6 +24,7 @@ from app.modules.commerce.billing.service.command.attribution import (
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.command.releases import publish_product
 from app.modules.content.product.types import ReleaseNoteCommand
+from app.use_cases.conversations import start_conversation
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_product_integration import ready_product
@@ -61,7 +62,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
         async with AsyncSession(db.bind, expire_on_commit=False) as session:
             return await begin_generation(
                 session,
-                ConversationTypes.BeginGenerationCommand(
+                ChatTypes.BeginGenerationCommand(
                     conversation_id=cid,
                     user_id=owner.id,
                     request_key="turn-1",
@@ -85,7 +86,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
         async with AsyncSession(db.bind, expire_on_commit=False) as session:
             return await finish_generation(
                 session,
-                ConversationTypes.FinishGenerationCommand(
+                ChatTypes.FinishGenerationCommand(
                     generation_id=a.id, user_id=owner.id, value=output
                 ),
             )
@@ -111,7 +112,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
     with pytest.raises(ValueError, match="different input"):
         await begin_generation(
             db,
-            ConversationTypes.BeginGenerationCommand(
+            ChatTypes.BeginGenerationCommand(
                 conversation_id=cid,
                 user_id=owner.id,
                 request_key="turn-1",
@@ -121,7 +122,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
     with pytest.raises(ValueError, match="different output"):
         await finish_generation(
             db,
-            ConversationTypes.FinishGenerationCommand(
+            ChatTypes.FinishGenerationCommand(
                 generation_id=a.id,
                 user_id=owner.id,
                 value=GenerationResult(100, 30, 8, output.messages),
@@ -133,7 +134,7 @@ async def test_stale_generation_retains_cost_and_old_version(db):
     owner, p, release, cid, character_id = await scenario(db)
     run = await begin_generation(
         db,
-        ConversationTypes.BeginGenerationCommand(
+        ChatTypes.BeginGenerationCommand(
             conversation_id=cid,
             user_id=owner.id,
             request_key="turn",
@@ -156,7 +157,7 @@ async def test_stale_generation_retains_cost_and_old_version(db):
     )
     result = await finish_generation(
         db,
-        ConversationTypes.FinishGenerationCommand(
+        ChatTypes.FinishGenerationCommand(
             generation_id=run.id,
             user_id=owner.id,
             value=GenerationResult(
@@ -184,7 +185,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
     owner, _p, _release, cid, character_id = await scenario(db)
     run = await begin_generation(
         db,
-        ConversationTypes.BeginGenerationCommand(
+        ChatTypes.BeginGenerationCommand(
             conversation_id=cid,
             user_id=owner.id,
             request_key="turn",
@@ -194,7 +195,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
     with pytest.raises(ValueError, match="character"):
         await finish_generation(
             db,
-            ConversationTypes.FinishGenerationCommand(
+            ChatTypes.FinishGenerationCommand(
                 generation_id=run.id,
                 user_id=owner.id,
                 value=GenerationResult(
@@ -221,7 +222,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
         )
     await finish_generation(
         db,
-        ConversationTypes.FinishGenerationCommand(
+        ChatTypes.FinishGenerationCommand(
             generation_id=run.id,
             user_id=owner.id,
             value=GenerationResult(1, 0, 1, outcome="failed"),
@@ -230,7 +231,7 @@ async def test_generation_validation_rolls_back_and_can_be_retried(db):
     with pytest.raises(LookupError):
         await finish_generation(
             db,
-            ConversationTypes.FinishGenerationCommand(
+            ChatTypes.FinishGenerationCommand(
                 generation_id=run.id,
                 user_id=uuid4(),
                 value=GenerationResult(1, 0, 1, outcome="failed"),

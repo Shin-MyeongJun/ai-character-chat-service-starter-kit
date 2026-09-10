@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 MODULES = Path(__file__).parents[1] / "app" / "modules"
+USE_CASES = Path(__file__).parents[1] / "app" / "use_cases"
 
 
 def test_openapi_contract_is_unchanged():
@@ -77,6 +78,33 @@ def test_cross_module_imports_use_only_public_services_and_types():
                 tail = parts[2 + len(other) :]
                 if own != other and (not tail or tail[0] not in {"service", "types"}):
                     violations.append(f"{path}:{node.lineno}: {'.'.join(parts)}")
+    assert not violations, "\n".join(violations)
+
+
+def test_top_level_use_cases_use_only_public_module_services_and_types():
+    violations = []
+    for path in USE_CASES.glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or not node.module:
+                continue
+            if node.module.startswith("app.db.models"):
+                violations.append(f"{path}:{node.lineno}: {node.module}")
+            if not node.module.startswith("app.modules."):
+                continue
+            for alias in node.names:
+                parts = (node.module + "." + alias.name).split(".")
+                domain_length = (
+                    2
+                    if parts[2]
+                    in {"content", "chatting", "commerce", "governance"}
+                    else 1
+                )
+                tail = parts[2 + domain_length :]
+                if not tail or tail[0] not in {"service", "types"}:
+                    violations.append(
+                        f"{path}:{node.lineno}: {'.'.join(parts)}"
+                    )
     assert not violations, "\n".join(violations)
 
 

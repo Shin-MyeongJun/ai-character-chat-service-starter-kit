@@ -6,9 +6,7 @@ from app.db.models.chat import (
     Conversation,
     ConversationCharacter,
     ConversationVersionChange,
-    Message,
 )
-from app.db.models.product_usage import ProductGeneration
 
 
 async def get_owned_conversation(session, conversation_id, user_id, *, lock=False):
@@ -18,6 +16,16 @@ async def get_owned_conversation(session, conversation_id, user_id, *, lock=Fals
     if lock:
         stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return await session.scalar(stmt)
+
+
+async def list_conversation_characters(session, conversation_id):
+    return list(
+        await session.scalars(
+            select(ConversationCharacter)
+            .where(ConversationCharacter.conversation_id == conversation_id)
+            .order_by(ConversationCharacter.role_order, ConversationCharacter.id)
+        )
+    )
 
 
 async def create_conversation(session, command):
@@ -42,18 +50,6 @@ async def create_conversation(session, command):
                 role_order=c.role_order,
             )
         )
-    session.add(
-        Message(
-            conversation_id=conversation.id,
-            sender_type="character",
-            character_id=command.primary_character_id,
-            product_character_id=command.primary_product_character_id,
-            product_snapshot_id=command.snapshot_id,
-            content=command.opening_message,
-            generated_by_ai=False,
-        )
-    )
-    await session.flush()
     return conversation
 
 
@@ -90,111 +86,7 @@ async def switch_conversation_version(
     await session.flush()
 
 
-async def get_generation_by_request(session, user_id, request_key):
-    return await session.scalar(
-        select(ProductGeneration).where(
-            ProductGeneration.user_id == user_id,
-            ProductGeneration.request_key == request_key,
-        )
-    )
-
-
-async def get_owned_generation(session, generation_id, user_id):
-    return await session.scalar(
-        select(ProductGeneration)
-        .where(
-            ProductGeneration.id == generation_id, ProductGeneration.user_id == user_id
-        )
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-
-
-async def create_generation(
-    session, conversation, execution, user_id, request_key, digest, input_text
-):
-    run = ProductGeneration(
-        id=uuid4(),
-        user_id=user_id,
-        conversation_id=conversation.id,
-        product_id=conversation.product_id,
-        product_snapshot_id=conversation.product_snapshot_id,
-        model_id=execution.model_id,
-        model_name=execution.model,
-        reasoning_effort=execution.reasoning_effort,
-        request_key=request_key,
-        input_digest=digest,
-        status="pending",
-        message_count=0,
-    )
-    session.add(run)
-    await session.flush()
-    session.add(
-        Message(
-            conversation_id=conversation.id,
-            product_snapshot_id=run.product_snapshot_id,
-            generation_id=run.id,
-            sender_type="user",
-            content=input_text,
-            generated_by_ai=False,
-        )
-    )
-    await session.flush()
-    return run
-
-
-async def add_generation_message(session, run, output, character_id) -> None:
-    session.add(
-        Message(
-            conversation_id=run.conversation_id,
-            product_snapshot_id=run.product_snapshot_id,
-            generation_id=run.id,
-            product_character_id=output.product_character_id,
-            character_id=character_id,
-            sender_type="character",
-            content=output.content,
-            model_id=run.model_id,
-            generated_by_ai=True,
-        )
-    )
-    await session.flush()
-
-
-async def finish_generation(
-    session, generation_id, status, fingerprint, now, message_count
-):
-    run = await session.get(ProductGeneration, generation_id)
-    run.status, run.result_digest, run.finished_at = status, fingerprint, now
-    run.message_count = message_count
-    await session.flush()
-    return run
-
-
 async def get_statistics_facts(session, product_id, start, end):
-    g = ProductGeneration
-    generations = list(
-        await session.execute(
-            select(
-                g.product_snapshot_id, g.status, func.count(), func.sum(g.message_count)
-            )
-            .where(
-                g.product_id == product_id, g.finished_at >= start, g.finished_at < end
-            )
-            .group_by(g.product_snapshot_id, g.status)
-        )
-    )
-    users = list(
-        await session.execute(
-            select(g.product_snapshot_id, g.user_id)
-            .where(
-                g.product_id == product_id,
-                g.status == "succeeded",
-                g.finished_at >= start,
-                g.finished_at < end,
-            )
-            .distinct()
-        )
-    )
     conversations = list(
         await session.execute(
             select(Conversation.initial_snapshot_id, func.count())
@@ -220,4 +112,4 @@ async def get_statistics_facts(session, product_id, start, end):
             .group_by(c.to_snapshot_id)
         )
     )
-    return generations, users, conversations, transitions
+    return conversations, transitions

@@ -10,9 +10,9 @@ from app.modules.content.product.service.command.statistics_queue import (
 )
 
 
-async def start_conversation(
+async def create_product_conversation(
     session, command: Types.StartConversationCommand
-) -> Types.ConversationStartedInfo:
+) -> Types.PreparedConversationInfo:
     product_id = command.product_id
     user_id = command.user_id
     start_set_id = command.start_set_id
@@ -52,4 +52,8 @@ async def start_conversation(
                 product_id, conversation.created_at
             ),
         )
-        return Types.ConversationStartedInfo(conversation.id, snapshot.id, start_set_id)
+        return Types.PreparedConversationInfo(
+            Types.ConversationStartedInfo(conversation.id, snapshot.id, start_set_id),
+            create_command.opening_message,
+            create_command.primary_product_character_id,
+        )

@@ -49,35 +49,33 @@ def payment_buckets_to_revenue(buckets):
     }
 
 
-def statistics_facts_infos_to_build_info(
-    conversation_facts, billing_facts
-) -> Types.StatisticsBuildInfo:
+def statistics_facts_infos_to_build_info(facts) -> Types.StatisticsBuildInfo:
     metrics: dict[UUID, dict[str, Any]] = defaultdict(_statistics_defaults_to_metrics)
-    rows = conversation_facts.generations
+    rows = facts.generations
     for sid, status, count, messages in rows:
         metrics[sid][status] += count
         metrics[sid]["messages"] += messages or 0
-    users = conversation_facts.users
+    users = facts.users
     for sid, _uid in users:
         metrics[sid]["active_users"] += 1
-    rows = billing_facts.usage
+    rows = facts.usage
     for sid, input_tokens, output_tokens, cost_credit in rows:
         metrics[sid].update(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost_credit=cost_credit,
         )
-    rows = conversation_facts.conversations
+    rows = facts.conversations
     for sid, count in rows:
         metrics[sid]["conversations"] = count
-    rows = conversation_facts.transitions
+    rows = facts.transitions
     for sid, count in rows:
         metrics[sid]["transitions"] = count
     version_money: dict[UUID, dict[str, dict[str, Any]]] = defaultdict(
         lambda: defaultdict(_payment_defaults_to_bucket)
     )
     total_money: dict[str, dict[str, Any]] = defaultdict(_payment_defaults_to_bucket)
-    rows = billing_facts.payments
+    rows = facts.payments
     for sid, currency, kind, amount, count, payment_ids in rows:
         for bucket in (version_money[sid][currency], total_money[currency]):
             if kind == "sale":

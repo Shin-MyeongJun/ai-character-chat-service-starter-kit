@@ -9,7 +9,7 @@ from typing import cast, get_args
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Select, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat import Conversation
@@ -20,6 +20,14 @@ from app.modules.chatting.memory import types as Types
 DEFAULT_MEMORY_LIST_LIMIT = 50
 MAX_MEMORY_LIST_LIMIT = 100
 MAX_MEMORY_SEARCH_LIMIT = 100
+
+
+async def delete_conversation_memories(session, conversation_id) -> None:
+    await session.execute(
+        delete(ConversationMemory).where(
+            ConversationMemory.conversation_id == conversation_id
+        )
+    )
 
 
 @dataclass(frozen=True)

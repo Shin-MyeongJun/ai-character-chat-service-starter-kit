@@ -3,23 +3,17 @@ from __future__ import annotations
 from typing import overload
 
 from app.db.models.chat import Conversation
-from app.db.models.product_usage import ProductGeneration
 from app.modules.chatting.conversation import types as Types
-from app.modules.chatting.conversation.types import GenerationInfo
 
 
-def generation_record_to_info(
-    run: ProductGeneration | Types.GenerationStateInfo, *, created: bool = False
-) -> GenerationInfo:
-    return GenerationInfo(
-        id=run.id,
-        created=created,
-        status=run.status,
-        product_snapshot_id=run.product_snapshot_id,
-        model_id=run.model_id,
-        model_name=run.model_name,
-        reasoning_effort=run.reasoning_effort,
-        message_count=run.message_count,
+def conversation_characters_entities_to_infos(
+    entities,
+) -> tuple[Types.ConversationCharacterInfo, ...]:
+    return tuple(
+        Types.ConversationCharacterInfo(
+            c.character_id, c.product_character_id, c.role_order
+        )
+        for c in entities
     )
 
 
@@ -65,7 +59,6 @@ def snapshot_runtime_view_to_create_command(
         start_set_id,
         snapshot.snapshot_data["title"],
         snapshot.snapshot_data["opening_message"],
-        runtime.characters[primary.character_snapshot_id].character_id,
         primary.id,
         snapshot_runtime_view_to_character_commands(runtime),
     )
@@ -104,29 +97,6 @@ def conversation_snapshot_infos_to_runtime_view(
             )
             for b in runtime.composition.books
         ],
-    )
-
-
-@overload
-def generation_entity_to_state_info(
-    entity: ProductGeneration,
-) -> Types.GenerationStateInfo: ...
-
-
-@overload
-def generation_entity_to_state_info(entity: None) -> None: ...
-
-
-def generation_entity_to_state_info(
-    entity: ProductGeneration | None,
-) -> Types.GenerationStateInfo | None:
-    if entity is None:
-        return None
-    return Types.GenerationStateInfo(
-        **{
-            key: getattr(entity, key)
-            for key in Types.GenerationStateInfo.__dataclass_fields__
-        }
     )
 
 

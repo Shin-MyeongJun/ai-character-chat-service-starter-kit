@@ -25,3 +25,13 @@ async def get_statistics_facts(
         session, command.product_id, command.start, command.end
     )
     return PersistenceMapper.conversation_statistics_rows_to_info(rows)
+
+
+async def list_conversation_characters(
+    session, command: Types.OwnedConversationCommand
+) -> tuple[Types.ConversationCharacterInfo, ...]:
+    await get_owned_conversation(session, command)
+    rows = await Repository.list_conversation_characters(
+        session, command.conversation_id
+    )
+    return PersistenceMapper.conversation_characters_entities_to_infos(rows)

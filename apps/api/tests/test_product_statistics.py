@@ -12,28 +12,28 @@ from app.db.models.product_usage import ProductGeneration
 from app.db.models.snapshot.product import ProductSnapshotCharacter
 from app.db.product_stats_queue import day_bounds, statistics_day
 from app.db.transaction import use_case_transaction
-from app.modules.chatting.conversation import types as ConversationTypes
-from app.modules.chatting.conversation.service.command.generation import (
+from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service.command.generation import (
     begin_generation,
     finish_generation,
 )
+from app.modules.chatting.chat.types import GeneratedMessage, GenerationResult
+from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service.command.versions import switch_version
-from app.modules.chatting.conversation.types import GeneratedMessage, GenerationResult
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.commerce.billing.service.command.attribution import (
     record_refund,
     record_sale,
 )
 from app.modules.content.product import types as ProductTypes
-from app.modules.content.product.service import statistics
-from app.modules.content.product.service.command import (
-    statistics as StatisticsCommandService,
-)
 from app.modules.content.product.service.command.releases import publish_product
 from app.modules.content.product.service.command.statistics_queue import (
     mark_statistics_dirty,
 )
+from app.modules.content.product.service.query.statistics import get_statistics
 from app.modules.content.product.types import ReleaseNoteCommand
+from app.use_cases import product_statistics as StatisticsCommandService
+from app.use_cases import product_statistics as statistics
 from sqlalchemy import func, select, update
 from test_product_usage import scenario
 
@@ -54,7 +54,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     owner, p, _release, cid, charid = await scenario(db)
     first = await begin_generation(
         db,
-        ConversationTypes.BeginGenerationCommand(
+        ChatTypes.BeginGenerationCommand(
             conversation_id=cid,
             user_id=owner.id,
             request_key="first",
@@ -63,7 +63,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     )
     await finish_generation(
         db,
-        ConversationTypes.FinishGenerationCommand(
+        ChatTypes.FinishGenerationCommand(
             generation_id=first.id,
             user_id=owner.id,
             value=GenerationResult(
@@ -96,7 +96,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         )
     second = await begin_generation(
         db,
-        ConversationTypes.BeginGenerationCommand(
+        ChatTypes.BeginGenerationCommand(
             conversation_id=cid,
             user_id=owner.id,
             request_key="second",
@@ -105,7 +105,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
     )
     await finish_generation(
         db,
-        ConversationTypes.FinishGenerationCommand(
+        ChatTypes.FinishGenerationCommand(
             generation_id=second.id,
             user_id=owner.id,
             value=GenerationResult(7, 2, 1, (GeneratedMessage(charid2, "New"),)),
@@ -116,7 +116,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         await statistics.process_pending(db, ProductTypes.ProcessPendingCommand())
     ).processed > 0
     async with use_case_transaction(db):
-        report = await statistics.get_statistics(
+        report = await get_statistics(
             db,
             ProductTypes.GetStatisticsCommand(
                 product_id=p.id, owner_id=owner.id, date_from=today, date_to=today
@@ -140,7 +140,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         )
     await statistics.process_pending(db, ProductTypes.ProcessPendingCommand())
     async with use_case_transaction(db):
-        again = await statistics.get_statistics(
+        again = await get_statistics(
             db,
             ProductTypes.GetStatisticsCommand(
                 product_id=p.id, owner_id=owner.id, date_from=today, date_to=today
@@ -148,7 +148,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         )
         assert again.totals == report.totals
         with pytest.raises(LookupError):
-            await statistics.get_statistics(
+            await get_statistics(
                 db,
                 ProductTypes.GetStatisticsCommand(
                     product_id=p.id, owner_id=uuid4(), date_from=today, date_to=today
@@ -174,7 +174,7 @@ async def test_version_totals_unique_users_and_rebuild_are_correct(db):
         )
     await statistics.process_pending(db, ProductTypes.ProcessPendingCommand())
     async with use_case_transaction(db):
-        period = await statistics.get_statistics(
+        period = await get_statistics(
             db,
             ProductTypes.GetStatisticsCommand(
                 product_id=p.id,
@@ -239,7 +239,7 @@ async def test_late_refund_rebuilds_original_day_and_keeps_currency_separate(db)
         assert dirty is not None
     await statistics.process_pending(db, ProductTypes.ProcessPendingCommand())
     async with use_case_transaction(db):
-        report = await statistics.get_statistics(
+        report = await get_statistics(
             db,
             ProductTypes.GetStatisticsCommand(
                 product_id=p.id,

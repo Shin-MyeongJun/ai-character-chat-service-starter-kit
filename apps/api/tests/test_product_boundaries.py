@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from app.modules.chatting.conversation import service as conversation_service
 from app.modules.chatting.conversation import types as conversation_types
 from app.modules.chatting.conversation.router import router as conversations
 from app.modules.chatting.conversation.service.command import versions
@@ -27,6 +26,7 @@ from app.modules.governance.admin.model_router import router as model_admin
 from app.modules.governance.admin.product_router import router as product_admin
 from app.modules.governance.admin.service import command as product_policy
 from app.modules.llm.types import ModelNoticeView
+from app.use_cases import conversations as conversation_service
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient

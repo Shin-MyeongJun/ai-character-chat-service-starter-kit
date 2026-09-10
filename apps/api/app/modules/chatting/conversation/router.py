@@ -11,8 +11,8 @@ from app.modules.chatting.conversation.mapper.schema import (
 from app.modules.chatting.conversation.mapper.schema import (
     pending_updates_view_to_response,
 )
-from app.modules.chatting.conversation.service import start_conversation
 from app.modules.content.product import types as ProductTypes
+from app.use_cases.conversations import start_conversation
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 

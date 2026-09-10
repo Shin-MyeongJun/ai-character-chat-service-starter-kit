@@ -7,7 +7,12 @@ from app.db.models.billing import (
     UserSubscription,
 )
 from app.db.models.character import Character, CharacterAsset, CharacterImage
-from app.db.models.chat import Conversation, ConversationCharacter, Message
+from app.db.models.chat import (
+    Conversation,
+    ConversationCharacter,
+    Message,
+    MessageRequest,
+)
 from app.db.models.identity import User, UserOAuthAccount
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.memory import ConversationMemory
@@ -46,6 +51,7 @@ __all__ = [
     "LorebookEntry",
     "LorebookSnapshot",
     "Message",
+    "MessageRequest",
     "Model",
     "ModerationFlag",
     "Payment",

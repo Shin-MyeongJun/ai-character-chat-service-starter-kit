@@ -439,10 +439,10 @@ async def test_release_policy_and_typo_correction(db):
 async def test_conversation_keeps_published_context(db):
     from app.modules.chatting.conversation.service import (
         prepare_runtime_context,
-        start_conversation,
     )
     from app.modules.content.product.service.command.releases import publish_product
     from app.modules.content.product.types import ReleaseNoteCommand
+    from app.use_cases.conversations import start_conversation
 
     owner, c, _b, p, _model, entry = await ready_product(db)
     first = await publish_product(
@@ -490,12 +490,12 @@ async def test_conversation_keeps_published_context(db):
 
 async def test_version_switch_requires_consent_and_preserves_initial_context(db):
     from app.db.models.chat import Conversation, ConversationVersionChange, Message
-    from app.modules.chatting.conversation.service import start_conversation
     from app.modules.chatting.conversation.service.command.versions import (
         switch_version,
     )
     from app.modules.content.product.service.command.releases import publish_product
     from app.modules.content.product.types import ReleaseNoteCommand
+    from app.use_cases.conversations import start_conversation
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
     first = await publish_product(

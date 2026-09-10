@@ -502,3 +502,15 @@ class ProcessedStatisticsInfo:
 @dataclass(frozen=True, slots=True)
 class MediaReferenceView:
     referenced: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReplaceStatisticsDayCommand:
+    product_id: UUID
+    day: date
+    generations: list[tuple]
+    users: list[tuple]
+    conversations: list[tuple]
+    transitions: list[tuple]
+    usage: list[tuple]
+    payments: list[tuple]

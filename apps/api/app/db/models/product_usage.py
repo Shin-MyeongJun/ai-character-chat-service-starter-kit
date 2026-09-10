@@ -67,6 +67,9 @@ class ProductGeneration(UuidPkMixin, Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    history_invalidated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class ProductPaymentEvent(UuidPkMixin, Base):

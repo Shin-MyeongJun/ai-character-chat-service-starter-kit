@@ -3,11 +3,13 @@ from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     Integer,
     Text,
@@ -112,6 +114,7 @@ class ConversationCharacter(UuidPkMixin, Base):
 class Message(UuidPkMixin, Base):
     __tablename__ = "messages"
     __table_args__ = (
+        UniqueConstraint("conversation_id", "position", name="uq_message_position"),
         ForeignKeyConstraint(
             ["generation_id", "product_snapshot_id"],
             ["product_generations.id", "product_generations.product_snapshot_id"],
@@ -148,6 +151,8 @@ class Message(UuidPkMixin, Base):
         ForeignKey("characters.id", ondelete="SET NULL"),
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[int] = mapped_column(BigInteger, Identity(), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     generation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     product_snapshot_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product_snapshots.id")
@@ -195,4 +200,20 @@ class ConversationVersionChange(UuidPkMixin, Base):
     mode: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class MessageRequest(Base):
+    """Persistent retry receipt, including after the resulting message is deleted."""
+
+    __tablename__ = "chat_message_requests"
+    conversation_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    request_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    input_digest: Mapped[str] = mapped_column(Text, nullable=False)
+    message_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL")
     )

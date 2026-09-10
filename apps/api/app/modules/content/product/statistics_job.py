@@ -7,7 +7,7 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.modules.content.product import types as Types
-from app.modules.content.product.service.statistics import (
+from app.use_cases.product_statistics import (
     enqueue_recent,
     process_pending,
 )

@@ -6,10 +6,11 @@ records return None for singular reads and empty results for collections.
 
 from collections.abc import Awaitable, Callable, Sequence
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
-from sqlalchemy.ext.asyncio import AsyncSession
 
 EmbedQuery = Callable[[str], Awaitable[Sequence[float]]]
 

@@ -7,18 +7,22 @@ from datetime import UTC, datetime
 
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
-from app.modules.chatting.conversation import repository as Repository
-from app.modules.chatting.conversation import types as Types
-from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper
-from app.modules.chatting.conversation.mapper.persistence import (
+from app.modules.chatting.chat import repository as Repository
+from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.mapper import persistence as PersistenceMapper
+from app.modules.chatting.chat.mapper.persistence import (
     generation_record_to_info,
 )
-from app.modules.chatting.conversation.service import get_owned_conversation
-from app.modules.chatting.conversation.types import GenerationInfo
+from app.modules.chatting.chat.service.command.messages import _ensure_idle
+from app.modules.chatting.chat.types import GenerationInfo
+from app.modules.chatting.conversation import types as ConversationTypes
+from app.modules.chatting.conversation.service import (
+    get_owned_conversation,
+    list_conversation_characters,
+)
 from app.modules.commerce.billing import service as BillingService
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.content.product import types as ProductTypes
-from app.modules.content.product.service import views as ProductViewsService
 from app.modules.content.product.service.command.statistics_queue import (
     mark_statistics_dirty,
 )
@@ -82,10 +86,11 @@ async def begin_generation(
             return generation_record_to_info(existing)
         conversation = await get_owned_conversation(
             session,
-            Types.OwnedConversationCommand(
+            ConversationTypes.OwnedConversationCommand(
                 conversation_id=conversation_id, user_id=user_id, lock=True
             ),
         )
+        await _ensure_idle(session, conversation_id)
         if not conversation.product_snapshot_id:
             raise ValueError("Legacy version must be verified before generation.")
         await ensure_available(
@@ -118,16 +123,22 @@ async def finish_generation(
         run = PersistenceMapper.generation_entity_to_state_info(row)
         if run is None:
             raise LookupError("Generation not found.")
+        conversation = await get_owned_conversation(
+            session,
+            ConversationTypes.OwnedConversationCommand(
+                conversation_id=run.conversation_id, user_id=user_id, lock=True
+            ),
+        )
+        # All history writers lock conversation first, then generation records.
+        row = await Repository.get_owned_generation(
+            session, generation_id, user_id, lock=True
+        )
+        run = PersistenceMapper.generation_entity_to_state_info(row)
+        assert run is not None
         if run.status != "pending":
             if run.result_digest != fingerprint:
                 raise ValueError("Generation already finished with different output.")
             return generation_record_to_info(run)
-        conversation = await get_owned_conversation(
-            session,
-            Types.OwnedConversationCommand(
-                conversation_id=run.conversation_id, user_id=user_id, lock=True
-            ),
-        )
         status: str = value.outcome
         if status == "succeeded":
             if conversation.product_snapshot_id != run.product_snapshot_id:
@@ -143,13 +154,13 @@ async def finish_generation(
                 except ValueError:
                     status = "stale"
         if status == "succeeded":
-            runtime = await ProductViewsService.get_snapshot_runtime(
-                session, ProductTypes.ProductSnapshotCommand(run.product_snapshot_id)
+            participants = await list_conversation_characters(
+                session,
+                ConversationTypes.OwnedConversationCommand(
+                    conversation_id=run.conversation_id, user_id=user_id
+                ),
             )
-            characters = {
-                c.id: runtime.characters[c.character_snapshot_id].character_id
-                for c in runtime.composition.characters
-            }
+            characters = {c.product_character_id: c.character_id for c in participants}
             for output in value.messages:
                 if output.product_character_id not in characters:
                     raise ValueError(
