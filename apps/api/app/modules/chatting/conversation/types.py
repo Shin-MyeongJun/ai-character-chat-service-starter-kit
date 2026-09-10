@@ -67,21 +67,10 @@ class ConversationRuntimeView:
 
 
 @dataclass(frozen=True, slots=True)
-class ConversationStart:
-    product_id: UUID
-    start_set_id: UUID | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class VersionSwitch:
-    target_snapshot_id: UUID
-
-
-@dataclass(frozen=True, slots=True)
 class ConversationInfo:
     id: UUID
     user_id: UUID
-    product_id: UUID | None
+    product_id: UUID
     product_snapshot_id: UUID | None
     initial_snapshot_id: UUID | None
     start_set_id: UUID | None
@@ -138,6 +127,7 @@ class StartConversationCommand:
 class PrepareRuntimeContextCommand:
     conversation_id: UUID
     user_id: UUID
+    activation_text: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

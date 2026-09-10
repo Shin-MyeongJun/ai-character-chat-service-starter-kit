@@ -2,6 +2,8 @@ from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper
 from app.modules.chatting.conversation.service.query import get_owned_conversation
+from app.modules.content.lorebook import types as LorebookTypes
+from app.modules.content.lorebook.service import query as LorebookQueryService
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service import views as ProductViewsService
@@ -33,14 +35,14 @@ async def prepare_runtime_context(
         execution = await resolve_execution(
             session, LlmTypes.ResolveExecutionCommand(snapshot_id=snapshot.id)
         )
-        eligible_entries = {
-            sid: [
-                entry
-                for entry in book.snapshot_data["entries"]
-                if entry["entry_type"] != "start_set" and entry["is_enabled"]
-            ]
+        active_entries = {
+            sid: LorebookQueryService.activate_snapshot_entries(
+                LorebookTypes.ActivateSnapshotEntriesCommand(
+                    snapshot=book, text=command.activation_text
+                )
+            ).entries
             for sid, book in runtime.lorebooks.items()
         }
         return PersistenceMapper.conversation_snapshot_infos_to_runtime_view(
-            conversation, snapshot, runtime, execution, eligible_entries
+            conversation, snapshot, runtime, execution, active_entries
         )

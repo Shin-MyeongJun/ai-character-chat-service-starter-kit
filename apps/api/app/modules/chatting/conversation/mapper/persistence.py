@@ -65,7 +65,7 @@ def snapshot_runtime_view_to_create_command(
 
 
 def conversation_snapshot_infos_to_runtime_view(
-    conversation, snapshot, runtime, execution, eligible_entries
+    conversation, snapshot, runtime, execution, active_entries
 ) -> Types.ConversationRuntimeView:
     start = next(
         s for s in runtime.composition.starts if s.id == conversation.start_set_id
@@ -93,7 +93,7 @@ def conversation_snapshot_infos_to_runtime_view(
                     for t in runtime.composition.targets
                     if t.product_lorebook_id == b.id
                 ],
-                entries=eligible_entries[b.lorebook_snapshot_id],
+                entries=active_entries[b.lorebook_snapshot_id],
             )
             for b in runtime.composition.books
         ],

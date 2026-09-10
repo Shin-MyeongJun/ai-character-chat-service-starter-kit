@@ -214,8 +214,12 @@ def test_conversation_and_admin_adapters_serialize_typed_results(
             "product_snapshot_id": str(sid),
             "start_set_id": str(start_id),
         }
-        assert service.await_args.args[1].user_id == owner
-        assert service.await_args.args[1].start_set_id == start_id
+        service.assert_awaited_once_with(
+            _session,
+            conversation_types.StartConversationCommand(
+                product_id=pid, user_id=owner, start_set_id=start_id
+            ),
+        )
     elif operation == "switch":
         service = AsyncMock(
             return_value=conversation_types.VersionSwitchedInfo(sid, True)
@@ -226,7 +230,12 @@ def test_conversation_and_admin_adapters_serialize_typed_results(
         )
         assert response.status_code == 200
         assert response.json() == {"snapshot_id": str(sid), "changed": True}
-        assert service.await_args.args[1].user_id == owner
+        service.assert_awaited_once_with(
+            _session,
+            conversation_types.SwitchVersionCommand(
+                conversation_id=cid, user_id=owner, target_snapshot_id=sid
+            ),
+        )
     else:
         service = AsyncMock(
             return_value=admin_types.ExpiryChangedInfo(sid, None, "Policy")

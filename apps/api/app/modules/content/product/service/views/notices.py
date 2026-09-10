@@ -43,7 +43,7 @@ async def get_pending_updates(
             conversation_id=conversation_id, user_id=user_id
         ),
     )
-    if not conversation.product_snapshot_id or not conversation.product_id:
+    if conversation.product_snapshot_id is None:
         raise ValueError("Legacy conversation requires verified version mapping.")
     current = await QueryService.get_product_snapshot(
         session, Types.ProductSnapshotCommand(conversation.product_snapshot_id)

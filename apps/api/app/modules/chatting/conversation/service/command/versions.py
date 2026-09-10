@@ -27,7 +27,7 @@ async def switch_version(
                 conversation_id=conversation_id, user_id=user_id, lock=True
             ),
         )
-        if not conversation.product_snapshot_id or not conversation.product_id:
+        if conversation.product_snapshot_id is None:
             raise ValueError("Legacy version is not verified.")
         if conversation.product_snapshot_id == target_snapshot_id:
             return Types.VersionSwitchedInfo(target_snapshot_id, False)

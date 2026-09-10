@@ -151,3 +151,9 @@ def lorebook_snapshot_entity_to_info(entity) -> Types.LorebookSnapshotInfo:
 
 def lorebook_snapshots_entities_to_info(entities) -> list[Types.LorebookSnapshotInfo]:
     return [lorebook_snapshot_entity_to_info(entity) for entity in entities]
+
+
+def lorebook_snapshot_entries_to_active_info(
+    entries: list[dict],
+) -> Types.ActivatedSnapshotEntriesInfo:
+    return Types.ActivatedSnapshotEntriesInfo(entries=deepcopy(entries))

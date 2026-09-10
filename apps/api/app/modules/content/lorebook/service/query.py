@@ -135,6 +135,32 @@ def _keyword_matches(text: str, trigger: str, match_mode: str) -> bool:
     raise ValueError("Stored lorebook entry has an invalid match mode.")
 
 
+def activate_snapshot_entries(
+    command: Types.ActivateSnapshotEntriesCommand,
+) -> Types.ActivatedSnapshotEntriesInfo:
+    """Select automatic entries from an authorized snapshot without reading live data.
+
+    Preserve snapshot order. Empty text activates only always entries; semantic
+    and manual activation are not supported here. Never mutate the snapshot.
+    """
+    active = []
+    for entry in command.snapshot.snapshot_data["entries"]:
+        if entry["entry_type"] == "start_set" or not entry["is_enabled"]:
+            continue
+        activation_type = entry["activation_type"]
+        if activation_type == "always":
+            active.append(entry)
+        elif activation_type == "keyword":
+            if command.text and any(
+                _keyword_matches(command.text, trigger, entry["match_mode"])
+                for trigger in entry["key_triggers"] or []
+            ):
+                active.append(entry)
+        elif activation_type not in ("semantic", "manual"):
+            raise ValueError("Stored lorebook entry has an invalid activation type.")
+    return PersistenceMapper.lorebook_snapshot_entries_to_active_info(active)
+
+
 async def get_always_entries(
     session: AsyncSession, command: Types.GetAlwaysEntriesCommand
 ) -> list[Types.ActiveLorebookEntryInfo]:
