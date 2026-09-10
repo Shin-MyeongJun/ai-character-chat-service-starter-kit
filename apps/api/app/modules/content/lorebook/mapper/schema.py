@@ -1,15 +1,16 @@
 from uuid import UUID
 
-from app.modules.content.lorebook import schemas, types
+from app.modules.content.lorebook import schemas as Schemas
+from app.modules.content.lorebook import types as Types
 
 
 class LorebookSchemaMapper:
     @staticmethod
     def create_lorebook_request_to_command(
-        request: schemas.CreateLorebookRequestDto,
+        request: Schemas.CreateLorebookRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookCreate:
-        return types.LorebookCreate(
+    ) -> Types.CreateLorebookCommand:
+        return Types.CreateLorebookCommand(
             owner_id=owner_id,
             title=request.title,
             description=request.description,
@@ -18,10 +19,10 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def update_lorebook_request_to_command(
-        request: schemas.UpdateLorebookRequestDto,
+        request: Schemas.UpdateLorebookRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookUpdate:
-        return types.LorebookUpdate(
+    ) -> Types.UpdateLorebookCommand:
+        return Types.UpdateLorebookCommand(
             lorebook_id=request.lorebook_id,
             owner_id=owner_id,
             title=request.title,
@@ -31,10 +32,10 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def change_lorebook_status_request_to_command(
-        request: schemas.ChangeLorebookStatusRequestDto,
+        request: Schemas.ChangeLorebookStatusRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookStatusChange:
-        return types.LorebookStatusChange(
+    ) -> Types.ChangeLorebookStatusCommand:
+        return Types.ChangeLorebookStatusCommand(
             lorebook_id=request.lorebook_id,
             owner_id=owner_id,
             status=request.status,
@@ -42,20 +43,20 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def delete_lorebook_request_to_command(
-        request: schemas.DeleteLorebookRequestDto,
+        request: Schemas.DeleteLorebookRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookDelete:
-        return types.LorebookDelete(
+    ) -> Types.DeleteLorebookCommand:
+        return Types.DeleteLorebookCommand(
             lorebook_id=request.lorebook_id,
             owner_id=owner_id,
         )
 
     @staticmethod
     def create_entry_request_to_command(
-        request: schemas.CreateLorebookEntryRequestDto,
+        request: Schemas.CreateLorebookEntryRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookEntryCreate:
-        return types.LorebookEntryCreate(
+    ) -> Types.CreateLorebookEntryCommand:
+        return Types.CreateLorebookEntryCommand(
             lorebook_id=request.lorebook_id,
             owner_id=owner_id,
             title=request.title,
@@ -73,10 +74,10 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def update_entry_request_to_command(
-        request: schemas.UpdateLorebookEntryRequestDto,
+        request: Schemas.UpdateLorebookEntryRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookEntryUpdate:
-        return types.LorebookEntryUpdate(
+    ) -> Types.UpdateLorebookEntryCommand:
+        return Types.UpdateLorebookEntryCommand(
             lorebook_id=request.lorebook_id,
             entry_id=request.entry_id,
             owner_id=owner_id,
@@ -95,10 +96,10 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def delete_entry_request_to_command(
-        request: schemas.DeleteLorebookEntryRequestDto,
+        request: Schemas.DeleteLorebookEntryRequestDto,
         owner_id: UUID,
-    ) -> types.LorebookEntryDelete:
-        return types.LorebookEntryDelete(
+    ) -> Types.DeleteLorebookEntryCommand:
+        return Types.DeleteLorebookEntryCommand(
             lorebook_id=request.lorebook_id,
             entry_id=request.entry_id,
             owner_id=owner_id,
@@ -106,24 +107,24 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def cursor_request_to_value(
-        request: schemas.CursorRequestDto,
-    ) -> types.LorebookCursor | None:
+        request: Schemas.CursorRequestDto,
+    ) -> Types.LorebookCursor | None:
         if request.cursor_created_at is None and request.cursor_id is None:
             return None
         if request.cursor_created_at is None or request.cursor_id is None:
             raise ValueError(
                 "cursor_created_at and cursor_id must be provided together."
             )
-        return types.LorebookCursor(
+        return Types.LorebookCursor(
             created_at=request.cursor_created_at,
             id=request.cursor_id,
         )
 
     @staticmethod
     def lorebook_info_to_response(
-        value: types.LorebookInfo,
-    ) -> schemas.LorebookResponseDto:
-        return schemas.LorebookResponseDto(
+        value: Types.LorebookInfo,
+    ) -> Schemas.LorebookResponseDto:
+        return Schemas.LorebookResponseDto(
             id=value.id,
             owner_id=value.owner_id,
             title=value.title,
@@ -136,9 +137,9 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def entry_info_to_response(
-        value: types.LorebookEntryInfo,
-    ) -> schemas.LorebookEntryResponseDto:
-        return schemas.LorebookEntryResponseDto(
+        value: Types.LorebookEntryInfo,
+    ) -> Schemas.LorebookEntryResponseDto:
+        return Schemas.LorebookEntryResponseDto(
             id=value.id,
             lorebook_id=value.lorebook_id,
             title=value.title,
@@ -158,11 +159,11 @@ class LorebookSchemaMapper:
 
     @staticmethod
     def _cursor_to_response(
-        value: types.LorebookCursor | None,
-    ) -> schemas.LorebookCursorResponseDto | None:
+        value: Types.LorebookCursor | None,
+    ) -> Schemas.LorebookCursorResponseDto | None:
         if value is None:
             return None
-        return schemas.LorebookCursorResponseDto(
+        return Schemas.LorebookCursorResponseDto(
             created_at=value.created_at,
             id=value.id,
         )
@@ -170,9 +171,9 @@ class LorebookSchemaMapper:
     @classmethod
     def lorebook_page_to_response(
         cls,
-        page: types.LorebookPage[types.LorebookInfo],
-    ) -> schemas.ListLorebooksResponseDto:
-        return schemas.ListLorebooksResponseDto(
+        page: Types.LorebookPage[Types.LorebookInfo],
+    ) -> Schemas.ListLorebooksResponseDto:
+        return Schemas.ListLorebooksResponseDto(
             lorebooks=[cls.lorebook_info_to_response(item) for item in page.items],
             next_cursor=cls._cursor_to_response(page.next_cursor),
         )
@@ -180,9 +181,9 @@ class LorebookSchemaMapper:
     @classmethod
     def entry_page_to_response(
         cls,
-        page: types.LorebookEntryPage[types.LorebookEntryInfo],
-    ) -> schemas.ListLorebookEntriesResponseDto:
-        return schemas.ListLorebookEntriesResponseDto(
+        page: Types.LorebookEntryPage[Types.LorebookEntryInfo],
+    ) -> Schemas.ListLorebookEntriesResponseDto:
+        return Schemas.ListLorebookEntriesResponseDto(
             entries=[cls.entry_info_to_response(item) for item in page.items],
             next_cursor=cls._cursor_to_response(page.next_cursor),
         )
@@ -190,74 +191,74 @@ class LorebookSchemaMapper:
     @classmethod
     def lorebook_info_to_create_response(
         cls,
-        value: types.LorebookInfo,
-    ) -> schemas.CreateLorebookResponseDto:
-        return schemas.CreateLorebookResponseDto(
+        value: Types.LorebookInfo,
+    ) -> Schemas.CreateLorebookResponseDto:
+        return Schemas.CreateLorebookResponseDto(
             lorebook=cls.lorebook_info_to_response(value)
         )
 
     @classmethod
     def lorebook_info_to_update_response(
         cls,
-        value: types.LorebookInfo,
-    ) -> schemas.UpdateLorebookResponseDto:
-        return schemas.UpdateLorebookResponseDto(
+        value: Types.LorebookInfo,
+    ) -> Schemas.UpdateLorebookResponseDto:
+        return Schemas.UpdateLorebookResponseDto(
             lorebook=cls.lorebook_info_to_response(value)
         )
 
     @classmethod
     def lorebook_info_to_status_response(
         cls,
-        value: types.LorebookInfo,
-    ) -> schemas.ChangeLorebookStatusResponseDto:
-        return schemas.ChangeLorebookStatusResponseDto(
+        value: Types.LorebookInfo,
+    ) -> Schemas.ChangeLorebookStatusResponseDto:
+        return Schemas.ChangeLorebookStatusResponseDto(
             lorebook=cls.lorebook_info_to_response(value)
         )
 
     @classmethod
     def lorebook_info_to_get_response(
         cls,
-        value: types.LorebookInfo,
-    ) -> schemas.GetLorebookByIdResponseDto:
-        return schemas.GetLorebookByIdResponseDto(
+        value: Types.LorebookInfo,
+    ) -> Schemas.GetLorebookByIdResponseDto:
+        return Schemas.GetLorebookByIdResponseDto(
             lorebook=cls.lorebook_info_to_response(value)
         )
 
     @classmethod
     def entry_info_to_create_response(
         cls,
-        value: types.LorebookEntryInfo,
-    ) -> schemas.CreateLorebookEntryResponseDto:
-        return schemas.CreateLorebookEntryResponseDto(
+        value: Types.LorebookEntryInfo,
+    ) -> Schemas.CreateLorebookEntryResponseDto:
+        return Schemas.CreateLorebookEntryResponseDto(
             entry=cls.entry_info_to_response(value)
         )
 
     @classmethod
     def entry_info_to_update_response(
         cls,
-        value: types.LorebookEntryInfo,
-    ) -> schemas.UpdateLorebookEntryResponseDto:
-        return schemas.UpdateLorebookEntryResponseDto(
+        value: Types.LorebookEntryInfo,
+    ) -> Schemas.UpdateLorebookEntryResponseDto:
+        return Schemas.UpdateLorebookEntryResponseDto(
             entry=cls.entry_info_to_response(value)
         )
 
     @classmethod
     def entry_info_to_get_response(
         cls,
-        value: types.LorebookEntryInfo,
-    ) -> schemas.GetLorebookEntryResponseDto:
-        return schemas.GetLorebookEntryResponseDto(
+        value: Types.LorebookEntryInfo,
+    ) -> Schemas.GetLorebookEntryResponseDto:
+        return Schemas.GetLorebookEntryResponseDto(
             entry=cls.entry_info_to_response(value)
         )
 
     @staticmethod
     def delete_lorebook_result_to_response(
         result: None,
-    ) -> schemas.DeleteLorebookResponseDto:
-        return schemas.DeleteLorebookResponseDto(deleted=True)
+    ) -> Schemas.DeleteLorebookResponseDto:
+        return Schemas.DeleteLorebookResponseDto(deleted=True)
 
     @staticmethod
     def delete_entry_result_to_response(
         result: None,
-    ) -> schemas.DeleteLorebookEntryResponseDto:
-        return schemas.DeleteLorebookEntryResponseDto(deleted=True)
+    ) -> Schemas.DeleteLorebookEntryResponseDto:
+        return Schemas.DeleteLorebookEntryResponseDto(deleted=True)

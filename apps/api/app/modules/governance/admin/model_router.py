@@ -2,24 +2,27 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.modules.content.product.http import Owner, Session, errors
-from app.modules.governance.admin import schemas
-from app.modules.governance.admin.mapper.schema import AdminSchemaMapper
-from app.modules.llm.replacement import announce_retirement
+from app.http.dependencies import Owner, Session, errors
+from app.modules.governance.admin import schemas as Schemas
+from app.modules.governance.admin.mapper.schema import AdminSchemaMapper as SchemaMapper
+from app.modules.llm import types as LlmTypes
+from app.modules.llm.service.replacement import announce_retirement
 
 router = APIRouter(prefix="/admin/models", tags=["model administration"])
 
 
 @router.put("/{model_id}/retirement", status_code=204)
 async def announce(
-    model_id: UUID, body: schemas.RetirementRequest, session: Session, owner: Owner
+    model_id: UUID, body: Schemas.RetirementRequest, session: Session, owner: Owner
 ):
-    value = AdminSchemaMapper.to_retirement(body)
+    value = SchemaMapper.retirement_request_to_command(body)
     with errors():
         await announce_retirement(
             session,
-            actor_id=owner,
-            model_id=model_id,
-            announced_at=value.announced_at,
-            shutdown_at=value.shutdown_at,
+            LlmTypes.AnnounceRetirementCommand(
+                actor_id=owner,
+                model_id=model_id,
+                announced_at=value.announced_at,
+                shutdown_at=value.shutdown_at,
+            ),
         )

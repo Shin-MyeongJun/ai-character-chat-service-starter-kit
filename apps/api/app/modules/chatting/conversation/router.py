@@ -2,60 +2,73 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.modules.chatting.conversation import schemas
-from app.modules.chatting.conversation.mapper.schema import ConversationSchemaMapper
+from app.http.dependencies import Owner, Session, errors
+from app.modules.chatting.conversation import schemas as Schemas
+from app.modules.chatting.conversation import types as Types
+from app.modules.chatting.conversation.mapper.schema import (
+    ConversationSchemaMapper as SchemaMapper,
+)
+from app.modules.chatting.conversation.mapper.schema import (
+    pending_updates_view_to_response,
+)
 from app.modules.chatting.conversation.service import start_conversation
-from app.modules.content.product import schemas as product_schemas
-from app.modules.content.product.http import Owner, Session, errors
-from app.modules.content.product.mapper.schema import ProductSchemaMapper
+from app.modules.content.product import types as ProductTypes
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
-@router.post("", status_code=201, response_model=schemas.ConversationStartedResponseDto)
-async def start(body: schemas.StartRequest, session: Session, owner: Owner):
-    value = ConversationSchemaMapper.to_start(body)
+@router.post("", status_code=201, response_model=Schemas.ConversationStartedResponseDto)
+async def start(body: Schemas.StartRequest, session: Session, owner: Owner):
+    value = SchemaMapper.conversation_start_request_to_command(body)
     with errors():
-        return ConversationSchemaMapper.started_response(
+        return SchemaMapper.conversation_started_info_to_response(
             await start_conversation(
                 session,
-                product_id=value.product_id,
-                user_id=owner,
-                start_set_id=value.start_set_id,
+                Types.StartConversationCommand(
+                    product_id=value.product_id,
+                    user_id=owner,
+                    start_set_id=value.start_set_id,
+                ),
             )
         )
 
 
 @router.get(
-    "/{conversation_id}/updates",
-    response_model=product_schemas.PendingUpdatesInfoResponseDto,
+    "/{conversation_id}/updates", response_model=Schemas.PendingUpdatesInfoResponseDto
 )
 async def updates(conversation_id: UUID, session: Session, owner: Owner):
-    from app.modules.content.product.service.notices import pending_updates
+    from app.modules.content.product.service.views.notices import get_pending_updates
 
     with errors():
-        return ProductSchemaMapper.updates_response(
-            await pending_updates(
-                session, conversation_id=conversation_id, user_id=owner
+        return pending_updates_view_to_response(
+            await get_pending_updates(
+                session,
+                ProductTypes.PendingUpdatesCommand(
+                    conversation_id=conversation_id, user_id=owner
+                ),
             )
         )
 
 
 @router.post(
-    "/{conversation_id}/version", response_model=schemas.VersionSwitchedResponseDto
+    "/{conversation_id}/version", response_model=Schemas.VersionSwitchedResponseDto
 )
 async def switch(
-    conversation_id: UUID, body: schemas.SwitchRequest, session: Session, owner: Owner
+    conversation_id: UUID, body: Schemas.SwitchRequest, session: Session, owner: Owner
 ):
-    value = ConversationSchemaMapper.to_switch(body)
-    from app.modules.chatting.conversation.versions import switch_version
+    value = SchemaMapper.conversation_switch_request_to_command(body)
+    from app.modules.chatting.conversation.service.command.versions import (
+        switch_version,
+    )
 
     with errors():
-        return ConversationSchemaMapper.switched_response(
+        return SchemaMapper.conversation_switched_info_to_response(
             await switch_version(
                 session,
-                conversation_id=conversation_id,
-                user_id=owner,
-                target_snapshot_id=value.target_snapshot_id,
+                Types.SwitchVersionCommand(
+                    conversation_id=conversation_id,
+                    user_id=owner,
+                    target_snapshot_id=value.target_snapshot_id,
+                ),
             )
         )

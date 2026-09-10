@@ -1,18 +1,9 @@
-"""Override with shared identity/DB dependencies at application composition time."""
+"""Compatibility exports for existing application dependency overrides."""
 
-from uuid import UUID
+from app.http.dependencies import (
+    get_current_owner_id,
+    get_product_session,
+    require_product_admin,
+)
 
-from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-
-
-async def get_product_session() -> AsyncSession:
-    raise HTTPException(503, "Product database dependency is not configured.")
-
-
-async def get_current_owner_id() -> UUID:
-    raise HTTPException(503, "Product authentication dependency is not configured.")
-
-
-async def require_product_admin() -> None:
-    raise HTTPException(503, "Product administration dependency is not configured.")
+__all__ = ["get_current_owner_id", "get_product_session", "require_product_admin"]

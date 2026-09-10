@@ -1,80 +1,34 @@
-from typing import cast
+from copy import deepcopy
+from typing import cast, overload
 
 from app.db.models import character as character_models
-from app.modules.content.character import types
-
-# Command type -> SQLAlchemy entity
-
-def character_create_to_entity(
-    command: types.CharacterCreate,
-) -> character_models.Character:
-    return character_models.Character(
-        owner_id=command.owner_id,
-        name=command.name,
-        description=command.description,
-        persona_prompt=command.persona_prompt,
-        visibility=command.visibility,
-        status=command.status,
-        default_model_id=command.default_model_id,
-    )
+from app.modules.content.character import repository as Repository
+from app.modules.content.character import types as Types
 
 
-def apply_character_update_to_entity(
+@overload
+def character_entity_to_info(
     entity: character_models.Character,
-    command: types.CharacterUpdate,
-) -> character_models.Character:
-    entity.name = command.name
-    entity.description = command.description
-    entity.persona_prompt = command.persona_prompt
-    entity.visibility = command.visibility
-    entity.default_model_id = command.default_model_id
-    return entity
+) -> Types.CharacterInfo: ...
 
 
-def apply_character_status_change_to_entity(
-    entity: character_models.Character,
-    command: types.CharacterStatusChange,
-) -> character_models.Character:
-    entity.status = command.status
-    return entity
-
-
-def character_image_create_to_entity(
-    command: types.CharacterImageCreate,
-) -> character_models.CharacterImage:
-    return character_models.CharacterImage(
-        character_id=command.character_id,
-        emotion_tag=command.emotion_tag,
-        image_url=command.image_url,
-        is_default=command.is_default,
-    )
-
-
-def character_asset_create_to_entity(
-    command: types.CharacterAssetCreate,
-) -> character_models.CharacterAsset:
-    return character_models.CharacterAsset(
-        character_id=command.character_id,
-        asset_type=command.asset_type,
-        purpose=command.purpose,
-        file_url=command.file_url,
-    )
-
-
-# SQLAlchemy entity -> result type
+@overload
+def character_entity_to_info(entity: None) -> None: ...
 
 
 def character_entity_to_info(
-    entity: character_models.Character,
-) -> types.CharacterInfo:
-    return types.CharacterInfo(
+    entity: character_models.Character | None,
+) -> Types.CharacterInfo | None:
+    if entity is None:
+        return None
+    return Types.CharacterInfo(
         id=entity.id,
         owner_id=entity.owner_id,
         name=entity.name,
         description=entity.description,
         persona_prompt=entity.persona_prompt,
-        visibility=cast(types.CharacterVisibilityValue, entity.visibility),
-        status=cast(types.CharacterStatusValue, entity.status),
+        visibility=cast(Types.CharacterVisibilityValue, entity.visibility),
+        status=cast(Types.CharacterStatusValue, entity.status),
         default_model_id=entity.default_model_id,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
@@ -82,28 +36,52 @@ def character_entity_to_info(
 
 
 def character_page_entity_to_info(
-    page: types.CharacterPage[character_models.Character],
-) -> types.CharacterPage[types.CharacterInfo]:
-    return types.CharacterPage(
+    page: Repository.CharacterPageRow,
+) -> Types.CharacterPage[Types.CharacterInfo]:
+    return Types.CharacterPage(
         items=[character_entity_to_info(item) for item in page.items],
         next_cursor=page.next_cursor,
     )
 
 
+@overload
 def character_entity_to_prompt_info(
     entity: character_models.Character,
-) -> types.CharacterPromptInfo:
-    return types.CharacterPromptInfo(
+) -> Types.CharacterPromptInfo: ...
+
+
+@overload
+def character_entity_to_prompt_info(entity: None) -> None: ...
+
+
+def character_entity_to_prompt_info(
+    entity: character_models.Character | None,
+) -> Types.CharacterPromptInfo | None:
+    if entity is None:
+        return None
+    return Types.CharacterPromptInfo(
         character_id=entity.id,
         persona_prompt=entity.persona_prompt,
         default_model_id=entity.default_model_id,
     )
 
 
+@overload
 def character_image_entity_to_info(
     entity: character_models.CharacterImage,
-) -> types.CharacterImageInfo:
-    return types.CharacterImageInfo(
+) -> Types.CharacterImageInfo: ...
+
+
+@overload
+def character_image_entity_to_info(entity: None) -> None: ...
+
+
+def character_image_entity_to_info(
+    entity: character_models.CharacterImage | None,
+) -> Types.CharacterImageInfo | None:
+    if entity is None:
+        return None
+    return Types.CharacterImageInfo(
         id=entity.id,
         character_id=entity.character_id,
         emotion_tag=entity.emotion_tag,
@@ -114,15 +92,73 @@ def character_image_entity_to_info(
     )
 
 
+@overload
 def character_asset_entity_to_info(
     entity: character_models.CharacterAsset,
-) -> types.CharacterAssetInfo:
-    return types.CharacterAssetInfo(
+) -> Types.CharacterAssetInfo: ...
+
+
+@overload
+def character_asset_entity_to_info(entity: None) -> None: ...
+
+
+def character_asset_entity_to_info(
+    entity: character_models.CharacterAsset | None,
+) -> Types.CharacterAssetInfo | None:
+    if entity is None:
+        return None
+    return Types.CharacterAssetInfo(
         id=entity.id,
         character_id=entity.character_id,
-        asset_type=cast(types.CharacterAssetTypeValue, entity.asset_type),
+        asset_type=cast(Types.CharacterAssetTypeValue, entity.asset_type),
         purpose=entity.purpose,
         file_url=entity.file_url,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
     )
+
+
+def character_promotion_row_to_info(row) -> Types.CharacterPromotionInfo | None:
+    if row is None:
+        return None
+    return Types.CharacterPromotionInfo(
+        character_id=row.character.id,
+        name=row.character.name,
+        description=row.character.description,
+        images=character_images_entities_to_info(row.images),
+        assets=character_assets_entities_to_info(row.assets),
+    )
+
+
+def character_images_entities_to_info(entities) -> list[Types.CharacterImageInfo]:
+    return [character_image_entity_to_info(entity) for entity in entities]
+
+
+def character_assets_entities_to_info(entities) -> list[Types.CharacterAssetInfo]:
+    return [character_asset_entity_to_info(entity) for entity in entities]
+
+
+def characters_entities_to_info(entities) -> list[Types.CharacterInfo]:
+    return [character_entity_to_info(entity) for entity in entities]
+
+
+def character_snapshot_entity_to_info(entity) -> Types.CharacterSnapshotInfo:
+    return Types.CharacterSnapshotInfo(
+        entity.id, entity.character_id, entity.version, deepcopy(entity.snapshot_data)
+    )
+
+
+def snapshot_media_row_to_info(row) -> Types.SnapshotMediaInfo:
+    manifest: set[tuple] = {
+        ("image", str(i.source_image_id), i.emotion_tag, i.image_url)
+        for i in row.images
+    }
+    manifest.update(
+        ("asset", str(a.source_asset_id), a.asset_type, a.purpose, a.file_url)
+        for a in row.assets
+    )
+    return Types.SnapshotMediaInfo(frozenset(manifest))
+
+
+def character_snapshots_entities_to_info(entities) -> list[Types.CharacterSnapshotInfo]:
+    return [character_snapshot_entity_to_info(entity) for entity in entities]

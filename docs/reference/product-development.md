@@ -58,34 +58,37 @@ alembic_version 갱신만 제외한 파일이며 반복 실행용 스크립트�
 
 ## 앱 연결
 
-상품 `router`, 대화 `router`, 관리 영역의 `product_router`, `model_router`를
-FastAPI 앱에 포함한다. `product.dependencies.get_product_session`은 요청마다
+`app.http.routes.router`를 FastAPI 앱에 포함한다. 이 조립 지점은
+소유자·관리자·모더레이터 경로를 함께 등록하고 고정 경로를 UUID 경로보다
+먼저 배치한다. `product.dependencies.get_product_session`은 요청마다
 독립 AsyncSession을 제공하고 `get_current_owner_id`는 인증된 사용자 ID를
 반환해야 한다. 인증 조회와 쓰기 command가 같은 열린 트랜잭션을 공유하지
 않도록 한다. 미설정 상태는 503으로 거부한다. 클라이언트 owner_id를 신뢰하지
 않는다. 관리자 기능은 DB의 활성 admin 역할도 검사한다.
 
-대화 생성은 `conversation.generation.begin_generation`으로 먼저 예약한다.
+대화 생성은 `conversation.service.command.generation.begin_generation`으로 먼저 예약한다.
 사용자별 request_key와 입력 해시가 같으면 기존 실행을 돌려준다. 반환값의
 `created`가 false이면 제공사를 다시 호출하지 않는다. pending 실행의 대사와
 프로세스 중단 복구는 실제 제공사 오케스트레이터에서 처리해야 한다.
 
-`runtime_context`는 서버 내부용이며 HTTP로 반환하지 않는다. 별도 트랜잭션에서
-읽고 `UUID(context.product_snapshot_id) == reservation.product_snapshot_id`인지
+`prepare_runtime_context(PrepareRuntimeContextCommand)`는 서버 내부용이며 HTTP로
+반환하지 않는다. 이 쓰기 유스케이스가 트랜잭션을 소유하며 결과를 받은 뒤 `UUID(context.product_snapshot_id) == reservation.product_snapshot_id`인지
 확인한다. 다르면 제공사를
 호출하지 않고 예약을 cancelled로 마감한다. 실제 제공사 호출에는 예약에
 고정된 model_id/model_name/reasoning_effort를 사용한다. 컨텍스트 조회에는
-모델 대체 계획 기록이 포함될 수 있으므로 성공 시 커밋한다.
+모델 대체 계획 기록이 포함될 수 있으므로 공통 use_case_transaction이 성공 시 커밋한다.
+여러 Command를 조합할 때는 같은 공통 범위에 참여시킨다.
 
-제공사 응답/실패/취소 후 `finish_generation`에 GenerationResult를 전달한다.
+제공사 응답/실패/취소 후 `finish_generation`에 GenerationResult를 담은 FinishGenerationCommand를 전달한다.
 메시지, 실제 토큰/비용, 종료 상태를 한 트랜잭션으로 저장한다. 같은 결과의
 재전송은 중복 저장하지 않는다. 생성 도중 버전 전환/만료가 발생하면 stale로
 기록하고 AI 메시지는 저장하지 않으며 발생한 비용은 보존한다. 제거된
 append_generated_message 경로 대신 이 완료 인터페이스를 사용한다.
 
-`billing.attribution.record_sale/record_refund`는 검증된 billing 내부 호출만
+`billing.service.command.attribution.record_sale/record_refund`는 검증된 billing 내부 호출만
 허용하는 계약이다. 공개 HTTP로 노출하지 않는다. 결제별 귀속 합계는 원결제
 이하, 부분 환불 합계는 원귀속 이하로 제한하며 event_key로 중복을 막는다.
+입력은 RecordSaleCommand/RecordRefundCommand이며 저장된 PaymentEventInfo를 반환한다.
 한 결제의 여러 배분은 같은 결제 완료 시각을 전달한다. 실제 결제 실행과
 크레딧 잔액 변경은 별도 billing 작업이다.
 

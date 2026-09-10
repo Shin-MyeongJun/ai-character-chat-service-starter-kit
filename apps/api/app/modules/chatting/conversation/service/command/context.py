@@ -1,0 +1,46 @@
+from app.db.transaction import use_case_transaction
+from app.modules.chatting.conversation import types as Types
+from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper
+from app.modules.chatting.conversation.service.query import get_owned_conversation
+from app.modules.content.product import types as ProductTypes
+from app.modules.content.product.service import query as ProductQueryService
+from app.modules.content.product.service import views as ProductViewsService
+from app.modules.llm import types as LlmTypes
+from app.modules.llm.service.replacement import resolve_execution
+
+
+async def prepare_runtime_context(
+    session, command: Types.PrepareRuntimeContextCommand
+) -> Types.ConversationRuntimeView:
+    async with use_case_transaction(session):
+        conversation_id = command.conversation_id
+        user_id = command.user_id
+        conversation = await get_owned_conversation(
+            session,
+            Types.OwnedConversationCommand(
+                conversation_id=conversation_id, user_id=user_id
+            ),
+        )
+        if conversation.product_snapshot_id is None:
+            raise ValueError("Legacy conversation requires verified version mapping.")
+        snapshot = await ProductQueryService.ensure_snapshot_available(
+            session,
+            ProductTypes.ProductSnapshotCommand(conversation.product_snapshot_id),
+        )
+        runtime = await ProductViewsService.get_snapshot_runtime(
+            session, ProductTypes.ProductSnapshotCommand(snapshot.id)
+        )
+        execution = await resolve_execution(
+            session, LlmTypes.ResolveExecutionCommand(snapshot_id=snapshot.id)
+        )
+        eligible_entries = {
+            sid: [
+                entry
+                for entry in book.snapshot_data["entries"]
+                if entry["entry_type"] != "start_set" and entry["is_enabled"]
+            ]
+            for sid, book in runtime.lorebooks.items()
+        }
+        return PersistenceMapper.conversation_snapshot_infos_to_runtime_view(
+            conversation, snapshot, runtime, execution, eligible_entries
+        )

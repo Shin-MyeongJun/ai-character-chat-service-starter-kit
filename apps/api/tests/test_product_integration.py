@@ -11,12 +11,17 @@ from app.db.models.product import (
     ProductLorebook,
     ProductLorebookCharacter,
 )
-from app.modules.content.product.service import command, composition
+from app.db.transaction import use_case_transaction
+from app.modules.chatting.conversation import types as ConversationTypes
+from app.modules.content.lorebook import types as LorebookTypes
+from app.modules.content.product import types as ProductTypes
+from app.modules.content.product.service import command
+from app.modules.content.product.service.command import composition
 from app.modules.content.product.types import (
     CharacterSelection,
-    Composition,
     LorebookSelection,
-    ProductWrite,
+    ProductCompositionInfo,
+    ProductProfileCommand,
 )
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -25,34 +30,45 @@ pytestmark = pytest.mark.asyncio
 
 
 async def seed(db):
-    async with db.begin():
+    async with use_case_transaction(db):
         owner = User(id=uuid4(), email=f"{uuid4()}@test.local")
         db.add(owner)
         await db.flush()
         c = Character(id=uuid4(), owner_id=owner.id, name="C", persona_prompt="P")
         b = Lorebook(id=uuid4(), owner_id=owner.id, title="B")
         db.add_all([c, b])
-    return SimpleNamespace(id=owner.id), c, b
+    return (SimpleNamespace(id=owner.id), c, b)
 
 
 async def test_composition_ownership_and_cross_product_fk(db):
     owner, c, b = await seed(db)
-    p = await command.create_product(db, owner_id=owner.id, value=ProductWrite("P"))
-    value = Composition(
+    p = await command.create_product(
+        db,
+        ProductTypes.CreateProductCommand(
+            owner_id=owner.id, value=ProductProfileCommand("P")
+        ),
+    )
+    value = ProductCompositionInfo(
         (CharacterSelection(c.id, True),),
         (LorebookSelection(b.id, "selected", (c.id,)),),
     )
     assert (
         await composition.replace_composition(
-            db, product_id=p.id, owner_id=owner.id, value=value
+            db,
+            ProductTypes.ReplaceCompositionCommand(
+                product_id=p.id, owner_id=owner.id, value=value
+            ),
         )
         == value
     )
     with pytest.raises(LookupError):
         await composition.replace_composition(
-            db, product_id=p.id, owner_id=uuid4(), value=value
+            db,
+            ProductTypes.ReplaceCompositionCommand(
+                product_id=p.id, owner_id=uuid4(), value=value
+            ),
         )
-    async with db.begin():
+    async with use_case_transaction(db):
         foreign = Product(id=uuid4(), owner_id=owner.id, title="foreign")
         db.add(foreign)
         await db.flush()
@@ -81,13 +97,20 @@ async def test_composition_ownership_and_cross_product_fk(db):
 async def test_foreign_content_cannot_be_added(db):
     _owner, c, _b = await seed(db)
     other, _, _ = await seed(db)
-    p = await command.create_product(db, owner_id=other.id, value=ProductWrite("P"))
+    p = await command.create_product(
+        db,
+        ProductTypes.CreateProductCommand(
+            owner_id=other.id, value=ProductProfileCommand("P")
+        ),
+    )
     with pytest.raises(LookupError):
         await composition.replace_composition(
             db,
-            product_id=p.id,
-            owner_id=other.id,
-            value=Composition((CharacterSelection(c.id),), ()),
+            ProductTypes.ReplaceCompositionCommand(
+                product_id=p.id,
+                owner_id=other.id,
+                value=ProductCompositionInfo((CharacterSelection(c.id),), ()),
+            ),
         )
 
 
@@ -96,7 +119,7 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
     from app.modules.content.lorebook.service import query
 
     _owner, _c, b = await seed(db)
-    async with db.begin():
+    async with use_case_transaction(db):
         db.add_all(
             [
                 LorebookEntry(
@@ -113,7 +136,9 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
                 ),
             ]
         )
-    entries = await query.get_always_entries(db, lorebook_ids=[b.id])
+    entries = await query.get_always_entries(
+        db, LorebookTypes.GetAlwaysEntriesCommand(lorebook_ids=[b.id])
+    )
     assert len(entries) == 1
     assert entries[0].content == "World"
     assert len(await lore_repo.list_start_sets(db, b.id)) == 1
@@ -121,11 +146,11 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
 
 async def ready_product(db):
     from app.db.models.model_routing import Model, Provider
-    from app.modules.content.product.service.settings import set_settings
-    from app.modules.content.product.types import Settings
+    from app.modules.content.product.service.command.settings import set_settings
+    from app.modules.content.product.types import ProductSettingsInfo
 
     owner, c, b = await seed(db)
-    async with db.begin():
+    async with use_case_transaction(db):
         provider = Provider(id=uuid4(), name=str(uuid4()))
         db.add(provider)
         await db.flush()
@@ -148,41 +173,53 @@ async def ready_product(db):
         )
         db.add_all([model, entry])
     p = await command.create_product(
-        db, owner_id=owner.id, value=ProductWrite("P", opening_message="Hello")
+        db,
+        ProductTypes.CreateProductCommand(
+            owner_id=owner.id, value=ProductProfileCommand("P", opening_message="Hello")
+        ),
     )
-    value = Composition((CharacterSelection(c.id, True),), (LorebookSelection(b.id),))
+    value = ProductCompositionInfo(
+        (CharacterSelection(c.id, True),), (LorebookSelection(b.id),)
+    )
     await composition.replace_composition(
-        db, product_id=p.id, owner_id=owner.id, value=value
+        db,
+        ProductTypes.ReplaceCompositionCommand(
+            product_id=p.id, owner_id=owner.id, value=value
+        ),
     )
     await set_settings(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=Settings(model.id, "low", (entry.id,)),
+        ProductTypes.SetSettingsCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ProductSettingsInfo(model.id, "low", (entry.id,)),
+        ),
     )
-    return owner, c, b, p, SimpleNamespace(id=model.id), entry
+    return (owner, c, b, p, SimpleNamespace(id=model.id), entry)
 
 
 async def test_settings_and_composition_preserve_start_selection(db):
     from app.db.models.product import ProductStartSet
-    from app.modules.content.product.service.settings import (
+    from app.modules.content.product.service.command.settings import (
+        _validate_publication,
         set_settings,
-        validate_publication,
     )
-    from app.modules.content.product.types import Settings
+    from app.modules.content.product.types import ProductSettingsInfo
 
     owner, c, b, p, model, entry = await ready_product(db)
     await composition.replace_composition(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=Composition(
-            (CharacterSelection(c.id, True),), (LorebookSelection(b.id),)
+        ProductTypes.ReplaceCompositionCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ProductCompositionInfo(
+                (CharacterSelection(c.id, True),), (LorebookSelection(b.id),)
+            ),
         ),
     )
-    async with db.begin():
+    async with use_case_transaction(db):
         row = await db.get(Product, p.id)
-        await validate_publication(db, row)
+        await _validate_publication(db, row)
         assert (
             len(
                 list(
@@ -198,16 +235,20 @@ async def test_settings_and_composition_preserve_start_selection(db):
     with pytest.raises(ValueError, match="reasoning"):
         await set_settings(
             db,
-            product_id=p.id,
-            owner_id=owner.id,
-            value=Settings(model.id, "max", (entry.id,)),
+            ProductTypes.SetSettingsCommand(
+                product_id=p.id,
+                owner_id=owner.id,
+                value=ProductSettingsInfo(model.id, "max", (entry.id,)),
+            ),
         )
     with pytest.raises(ValueError, match="start_set"):
         await set_settings(
             db,
-            product_id=p.id,
-            owner_id=owner.id,
-            value=Settings(model.id, "low", (uuid4(),)),
+            ProductTypes.SetSettingsCommand(
+                product_id=p.id,
+                owner_id=owner.id,
+                value=ProductSettingsInfo(model.id, "low", (uuid4(),)),
+            ),
         )
 
 
@@ -217,13 +258,14 @@ async def test_snapshot_media_survives_source_deletion(db):
         CharacterSnapshot,
         CharacterSnapshotImage,
     )
-    from app.modules.content.product.service.snapshots import (
-        freeze_character,
-        media_is_referenced,
+    from app.modules.content.character.service.command import freeze_character
+    from app.modules.content.character.types import FreezeCharacterCommand
+    from app.modules.content.product.service.views.snapshots import (
+        check_media_reference,
     )
 
     _owner, c, _b = await seed(db)
-    async with db.begin():
+    async with use_case_transaction(db):
         db.add_all(
             [
                 CharacterImage(
@@ -241,16 +283,20 @@ async def test_snapshot_media_survives_source_deletion(db):
             ]
         )
         await db.flush()
-        snapshot = await freeze_character(db, c)
+        snapshot = await freeze_character(db, FreezeCharacterCommand(c.id, _owner.id))
         sid = snapshot.id
-    async with db.begin():
+    async with use_case_transaction(db):
         await db.delete(c)
-    async with db.begin():
+    async with use_case_transaction(db):
         db.expire_all()
         saved = await db.get(CharacterSnapshot, sid)
         assert saved.character_id is None
         assert saved.snapshot_data["persona_prompt"] == "P"
-        assert await media_is_referenced(db, "immutable/image/v1")
+        assert (
+            await check_media_reference(
+                db, ProductTypes.MediaIsReferencedCommand(url="immutable/image/v1")
+            )
+        ).referenced
         assert (
             await db.scalar(
                 select(CharacterSnapshotImage).where(
@@ -267,19 +313,28 @@ async def test_atomic_publication_and_original_edits(db):
         ProductSnapshotCharacter,
         ProductSnapshotStartSet,
     )
-    from app.modules.content.product.service.publication import build_publication
+    from app.modules.content.product.service.command.publication import (
+        _build_publication,
+    )
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
-    async with db.begin():
-        first = await build_publication(db, product_id=p.id, owner_id=owner.id)
+    async with use_case_transaction(db):
+        first = await _build_publication(
+            db, ProductTypes.BuildPublicationCommand(product_id=p.id, owner_id=owner.id)
+        )
         first_id = first.id
-    async with db.begin():
+    async with use_case_transaction(db):
         c.persona_prompt = "New persona"
     with pytest.raises(RuntimeError):
-        async with db.begin():
-            await build_publication(db, product_id=p.id, owner_id=owner.id)
+        async with use_case_transaction(db):
+            await _build_publication(
+                db,
+                ProductTypes.BuildPublicationCommand(
+                    product_id=p.id, owner_id=owner.id
+                ),
+            )
             raise RuntimeError("simulate publication failure")
-    async with db.begin():
+    async with use_case_transaction(db):
         db.expire_all()
         product = await db.get(Product, p.id)
         assert product.latest_snapshot_id == first_id
@@ -303,7 +358,12 @@ async def test_atomic_publication_and_original_edits(db):
         assert (
             await db.get(CharacterSnapshot, link.character_snapshot_id)
         ).snapshot_data["persona_prompt"] == "P"
-        second = await build_publication(db, product_id=p.id, owner_id=product.owner_id)
+        second = await _build_publication(
+            db,
+            ProductTypes.BuildPublicationCommand(
+                product_id=p.id, owner_id=product.owner_id
+            ),
+        )
         assert second.version == 2
         assert (
             second.snapshot_data["content_digest"]
@@ -325,124 +385,171 @@ async def test_atomic_publication_and_original_edits(db):
 
 async def test_release_policy_and_typo_correction(db):
     from app.db.models.product_release import ProductReleaseNoteRevision
-    from app.modules.content.product.service.releases import correct_note, publish
-    from app.modules.content.product.types import ReleasePublish
+    from app.modules.content.product.service.command.releases import (
+        correct_note,
+        publish_product,
+    )
+    from app.modules.content.product.types import ReleaseNoteCommand
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
-    first = await publish(
+    first = await publish_product(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=ReleasePublish("First", "Initial release", True),
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("First", "Initial release", True),
+        ),
     )
     assert first.update_policy == "choice"
-    media = await publish(
+    media = await publish_product(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=ReleasePublish("Media", "No content change", True),
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("Media", "No content change", True),
+        ),
     )
     assert media.update_policy == "automatic"
-    async with db.begin():
+    async with use_case_transaction(db):
         c.persona_prompt = "Changed"
-    changed = await publish(
+    changed = await publish_product(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=ReleasePublish("Changes", "Content changed", True),
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("Changes", "Content changed", True),
+        ),
     )
     assert changed.change_kind == "content" and changed.update_policy == "choice"
     corrected = await correct_note(
         db,
-        product_id=p.id,
-        snapshot_id=changed.snapshot_id,
-        owner_id=owner.id,
-        summary="Corrected",
-        body="Typo corrected",
+        ProductTypes.CorrectNoteCommand(
+            product_id=p.id,
+            snapshot_id=changed.snapshot_id,
+            owner_id=owner.id,
+            summary="Corrected",
+            body="Typo corrected",
+        ),
     )
     assert corrected.update_policy == "choice"
-    async with db.begin():
+    async with use_case_transaction(db):
         assert len(list(await db.scalars(select(ProductReleaseNoteRevision)))) == 1
 
 
 async def test_conversation_keeps_published_context(db):
     from app.modules.chatting.conversation.service import (
-        runtime_context,
+        prepare_runtime_context,
         start_conversation,
     )
-    from app.modules.content.product.service.releases import publish
-    from app.modules.content.product.types import ReleasePublish
+    from app.modules.content.product.service.command.releases import publish_product
+    from app.modules.content.product.types import ReleaseNoteCommand
 
     owner, c, _b, p, _model, entry = await ready_product(db)
-    first = await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("First", "First")
+    first = await publish_product(
+        db,
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("First", "First"),
+        ),
     )
-    conversation = await start_conversation(db, product_id=p.id, user_id=owner.id)
-    async with db.begin():
+    conversation = await start_conversation(
+        db,
+        ConversationTypes.StartConversationCommand(product_id=p.id, user_id=owner.id),
+    )
+    async with use_case_transaction(db):
         c.persona_prompt = "new content"
         entry.content = "new starting point"
-    await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("Update", "Update")
+    await publish_product(
+        db,
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("Update", "Update"),
+        ),
     )
-    async with db.begin():
-        context = await runtime_context(
-            db, conversation_id=conversation.id, user_id=owner.id
+    async with use_case_transaction(db):
+        context = await prepare_runtime_context(
+            db,
+            ConversationTypes.PrepareRuntimeContextCommand(
+                conversation_id=conversation.id, user_id=owner.id
+            ),
         )
         assert context.product_snapshot_id == str(first.snapshot_id)
         assert context.characters[0].data["persona_prompt"] == "P"
         assert context.start.content == "Begin at home"
         assert context.lorebooks[0].entries == []
-        with pytest.raises(LookupError):
-            await runtime_context(db, conversation_id=conversation.id, user_id=uuid4())
+    with pytest.raises(LookupError):
+        await prepare_runtime_context(
+            db,
+            ConversationTypes.PrepareRuntimeContextCommand(
+                conversation_id=conversation.id, user_id=uuid4()
+            ),
+        )
 
 
 async def test_version_switch_requires_consent_and_preserves_initial_context(db):
     from app.db.models.chat import Conversation, ConversationVersionChange, Message
     from app.modules.chatting.conversation.service import start_conversation
-    from app.modules.chatting.conversation.versions import (
+    from app.modules.chatting.conversation.service.command.versions import (
         switch_version,
     )
-    from app.modules.content.product.service.releases import publish
-    from app.modules.content.product.types import ReleasePublish
+    from app.modules.content.product.service.command.releases import publish_product
+    from app.modules.content.product.types import ReleaseNoteCommand
 
     owner, c, _b, p, _model, _entry = await ready_product(db)
-    first = await publish(
-        db, product_id=p.id, owner_id=owner.id, value=ReleasePublish("First", "First")
+    first = await publish_product(
+        db,
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("First", "First"),
+        ),
     )
-    conversation = await start_conversation(db, product_id=p.id, user_id=owner.id)
-    async with db.begin():
+    conversation = await start_conversation(
+        db,
+        ConversationTypes.StartConversationCommand(product_id=p.id, user_id=owner.id),
+    )
+    async with use_case_transaction(db):
         c.persona_prompt = "Changed"
-    await publish(
+    await publish_product(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=ReleasePublish("Content", "Content"),
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("Content", "Content"),
+        ),
     )
-    latest = await publish(
+    latest = await publish_product(
         db,
-        product_id=p.id,
-        owner_id=owner.id,
-        value=ReleasePublish("Media", "Media", True),
+        ProductTypes.PublishCommand(
+            product_id=p.id,
+            owner_id=owner.id,
+            value=ReleaseNoteCommand("Media", "Media", True),
+        ),
     )
     with pytest.raises(ValueError, match="consent"):
         await switch_version(
             db,
-            conversation_id=conversation.id,
-            user_id=owner.id,
-            target_snapshot_id=latest.snapshot_id,
-            automatic=True,
+            ConversationTypes.SwitchVersionCommand(
+                conversation_id=conversation.id,
+                user_id=owner.id,
+                target_snapshot_id=latest.snapshot_id,
+                automatic=True,
+            ),
         )
-    # Rollback expires ORM objects; use immutable owner ID from the returned product seed.
-    async with db.begin():
+    async with use_case_transaction(db):
         product = await db.get(Product, p.id)
         uid = product.owner_id
     await switch_version(
         db,
-        conversation_id=conversation.id,
-        user_id=uid,
-        target_snapshot_id=latest.snapshot_id,
+        ConversationTypes.SwitchVersionCommand(
+            conversation_id=conversation.id,
+            user_id=uid,
+            target_snapshot_id=latest.snapshot_id,
+        ),
     )
-    async with db.begin():
+    async with use_case_transaction(db):
         saved = await db.get(Conversation, conversation.id)
         assert saved.initial_snapshot_id == first.snapshot_id
         assert saved.start_set_id == conversation.start_set_id

@@ -11,27 +11,22 @@ from uuid import uuid4
 import pytest
 from app.modules.chatting.conversation import service as conversation_service
 from app.modules.chatting.conversation import types as conversation_types
-from app.modules.chatting.conversation import versions
 from app.modules.chatting.conversation.router import router as conversations
+from app.modules.chatting.conversation.service.command import versions
 from app.modules.content.product import types
 from app.modules.content.product.dependencies import (
     get_current_owner_id,
     get_product_session,
 )
 from app.modules.content.product.router import router as products
-from app.modules.content.product.service import (
-    composition,
-    notices,
-    query,
-    releases,
-    settings,
-    statistics,
-)
-from app.modules.governance.admin import product_policy
+from app.modules.content.product.service import query, statistics
+from app.modules.content.product.service.command import composition, releases, settings
+from app.modules.content.product.service.views import notices
 from app.modules.governance.admin import types as admin_types
 from app.modules.governance.admin.model_router import router as model_admin
 from app.modules.governance.admin.product_router import router as product_admin
-from app.modules.llm.types import ModelNotice
+from app.modules.governance.admin.service import command as product_policy
+from app.modules.llm.types import ModelNoticeView
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -57,9 +52,15 @@ def test_composition_adapter_maps_nested_commands_and_rejects_extra_fields(
     _app, client, owner, session = http
     pid, cid, bid = uuid4(), uuid4(), uuid4()
 
-    async def replace(db, *, product_id, owner_id, value):
+    async def replace(db, command):
+        product_id, owner_id, value = (
+            command.product_id,
+            command.owner_id,
+            command.value,
+        )
+        assert type(command) is types.ReplaceCompositionCommand
         assert db is session and product_id == pid and owner_id == owner
-        assert type(value) is types.Composition
+        assert type(value) is types.ProductCompositionInfo
         assert type(value.characters[0]) is types.CharacterSelection
         assert type(value.lorebooks[0]) is types.LorebookSelection
         assert value.lorebooks[0].character_ids == (cid,)
@@ -99,26 +100,26 @@ def test_settings_and_release_adapters_pass_application_types(
             "reasoning_effort": "low",
             "start_entry_ids": [str(entry_id)],
         }
-        expected = types.Settings(model_id, "low", (entry_id,))
+        expected = types.ProductSettingsInfo(model_id, "low", (entry_id,))
         service = AsyncMock(return_value=expected)
         monkeypatch.setattr(settings, "set_settings", service)
         response = client.put(f"/products/{pid}/settings", json=body)
         assert response.json()["start_entry_ids"] == [str(entry_id)]
     else:
         body = {"summary": "First", "body": "Initial release"}
-        expected = types.ReleasePublish("First", "Initial release")
+        expected = types.ReleaseNoteCommand("First", "Initial release")
         service = AsyncMock(
             return_value=types.ReleaseInfo(
                 snapshot_id, 1, "First", "Initial release", "initial", "choice"
             )
         )
-        monkeypatch.setattr(releases, "publish", service)
+        monkeypatch.setattr(releases, "publish_product", service)
         response = client.post(f"/products/{pid}/releases", json=body)
         assert response.json()["snapshot_id"] == str(snapshot_id)
     assert response.status_code in (200, 201)
-    assert service.await_args.kwargs["owner_id"] == owner
-    assert type(service.await_args.kwargs["value"]) is type(expected)
-    assert service.await_args.kwargs["value"] == expected
+    assert service.await_args.args[1].owner_id == owner
+    assert type(service.await_args.args[1].value) is type(expected)
+    assert service.await_args.args[1].value == expected
 
 
 def test_product_list_query_and_response_pass_through_dtos(http, monkeypatch):
@@ -133,7 +134,9 @@ def test_product_list_query_and_response_pass_through_dtos(http, monkeypatch):
     response = client.get("/products/mine", params={"offset": 2, "limit": 3})
     assert response.status_code == 200
     assert response.json()[0]["id"] == str(pid)
-    assert service.await_args.kwargs == {"owner_id": owner, "offset": 2, "limit": 3}
+    assert service.await_args.args[1] == types.ListProductsCommand(
+        owner_id=owner, offset=2, limit=3
+    )
     assert client.get("/products/mine", params={"limit": 101}).status_code == 422
     assert service.await_count == 1
 
@@ -142,11 +145,13 @@ def test_typed_notices_and_statistics_keep_public_json_contract(http, monkeypatc
     _app, client, _owner, _session = http
     pid, sid, start_id = uuid4(), uuid4(), uuid4()
     now, day = datetime.now(UTC), date(2026, 9, 9)
-    notice = ModelNotice(state="scheduled", shutdown_at=now)
-    published = types.PublishedProductInfo(
+    notice = ModelNoticeView(state="scheduled", shutdown_at=now)
+    published = types.PublishedProductView(
         pid, sid, 1, "Title", None, [types.StartOptionInfo(start_id, "Start")], notice
     )
-    monkeypatch.setattr(notices, "published_product", AsyncMock(return_value=published))
+    monkeypatch.setattr(
+        notices, "get_published_product", AsyncMock(return_value=published)
+    )
     response = client.get(f"/products/{pid}")
     assert response.status_code == 200
     payload = response.json()
@@ -157,7 +162,7 @@ def test_typed_notices_and_statistics_keep_public_json_contract(http, monkeypatc
     )
 
     metrics = {
-        f.name: 0 for f in fields(types.StatisticsMetrics) if f.name != "revenue"
+        f.name: 0 for f in fields(types.StatisticsMetricsInfo) if f.name != "revenue"
     }
     revenue = {"KRW": types.RevenueInfo("100.00", "20.00", "80.00", 1, 1)}
     report = types.StatisticsInfo(
@@ -166,7 +171,7 @@ def test_typed_notices_and_statistics_keep_public_json_contract(http, monkeypatc
         "Asia/Seoul",
         day,
         day,
-        types.StatisticsMetrics(**metrics, revenue=revenue),
+        types.StatisticsMetricsInfo(**metrics, revenue=revenue),
         [day],
         [types.StatisticsDayInfo(**metrics, revenue=revenue, day=day, updated_at=now)],
     )
@@ -192,7 +197,7 @@ def test_conversation_and_admin_adapters_serialize_typed_results(
     pid, cid, sid, start_id = uuid4(), uuid4(), uuid4(), uuid4()
     if operation == "start":
         service = AsyncMock(
-            return_value=conversation_types.ConversationStarted(cid, sid, start_id)
+            return_value=conversation_types.ConversationStartedInfo(cid, sid, start_id)
         )
         monkeypatch.setattr(conversation_service, "start_conversation", service)
         # The start router imports this function at module load.
@@ -209,19 +214,23 @@ def test_conversation_and_admin_adapters_serialize_typed_results(
             "product_snapshot_id": str(sid),
             "start_set_id": str(start_id),
         }
-        assert service.await_args.kwargs["user_id"] == owner
-        assert service.await_args.kwargs["start_set_id"] == start_id
+        assert service.await_args.args[1].user_id == owner
+        assert service.await_args.args[1].start_set_id == start_id
     elif operation == "switch":
-        service = AsyncMock(return_value=conversation_types.VersionSwitched(sid, True))
+        service = AsyncMock(
+            return_value=conversation_types.VersionSwitchedInfo(sid, True)
+        )
         monkeypatch.setattr(versions, "switch_version", service)
         response = client.post(
             f"/conversations/{cid}/version", json={"target_snapshot_id": str(sid)}
         )
         assert response.status_code == 200
         assert response.json() == {"snapshot_id": str(sid), "changed": True}
-        assert service.await_args.kwargs["user_id"] == owner
+        assert service.await_args.args[1].user_id == owner
     else:
-        service = AsyncMock(return_value=admin_types.ExpiryChanged(sid, None, "Policy"))
+        service = AsyncMock(
+            return_value=admin_types.ExpiryChangedInfo(sid, None, "Policy")
+        )
         monkeypatch.setattr(product_policy, "set_expiry", service)
         monkeypatch.setattr(
             "app.modules.governance.admin.product_router.set_expiry", service
@@ -236,7 +245,7 @@ def test_conversation_and_admin_adapters_serialize_typed_results(
             "expires_at": None,
             "reason": "Policy",
         }
-        assert service.await_args.kwargs["actor_id"] == owner
+        assert service.await_args.args[1].actor_id == owner
 
 
 def test_http_routes_use_schema_models_and_application_layers_do_not_import_them(http):

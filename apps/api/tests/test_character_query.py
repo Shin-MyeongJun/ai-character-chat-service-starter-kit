@@ -7,6 +7,7 @@ from uuid import UUID
 import pytest
 from app.db.models.character import Character, CharacterAsset, CharacterImage
 from app.modules.content.character import repository, types
+from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service import query
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +18,7 @@ pytestmark = pytest.mark.asyncio
 
 
 def uid(value):
-    # SQLite treats the PostgreSQL UUID column as numeric when all digits match.
-    return UUID(int=(0xA << 124) + value)
+    return UUID(int=(10 << 124) + value)
 
 
 def make_character(value, owner_id, created_at):
@@ -103,8 +103,6 @@ def data():
 @pytest.fixture
 def database(data):
     engine = create_engine("sqlite://")
-    # Exercise actual SELECT predicates. PostgreSQL-only indexes are not created;
-    # UUIDs and timestamps are supplied explicitly instead of using DB defaults.
     with engine.begin() as connection:
         for model in (Character, CharacterImage, CharacterAsset):
             connection.execute(CreateTable(model.__table__))
@@ -121,7 +119,9 @@ async def test_all_character_pages_include_private_characters_and_handle_timesta
     seen = []
     cursor = None
     while True:
-        page = await query.list_characters(database, cursor=cursor, limit=2)
+        page = await query.list_characters(
+            database, CharacterTypes.ListCharactersCommand(cursor=cursor, limit=2)
+        )
         assert isinstance(page, types.CharacterPage)
         assert all(isinstance(item, types.CharacterInfo) for item in page.items)
         seen.extend(item.id for item in page.items)
@@ -131,18 +131,20 @@ async def test_all_character_pages_include_private_characters_and_handle_timesta
         assert cursor.id == page.items[-1].id
         assert cursor.created_at == page.items[-1].created_at
         assert len(seen) <= 5, "The cursor must advance without repeating rows"
-
     assert seen == [uid(value) for value in (40, 30, 20, 10, 50)]
 
 
 async def test_owner_filter_is_preserved_across_cursor_pages(database, data):
     first = await query.list_characters_by_owner_id(
-        database, owner_id=data.owner_id, limit=2
+        database,
+        CharacterTypes.ListCharactersByOwnerIdCommand(owner_id=data.owner_id, limit=2),
     )
     second = await query.list_characters_by_owner_id(
-        database, owner_id=data.owner_id, cursor=first.next_cursor, limit=2
+        database,
+        CharacterTypes.ListCharactersByOwnerIdCommand(
+            owner_id=data.owner_id, cursor=first.next_cursor, limit=2
+        ),
     )
-
     assert [item.id for item in first.items] == [uid(40), uid(30)]
     assert [item.id for item in second.items] == [uid(10)]
     assert all(item.owner_id == data.owner_id for item in first.items + second.items)
@@ -150,29 +152,44 @@ async def test_owner_filter_is_preserved_across_cursor_pages(database, data):
 
 
 async def test_empty_owner_page_and_minimum_limit(database):
-    missing = await query.list_characters_by_owner_id(database, owner_id=uid(999))
+    missing = await query.list_characters_by_owner_id(
+        database, CharacterTypes.ListCharactersByOwnerIdCommand(owner_id=uid(999))
+    )
     assert missing.items == []
     assert missing.next_cursor is None
-
-    first = await query.list_characters(database, limit=0)
+    first = await query.list_characters(
+        database, CharacterTypes.ListCharactersCommand(limit=0)
+    )
     assert [item.id for item in first.items] == [uid(40)]
     assert first.next_cursor.id == uid(40)
 
 
 async def test_character_detail_and_owner_detail_return_results(database, data):
-    result = await query.get_character_by_id(database, character_id=uid(10))
+    result = await query.get_character_by_id(
+        database, CharacterTypes.GetCharacterByIdCommand(character_id=uid(10))
+    )
     owned = await query.get_character_by_id_and_owner_id(
-        database, character_id=uid(10), owner_id=data.owner_id
+        database,
+        CharacterTypes.GetCharacterByIdAndOwnerIdCommand(
+            character_id=uid(10), owner_id=data.owner_id
+        ),
     )
     foreign = await query.get_character_by_id_and_owner_id(
-        database, character_id=uid(10), owner_id=data.other_owner_id
+        database,
+        CharacterTypes.GetCharacterByIdAndOwnerIdCommand(
+            character_id=uid(10), owner_id=data.other_owner_id
+        ),
     )
-
     assert isinstance(result, types.CharacterInfo)
     assert result == owned
     assert result.persona_prompt == "Private persona 10"
     assert foreign is None
-    assert await query.get_character_by_id(database, character_id=uid(999)) is None
+    assert (
+        await query.get_character_by_id(
+            database, CharacterTypes.GetCharacterByIdCommand(character_id=uid(999))
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -186,12 +203,16 @@ async def test_individual_media_must_belong_to_requested_character(
     database, kind, own_id, foreign_id, result_type
 ):
     lookup = getattr(query, f"get_character_{kind}")
-    own = await lookup(database, character_id=uid(10), **{f"{kind}_id": uid(own_id)})
-    foreign = await lookup(
-        database, character_id=uid(10), **{f"{kind}_id": uid(foreign_id)}
+    request_type = getattr(types, f"GetCharacter{kind.title()}Command")
+    own = await lookup(
+        database, request_type(character_id=uid(10), **{f"{kind}_id": uid(own_id)})
     )
-    missing = await lookup(database, character_id=uid(10), **{f"{kind}_id": uid(999)})
-
+    foreign = await lookup(
+        database, request_type(character_id=uid(10), **{f"{kind}_id": uid(foreign_id)})
+    )
+    missing = await lookup(
+        database, request_type(character_id=uid(10), **{f"{kind}_id": uid(999)})
+    )
     assert isinstance(own, result_type)
     assert own.id == uid(own_id)
     assert foreign is None
@@ -200,33 +221,50 @@ async def test_individual_media_must_belong_to_requested_character(
 
 async def test_emotion_match_is_exact_and_has_no_implicit_default_fallback(database):
     happy = await query.get_character_image_by_emotion_tag(
-        database, character_id=uid(10), emotion_tag="happy"
+        database,
+        CharacterTypes.GetCharacterImageByEmotionTagCommand(
+            character_id=uid(10), emotion_tag="happy"
+        ),
     )
     assert isinstance(happy, types.CharacterImageInfo)
     assert happy.id == uid(102)
     for emotion in ("Happy", " happy ", "sad"):
         assert (
             await query.get_character_image_by_emotion_tag(
-                database, character_id=uid(10), emotion_tag=emotion
+                database,
+                CharacterTypes.GetCharacterImageByEmotionTagCommand(
+                    character_id=uid(10), emotion_tag=emotion
+                ),
             )
             is None
         )
-
-    default = await query.get_default_character_image(database, character_id=uid(10))
+    default = await query.get_default_character_image(
+        database, CharacterTypes.GetDefaultCharacterImageCommand(character_id=uid(10))
+    )
     assert default.id == uid(101)
     assert default.is_default
     assert (
-        await query.get_default_character_image(database, character_id=uid(30)) is None
+        await query.get_default_character_image(
+            database,
+            CharacterTypes.GetDefaultCharacterImageCommand(character_id=uid(30)),
+        )
+        is None
     )
 
 
 async def test_media_lists_are_scoped_and_asset_type_filters_apply(database):
-    images = await query.list_character_images(database, character_id=uid(10))
-    assets = await query.list_character_assets(database, character_id=uid(10))
-    audio = await query.list_character_assets(
-        database, character_id=uid(10), asset_type="audio"
+    images = await query.list_character_images(
+        database, CharacterTypes.ListCharacterImagesCommand(character_id=uid(10))
     )
-
+    assets = await query.list_character_assets(
+        database, CharacterTypes.ListCharacterAssetsCommand(character_id=uid(10))
+    )
+    audio = await query.list_character_assets(
+        database,
+        CharacterTypes.ListCharacterAssetsCommand(
+            character_id=uid(10), asset_type="audio"
+        ),
+    )
     assert [image.id for image in images] == [uid(101), uid(102)]
     assert all(isinstance(image, types.CharacterImageInfo) for image in images)
     assert [asset.id for asset in assets] == [uid(302), uid(301)]
@@ -234,7 +272,10 @@ async def test_media_lists_are_scoped_and_asset_type_filters_apply(database):
     assert [asset.id for asset in audio] == [uid(301)]
     assert (
         await query.list_character_assets(
-            database, character_id=uid(10), asset_type="video"
+            database,
+            CharacterTypes.ListCharacterAssetsCommand(
+                character_id=uid(10), asset_type="video"
+            ),
         )
         == []
     )
@@ -244,25 +285,44 @@ async def test_media_lists_are_scoped_and_asset_type_filters_apply(database):
 async def test_empty_and_missing_characters_have_empty_media_lists(
     database, character_id
 ):
-    assert await query.list_character_images(database, character_id=character_id) == []
-    assert await query.list_character_assets(database, character_id=character_id) == []
+    assert (
+        await query.list_character_images(
+            database,
+            CharacterTypes.ListCharacterImagesCommand(character_id=character_id),
+        )
+        == []
+    )
+    assert (
+        await query.list_character_assets(
+            database,
+            CharacterTypes.ListCharacterAssetsCommand(character_id=character_id),
+        )
+        == []
+    )
 
 
 async def test_prompt_returns_only_runtime_prompt_fields(database):
-    result = await query.get_character_prompt(database, character_id=uid(10))
-
+    result = await query.get_character_prompt(
+        database, CharacterTypes.GetCharacterPromptCommand(character_id=uid(10))
+    )
     assert isinstance(result, types.CharacterPromptInfo)
     assert asdict(result) == {
         "character_id": uid(10),
         "persona_prompt": "Private persona 10",
         "default_model_id": uid(900),
     }
-    assert await query.get_character_prompt(database, character_id=uid(999)) is None
+    assert (
+        await query.get_character_prompt(
+            database, CharacterTypes.GetCharacterPromptCommand(character_id=uid(999))
+        )
+        is None
+    )
 
 
 async def test_promotion_contains_scoped_media_and_excludes_prompt(database):
-    result = await query.get_character_promotion(database, character_id=uid(10))
-
+    result = await query.get_character_promotion(
+        database, CharacterTypes.GetCharacterPromotionCommand(character_id=uid(10))
+    )
     assert isinstance(result, types.CharacterPromotionInfo)
     assert result.character_id == uid(10)
     assert result.name == "Character 10"
@@ -276,12 +336,18 @@ async def test_promotion_contains_scoped_media_and_excludes_prompt(database):
 
 
 async def test_promotion_distinguishes_missing_character_from_empty_media(database):
-    empty = await query.get_character_promotion(database, character_id=uid(30))
-
+    empty = await query.get_character_promotion(
+        database, CharacterTypes.GetCharacterPromotionCommand(character_id=uid(30))
+    )
     assert isinstance(empty, types.CharacterPromotionInfo)
     assert empty.images == []
     assert empty.assets == []
-    assert await query.get_character_promotion(database, character_id=uid(999)) is None
+    assert (
+        await query.get_character_promotion(
+            database, CharacterTypes.GetCharacterPromotionCommand(character_id=uid(999))
+        )
+        is None
+    )
 
 
 async def test_promotion_uses_existing_transaction_without_committing_or_rolling_back(
@@ -301,7 +367,10 @@ async def test_promotion_uses_existing_transaction_without_committing_or_rolling
             session.sync_session, "after_rollback", lambda _: events.append("rollback")
         )
         async with session.begin():
-            result = await query.get_character_promotion(session, character_id=uid(10))
+            result = await query.get_character_promotion(
+                session,
+                CharacterTypes.GetCharacterPromotionCommand(character_id=uid(10)),
+            )
             assert result.character_id == uid(10)
             assert session.in_transaction()
             assert events == []
@@ -319,7 +388,10 @@ async def test_invalid_asset_type_does_not_query_or_end_callers_transaction(
     async with AsyncSession() as session, session.begin():
         with pytest.raises(ValueError):
             await query.list_character_assets(
-                session, character_id=uid(10), asset_type=asset_type
+                session,
+                CharacterTypes.ListCharacterAssetsCommand(
+                    character_id=uid(10), asset_type=asset_type
+                ),
             )
         all_assets.assert_not_awaited()
         typed_assets.assert_not_awaited()

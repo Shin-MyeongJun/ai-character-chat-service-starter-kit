@@ -1,28 +1,33 @@
-from app.modules.content.product import schemas, types
+from app.modules.content.product import schemas as Schemas
+from app.modules.content.product import types as Types
 
 
 class ProductSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
-    def to_list_query(
-        request: schemas.ListProductsRequestDto,
-    ) -> types.ProductListQuery:
-        return types.ProductListQuery(offset=request.offset, limit=request.limit)
+    def product_list_request_to_command(
+        request: Schemas.ListProductsRequestDto,
+    ) -> Types.ProductPaginationCommand:
+        return Types.ProductPaginationCommand(
+            offset=request.offset, limit=request.limit
+        )
 
     @staticmethod
-    def to_statistics_query(
-        request: schemas.ProductStatisticsRequestDto,
-    ) -> types.ProductStatisticsQuery:
-        return types.ProductStatisticsQuery(
+    def statistics_request_to_command(
+        request: Schemas.ProductStatisticsRequestDto,
+    ) -> Types.ProductStatisticsRangeCommand:
+        return Types.ProductStatisticsRangeCommand(
             date_from=request.date_from,
             date_to=request.date_to,
             snapshot_id=request.snapshot_id,
         )
 
     @staticmethod
-    def to_write(request: schemas.ProductWriteRequestDto) -> types.ProductWrite:
-        return types.ProductWrite(
+    def product_request_to_command(
+        request: Schemas.ProductWriteRequestDto,
+    ) -> Types.ProductProfileCommand:
+        return Types.ProductProfileCommand(
             title=request.title,
             description=request.description,
             opening_message=request.opening_message,
@@ -30,10 +35,12 @@ class ProductSchemaMapper:
         )
 
     @staticmethod
-    def to_composition(request: schemas.CompositionRequestDto) -> types.Composition:
-        return types.Composition(
+    def composition_request_to_info(
+        request: Schemas.CompositionRequestDto,
+    ) -> Types.ProductCompositionInfo:
+        return Types.ProductCompositionInfo(
             characters=tuple(
-                types.CharacterSelection(
+                Types.CharacterSelection(
                     character_id=c.character_id,
                     is_primary=c.is_primary,
                     role_name=c.role_name,
@@ -41,7 +48,7 @@ class ProductSchemaMapper:
                 for c in request.characters
             ),
             lorebooks=tuple(
-                types.LorebookSelection(
+                Types.LorebookSelection(
                     lorebook_id=b.lorebook_id,
                     scope=b.scope,
                     character_ids=b.character_ids,
@@ -54,8 +61,10 @@ class ProductSchemaMapper:
         )
 
     @staticmethod
-    def to_settings(request: schemas.SettingsRequestDto) -> types.Settings:
-        return types.Settings(
+    def settings_request_to_info(
+        request: Schemas.SettingsRequestDto,
+    ) -> Types.ProductSettingsInfo:
+        return Types.ProductSettingsInfo(
             model_id=request.model_id,
             reasoning_effort=request.reasoning_effort,
             start_entry_ids=request.start_entry_ids,
@@ -65,51 +74,53 @@ class ProductSchemaMapper:
         )
 
     @staticmethod
-    def to_release(request: schemas.ReleaseRequestDto) -> types.ReleasePublish:
-        return types.ReleasePublish(
+    def release_request_to_command(
+        request: Schemas.ReleaseRequestDto,
+    ) -> Types.ReleaseNoteCommand:
+        return Types.ReleaseNoteCommand(
             summary=request.summary,
             body=request.body,
             auto_apply_media=request.auto_apply_media,
         )
 
     @staticmethod
-    def product_response(result: types.ProductInfo) -> schemas.ProductInfoResponseDto:
-        return schemas.ProductInfoResponseDto.model_validate(result)
+    def product_info_to_response(
+        result: Types.ProductInfo,
+    ) -> Schemas.ProductInfoResponseDto:
+        return Schemas.ProductInfoResponseDto.model_validate(result)
 
     @staticmethod
-    def composition_response(
-        result: types.Composition,
-    ) -> schemas.CompositionResponseDto:
-        return schemas.CompositionResponseDto.model_validate(result)
+    def composition_info_to_response(
+        result: Types.ProductCompositionInfo,
+    ) -> Schemas.CompositionResponseDto:
+        return Schemas.CompositionResponseDto.model_validate(result)
 
     @staticmethod
-    def settings_response(result: types.Settings) -> schemas.SettingsResponseDto:
-        return schemas.SettingsResponseDto.model_validate(result)
+    def settings_info_to_response(
+        result: Types.ProductSettingsInfo,
+    ) -> Schemas.SettingsResponseDto:
+        return Schemas.SettingsResponseDto.model_validate(result)
 
     @staticmethod
-    def release_response(result: types.ReleaseInfo) -> schemas.ReleaseInfoResponseDto:
-        return schemas.ReleaseInfoResponseDto.model_validate(result)
+    def release_info_to_response(
+        result: Types.ReleaseInfo,
+    ) -> Schemas.ReleaseInfoResponseDto:
+        return Schemas.ReleaseInfoResponseDto.model_validate(result)
 
     @staticmethod
-    def published_response(
-        result: types.PublishedProductInfo,
-    ) -> schemas.PublishedProductInfoResponseDto:
-        return schemas.PublishedProductInfoResponseDto.model_validate(result)
+    def published_view_to_response(
+        result: Types.PublishedProductView,
+    ) -> Schemas.PublishedProductInfoResponseDto:
+        return Schemas.PublishedProductInfoResponseDto.model_validate(result)
 
     @staticmethod
-    def updates_response(
-        result: types.PendingUpdatesInfo,
-    ) -> schemas.PendingUpdatesInfoResponseDto:
-        return schemas.PendingUpdatesInfoResponseDto.model_validate(result)
+    def availability_view_to_response(
+        result: Types.VersionAvailabilityView,
+    ) -> Schemas.VersionAvailabilityInfoResponseDto:
+        return Schemas.VersionAvailabilityInfoResponseDto.model_validate(result)
 
     @staticmethod
-    def availability_response(
-        result: types.VersionAvailabilityInfo,
-    ) -> schemas.VersionAvailabilityInfoResponseDto:
-        return schemas.VersionAvailabilityInfoResponseDto.model_validate(result)
-
-    @staticmethod
-    def statistics_response(
-        result: types.StatisticsInfo,
-    ) -> schemas.StatisticsInfoResponseDto:
-        return schemas.StatisticsInfoResponseDto.model_validate(result)
+    def statistics_info_to_response(
+        result: Types.StatisticsInfo,
+    ) -> Schemas.StatisticsInfoResponseDto:
+        return Schemas.StatisticsInfoResponseDto.model_validate(result)

@@ -7,6 +7,7 @@ import pytest
 from app.db.models.chat import Conversation
 from app.db.models.memory import ConversationMemory
 from app.modules.chatting.memory import repository, types
+from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.chatting.memory.service import query
 from sqlalchemy import create_engine
 from sqlalchemy.dialects import postgresql
@@ -17,7 +18,7 @@ pytestmark = pytest.mark.asyncio
 
 
 def uid(value):
-    return UUID(int=(0xA << 124) + value)
+    return UUID(int=(10 << 124) + value)
 
 
 class AsyncAdapter:
@@ -77,10 +78,9 @@ async def test_pages_preserve_scope_and_timestamp_ties(database):
     for _ in range(4):
         page = await query.list_memories(
             database,
-            conversation_id=uid(10),
-            owner_id=uid(1),
-            limit=1,
-            cursor=cursor,
+            MemoryTypes.ListMemoriesCommand(
+                conversation_id=uid(10), owner_id=uid(1), limit=1, cursor=cursor
+            ),
         )
         assert all(isinstance(item, types.MemoryInfo) for item in page.items)
         seen.extend(item.id for item in page.items)
@@ -95,54 +95,51 @@ async def test_owner_and_conversation_isolation(database):
         assert (
             await query.get_memory(
                 database,
-                memory_id=uid(mid),
-                conversation_id=uid(cid),
-                owner_id=uid(owner),
+                MemoryTypes.GetMemoryCommand(
+                    memory_id=uid(mid), conversation_id=uid(cid), owner_id=uid(owner)
+                ),
             )
             is None
         )
     assert (
         await query.list_memories(
             database,
-            conversation_id=uid(10),
-            owner_id=uid(2),
+            MemoryTypes.ListMemoriesCommand(conversation_id=uid(10), owner_id=uid(2)),
         )
     ).items == []
     assert (
         await query.get_latest_summary(
             database,
-            conversation_id=uid(10),
-            owner_id=uid(2),
+            MemoryTypes.GetLatestSummaryCommand(
+                conversation_id=uid(10), owner_id=uid(2)
+            ),
         )
         is None
     )
     assert not await repository.conversation_is_owned(
-        database,
-        conversation_id=uid(10),
-        owner_id=uid(2),
+        database, conversation_id=uid(10), owner_id=uid(2)
     )
 
 
 async def test_summary_and_type_filters_work_without_embeddings(database):
     summary = await query.get_latest_summary(
         database,
-        conversation_id=uid(10),
-        owner_id=uid(1),
+        MemoryTypes.GetLatestSummaryCommand(conversation_id=uid(10), owner_id=uid(1)),
     )
     assert summary.id == uid(103)
     page = await query.list_memories(
         database,
-        conversation_id=uid(10),
-        owner_id=uid(1),
-        memory_types=("fact",),
+        MemoryTypes.ListMemoriesCommand(
+            conversation_id=uid(10), owner_id=uid(1), memory_types=("fact",)
+        ),
     )
     assert [item.id for item in page.items] == [uid(102)]
     assert (
         await query.list_memories(
             database,
-            conversation_id=uid(10),
-            owner_id=uid(1),
-            memory_types=(),
+            MemoryTypes.ListMemoriesCommand(
+                conversation_id=uid(10), owner_id=uid(1), memory_types=()
+            ),
         )
     ).items == []
 
@@ -152,7 +149,7 @@ async def test_unauthorized_search_does_not_embed(database):
     assert (
         await query.search_memories(
             database,
-            types.MemorySearchQuery(uid(10), "coffee", uid(2)),
+            types.SearchMemoriesCommand(uid(10), "coffee", uid(2)),
             embed_query=embed,
         )
         == []
@@ -162,15 +159,14 @@ async def test_unauthorized_search_does_not_embed(database):
 
 async def test_search_mapping_and_provider_failure(database, monkeypatch):
     entity = await repository.get_memory(
-        database,
-        memory_id=uid(102),
-        conversation_id=uid(10),
-        owner_id=uid(1),
+        database, memory_id=uid(102), conversation_id=uid(10), owner_id=uid(1)
     )
     search = AsyncMock(return_value=[(entity, -0.25)])
     monkeypatch.setattr(repository, "search_memories", search)
     embed = AsyncMock(return_value=[1.0] * 1536)
-    request = types.MemorySearchQuery(uid(10), "coffee", uid(1), memory_types=("fact",))
+    request = types.SearchMemoriesCommand(
+        uid(10), "coffee", uid(1), memory_types=("fact",)
+    )
     result = await query.search_memories(database, request, embed_query=embed)
     assert result[0].similarity_score == -0.25
     assert result[0].memory_id == uid(102)
@@ -190,10 +186,7 @@ async def test_invalid_vectors_fail_before_database(vector):
     session = SimpleNamespace(execute=AsyncMock())
     with pytest.raises(ValueError):
         await repository.search_memories(
-            session,
-            conversation_id=uid(10),
-            owner_id=uid(1),
-            query_embedding=vector,
+            session, conversation_id=uid(10), owner_id=uid(1), query_embedding=vector
         )
     session.execute.assert_not_awaited()
 
@@ -201,9 +194,7 @@ async def test_invalid_vectors_fail_before_database(vector):
 async def test_search_sql_scope_and_distance_conversion():
     entity = object()
     session = SimpleNamespace(
-        execute=AsyncMock(
-            return_value=SimpleNamespace(all=lambda: [(entity, 0.2)]),
-        )
+        execute=AsyncMock(return_value=SimpleNamespace(all=lambda: [(entity, 0.2)]))
     )
     result = await repository.search_memories(
         session,
@@ -234,7 +225,7 @@ async def test_invalid_search_request_skips_provider(text, top_k, kinds):
     with pytest.raises(ValueError):
         await query.search_memories(
             object(),
-            types.MemorySearchQuery(uid(10), text, uid(1), top_k, kinds),
+            types.SearchMemoriesCommand(uid(10), text, uid(1), top_k, kinds),
             embed_query=embed,
         )
     embed.assert_not_awaited()
@@ -245,7 +236,7 @@ async def test_empty_type_filter_skips_provider():
     assert (
         await query.search_memories(
             object(),
-            types.MemorySearchQuery(uid(10), "x", uid(1), memory_types=()),
+            types.SearchMemoriesCommand(uid(10), "x", uid(1), memory_types=()),
             embed_query=embed,
         )
         == []

@@ -15,8 +15,9 @@ CharacterAssetTypeValue: TypeAlias = Literal["image", "audio", "video"]
 # Commands
 # Application service inputs. These are converted from router schemas.
 
+
 @dataclass(frozen=True, slots=True)
-class CharacterCreate:
+class CreateCharacterCommand:
     owner_id: UUID
     name: str
     persona_prompt: str
@@ -27,7 +28,7 @@ class CharacterCreate:
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterUpdate:
+class UpdateCharacterCommand:
     character_id: UUID
     owner_id: UUID
     name: str
@@ -38,20 +39,20 @@ class CharacterUpdate:
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterStatusChange:
+class ChangeCharacterStatusCommand:
     character_id: UUID
     owner_id: UUID
     status: CharacterStatusValue
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterDelete:
+class DeleteCharacterCommand:
     character_id: UUID
     owner_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterImageCreate:
+class CreateCharacterImageCommand:
     character_id: UUID
     owner_id: UUID
     emotion_tag: str
@@ -60,21 +61,21 @@ class CharacterImageCreate:
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterImageDefaultSet:
+class SetDefaultCharacterImageCommand:
     character_id: UUID
     image_id: UUID
     owner_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterImageDelete:
+class DeleteCharacterImageCommand:
     character_id: UUID
     image_id: UUID
     owner_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterAssetCreate:
+class CreateCharacterAssetCommand:
     character_id: UUID
     owner_id: UUID
     asset_type: CharacterAssetTypeValue
@@ -83,7 +84,7 @@ class CharacterAssetCreate:
 
 
 @dataclass(frozen=True, slots=True)
-class CharacterAssetDelete:
+class DeleteCharacterAssetCommand:
     character_id: UUID
     asset_id: UUID
     owner_id: UUID
@@ -91,6 +92,7 @@ class CharacterAssetDelete:
 
 # Results
 # Application service outputs. Router schemas are built from these.
+
 
 @dataclass(frozen=True, slots=True)
 class CharacterInfo:
@@ -159,3 +161,117 @@ TCharacterPageItem = TypeVar("TCharacterPageItem")
 class CharacterPage(Generic[TCharacterPageItem]):
     items: list[TCharacterPageItem]
     next_cursor: CharacterCursor | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListCharactersCommand:
+    cursor: CharacterCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListCharactersByOwnerIdCommand:
+    owner_id: UUID
+    cursor: CharacterCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterByIdCommand:
+    character_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterByIdAndOwnerIdCommand:
+    character_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterImageCommand:
+    character_id: UUID
+    image_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterImageByEmotionTagCommand:
+    character_id: UUID
+    emotion_tag: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetDefaultCharacterImageCommand:
+    character_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListCharacterImagesCommand:
+    character_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterAssetCommand:
+    character_id: UUID
+    asset_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListCharacterAssetsCommand:
+    character_id: UUID
+    asset_type: CharacterAssetTypeValue | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterPromptCommand:
+    character_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetCharacterPromotionCommand:
+    character_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class GetOwnedCharactersCommand:
+    ids: tuple[UUID, ...]
+    owner_id: UUID
+    lock: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FreezeCharacterCommand:
+    character_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterSnapshotInfo:
+    id: UUID
+    character_id: UUID | None
+    version: int
+    snapshot_data: dict
+
+
+@dataclass(frozen=True, slots=True)
+class GetSnapshotMediaCommand:
+    snapshot_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotMediaInfo:
+    manifest: frozenset[tuple]
+
+
+@dataclass(frozen=True, slots=True)
+class CheckMediaReferenceCommand:
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
+class MediaReferenceInfo:
+    referenced: bool
+
+
+@dataclass(frozen=True, slots=True)
+class GetCharacterSnapshotsCommand:
+    snapshot_ids: tuple[UUID, ...]

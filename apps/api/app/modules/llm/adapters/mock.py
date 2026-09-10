@@ -5,9 +5,9 @@ from collections.abc import Callable
 from app.modules.llm.adapters.base import BaseLLMAdapter
 from app.modules.llm.types import (
     LLMProvider,
-    LLMResult,
+    LLMResultInfo,
     ReasoningEffort,
-    TokenUsage,
+    TokenUsageInfo,
 )
 
 
@@ -31,12 +31,12 @@ class MockLLMAdapter(BaseLLMAdapter):
         model: str,
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
-    ) -> LLMResult:
-        return LLMResult(
+    ) -> LLMResultInfo:
+        return LLMResultInfo(
             content=self._responder(request_json),
             provider=self.provider,
             model=model,
-            usage=TokenUsage(0, 0, 0),
+            usage=TokenUsageInfo(0, 0, 0),
             status="completed",
             finish_reason="mock",
         )

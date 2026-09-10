@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, call
 from uuid import uuid4
 
 import pytest
@@ -25,8 +25,12 @@ async def session():
 @pytest.fixture
 def transaction_events(session):
     events = []
-    event.listen(session.sync_session, "after_commit", lambda _: events.append("commit"))
-    event.listen(session.sync_session, "after_rollback", lambda _: events.append("rollback"))
+    event.listen(
+        session.sync_session, "after_commit", lambda _: events.append("commit")
+    )
+    event.listen(
+        session.sync_session, "after_rollback", lambda _: events.append("rollback")
+    )
     return events
 
 
@@ -51,25 +55,25 @@ def character():
 def commands(character):
     owner = {"character_id": character.id, "owner_id": character.owner_id}
     return SimpleNamespace(
-        create=types.CharacterCreate(
+        create=types.CreateCharacterCommand(
             owner_id=character.owner_id, name="New name", persona_prompt="New persona"
         ),
-        update=types.CharacterUpdate(
+        update=types.UpdateCharacterCommand(
             **owner,
             name="Updated name",
             persona_prompt="Updated persona",
             description=None,
             visibility="public",
         ),
-        status=types.CharacterStatusChange(**owner, status="rejected"),
-        delete=types.CharacterDelete(**owner),
-        default_image=types.CharacterImageDefaultSet(**owner, image_id=uuid4()),
-        delete_image=types.CharacterImageDelete(**owner, image_id=uuid4()),
-        delete_asset=types.CharacterAssetDelete(**owner, asset_id=uuid4()),
-        add_image=types.CharacterImageCreate(
+        status=types.ChangeCharacterStatusCommand(**owner, status="rejected"),
+        delete=types.DeleteCharacterCommand(**owner),
+        default_image=types.SetDefaultCharacterImageCommand(**owner, image_id=uuid4()),
+        delete_image=types.DeleteCharacterImageCommand(**owner, image_id=uuid4()),
+        delete_asset=types.DeleteCharacterAssetCommand(**owner, asset_id=uuid4()),
+        add_image=types.CreateCharacterImageCommand(
             **owner, emotion_tag="happy", image_url="pending.png"
         ),
-        add_asset=types.CharacterAssetCreate(
+        add_asset=types.CreateCharacterAssetCommand(
             **owner, asset_type="audio", purpose="voice", file_url="pending.wav"
         ),
     )
@@ -155,8 +159,11 @@ async def test_update_preserves_identity_and_status_and_clears_optional_fields(
     assert result.visibility == "public"
     assert result.description is None
     assert result.default_model_id is None
-    repo.get_character_by_id_and_owner_id.assert_awaited_once_with(
-        session, character.id, character.owner_id, for_update=True
+    repo.get_character_by_id_and_owner_id.assert_has_awaits(
+        [
+            call(session, character.id, character.owner_id, for_update=True),
+            call(session, character.id, character.owner_id, for_update=True),
+        ]
     )
     assert transaction_events == ["commit"]
 
@@ -208,7 +215,9 @@ async def test_invalid_status_is_rejected_before_write(
 ):
     invalid_command = replace(getattr(commands, operation), status="unknown")
     function = (
-        service.create_character if operation == "create" else service.change_character_status
+        service.create_character
+        if operation == "create"
+        else service.change_character_status
     )
 
     with pytest.raises(ValueError):
@@ -278,7 +287,9 @@ async def test_media_deletion_is_scoped_to_owned_character(
         delete.assert_not_awaited()
         assert transaction_events == ["rollback"]
 
-    lookup.assert_awaited_once_with(session, media_id, command.character_id)
+    assert lookup.await_args_list == [call(session, media_id, command.character_id)] * (
+        2 if found else 1
+    )
 
 
 async def test_missing_or_unrelated_default_image_rolls_back(

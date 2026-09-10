@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 
@@ -32,7 +33,7 @@ class LLMErrorKind(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class TokenUsage:
+class TokenUsageInfo:
     """Provider-reported usage normalized without serializing the SDK response."""
 
     input_tokens: int | None = None
@@ -47,11 +48,11 @@ class TokenUsage:
 
 
 @dataclass(frozen=True, slots=True)
-class LLMResult:
+class LLMResultInfo:
     content: str
     provider: LLMProvider
     model: str
-    usage: TokenUsage
+    usage: TokenUsageInfo
     response_id: str | None = None
     request_id: str | None = None
     status: str | None = None
@@ -59,7 +60,7 @@ class LLMResult:
 
 
 @dataclass(frozen=True, slots=True)
-class ModelOption:
+class ModelOptionInfo:
     provider: LLMProvider
     model: str
     reasoning_efforts: frozenset[ReasoningEffort]
@@ -78,7 +79,7 @@ class LLMError(RuntimeError):
         retryable: bool,
         request_id: str | None = None,
         status_code: int | None = None,
-        usage: TokenUsage | None = None,
+        usage: TokenUsageInfo | None = None,
     ) -> None:
         super().__init__(message)
         self.kind = kind
@@ -99,7 +100,7 @@ class UnsupportedReasoningEffortError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class ModelNotice:
+class ModelNoticeView:
     state: str
     reason: str | None = None
     model_id: UUID | None = None
@@ -114,7 +115,7 @@ class ModelNotice:
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionInfo:
+class ExecutionView:
     model_id: UUID
     provider: str
     model: str
@@ -123,3 +124,70 @@ class ExecutionInfo:
     scheduled_at: datetime | None
     replacement_unavailable: bool = False
     planned_model_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModelInfo:
+    id: UUID
+    provider_id: UUID
+    model_name: str
+    is_enabled: bool
+    capabilities: dict
+    retirement_announced_at: datetime | None
+    shutdown_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderInfo:
+    id: UUID
+    name: str
+    is_enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class GetModelCommand:
+    model_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class GetProviderCommand:
+    provider_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ValidateModelCommand:
+    model_id: UUID
+    reasoning_effort: str
+
+
+if TYPE_CHECKING:
+    from app.modules.content.product.types import ProductSnapshotInfo
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AnnounceRetirementCommand:
+    actor_id: UUID
+    model_id: UUID
+    announced_at: datetime
+    shutdown_at: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExecutionNoticeCommand:
+    snapshot: ProductSnapshotInfo
+    now: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ResolveExecutionCommand:
+    snapshot_id: UUID
+    now: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GenerateTextCommand:
+    request_json: str
+    model: str
+    reasoning_effort: ReasoningEffort | str | None = None
+    max_output_tokens: int | None = None
+    provider: LLMProvider | str | None = None

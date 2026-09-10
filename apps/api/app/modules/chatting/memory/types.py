@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Literal, TypeAlias, TypeVar
@@ -33,7 +34,7 @@ class DeleteMemoryCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class MemorySearchQuery:
+class SearchMemoriesCommand:
     conversation_id: UUID
     query_text: str  # 서비스가 내부적으로 임베딩 변환
     owner_id: UUID  # 서비스에서 대화 접근 권한 검증에 사용
@@ -42,7 +43,7 @@ class MemorySearchQuery:
 
 
 @dataclass(frozen=True, slots=True)
-class RetrievedMemory:
+class RetrievedMemoryInfo:
     memory_id: UUID
     memory_type: MemoryType
     content: str
@@ -72,3 +73,25 @@ TMemoryItem = TypeVar("TMemoryItem")
 class MemoryPage(Generic[TMemoryItem]):
     items: list[TMemoryItem]
     next_cursor: MemoryCursor | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetMemoryCommand:
+    memory_id: UUID
+    conversation_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListMemoriesCommand:
+    conversation_id: UUID
+    owner_id: UUID
+    cursor: MemoryCursor | None = None
+    limit: int = 50
+    memory_types: Sequence[MemoryType] | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetLatestSummaryCommand:
+    conversation_id: UUID
+    owner_id: UUID

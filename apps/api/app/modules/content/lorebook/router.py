@@ -8,22 +8,23 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.content.lorebook import schemas
+from app.modules.content.lorebook import schemas as Schemas
+from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.dependencies import (
     get_current_owner_id,
     get_lorebook_session,
-    require_lorebook_admin,
-    require_lorebook_moderator,
 )
-from app.modules.content.lorebook.mapper.schema import LorebookSchemaMapper
-from app.modules.content.lorebook.service import command, query
+from app.modules.content.lorebook.mapper.schema import (
+    LorebookSchemaMapper as SchemaMapper,
+)
+from app.modules.content.lorebook.service import command as CommandService
+from app.modules.content.lorebook.service import query as QueryService
 
 router = APIRouter(prefix="/lorebooks", tags=["lorebooks"])
-
 SessionDependency = Annotated[AsyncSession, Depends(get_lorebook_session)]
 OwnerDependency = Annotated[UUID, Depends(get_current_owner_id)]
-LorebookListRequest = Annotated[schemas.ListLorebooksRequestDto, Query()]
-EntryListRequest = Annotated[schemas.ListLorebookEntriesRequestDto, Query()]
+LorebookListRequest = Annotated[Schemas.ListLorebooksRequestDto, Query()]
+EntryListRequest = Annotated[Schemas.ListLorebookEntriesRequestDto, Query()]
 
 
 @contextmanager
@@ -32,8 +33,7 @@ def _service_errors() -> Iterator[None]:
         yield
     except LookupError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lorebook resource not found.",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lorebook resource not found."
         ) from exc
     except ValueError as exc:
         raise HTTPException(
@@ -42,271 +42,159 @@ def _service_errors() -> Iterator[None]:
         ) from exc
 
 
-@router.get(
-    "",
-    response_model=schemas.ListLorebooksResponseDto,
-    dependencies=[Depends(require_lorebook_admin)],
-)
-async def list_lorebooks(
-    request: LorebookListRequest,
-    session: SessionDependency,
-) -> schemas.ListLorebooksResponseDto:
-    cursor = LorebookSchemaMapper.cursor_request_to_value(request)
-    with _service_errors():
-        result = await query.list_lorebooks(
-            session,
-            cursor=cursor,
-            limit=request.limit,
-        )
-    return LorebookSchemaMapper.lorebook_page_to_response(result)
-
-
-@router.get("/me", response_model=schemas.ListLorebooksResponseDto)
+@router.get("/me", response_model=Schemas.ListLorebooksResponseDto)
 async def list_my_lorebooks(
-    request: LorebookListRequest,
-    owner_id: OwnerDependency,
-    session: SessionDependency,
-) -> schemas.ListLorebooksResponseDto:
-    cursor = LorebookSchemaMapper.cursor_request_to_value(request)
+    request: LorebookListRequest, owner_id: OwnerDependency, session: SessionDependency
+) -> Schemas.ListLorebooksResponseDto:
+    cursor = SchemaMapper.cursor_request_to_value(request)
     with _service_errors():
-        result = await query.list_lorebooks_by_owner_id(
+        result = await QueryService.list_lorebooks_by_owner_id(
             session,
-            owner_id=owner_id,
-            cursor=cursor,
-            limit=request.limit,
+            Types.ListLorebooksByOwnerIdCommand(
+                owner_id=owner_id, cursor=cursor, limit=request.limit
+            ),
         )
-    return LorebookSchemaMapper.lorebook_page_to_response(result)
+    return SchemaMapper.lorebook_page_to_response(result)
 
 
-@router.get("/me/{lorebook_id}", response_model=schemas.GetLorebookByIdResponseDto)
+@router.get("/me/{lorebook_id}", response_model=Schemas.GetLorebookByIdResponseDto)
 async def get_my_lorebook(
-    lorebook_id: UUID,
-    owner_id: OwnerDependency,
-    session: SessionDependency,
-) -> schemas.GetLorebookByIdResponseDto:
+    lorebook_id: UUID, owner_id: OwnerDependency, session: SessionDependency
+) -> Schemas.GetLorebookByIdResponseDto:
     with _service_errors():
-        result = await query.get_lorebook_by_id_and_owner_id(
+        result = await QueryService.get_lorebook_by_id_and_owner_id(
             session,
-            lorebook_id=lorebook_id,
-            owner_id=owner_id,
+            Types.GetLorebookByIdAndOwnerIdCommand(
+                lorebook_id=lorebook_id, owner_id=owner_id
+            ),
         )
         if result is None:
             raise LookupError("Lorebook not found.")
-    return LorebookSchemaMapper.lorebook_info_to_get_response(result)
+    return SchemaMapper.lorebook_info_to_get_response(result)
 
 
 @router.get(
-    "/me/{lorebook_id}/entries",
-    response_model=schemas.ListLorebookEntriesResponseDto,
+    "/me/{lorebook_id}/entries", response_model=Schemas.ListLorebookEntriesResponseDto
 )
 async def list_my_lorebook_entries(
     lorebook_id: UUID,
     request: EntryListRequest,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.ListLorebookEntriesResponseDto:
-    cursor = LorebookSchemaMapper.cursor_request_to_value(request)
+) -> Schemas.ListLorebookEntriesResponseDto:
+    cursor = SchemaMapper.cursor_request_to_value(request)
     with _service_errors():
-        result = await query.list_lorebook_entries_by_owner_id(
+        result = await QueryService.list_lorebook_entries_by_owner_id(
             session,
-            lorebook_id=lorebook_id,
-            owner_id=owner_id,
-            cursor=cursor,
-            limit=request.limit,
+            Types.ListLorebookEntriesByOwnerIdCommand(
+                lorebook_id=lorebook_id,
+                owner_id=owner_id,
+                cursor=cursor,
+                limit=request.limit,
+            ),
         )
         if result is None:
             raise LookupError("Lorebook not found.")
-    return LorebookSchemaMapper.entry_page_to_response(result)
+    return SchemaMapper.entry_page_to_response(result)
 
 
 @router.get(
     "/me/{lorebook_id}/entries/{entry_id}",
-    response_model=schemas.GetLorebookEntryResponseDto,
+    response_model=Schemas.GetLorebookEntryResponseDto,
 )
 async def get_my_lorebook_entry(
     lorebook_id: UUID,
     entry_id: UUID,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.GetLorebookEntryResponseDto:
+) -> Schemas.GetLorebookEntryResponseDto:
     with _service_errors():
-        result = await query.get_lorebook_entry_by_owner_id(
+        result = await QueryService.get_lorebook_entry_by_owner_id(
             session,
-            lorebook_id=lorebook_id,
-            entry_id=entry_id,
-            owner_id=owner_id,
+            Types.GetLorebookEntryByOwnerIdCommand(
+                lorebook_id=lorebook_id, entry_id=entry_id, owner_id=owner_id
+            ),
         )
         if result is None:
             raise LookupError("Lorebook entry not found.")
-    return LorebookSchemaMapper.entry_info_to_get_response(result)
-
-
-@router.get(
-    "/{lorebook_id}",
-    response_model=schemas.GetLorebookByIdResponseDto,
-    dependencies=[Depends(require_lorebook_admin)],
-)
-async def get_lorebook(
-    lorebook_id: UUID,
-    session: SessionDependency,
-) -> schemas.GetLorebookByIdResponseDto:
-    with _service_errors():
-        result = await query.get_lorebook_by_id(session, lorebook_id=lorebook_id)
-        if result is None:
-            raise LookupError("Lorebook not found.")
-    return LorebookSchemaMapper.lorebook_info_to_get_response(result)
-
-
-@router.get(
-    "/{lorebook_id}/entries",
-    response_model=schemas.ListLorebookEntriesResponseDto,
-    dependencies=[Depends(require_lorebook_admin)],
-)
-async def list_entries(
-    lorebook_id: UUID,
-    request: EntryListRequest,
-    session: SessionDependency,
-) -> schemas.ListLorebookEntriesResponseDto:
-    cursor = LorebookSchemaMapper.cursor_request_to_value(request)
-    with _service_errors():
-        parent = await query.get_lorebook_by_id(session, lorebook_id=lorebook_id)
-        if parent is None:
-            raise LookupError("Lorebook not found.")
-        result = await query.list_lorebook_entries(
-            session,
-            lorebook_id=lorebook_id,
-            cursor=cursor,
-            limit=request.limit,
-        )
-    return LorebookSchemaMapper.entry_page_to_response(result)
-
-
-@router.get(
-    "/{lorebook_id}/entries/{entry_id}",
-    response_model=schemas.GetLorebookEntryResponseDto,
-    dependencies=[Depends(require_lorebook_admin)],
-)
-async def get_entry(
-    lorebook_id: UUID,
-    entry_id: UUID,
-    session: SessionDependency,
-) -> schemas.GetLorebookEntryResponseDto:
-    with _service_errors():
-        result = await query.get_lorebook_entry(
-            session,
-            lorebook_id=lorebook_id,
-            entry_id=entry_id,
-        )
-        if result is None:
-            raise LookupError("Lorebook entry not found.")
-    return LorebookSchemaMapper.entry_info_to_get_response(result)
+    return SchemaMapper.entry_info_to_get_response(result)
 
 
 @router.post(
     "",
-    response_model=schemas.CreateLorebookResponseDto,
+    response_model=Schemas.CreateLorebookResponseDto,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_lorebook(
-    request: schemas.CreateLorebookRequestDto,
+    request: Schemas.CreateLorebookRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.CreateLorebookResponseDto:
-    value = LorebookSchemaMapper.create_lorebook_request_to_command(
-        request,
-        owner_id,
-    )
+) -> Schemas.CreateLorebookResponseDto:
+    value = SchemaMapper.create_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        result = await command.create_lorebook(session, value)
-    return LorebookSchemaMapper.lorebook_info_to_create_response(result)
+        result = await CommandService.create_lorebook(session, value)
+    return SchemaMapper.lorebook_info_to_create_response(result)
 
 
-@router.put("", response_model=schemas.UpdateLorebookResponseDto)
+@router.put("", response_model=Schemas.UpdateLorebookResponseDto)
 async def update_lorebook(
-    request: schemas.UpdateLorebookRequestDto,
+    request: Schemas.UpdateLorebookRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.UpdateLorebookResponseDto:
-    value = LorebookSchemaMapper.update_lorebook_request_to_command(
-        request,
-        owner_id,
-    )
+) -> Schemas.UpdateLorebookResponseDto:
+    value = SchemaMapper.update_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        result = await command.update_lorebook(session, value)
-    return LorebookSchemaMapper.lorebook_info_to_update_response(result)
+        result = await CommandService.update_lorebook(session, value)
+    return SchemaMapper.lorebook_info_to_update_response(result)
 
 
-@router.patch(
-    "/status",
-    response_model=schemas.ChangeLorebookStatusResponseDto,
-    dependencies=[Depends(require_lorebook_moderator)],
-)
-async def change_lorebook_status(
-    request: schemas.ChangeLorebookStatusRequestDto,
-    owner_id: OwnerDependency,
-    session: SessionDependency,
-) -> schemas.ChangeLorebookStatusResponseDto:
-    # This mirrors the current character contract and still requires ownership.
-    # A cross-owner moderator workflow needs a separate command and audit policy.
-    value = LorebookSchemaMapper.change_lorebook_status_request_to_command(
-        request,
-        owner_id,
-    )
-    with _service_errors():
-        result = await command.change_lorebook_status(session, value)
-    return LorebookSchemaMapper.lorebook_info_to_status_response(result)
-
-
-@router.delete("", response_model=schemas.DeleteLorebookResponseDto)
+@router.delete("", response_model=Schemas.DeleteLorebookResponseDto)
 async def delete_lorebook(
-    request: schemas.DeleteLorebookRequestDto,
+    request: Schemas.DeleteLorebookRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.DeleteLorebookResponseDto:
-    value = LorebookSchemaMapper.delete_lorebook_request_to_command(
-        request,
-        owner_id,
-    )
+) -> Schemas.DeleteLorebookResponseDto:
+    value = SchemaMapper.delete_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        await command.delete_lorebook(session, value)
-    return LorebookSchemaMapper.delete_lorebook_result_to_response(None)
+        await CommandService.delete_lorebook(session, value)
+    return SchemaMapper.delete_lorebook_result_to_response(None)
 
 
 @router.post(
     "/entries",
-    response_model=schemas.CreateLorebookEntryResponseDto,
+    response_model=Schemas.CreateLorebookEntryResponseDto,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_lorebook_entry(
-    request: schemas.CreateLorebookEntryRequestDto,
+    request: Schemas.CreateLorebookEntryRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.CreateLorebookEntryResponseDto:
-    value = LorebookSchemaMapper.create_entry_request_to_command(request, owner_id)
+) -> Schemas.CreateLorebookEntryResponseDto:
+    value = SchemaMapper.create_entry_request_to_command(request, owner_id)
     with _service_errors():
-        result = await command.create_lorebook_entry(session, value)
-    return LorebookSchemaMapper.entry_info_to_create_response(result)
+        result = await CommandService.create_lorebook_entry(session, value)
+    return SchemaMapper.entry_info_to_create_response(result)
 
 
-@router.put("/entries", response_model=schemas.UpdateLorebookEntryResponseDto)
+@router.put("/entries", response_model=Schemas.UpdateLorebookEntryResponseDto)
 async def update_lorebook_entry(
-    request: schemas.UpdateLorebookEntryRequestDto,
+    request: Schemas.UpdateLorebookEntryRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.UpdateLorebookEntryResponseDto:
-    value = LorebookSchemaMapper.update_entry_request_to_command(request, owner_id)
+) -> Schemas.UpdateLorebookEntryResponseDto:
+    value = SchemaMapper.update_entry_request_to_command(request, owner_id)
     with _service_errors():
-        result = await command.update_lorebook_entry(session, value)
-    return LorebookSchemaMapper.entry_info_to_update_response(result)
+        result = await CommandService.update_lorebook_entry(session, value)
+    return SchemaMapper.entry_info_to_update_response(result)
 
 
-@router.delete("/entries", response_model=schemas.DeleteLorebookEntryResponseDto)
+@router.delete("/entries", response_model=Schemas.DeleteLorebookEntryResponseDto)
 async def delete_lorebook_entry(
-    request: schemas.DeleteLorebookEntryRequestDto,
+    request: Schemas.DeleteLorebookEntryRequestDto,
     owner_id: OwnerDependency,
     session: SessionDependency,
-) -> schemas.DeleteLorebookEntryResponseDto:
-    value = LorebookSchemaMapper.delete_entry_request_to_command(request, owner_id)
+) -> Schemas.DeleteLorebookEntryResponseDto:
+    value = SchemaMapper.delete_entry_request_to_command(request, owner_id)
     with _service_errors():
-        await command.delete_lorebook_entry(session, value)
-    return LorebookSchemaMapper.delete_entry_result_to_response(None)
+        await CommandService.delete_lorebook_entry(session, value)
+    return SchemaMapper.delete_entry_result_to_response(None)

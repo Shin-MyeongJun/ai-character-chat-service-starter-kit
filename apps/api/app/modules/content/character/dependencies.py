@@ -1,50 +1,15 @@
-"""Integration points for the character HTTP adapter.
+"""Compatibility imports for existing dependency overrides."""
 
-TODO: Replace these hooks with shared DB/auth dependencies when those modules
-exist. Until then the application can supply FastAPI dependency_overrides.
-Unconfigured hooks reject requests instead of inventing an authenticated owner.
-"""
+from app.http.character_dependencies import (
+    get_character_session,
+    get_current_owner_id,
+    require_character_admin,
+    require_character_moderator,
+)
 
-from uuid import UUID
-
-from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-
-async def get_character_session() -> AsyncSession:
-    """Supply a request-scoped session and close it when the request ends."""
-    # TODO: Wire a yielding session dependency. Commands need a fresh session with
-    # no active transaction; do not share a session already used by authentication.
-    # TODO(error-codes): Use the shared infrastructure-unavailable response later.
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Character database dependency is not configured.",
-    )
-
-
-async def get_current_owner_id() -> UUID:
-    # TODO: Resolve the authenticated user's ID through the identity module.
-    # Never treat a raw request owner_id or an unverified header as authentication.
-    # TODO(error-codes): Replace with shared unauthenticated/expired-token handling.
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Character authentication dependency is not configured.",
-    )
-
-
-async def require_character_admin() -> None:
-    # TODO: Authenticate and authorize cross-owner/private-character reads.
-    # TODO(error-codes): Use the shared authentication/authorization error codes.
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Character administration dependency is not configured.",
-    )
-
-
-async def require_character_moderator() -> None:
-    # TODO: Authenticate and authorize moderation separately from ownership.
-    # TODO(error-codes): Use the shared authentication/authorization error codes.
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Character moderation dependency is not configured.",
-    )
+__all__ = [
+    "get_character_session",
+    "get_current_owner_id",
+    "require_character_admin",
+    "require_character_moderator",
+]

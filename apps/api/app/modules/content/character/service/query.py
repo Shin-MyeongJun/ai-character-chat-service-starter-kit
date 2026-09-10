@@ -8,199 +8,167 @@ and honors the caller's session autoflush setting for pending changes.
 """
 
 from typing import get_args
-from uuid import UUID
 
-from app.modules.content.character import repository, types
-from app.modules.content.character.mapper import persistence
+from app.modules.content.character import repository as Repository
+from app.modules.content.character import types as Types
+from app.modules.content.character.mapper import persistence as PersistenceMapper
 from sqlalchemy.ext.asyncio import AsyncSession
-
-# Router-oriented queries
-# Keep these sections together for now; split by use case when this file grows.
-# IMPORTANT: these are authorized management reads, not a public catalog API.
-# Full CharacterInfo includes persona_prompt and private/draft records. The caller
-# must authorize access and derive owner_id from a trusted identity/context.
 
 
 async def list_characters(
-    session: AsyncSession,
-    *,
-    cursor: types.CharacterCursor | None = None,
-    limit: int = repository.DEFAULT_CHARACTER_LIST_LIMIT,
-) -> types.CharacterPage[types.CharacterInfo]:
+    session: AsyncSession, command: Types.ListCharactersCommand
+) -> Types.CharacterPage[Types.CharacterInfo]:
     """List all characters, regardless of owner, visibility, or moderation status."""
-    page = await repository.list_characters(session, cursor=cursor, limit=limit)
-    return persistence.character_page_entity_to_info(page)
+    cursor = command.cursor
+    limit = command.limit
+    page = await Repository.list_characters(session, cursor=cursor, limit=limit)
+    return PersistenceMapper.character_page_entity_to_info(page)
 
 
 async def list_characters_by_owner_id(
-    session: AsyncSession,
-    *,
-    owner_id: UUID,
-    cursor: types.CharacterCursor | None = None,
-    limit: int = repository.DEFAULT_CHARACTER_LIST_LIMIT,
-) -> types.CharacterPage[types.CharacterInfo]:
-    page = await repository.list_characters_by_owner_id(
+    session: AsyncSession, command: Types.ListCharactersByOwnerIdCommand
+) -> Types.CharacterPage[Types.CharacterInfo]:
+    owner_id = command.owner_id
+    cursor = command.cursor
+    limit = command.limit
+    page = await Repository.list_characters_by_owner_id(
         session, owner_id, cursor=cursor, limit=limit
     )
-    return persistence.character_page_entity_to_info(page)
+    return PersistenceMapper.character_page_entity_to_info(page)
 
 
-# Additional detail reads support router detail/edit views without exposing ORM.
 async def get_character_by_id(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-) -> types.CharacterInfo | None:
-    entity = await repository.get_character_by_id(session, character_id)
-    if entity is None:
-        return None
-    return persistence.character_entity_to_info(entity)
+    session: AsyncSession, command: Types.GetCharacterByIdCommand
+) -> Types.CharacterInfo | None:
+    character_id = command.character_id
+    entity = await Repository.get_character_by_id(session, character_id)
+    return PersistenceMapper.character_entity_to_info(entity)
 
 
 async def get_character_by_id_and_owner_id(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-    owner_id: UUID,
-) -> types.CharacterInfo | None:
+    session: AsyncSession, command: Types.GetCharacterByIdAndOwnerIdCommand
+) -> Types.CharacterInfo | None:
     """Return None both for an absent character and for an owner mismatch."""
-    entity = await repository.get_character_by_id_and_owner_id(
+    character_id = command.character_id
+    owner_id = command.owner_id
+    entity = await Repository.get_character_by_id_and_owner_id(
         session, character_id, owner_id
     )
-    if entity is None:
-        return None
-    return persistence.character_entity_to_info(entity)
-
-
-# TODO: Implement router search/filter queries after search requirements and
-# supporting metadata are defined (keyword, tags, visibility/status, sorting).
-# Define public catalog visibility/moderation rules and its response fields then.
-# Group conditions in a Query/Filter input type when they need reuse; pagination
-# cursors must agree with the selected filters and sort order.
-
-
-# Queries for other modules (chat, conversation, character presentation, etc.)
-# Internal use alone does not grant access: callers must authorize the character.
-# A missing parent and an existing parent with no media both yield [] in media
-# lists. Use a character detail read if the caller must distinguish those cases.
+    return PersistenceMapper.character_entity_to_info(entity)
 
 
 async def get_character_image(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-    image_id: UUID,
-) -> types.CharacterImageInfo | None:
-    # Always scope child IDs to the character to avoid returning unrelated media.
-    entity = await repository.get_character_image_by_id_and_character_id(
+    session: AsyncSession, command: Types.GetCharacterImageCommand
+) -> Types.CharacterImageInfo | None:
+    character_id = command.character_id
+    image_id = command.image_id
+    entity = await Repository.get_character_image_by_id_and_character_id(
         session, image_id, character_id
     )
-    if entity is None:
-        return None
-    return persistence.character_image_entity_to_info(entity)
+    return PersistenceMapper.character_image_entity_to_info(entity)
 
 
 async def get_character_image_by_emotion_tag(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-    emotion_tag: str,
-) -> types.CharacterImageInfo | None:
+    session: AsyncSession, command: Types.GetCharacterImageByEmotionTagCommand
+) -> Types.CharacterImageInfo | None:
     """Match an exact emotion tag; missing tags do not silently use a default image."""
-    entity = await repository.get_character_image_by_emotion_tag(
+    character_id = command.character_id
+    emotion_tag = command.emotion_tag
+    entity = await Repository.get_character_image_by_emotion_tag(
         session, character_id, emotion_tag
     )
-    if entity is None:
-        return None
-    return persistence.character_image_entity_to_info(entity)
+    return PersistenceMapper.character_image_entity_to_info(entity)
 
 
 async def get_default_character_image(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-) -> types.CharacterImageInfo | None:
-    # Additional read: the caller can explicitly choose a fallback for missing tags.
-    entity = await repository.get_default_character_image(session, character_id)
-    if entity is None:
-        return None
-    return persistence.character_image_entity_to_info(entity)
+    session: AsyncSession, command: Types.GetDefaultCharacterImageCommand
+) -> Types.CharacterImageInfo | None:
+    character_id = command.character_id
+    entity = await Repository.get_default_character_image(session, character_id)
+    return PersistenceMapper.character_image_entity_to_info(entity)
 
 
 async def list_character_images(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-) -> list[types.CharacterImageInfo]:
-    entities = await repository.list_character_images(session, character_id)
-    return [persistence.character_image_entity_to_info(entity) for entity in entities]
+    session: AsyncSession, command: Types.ListCharacterImagesCommand
+) -> list[Types.CharacterImageInfo]:
+    character_id = command.character_id
+    entities = await Repository.list_character_images(session, character_id)
+    return PersistenceMapper.character_images_entities_to_info(entities)
 
 
 async def get_character_asset(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-    asset_id: UUID,
-) -> types.CharacterAssetInfo | None:
-    entity = await repository.get_character_asset_by_id_and_character_id(
+    session: AsyncSession, command: Types.GetCharacterAssetCommand
+) -> Types.CharacterAssetInfo | None:
+    character_id = command.character_id
+    asset_id = command.asset_id
+    entity = await Repository.get_character_asset_by_id_and_character_id(
         session, asset_id, character_id
     )
-    if entity is None:
-        return None
-    return persistence.character_asset_entity_to_info(entity)
+    return PersistenceMapper.character_asset_entity_to_info(entity)
 
 
 async def list_character_assets(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-    asset_type: types.CharacterAssetTypeValue | None = None,
-) -> list[types.CharacterAssetInfo]:
-    # Optional type selection reuses the existing repository filter for chat/media.
+    session: AsyncSession, command: Types.ListCharacterAssetsCommand
+) -> list[Types.CharacterAssetInfo]:
+    character_id = command.character_id
+    asset_type = command.asset_type
     if asset_type is None:
-        entities = await repository.list_character_assets(session, character_id)
+        entities = await Repository.list_character_assets(session, character_id)
     else:
-        # Literal annotations alone do not validate calls from other Python modules.
-        if asset_type not in get_args(types.CharacterAssetTypeValue):
+        if asset_type not in get_args(Types.CharacterAssetTypeValue):
             raise ValueError("Invalid character asset type.")
-        entities = await repository.list_character_assets_by_type(
+        entities = await Repository.list_character_assets_by_type(
             session, character_id, asset_type
         )
-    return [persistence.character_asset_entity_to_info(entity) for entity in entities]
+    return PersistenceMapper.character_assets_entities_to_info(entities)
 
 
 async def get_character_prompt(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-) -> types.CharacterPromptInfo | None:
-    entity = await repository.get_character_by_id(session, character_id)
-    if entity is None:
-        return None
-    return persistence.character_entity_to_prompt_info(entity)
+    session: AsyncSession, command: Types.GetCharacterPromptCommand
+) -> Types.CharacterPromptInfo | None:
+    character_id = command.character_id
+    entity = await Repository.get_character_by_id(session, character_id)
+    return PersistenceMapper.character_entity_to_prompt_info(entity)
 
 
 async def get_character_promotion(
-    session: AsyncSession,
-    *,
-    character_id: UUID,
-) -> types.CharacterPromotionInfo | None:
+    session: AsyncSession, command: Types.GetCharacterPromotionCommand
+) -> Types.CharacterPromotionInfo | None:
     """Collect description and all media for one authorized character."""
-    entity = await repository.get_character_by_id(session, character_id)
-    if entity is None:
-        return None
+    character_id = command.character_id
+    row = await Repository.get_character_promotion(session, character_id)
+    return PersistenceMapper.character_promotion_row_to_info(row)
 
-    # Do not run concurrent operations on the same AsyncSession. These three
-    # reads are not a guaranteed snapshot at READ COMMITTED; a caller requiring
-    # that guarantee must choose an appropriate transaction isolation level.
-    images = await list_character_images(session, character_id=character_id)
-    assets = await list_character_assets(session, character_id=character_id)
-    # Includes every asset purpose; public media selection awaits product policy.
-    # For future list previews, add batched loading instead of calling this per row.
-    return types.CharacterPromotionInfo(
-        character_id=entity.id,
-        name=entity.name,
-        description=entity.description,
-        images=images,
-        assets=assets,
+
+async def get_owned_characters(
+    session: AsyncSession, command: Types.GetOwnedCharactersCommand
+) -> list[Types.CharacterInfo]:
+    rows = await Repository.list_owned_characters(
+        session, command.ids, command.owner_id, lock=command.lock
     )
+    infos = PersistenceMapper.characters_entities_to_info(rows)
+    if len(infos) != len(command.ids):
+        raise LookupError("Owned component not found.")
+    return infos
+
+
+async def get_snapshot_media(
+    session: AsyncSession, command: Types.GetSnapshotMediaCommand
+) -> Types.SnapshotMediaInfo:
+    row = await Repository.get_snapshot_media(session, command.snapshot_ids)
+    return PersistenceMapper.snapshot_media_row_to_info(row)
+
+
+async def check_media_reference(
+    session: AsyncSession, command: Types.CheckMediaReferenceCommand
+) -> Types.MediaReferenceInfo:
+    return Types.MediaReferenceInfo(
+        await Repository.has_snapshot_media_reference(session, command.url)
+    )
+
+
+async def get_character_snapshots(
+    session: AsyncSession, command: Types.GetCharacterSnapshotsCommand
+) -> list[Types.CharacterSnapshotInfo]:
+    rows = await Repository.list_character_snapshots(session, command.snapshot_ids)
+    return PersistenceMapper.character_snapshots_entities_to_info(rows)

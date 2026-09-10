@@ -9,9 +9,9 @@ from app.modules.llm.adapters.base import BaseLLMAdapter
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
-    LLMResult,
+    LLMResultInfo,
     ReasoningEffort,
-    TokenUsage,
+    TokenUsageInfo,
 )
 
 
@@ -44,9 +44,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         api_key: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 0,
-        model_reasoning_efforts: Mapping[
-            str, Iterable[ReasoningEffort | str]
-        ]
+        model_reasoning_efforts: Mapping[str, Iterable[ReasoningEffort | str]]
         | None = None,
         default_max_output_tokens: int = 1200,
     ) -> None:
@@ -69,7 +67,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         model: str,
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
-    ) -> LLMResult:
+    ) -> LLMResultInfo:
         params: dict[str, Any] = {
             "model": model,
             "input": request_json,
@@ -102,7 +100,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         usage_raw = _attr(response, "usage")
         input_details = _attr(usage_raw, "input_tokens_details")
         output_details = _attr(usage_raw, "output_tokens_details")
-        usage = TokenUsage(
+        usage = TokenUsageInfo(
             input_tokens=_attr(usage_raw, "input_tokens"),
             output_tokens=_attr(usage_raw, "output_tokens"),
             total_tokens=_attr(usage_raw, "total_tokens"),
@@ -115,7 +113,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         finish_reason = _attr(incomplete, "reason") if incomplete else status
         if self._contains_refusal(response):
             finish_reason = "refusal"
-        return LLMResult(
+        return LLMResultInfo(
             content=_attr(response, "output_text", "") or "",
             provider=self.provider,
             model=_attr(response, "model", model) or model,

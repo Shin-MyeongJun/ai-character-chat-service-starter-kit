@@ -7,8 +7,8 @@ from app.modules.llm.types import (
     LLMError,
     LLMErrorKind,
     LLMProvider,
-    LLMResult,
-    ModelOption,
+    LLMResultInfo,
+    ModelOptionInfo,
     ReasoningEffort,
     UnsupportedModelError,
     UnsupportedReasoningEffortError,
@@ -23,9 +23,7 @@ class BaseLLMAdapter(ABC):
     def __init__(
         self,
         *,
-        model_reasoning_efforts: Mapping[
-            str, Iterable[ReasoningEffort | str]
-        ]
+        model_reasoning_efforts: Mapping[str, Iterable[ReasoningEffort | str]]
         | None = None,
         default_max_output_tokens: int = 1200,
     ) -> None:
@@ -46,17 +44,15 @@ class BaseLLMAdapter(ABC):
             return model in self._model_reasoning_efforts
         return any(model.startswith(prefix) for prefix in self.model_prefixes)
 
-    def model_options(self) -> tuple[ModelOption, ...]:
+    def model_options(self) -> tuple[ModelOptionInfo, ...]:
         if self._model_reasoning_efforts is None:
             return ()
         return tuple(
-            ModelOption(self.provider, model, efforts)
+            ModelOptionInfo(self.provider, model, efforts)
             for model, efforts in self._model_reasoning_efforts.items()
         )
 
-    def supported_reasoning_efforts(
-        self, model: str
-    ) -> frozenset[ReasoningEffort]:
+    def supported_reasoning_efforts(self, model: str) -> frozenset[ReasoningEffort]:
         if not self.supports_model(model):
             raise UnsupportedModelError(
                 f"Model {model!r} is not supported by {self.provider.value}."
@@ -72,7 +68,7 @@ class BaseLLMAdapter(ABC):
         model: str,
         reasoning_effort: ReasoningEffort | str | None = None,
         max_output_tokens: int | None = None,
-    ) -> LLMResult:
+    ) -> LLMResultInfo:
         if not isinstance(request_json, str) or not request_json.strip():
             raise ValueError("request_json must be a non-blank string.")
         if not isinstance(model, str) or not model.strip():
@@ -119,7 +115,7 @@ class BaseLLMAdapter(ABC):
         model: str,
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
-    ) -> LLMResult: ...
+    ) -> LLMResultInfo: ...
 
     async def aclose(self) -> None:
         return None

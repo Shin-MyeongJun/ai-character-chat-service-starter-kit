@@ -1,0 +1,5207 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/conversations": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Start",
+        "operationId": "start_conversations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationStartedResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{conversation_id}/updates": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Updates",
+        "operationId": "updates_conversations__conversation_id__updates_get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingUpdatesInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{conversation_id}/version": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Switch",
+        "operationId": "switch_conversations__conversation_id__version_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSwitchedResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "List Characters",
+        "operationId": "list_characters_characters_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCharactersResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Create Character",
+        "operationId": "create_character_characters_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCharacterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCharacterResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Update Character",
+        "operationId": "update_character_characters_put",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCharacterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCharacterResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Delete Character",
+        "operationId": "delete_character_characters_delete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCharacterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteCharacterResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/me": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "List My Characters",
+        "operationId": "list_my_characters_characters_me_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCharactersResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/me/{character_id}": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Get My Character",
+        "operationId": "get_my_character_characters_me__character_id__get",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Character Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetCharacterByIdResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{character_id}": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Get Character",
+        "operationId": "get_character_characters__character_id__get",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Character Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetCharacterByIdResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/status": {
+      "patch": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Change Character Status",
+        "operationId": "change_character_status_characters_status_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeCharacterStatusRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeCharacterStatusResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/images": {
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Add Character Image",
+        "operationId": "add_character_image_characters_images_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCharacterImageRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddCharacterImageResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Delete Character Image",
+        "operationId": "delete_character_image_characters_images_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCharacterImageRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteCharacterImageResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/images/default": {
+      "patch": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Set Default Character Image",
+        "operationId": "set_default_character_image_characters_images_default_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDefaultCharacterImageRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetDefaultCharacterImageResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/assets": {
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Add Character Asset",
+        "operationId": "add_character_asset_characters_assets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCharacterAssetRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddCharacterAssetResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Delete Character Asset",
+        "operationId": "delete_character_asset_characters_assets_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCharacterAssetRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteCharacterAssetResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "List Lorebooks",
+        "operationId": "list_lorebooks_lorebooks_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLorebooksResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Create Lorebook",
+        "operationId": "create_lorebook_lorebooks_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLorebookRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateLorebookResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Update Lorebook",
+        "operationId": "update_lorebook_lorebooks_put",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLorebookRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateLorebookResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Delete Lorebook",
+        "operationId": "delete_lorebook_lorebooks_delete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteLorebookRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteLorebookResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/me": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "List My Lorebooks",
+        "operationId": "list_my_lorebooks_lorebooks_me_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLorebooksResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/me/{lorebook_id}": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Get My Lorebook",
+        "operationId": "get_my_lorebook_lorebooks_me__lorebook_id__get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetLorebookByIdResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/me/{lorebook_id}/entries": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "List My Lorebook Entries",
+        "operationId": "list_my_lorebook_entries_lorebooks_me__lorebook_id__entries_get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLorebookEntriesResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/me/{lorebook_id}/entries/{entry_id}": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Get My Lorebook Entry",
+        "operationId": "get_my_lorebook_entry_lorebooks_me__lorebook_id__entries__entry_id__get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetLorebookEntryResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/{lorebook_id}": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Get Lorebook",
+        "operationId": "get_lorebook_lorebooks__lorebook_id__get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetLorebookByIdResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/{lorebook_id}/entries": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "List Entries",
+        "operationId": "list_entries_lorebooks__lorebook_id__entries_get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor_created_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Created At"
+            }
+          },
+          {
+            "name": "cursor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLorebookEntriesResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/{lorebook_id}/entries/{entry_id}": {
+      "get": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Get Entry",
+        "operationId": "get_entry_lorebooks__lorebook_id__entries__entry_id__get",
+        "parameters": [
+          {
+            "name": "lorebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lorebook Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetLorebookEntryResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/status": {
+      "patch": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Change Lorebook Status",
+        "operationId": "change_lorebook_status_lorebooks_status_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLorebookStatusRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeLorebookStatusResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lorebooks/entries": {
+      "put": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Update Lorebook Entry",
+        "operationId": "update_lorebook_entry_lorebooks_entries_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLorebookEntryRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateLorebookEntryResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Create Lorebook Entry",
+        "operationId": "create_lorebook_entry_lorebooks_entries_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLorebookEntryRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateLorebookEntryResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lorebooks"
+        ],
+        "summary": "Delete Lorebook Entry",
+        "operationId": "delete_lorebook_entry_lorebooks_entries_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteLorebookEntryRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteLorebookEntryResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/mine": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "List Mine",
+        "operationId": "list_mine_products_mine_get",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductInfoResponseDto"
+                  },
+                  "title": "Response List Mine Products Mine Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "post": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Create",
+        "operationId": "create_products_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductWriteRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/draft": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Get Draft",
+        "operationId": "get_draft_products__product_id__draft_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Update",
+        "operationId": "update_products__product_id__draft_put",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductWriteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Delete",
+        "operationId": "delete_products__product_id__draft_delete",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/composition": {
+      "put": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Put Composition",
+        "operationId": "put_composition_products__product_id__composition_put",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompositionRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositionResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Read Composition",
+        "operationId": "read_composition_products__product_id__composition_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompositionResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/settings": {
+      "put": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Put Settings",
+        "operationId": "put_settings_products__product_id__settings_put",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/releases": {
+      "post": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Publish",
+        "operationId": "publish_products__product_id__releases_post",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/releases/{snapshot_id}/note": {
+      "patch": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Correct Note",
+        "operationId": "correct_note_products__product_id__releases__snapshot_id__note_patch",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Published",
+        "operationId": "published_products__product_id__get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedProductInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/statistics": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Statistics",
+        "operationId": "statistics_products__product_id__statistics_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticsInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/releases/{snapshot_id}/availability": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Version Availability",
+        "operationId": "version_availability_products__product_id__releases__snapshot_id__availability_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionAvailabilityInfoResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/models/{model_id}/retirement": {
+      "put": {
+        "tags": [
+          "model administration"
+        ],
+        "summary": "Announce",
+        "operationId": "announce_admin_models__model_id__retirement_put",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetirementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/products/versions/{snapshot_id}/expiry": {
+      "put": {
+        "tags": [
+          "product administration"
+        ],
+        "summary": "Expiry",
+        "operationId": "expiry_admin_products_versions__snapshot_id__expiry_put",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpiryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryChangedResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/products/{product_id}/status": {
+      "put": {
+        "tags": [
+          "product administration"
+        ],
+        "summary": "Status",
+        "operationId": "status_admin_products__product_id__status_put",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddCharacterAssetRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "asset_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio",
+              "video"
+            ],
+            "title": "Asset Type"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Purpose"
+          },
+          "file_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "File Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "asset_type",
+          "purpose",
+          "file_url"
+        ],
+        "title": "AddCharacterAssetRequestDto"
+      },
+      "AddCharacterAssetResponseDto": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/CharacterAssetResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset"
+        ],
+        "title": "AddCharacterAssetResponseDto"
+      },
+      "AddCharacterImageRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "emotion_tag": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Emotion Tag"
+          },
+          "image_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Image Url"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "emotion_tag",
+          "image_url"
+        ],
+        "title": "AddCharacterImageRequestDto"
+      },
+      "AddCharacterImageResponseDto": {
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/CharacterImageResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "AddCharacterImageResponseDto"
+      },
+      "ChangeCharacterStatusRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "status"
+        ],
+        "title": "ChangeCharacterStatusRequestDto"
+      },
+      "ChangeCharacterStatusResponseDto": {
+        "properties": {
+          "character": {
+            "$ref": "#/components/schemas/CharacterResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character"
+        ],
+        "title": "ChangeCharacterStatusResponseDto"
+      },
+      "ChangeLorebookStatusRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id",
+          "status"
+        ],
+        "title": "ChangeLorebookStatusRequestDto"
+      },
+      "ChangeLorebookStatusResponseDto": {
+        "properties": {
+          "lorebook": {
+            "$ref": "#/components/schemas/LorebookResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook"
+        ],
+        "title": "ChangeLorebookStatusResponseDto"
+      },
+      "CharacterAssetResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "asset_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio",
+              "video"
+            ],
+            "title": "Asset Type"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "character_id",
+          "asset_type",
+          "purpose",
+          "file_url",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CharacterAssetResponseDto"
+      },
+      "CharacterCursorResponseDto": {
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_at",
+          "id"
+        ],
+        "title": "CharacterCursorResponseDto"
+      },
+      "CharacterImageResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "emotion_tag": {
+            "type": "string",
+            "title": "Emotion Tag"
+          },
+          "image_url": {
+            "type": "string",
+            "title": "Image Url"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "character_id",
+          "emotion_tag",
+          "image_url",
+          "is_default",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CharacterImageResponseDto"
+      },
+      "CharacterResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "persona_prompt": {
+            "type": "string",
+            "title": "Persona Prompt"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "default_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "name",
+          "persona_prompt",
+          "visibility",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CharacterResponseDto"
+      },
+      "CharacterSelectionRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "title": "Is Primary",
+            "default": false
+          },
+          "role_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "character_id"
+        ],
+        "title": "CharacterSelectionRequestDto"
+      },
+      "CharacterSelectionResponseDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "title": "Is Primary",
+            "default": false
+          },
+          "role_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id"
+        ],
+        "title": "CharacterSelectionResponseDto"
+      },
+      "CompositionRequestDto": {
+        "properties": {
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterSelectionRequestDto"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Characters",
+            "default": []
+          },
+          "lorebooks": {
+            "items": {
+              "$ref": "#/components/schemas/LorebookSelectionRequestDto"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Lorebooks",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CompositionRequestDto"
+      },
+      "CompositionResponseDto": {
+        "properties": {
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterSelectionResponseDto"
+            },
+            "type": "array",
+            "title": "Characters",
+            "default": []
+          },
+          "lorebooks": {
+            "items": {
+              "$ref": "#/components/schemas/LorebookSelectionResponseDto"
+            },
+            "type": "array",
+            "title": "Lorebooks",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "CompositionResponseDto"
+      },
+      "ConversationStartedResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "product_snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Product Snapshot Id"
+          },
+          "start_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Start Set Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "product_snapshot_id",
+          "start_set_id"
+        ],
+        "title": "ConversationStartedResponseDto"
+      },
+      "CreateCharacterRequestDto": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "persona_prompt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Persona Prompt"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          },
+          "default_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "persona_prompt"
+        ],
+        "title": "CreateCharacterRequestDto"
+      },
+      "CreateCharacterResponseDto": {
+        "properties": {
+          "character": {
+            "$ref": "#/components/schemas/CharacterResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character"
+        ],
+        "title": "CreateCharacterResponseDto"
+      },
+      "CreateLorebookEntryRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 32000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "entry_type": {
+            "type": "string",
+            "enum": [
+              "author_note",
+              "world",
+              "genre",
+              "rule",
+              "location",
+              "faction",
+              "character_relation",
+              "event",
+              "term",
+              "secret",
+              "start_set"
+            ],
+            "title": "Entry Type",
+            "default": "world"
+          },
+          "activation_type": {
+            "type": "string",
+            "enum": [
+              "always",
+              "keyword",
+              "semantic",
+              "manual"
+            ],
+            "title": "Activation Type",
+            "default": "always"
+          },
+          "key_triggers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 256,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Triggers"
+          },
+          "match_mode": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "contains",
+              "regex"
+            ],
+            "title": "Match Mode",
+            "default": "contains"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": -2147483648.0,
+            "title": "Priority",
+            "default": 0
+          },
+          "token_budget": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Budget"
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "system_top",
+              "before_memory",
+              "after_memory",
+              "before_history",
+              "near_user_message"
+            ],
+            "title": "Placement",
+            "default": "before_history"
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled",
+            "default": true
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id",
+          "content"
+        ],
+        "title": "CreateLorebookEntryRequestDto"
+      },
+      "CreateLorebookEntryResponseDto": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/LorebookEntryResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry"
+        ],
+        "title": "CreateLorebookEntryResponseDto"
+      },
+      "CreateLorebookRequestDto": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "CreateLorebookRequestDto"
+      },
+      "CreateLorebookResponseDto": {
+        "properties": {
+          "lorebook": {
+            "$ref": "#/components/schemas/LorebookResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook"
+        ],
+        "title": "CreateLorebookResponseDto"
+      },
+      "DeleteCharacterAssetRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Asset Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "asset_id"
+        ],
+        "title": "DeleteCharacterAssetRequestDto"
+      },
+      "DeleteCharacterAssetResponseDto": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteCharacterAssetResponseDto"
+      },
+      "DeleteCharacterImageRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "image_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Image Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "image_id"
+        ],
+        "title": "DeleteCharacterImageRequestDto"
+      },
+      "DeleteCharacterImageResponseDto": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteCharacterImageResponseDto"
+      },
+      "DeleteCharacterRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id"
+        ],
+        "title": "DeleteCharacterRequestDto"
+      },
+      "DeleteCharacterResponseDto": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteCharacterResponseDto"
+      },
+      "DeleteLorebookEntryRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entry Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id",
+          "entry_id"
+        ],
+        "title": "DeleteLorebookEntryRequestDto"
+      },
+      "DeleteLorebookEntryResponseDto": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteLorebookEntryResponseDto"
+      },
+      "DeleteLorebookRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id"
+        ],
+        "title": "DeleteLorebookRequestDto"
+      },
+      "DeleteLorebookResponseDto": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteLorebookResponseDto"
+      },
+      "ExpiryChangedResponseDto": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "expires_at",
+          "reason"
+        ],
+        "title": "ExpiryChangedResponseDto"
+      },
+      "ExpiryRequest": {
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expires_at",
+          "reason"
+        ],
+        "title": "ExpiryRequest"
+      },
+      "GetCharacterByIdResponseDto": {
+        "properties": {
+          "character": {
+            "$ref": "#/components/schemas/CharacterResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character"
+        ],
+        "title": "GetCharacterByIdResponseDto"
+      },
+      "GetLorebookByIdResponseDto": {
+        "properties": {
+          "lorebook": {
+            "$ref": "#/components/schemas/LorebookResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook"
+        ],
+        "title": "GetLorebookByIdResponseDto"
+      },
+      "GetLorebookEntryResponseDto": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/LorebookEntryResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry"
+        ],
+        "title": "GetLorebookEntryResponseDto"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ListCharactersResponseDto": {
+        "properties": {
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterResponseDto"
+            },
+            "type": "array",
+            "title": "Characters"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CharacterCursorResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "characters"
+        ],
+        "title": "ListCharactersResponseDto"
+      },
+      "ListLorebookEntriesResponseDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LorebookEntryResponseDto"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LorebookCursorResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "title": "ListLorebookEntriesResponseDto"
+      },
+      "ListLorebooksResponseDto": {
+        "properties": {
+          "lorebooks": {
+            "items": {
+              "$ref": "#/components/schemas/LorebookResponseDto"
+            },
+            "type": "array",
+            "title": "Lorebooks"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LorebookCursorResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebooks"
+        ],
+        "title": "ListLorebooksResponseDto"
+      },
+      "LorebookCursorResponseDto": {
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_at",
+          "id"
+        ],
+        "title": "LorebookCursorResponseDto"
+      },
+      "LorebookEntryResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "entry_type": {
+            "type": "string",
+            "enum": [
+              "author_note",
+              "world",
+              "genre",
+              "rule",
+              "location",
+              "faction",
+              "character_relation",
+              "event",
+              "term",
+              "secret",
+              "start_set"
+            ],
+            "title": "Entry Type"
+          },
+          "activation_type": {
+            "type": "string",
+            "enum": [
+              "always",
+              "keyword",
+              "semantic",
+              "manual"
+            ],
+            "title": "Activation Type"
+          },
+          "key_triggers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Triggers"
+          },
+          "match_mode": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "contains",
+              "regex"
+            ],
+            "title": "Match Mode"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "token_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Budget"
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "system_top",
+              "before_memory",
+              "after_memory",
+              "before_history",
+              "near_user_message"
+            ],
+            "title": "Placement"
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "lorebook_id",
+          "content",
+          "entry_type",
+          "activation_type",
+          "match_mode",
+          "priority",
+          "placement",
+          "is_enabled",
+          "metadata",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LorebookEntryResponseDto"
+      },
+      "LorebookResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "owner_id",
+          "title",
+          "visibility",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LorebookResponseDto"
+      },
+      "LorebookSelectionRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "selected"
+            ],
+            "title": "Scope",
+            "default": "all"
+          },
+          "character_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Character Ids",
+            "default": []
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "main",
+              "detail",
+              "rule",
+              "optional"
+            ],
+            "title": "Role",
+            "default": "detail"
+          },
+          "priority": {
+            "type": "integer",
+            "exclusiveMaximum": 2147483648.0,
+            "minimum": -2147483648.0,
+            "title": "Priority",
+            "default": 0
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lorebook_id"
+        ],
+        "title": "LorebookSelectionRequestDto"
+      },
+      "LorebookSelectionResponseDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "selected"
+            ],
+            "title": "Scope",
+            "default": "all"
+          },
+          "character_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Character Ids",
+            "default": []
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "main",
+              "detail",
+              "rule",
+              "optional"
+            ],
+            "title": "Role",
+            "default": "detail"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id"
+        ],
+        "title": "LorebookSelectionResponseDto"
+      },
+      "ModelNoticeResponseDto": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "announced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced At"
+          },
+          "shutdown_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shutdown At"
+          },
+          "transition_deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transition Deadline"
+          },
+          "replacement_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Model Id"
+          },
+          "replacement_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Model Name"
+          },
+          "replacement_reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Reasoning Effort"
+          },
+          "unavailable_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ModelNoticeResponseDto"
+      },
+      "PendingUpdatesInfoResponseDto": {
+        "properties": {
+          "current_snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Current Snapshot Id"
+          },
+          "current_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Expires At"
+          },
+          "expiry_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Reason"
+          },
+          "latest_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Snapshot Id"
+          },
+          "updates": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateInfoResponseDto"
+            },
+            "type": "array",
+            "title": "Updates"
+          },
+          "model_notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelNoticeResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_snapshot_id",
+          "current_expires_at",
+          "expiry_reason",
+          "latest_snapshot_id",
+          "updates",
+          "model_notice"
+        ],
+        "title": "PendingUpdatesInfoResponseDto"
+      },
+      "ProductInfoResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "opening_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Message"
+          },
+          "visibility": {
+            "type": "string",
+            "title": "Visibility"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "opening_message",
+          "visibility",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProductInfoResponseDto"
+      },
+      "ProductWriteRequestDto": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "opening_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Message"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility",
+            "default": "private"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ProductWriteRequestDto"
+      },
+      "PublishedProductInfoResponseDto": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Product Id"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "start_options": {
+            "items": {
+              "$ref": "#/components/schemas/StartOptionInfoResponseDto"
+            },
+            "type": "array",
+            "title": "Start Options"
+          },
+          "model_notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelNoticeResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "snapshot_id",
+          "version",
+          "title",
+          "description",
+          "start_options",
+          "model_notice"
+        ],
+        "title": "PublishedProductInfoResponseDto"
+      },
+      "ReleaseInfoResponseDto": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "change_kind": {
+            "type": "string",
+            "title": "Change Kind"
+          },
+          "update_policy": {
+            "type": "string",
+            "title": "Update Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "version",
+          "summary",
+          "body",
+          "change_kind",
+          "update_policy"
+        ],
+        "title": "ReleaseInfoResponseDto"
+      },
+      "ReleaseRequestDto": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Body"
+          },
+          "auto_apply_media": {
+            "type": "boolean",
+            "title": "Auto Apply Media",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "summary",
+          "body"
+        ],
+        "title": "ReleaseRequestDto"
+      },
+      "RetirementRequest": {
+        "properties": {
+          "announced_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Announced At"
+          },
+          "shutdown_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Shutdown At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "announced_at",
+          "shutdown_at"
+        ],
+        "title": "RetirementRequest"
+      },
+      "RevenueInfoResponseDto": {
+        "properties": {
+          "sales": {
+            "type": "string",
+            "title": "Sales"
+          },
+          "refunds": {
+            "type": "string",
+            "title": "Refunds"
+          },
+          "net": {
+            "type": "string",
+            "title": "Net"
+          },
+          "sale_count": {
+            "type": "integer",
+            "title": "Sale Count"
+          },
+          "refund_count": {
+            "type": "integer",
+            "title": "Refund Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sales",
+          "refunds",
+          "net",
+          "sale_count",
+          "refund_count"
+        ],
+        "title": "RevenueInfoResponseDto"
+      },
+      "SetDefaultCharacterImageRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "image_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Image Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "image_id"
+        ],
+        "title": "SetDefaultCharacterImageRequestDto"
+      },
+      "SetDefaultCharacterImageResponseDto": {
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/CharacterImageResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image"
+        ],
+        "title": "SetDefaultCharacterImageResponseDto"
+      },
+      "SettingsRequestDto": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Model Id"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "title": "Reasoning Effort"
+          },
+          "start_entry_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Start Entry Ids"
+          },
+          "replacement_scope": {
+            "type": "string",
+            "enum": [
+              "same_family",
+              "same_provider",
+              "allowlist"
+            ],
+            "title": "Replacement Scope",
+            "default": "same_family"
+          },
+          "replacement_model_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Replacement Model Ids",
+            "default": []
+          },
+          "unavailable_policy": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "use_original_until_shutdown"
+            ],
+            "title": "Unavailable Policy",
+            "default": "pause"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "reasoning_effort",
+          "start_entry_ids"
+        ],
+        "title": "SettingsRequestDto"
+      },
+      "SettingsResponseDto": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Model Id"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "title": "Reasoning Effort"
+          },
+          "start_entry_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Start Entry Ids"
+          },
+          "replacement_scope": {
+            "type": "string",
+            "enum": [
+              "same_family",
+              "same_provider",
+              "allowlist"
+            ],
+            "title": "Replacement Scope",
+            "default": "same_family"
+          },
+          "replacement_model_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Replacement Model Ids",
+            "default": []
+          },
+          "unavailable_policy": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "use_original_until_shutdown"
+            ],
+            "title": "Unavailable Policy",
+            "default": "pause"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "reasoning_effort",
+          "start_entry_ids"
+        ],
+        "title": "SettingsResponseDto"
+      },
+      "StartOptionInfoResponseDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "StartOptionInfoResponseDto"
+      },
+      "StartRequest": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Product Id"
+          },
+          "start_set_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Set Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "title": "StartRequest"
+      },
+      "StatisticsDayInfoResponseDto": {
+        "properties": {
+          "active_users": {
+            "type": "integer",
+            "title": "Active Users"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled"
+          },
+          "stale": {
+            "type": "integer",
+            "title": "Stale"
+          },
+          "messages": {
+            "type": "integer",
+            "title": "Messages"
+          },
+          "conversations": {
+            "type": "integer",
+            "title": "Conversations"
+          },
+          "transitions": {
+            "type": "integer",
+            "title": "Transitions"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cost_credit": {
+            "type": "integer",
+            "title": "Cost Credit"
+          },
+          "revenue": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RevenueInfoResponseDto"
+            },
+            "type": "object",
+            "title": "Revenue"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_users",
+          "succeeded",
+          "failed",
+          "cancelled",
+          "stale",
+          "messages",
+          "conversations",
+          "transitions",
+          "input_tokens",
+          "output_tokens",
+          "cost_credit",
+          "revenue",
+          "day",
+          "updated_at"
+        ],
+        "title": "StatisticsDayInfoResponseDto"
+      },
+      "StatisticsInfoResponseDto": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Product Id"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatisticsMetricsResponseDto"
+          },
+          "pending_days": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Pending Days"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/StatisticsDayInfoResponseDto"
+            },
+            "type": "array",
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "snapshot_id",
+          "timezone",
+          "date_from",
+          "date_to",
+          "totals",
+          "pending_days",
+          "days"
+        ],
+        "title": "StatisticsInfoResponseDto"
+      },
+      "StatisticsMetricsResponseDto": {
+        "properties": {
+          "active_users": {
+            "type": "integer",
+            "title": "Active Users"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled"
+          },
+          "stale": {
+            "type": "integer",
+            "title": "Stale"
+          },
+          "messages": {
+            "type": "integer",
+            "title": "Messages"
+          },
+          "conversations": {
+            "type": "integer",
+            "title": "Conversations"
+          },
+          "transitions": {
+            "type": "integer",
+            "title": "Transitions"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cost_credit": {
+            "type": "integer",
+            "title": "Cost Credit"
+          },
+          "revenue": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RevenueInfoResponseDto"
+            },
+            "type": "object",
+            "title": "Revenue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_users",
+          "succeeded",
+          "failed",
+          "cancelled",
+          "stale",
+          "messages",
+          "conversations",
+          "transitions",
+          "input_tokens",
+          "output_tokens",
+          "cost_credit",
+          "revenue"
+        ],
+        "title": "StatisticsMetricsResponseDto"
+      },
+      "StatusRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "StatusRequest"
+      },
+      "SwitchRequest": {
+        "properties": {
+          "target_snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Snapshot Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_snapshot_id"
+        ],
+        "title": "SwitchRequest"
+      },
+      "UpdateCharacterRequestDto": {
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Character Id"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "persona_prompt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Persona Prompt"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility"
+          },
+          "default_model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Model Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character_id",
+          "name",
+          "persona_prompt",
+          "description",
+          "visibility"
+        ],
+        "title": "UpdateCharacterRequestDto"
+      },
+      "UpdateCharacterResponseDto": {
+        "properties": {
+          "character": {
+            "$ref": "#/components/schemas/CharacterResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "character"
+        ],
+        "title": "UpdateCharacterResponseDto"
+      },
+      "UpdateInfoResponseDto": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "change_kind": {
+            "type": "string",
+            "title": "Change Kind"
+          },
+          "update_policy": {
+            "type": "string",
+            "title": "Update Policy"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "version",
+          "summary",
+          "body",
+          "change_kind",
+          "update_policy",
+          "expires_at"
+        ],
+        "title": "UpdateInfoResponseDto"
+      },
+      "UpdateLorebookEntryRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entry Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 32000,
+            "minLength": 1,
+            "title": "Content"
+          },
+          "entry_type": {
+            "type": "string",
+            "enum": [
+              "author_note",
+              "world",
+              "genre",
+              "rule",
+              "location",
+              "faction",
+              "character_relation",
+              "event",
+              "term",
+              "secret",
+              "start_set"
+            ],
+            "title": "Entry Type"
+          },
+          "activation_type": {
+            "type": "string",
+            "enum": [
+              "always",
+              "keyword",
+              "semantic",
+              "manual"
+            ],
+            "title": "Activation Type"
+          },
+          "key_triggers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 256,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Triggers"
+          },
+          "match_mode": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "contains",
+              "regex"
+            ],
+            "title": "Match Mode"
+          },
+          "priority": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": -2147483648.0,
+            "title": "Priority"
+          },
+          "token_budget": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Budget"
+          },
+          "placement": {
+            "type": "string",
+            "enum": [
+              "system_top",
+              "before_memory",
+              "after_memory",
+              "before_history",
+              "near_user_message"
+            ],
+            "title": "Placement"
+          },
+          "is_enabled": {
+            "type": "boolean",
+            "title": "Is Enabled"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id",
+          "entry_id",
+          "title",
+          "content",
+          "entry_type",
+          "activation_type",
+          "key_triggers",
+          "match_mode",
+          "priority",
+          "token_budget",
+          "placement",
+          "is_enabled",
+          "metadata"
+        ],
+        "title": "UpdateLorebookEntryRequestDto"
+      },
+      "UpdateLorebookEntryResponseDto": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/LorebookEntryResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry"
+        ],
+        "title": "UpdateLorebookEntryResponseDto"
+      },
+      "UpdateLorebookRequestDto": {
+        "properties": {
+          "lorebook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lorebook Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public",
+              "unlisted"
+            ],
+            "title": "Visibility"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook_id",
+          "title",
+          "description",
+          "visibility"
+        ],
+        "title": "UpdateLorebookRequestDto"
+      },
+      "UpdateLorebookResponseDto": {
+        "properties": {
+          "lorebook": {
+            "$ref": "#/components/schemas/LorebookResponseDto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lorebook"
+        ],
+        "title": "UpdateLorebookResponseDto"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VersionAvailabilityInfoResponseDto": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "expiry_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Reason"
+          },
+          "model_notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelNoticeResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "expires_at",
+          "expiry_reason",
+          "model_notice"
+        ],
+        "title": "VersionAvailabilityInfoResponseDto"
+      },
+      "VersionSwitchedResponseDto": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "changed"
+        ],
+        "title": "VersionSwitchedResponseDto"
+      }
+    }
+  }
+}

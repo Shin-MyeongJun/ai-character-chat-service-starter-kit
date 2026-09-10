@@ -1,21 +1,31 @@
 """Memory persistence. The caller owns the transaction and authorizes writes."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
+from dataclasses import dataclass
 from math import isfinite
-from typing import get_args
+from typing import cast, get_args
 from uuid import UUID
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat import Conversation
 from app.db.models.memory import ConversationMemory
 from app.db.pagination import fetch_cursor_page
-from app.modules.chatting.memory import types
+from app.modules.chatting.memory import types as Types
 
 DEFAULT_MEMORY_LIST_LIMIT = 50
 MAX_MEMORY_LIST_LIMIT = 100
 MAX_MEMORY_SEARCH_LIMIT = 100
+
+
+@dataclass(frozen=True)
+class MemoryPageRow:
+    items: list[ConversationMemory]
+    next_cursor: Types.MemoryCursor | None
 
 
 def _scoped_select(
@@ -35,9 +45,9 @@ def _scoped_select(
     )
 
 
-def validate_memory_types(memory_types: Sequence[types.MemoryType] | None) -> None:
+def validate_memory_types(memory_types: Sequence[Types.MemoryType] | None) -> None:
     if memory_types is not None and any(
-        item not in get_args(types.MemoryType) for item in memory_types
+        item not in get_args(Types.MemoryType) for item in memory_types
     ):
         raise ValueError("Invalid memory type.")
 
@@ -103,24 +113,25 @@ async def list_memories(
     *,
     conversation_id: UUID,
     owner_id: UUID,
-    cursor: types.MemoryCursor | None = None,
+    cursor: Types.MemoryCursor | None = None,
     limit: int = DEFAULT_MEMORY_LIST_LIMIT,
-    memory_types: Sequence[types.MemoryType] | None = None,
-) -> types.MemoryPage[ConversationMemory]:
+    memory_types: Sequence[Types.MemoryType] | None = None,
+) -> MemoryPageRow:
     """Newest first; None selects all types and an empty sequence selects none."""
     validate_memory_types(memory_types)
     stmt = _scoped_select(conversation_id, owner_id)
     if memory_types is not None:
         stmt = stmt.where(ConversationMemory.memory_type.in_(memory_types))
     return await fetch_cursor_page(
-        session, stmt,
+        session,
+        stmt,
         created_at=ConversationMemory.created_at,
         id_column=ConversationMemory.id,
         cursor=cursor,
         limit=limit,
         max_limit=MAX_MEMORY_LIST_LIMIT,
-        cursor_factory=types.MemoryCursor,
-        page_factory=types.MemoryPage,
+        cursor_factory=Types.MemoryCursor,
+        page_factory=MemoryPageRow,
     )
 
 
@@ -148,7 +159,7 @@ async def search_memories(
     owner_id: UUID,
     query_embedding: Sequence[float],
     top_k: int = 5,
-    memory_types: Sequence[types.MemoryType] | None = None,
+    memory_types: Sequence[Types.MemoryType] | None = None,
 ) -> list[tuple[ConversationMemory, float]]:
     """Return cosine similarities. Existing indexes determine exact/ANN execution.
 
@@ -159,7 +170,7 @@ async def search_memories(
     if not 1 <= top_k <= MAX_MEMORY_SEARCH_LIMIT:
         raise ValueError(f"top_k must be between 1 and {MAX_MEMORY_SEARCH_LIMIT}.")
     vector = list(query_embedding)
-    dimension = ConversationMemory.__table__.c.embedding.type.dim
+    dimension = cast(Vector, ConversationMemory.__table__.c.embedding.type).dim
     if len(vector) != dimension or not all(isfinite(value) for value in vector):
         raise ValueError(f"Query embedding must contain {dimension} finite values.")
     if not any(vector):

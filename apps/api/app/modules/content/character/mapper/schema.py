@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from app.modules.content.character import schemas, types
+from app.modules.content.character import schemas as Schemas
+from app.modules.content.character import types as Types
 
 
 class CharacterSchemaMapper:
@@ -10,10 +11,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def create_character_request_to_command(
-        request: schemas.CreateCharacterRequestDto,
+        request: Schemas.CreateCharacterRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterCreate:
-        return types.CharacterCreate(
+    ) -> Types.CreateCharacterCommand:
+        return Types.CreateCharacterCommand(
             owner_id=owner_id,
             name=request.name,
             persona_prompt=request.persona_prompt,
@@ -24,10 +25,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def update_character_request_to_command(
-        request: schemas.UpdateCharacterRequestDto,
+        request: Schemas.UpdateCharacterRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterUpdate:
-        return types.CharacterUpdate(
+    ) -> Types.UpdateCharacterCommand:
+        return Types.UpdateCharacterCommand(
             character_id=request.character_id,
             owner_id=owner_id,
             name=request.name,
@@ -39,10 +40,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def change_character_status_request_to_command(
-        request: schemas.ChangeCharacterStatusRequestDto,
+        request: Schemas.ChangeCharacterStatusRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterStatusChange:
-        return types.CharacterStatusChange(
+    ) -> Types.ChangeCharacterStatusCommand:
+        return Types.ChangeCharacterStatusCommand(
             character_id=request.character_id,
             owner_id=owner_id,
             status=request.status,
@@ -50,20 +51,20 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def delete_character_request_to_command(
-        request: schemas.DeleteCharacterRequestDto,
+        request: Schemas.DeleteCharacterRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterDelete:
-        return types.CharacterDelete(
+    ) -> Types.DeleteCharacterCommand:
+        return Types.DeleteCharacterCommand(
             character_id=request.character_id,
             owner_id=owner_id,
         )
 
     @staticmethod
     def add_character_image_request_to_command(
-        request: schemas.AddCharacterImageRequestDto,
+        request: Schemas.AddCharacterImageRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterImageCreate:
-        return types.CharacterImageCreate(
+    ) -> Types.CreateCharacterImageCommand:
+        return Types.CreateCharacterImageCommand(
             character_id=request.character_id,
             owner_id=owner_id,
             emotion_tag=request.emotion_tag,
@@ -73,10 +74,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def set_default_character_image_request_to_command(
-        request: schemas.SetDefaultCharacterImageRequestDto,
+        request: Schemas.SetDefaultCharacterImageRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterImageDefaultSet:
-        return types.CharacterImageDefaultSet(
+    ) -> Types.SetDefaultCharacterImageCommand:
+        return Types.SetDefaultCharacterImageCommand(
             character_id=request.character_id,
             image_id=request.image_id,
             owner_id=owner_id,
@@ -84,10 +85,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def delete_character_image_request_to_command(
-        request: schemas.DeleteCharacterImageRequestDto,
+        request: Schemas.DeleteCharacterImageRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterImageDelete:
-        return types.CharacterImageDelete(
+    ) -> Types.DeleteCharacterImageCommand:
+        return Types.DeleteCharacterImageCommand(
             character_id=request.character_id,
             image_id=request.image_id,
             owner_id=owner_id,
@@ -95,10 +96,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def add_character_asset_request_to_command(
-        request: schemas.AddCharacterAssetRequestDto,
+        request: Schemas.AddCharacterAssetRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterAssetCreate:
-        return types.CharacterAssetCreate(
+    ) -> Types.CreateCharacterAssetCommand:
+        return Types.CreateCharacterAssetCommand(
             character_id=request.character_id,
             owner_id=owner_id,
             asset_type=request.asset_type,
@@ -108,10 +109,10 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def delete_character_asset_request_to_command(
-        request: schemas.DeleteCharacterAssetRequestDto,
+        request: Schemas.DeleteCharacterAssetRequestDto,
         owner_id: UUID,
-    ) -> types.CharacterAssetDelete:
-        return types.CharacterAssetDelete(
+    ) -> Types.DeleteCharacterAssetCommand:
+        return Types.DeleteCharacterAssetCommand(
             character_id=request.character_id,
             asset_id=request.asset_id,
             owner_id=owner_id,
@@ -119,8 +120,8 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def list_characters_request_to_cursor(
-        request: schemas.ListCharactersRequestDto,
-    ) -> types.CharacterCursor | None:
+        request: Schemas.ListCharactersRequestDto,
+    ) -> Types.CharacterCursor | None:
         if request.cursor_created_at is None and request.cursor_id is None:
             return None
         if request.cursor_created_at is None or request.cursor_id is None:
@@ -130,24 +131,24 @@ class CharacterSchemaMapper:
                 "cursor_created_at and cursor_id must be provided together."
             )
 
-        return types.CharacterCursor(
+        return Types.CharacterCursor(
             created_at=request.cursor_created_at,
             id=request.cursor_id,
         )
 
     @staticmethod
     def search_characters_request_to_cursor(
-        request: schemas.SearchCharactersByNameRequestDto,
-    ) -> types.CharacterCursor | None:
+        request: Schemas.SearchCharactersByNameRequestDto,
+    ) -> Types.CharacterCursor | None:
         return CharacterSchemaMapper.list_characters_request_to_cursor(request)
 
     # Result type -> response schema
 
     @staticmethod
     def character_info_to_response(
-        character: types.CharacterInfo,
-    ) -> schemas.CharacterResponseDto:
-        return schemas.CharacterResponseDto(
+        character: Types.CharacterInfo,
+    ) -> Schemas.CharacterResponseDto:
+        return Schemas.CharacterResponseDto(
             id=character.id,
             owner_id=character.owner_id,
             name=character.name,
@@ -162,9 +163,9 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def character_image_info_to_response(
-        image: types.CharacterImageInfo,
-    ) -> schemas.CharacterImageResponseDto:
-        return schemas.CharacterImageResponseDto(
+        image: Types.CharacterImageInfo,
+    ) -> Schemas.CharacterImageResponseDto:
+        return Schemas.CharacterImageResponseDto(
             id=image.id,
             character_id=image.character_id,
             emotion_tag=image.emotion_tag,
@@ -176,9 +177,9 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def character_asset_info_to_response(
-        asset: types.CharacterAssetInfo,
-    ) -> schemas.CharacterAssetResponseDto:
-        return schemas.CharacterAssetResponseDto(
+        asset: Types.CharacterAssetInfo,
+    ) -> Schemas.CharacterAssetResponseDto:
+        return Schemas.CharacterAssetResponseDto(
             id=asset.id,
             character_id=asset.character_id,
             asset_type=asset.asset_type,
@@ -190,24 +191,24 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def character_cursor_to_response(
-        cursor: types.CharacterCursor,
-    ) -> schemas.CharacterCursorResponseDto:
-        return schemas.CharacterCursorResponseDto(
+        cursor: Types.CharacterCursor,
+    ) -> Schemas.CharacterCursorResponseDto:
+        return Schemas.CharacterCursorResponseDto(
             created_at=cursor.created_at,
             id=cursor.id,
         )
 
     @staticmethod
     def character_page_to_list_response(
-        page: types.CharacterPage[types.CharacterInfo],
-    ) -> schemas.ListCharactersResponseDto:
+        page: Types.CharacterPage[Types.CharacterInfo],
+    ) -> Schemas.ListCharactersResponseDto:
         next_cursor = None
         if page.next_cursor is not None:
             next_cursor = CharacterSchemaMapper.character_cursor_to_response(
                 page.next_cursor
             )
 
-        return schemas.ListCharactersResponseDto(
+        return Schemas.ListCharactersResponseDto(
             characters=[
                 CharacterSchemaMapper.character_info_to_response(item)
                 for item in page.items
@@ -217,15 +218,15 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def character_page_to_search_response(
-        page: types.CharacterPage[types.CharacterInfo],
-    ) -> schemas.SearchCharactersByNameResponseDto:
+        page: Types.CharacterPage[Types.CharacterInfo],
+    ) -> Schemas.SearchCharactersByNameResponseDto:
         next_cursor = None
         if page.next_cursor is not None:
             next_cursor = CharacterSchemaMapper.character_cursor_to_response(
                 page.next_cursor
             )
 
-        return schemas.SearchCharactersByNameResponseDto(
+        return Schemas.SearchCharactersByNameResponseDto(
             characters=[
                 CharacterSchemaMapper.character_info_to_response(item)
                 for item in page.items
@@ -235,9 +236,9 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def image_list_to_response(
-        images: list[types.CharacterImageInfo],
-    ) -> schemas.ListCharacterImagesResponseDto:
-        return schemas.ListCharacterImagesResponseDto(
+        images: list[Types.CharacterImageInfo],
+    ) -> Schemas.ListCharacterImagesResponseDto:
+        return Schemas.ListCharacterImagesResponseDto(
             images=[
                 CharacterSchemaMapper.character_image_info_to_response(image)
                 for image in images
@@ -246,9 +247,9 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def asset_list_to_response(
-        assets: list[types.CharacterAssetInfo],
-    ) -> schemas.ListCharacterAssetsResponseDto:
-        return schemas.ListCharacterAssetsResponseDto(
+        assets: list[Types.CharacterAssetInfo],
+    ) -> Schemas.ListCharacterAssetsResponseDto:
+        return Schemas.ListCharacterAssetsResponseDto(
             assets=[
                 CharacterSchemaMapper.character_asset_info_to_response(asset)
                 for asset in assets
@@ -257,74 +258,74 @@ class CharacterSchemaMapper:
 
     @staticmethod
     def character_info_to_create_response(
-        character: types.CharacterInfo,
-    ) -> schemas.CreateCharacterResponseDto:
-        return schemas.CreateCharacterResponseDto(
+        character: Types.CharacterInfo,
+    ) -> Schemas.CreateCharacterResponseDto:
+        return Schemas.CreateCharacterResponseDto(
             character=CharacterSchemaMapper.character_info_to_response(character),
         )
 
     @staticmethod
     def character_info_to_update_response(
-        character: types.CharacterInfo,
-    ) -> schemas.UpdateCharacterResponseDto:
-        return schemas.UpdateCharacterResponseDto(
+        character: Types.CharacterInfo,
+    ) -> Schemas.UpdateCharacterResponseDto:
+        return Schemas.UpdateCharacterResponseDto(
             character=CharacterSchemaMapper.character_info_to_response(character),
         )
 
     @staticmethod
     def character_info_to_status_change_response(
-        character: types.CharacterInfo,
-    ) -> schemas.ChangeCharacterStatusResponseDto:
-        return schemas.ChangeCharacterStatusResponseDto(
+        character: Types.CharacterInfo,
+    ) -> Schemas.ChangeCharacterStatusResponseDto:
+        return Schemas.ChangeCharacterStatusResponseDto(
             character=CharacterSchemaMapper.character_info_to_response(character),
         )
 
     @staticmethod
     def character_info_to_get_response(
-        character: types.CharacterInfo,
-    ) -> schemas.GetCharacterByIdResponseDto:
-        return schemas.GetCharacterByIdResponseDto(
+        character: Types.CharacterInfo,
+    ) -> Schemas.GetCharacterByIdResponseDto:
+        return Schemas.GetCharacterByIdResponseDto(
             character=CharacterSchemaMapper.character_info_to_response(character),
         )
 
     @staticmethod
     def character_image_info_to_add_response(
-        image: types.CharacterImageInfo,
-    ) -> schemas.AddCharacterImageResponseDto:
-        return schemas.AddCharacterImageResponseDto(
+        image: Types.CharacterImageInfo,
+    ) -> Schemas.AddCharacterImageResponseDto:
+        return Schemas.AddCharacterImageResponseDto(
             image=CharacterSchemaMapper.character_image_info_to_response(image),
         )
 
     @staticmethod
     def character_image_info_to_default_response(
-        image: types.CharacterImageInfo,
-    ) -> schemas.SetDefaultCharacterImageResponseDto:
-        return schemas.SetDefaultCharacterImageResponseDto(
+        image: Types.CharacterImageInfo,
+    ) -> Schemas.SetDefaultCharacterImageResponseDto:
+        return Schemas.SetDefaultCharacterImageResponseDto(
             image=CharacterSchemaMapper.character_image_info_to_response(image),
         )
 
     @staticmethod
     def character_asset_info_to_add_response(
-        asset: types.CharacterAssetInfo,
-    ) -> schemas.AddCharacterAssetResponseDto:
-        return schemas.AddCharacterAssetResponseDto(
+        asset: Types.CharacterAssetInfo,
+    ) -> Schemas.AddCharacterAssetResponseDto:
+        return Schemas.AddCharacterAssetResponseDto(
             asset=CharacterSchemaMapper.character_asset_info_to_response(asset),
         )
 
     @staticmethod
     def delete_character_result_to_response(
         result: None,
-    ) -> schemas.DeleteCharacterResponseDto:
-        return schemas.DeleteCharacterResponseDto(deleted=True)
+    ) -> Schemas.DeleteCharacterResponseDto:
+        return Schemas.DeleteCharacterResponseDto(deleted=True)
 
     @staticmethod
     def delete_character_image_result_to_response(
         result: None,
-    ) -> schemas.DeleteCharacterImageResponseDto:
-        return schemas.DeleteCharacterImageResponseDto(deleted=True)
+    ) -> Schemas.DeleteCharacterImageResponseDto:
+        return Schemas.DeleteCharacterImageResponseDto(deleted=True)
 
     @staticmethod
     def delete_character_asset_result_to_response(
         result: None,
-    ) -> schemas.DeleteCharacterAssetResponseDto:
-        return schemas.DeleteCharacterAssetResponseDto(deleted=True)
+    ) -> Schemas.DeleteCharacterAssetResponseDto:
+        return Schemas.DeleteCharacterAssetResponseDto(deleted=True)

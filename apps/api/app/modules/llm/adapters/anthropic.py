@@ -9,9 +9,9 @@ from app.modules.llm.adapters.base import BaseLLMAdapter
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
-    LLMResult,
+    LLMResultInfo,
     ReasoningEffort,
-    TokenUsage,
+    TokenUsageInfo,
 )
 
 
@@ -43,9 +43,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         api_key: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 0,
-        model_reasoning_efforts: Mapping[
-            str, Iterable[ReasoningEffort | str]
-        ]
+        model_reasoning_efforts: Mapping[str, Iterable[ReasoningEffort | str]]
         | None = None,
         default_max_output_tokens: int = 1200,
     ) -> None:
@@ -68,7 +66,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         model: str,
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
-    ) -> LLMResult:
+    ) -> LLMResultInfo:
         params: dict[str, Any] = {
             "model": model,
             "max_tokens": max_output_tokens,
@@ -110,7 +108,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         )
         output_details = _attr(usage_raw, "output_tokens_details")
         cache_creation_details = _attr(usage_raw, "cache_creation")
-        usage = TokenUsage(
+        usage = TokenUsageInfo(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
@@ -131,7 +129,7 @@ class AnthropicAdapter(BaseLLMAdapter):
         )
         stop_details = _attr(response, "stop_details")
         finish_reason = _attr(stop_details, "type") or _attr(response, "stop_reason")
-        return LLMResult(
+        return LLMResultInfo(
             content=content,
             provider=self.provider,
             model=_attr(response, "model", model) or model,

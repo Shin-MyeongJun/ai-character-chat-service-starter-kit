@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from app.http.routes import router
 from app.modules.content.lorebook import schemas, types
 from app.modules.content.lorebook.mapper.schema import LorebookSchemaMapper
-from app.modules.content.lorebook.router import router
 from pydantic import ValidationError
 
 
@@ -104,6 +104,10 @@ def test_enabled_keyword_entry_requires_a_trigger():
 
 
 def test_static_me_routes_are_registered_before_uuid_routes():
-    paths = [route.path for route in router.routes]
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(router)
+    paths = list(app.openapi()["paths"])
 
     assert paths.index("/lorebooks/me") < paths.index("/lorebooks/{lorebook_id}")

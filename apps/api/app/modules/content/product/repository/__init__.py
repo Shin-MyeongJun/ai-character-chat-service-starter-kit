@@ -1,0 +1,83 @@
+"""Product storage boundary; implementations grouped by responsibility."""
+
+from .composition import (
+    ProductCompositionRow,
+    get_product_composition,
+    list_product_start_sets,
+    replace_product_composition,
+    set_product_settings,
+)
+from .core import (
+    create_product,
+    delete_product,
+    get_owned_product,
+    get_product,
+    has_product_snapshot,
+    list_owned,
+    save_product,
+    set_product_status,
+    update_product,
+)
+from .publication import (
+    SnapshotCompositionRow,
+    add_snapshot_character,
+    add_snapshot_lorebook,
+    add_snapshot_start,
+    add_snapshot_target,
+    create_product_snapshot,
+    finish_product_snapshot,
+    get_product_snapshot,
+    get_snapshot_composition,
+    list_snapshot_character_ids,
+    set_product_snapshot_expiry,
+)
+from .releases import (
+    correct_release_note,
+    create_release_note,
+    get_release_note,
+    list_product_release_rows,
+)
+from .statistics import (
+    delete_statistics_work,
+    get_pending_statistics_work,
+    get_statistics_report,
+    list_published_product_ids,
+    replace_statistics_day,
+)
+
+__all__ = [
+    "ProductCompositionRow",
+    "SnapshotCompositionRow",
+    "add_snapshot_character",
+    "add_snapshot_lorebook",
+    "add_snapshot_start",
+    "add_snapshot_target",
+    "correct_release_note",
+    "create_product",
+    "create_product_snapshot",
+    "create_release_note",
+    "delete_product",
+    "delete_statistics_work",
+    "finish_product_snapshot",
+    "get_owned_product",
+    "get_pending_statistics_work",
+    "get_product",
+    "get_product_composition",
+    "get_product_snapshot",
+    "get_release_note",
+    "get_snapshot_composition",
+    "get_statistics_report",
+    "has_product_snapshot",
+    "list_owned",
+    "list_product_release_rows",
+    "list_product_start_sets",
+    "list_published_product_ids",
+    "list_snapshot_character_ids",
+    "replace_product_composition",
+    "replace_statistics_day",
+    "save_product",
+    "set_product_settings",
+    "set_product_snapshot_expiry",
+    "set_product_status",
+    "update_product",
+]

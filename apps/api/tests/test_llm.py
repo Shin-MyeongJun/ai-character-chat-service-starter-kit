@@ -16,6 +16,7 @@ from app.modules.llm import (
     UnsupportedReasoningEffortError,
 )
 from app.modules.llm.adapters import AnthropicAdapter, OpenAIAdapter
+from app.modules.llm.types import GenerateTextCommand
 from openai.types.responses import Response
 
 pytestmark = pytest.mark.asyncio
@@ -62,11 +63,13 @@ async def test_service_routes_openai_and_preserves_usage():
     )
     service = LLMService([adapter])
 
-    result = await service.generate(
-        '{"prompt":"hello"}',
-        model="gpt-test",
-        reasoning_effort="high",
-        max_output_tokens=500,
+    result = await service.generate_text(
+        GenerateTextCommand(
+            '{"prompt":"hello"}',
+            model="gpt-test",
+            reasoning_effort="high",
+            max_output_tokens=500,
+        )
     )
 
     assert result.content == '{"answer":"ok"}'
@@ -118,10 +121,12 @@ async def test_anthropic_extracts_only_text_and_detailed_usage():
     )
     service = LLMService([adapter])
 
-    result = await service.generate(
-        '{"prompt":"hello"}',
-        model="claude-test",
-        reasoning_effort=ReasoningEffort.MEDIUM,
+    result = await service.generate_text(
+        GenerateTextCommand(
+            '{"prompt":"hello"}',
+            model="claude-test",
+            reasoning_effort=ReasoningEffort.MEDIUM,
+        )
     )
 
     assert result.content == "first second"
@@ -149,13 +154,19 @@ async def test_model_capabilities_are_validated_before_calling_provider():
     service = LLMService([adapter])
 
     with pytest.raises(UnsupportedReasoningEffortError):
-        await service.generate("{}", model="gpt-test", reasoning_effort="high")
+        await service.generate_text(
+            GenerateTextCommand("{}", model="gpt-test", reasoning_effort="high")
+        )
     with pytest.raises(UnsupportedModelError):
-        await service.generate("{}", model="gpt-unknown")
+        await service.generate_text(GenerateTextCommand("{}", model="gpt-unknown"))
     with pytest.raises(UnsupportedReasoningEffortError, match="Unknown"):
-        await service.generate("{}", model="gpt-test", reasoning_effort="extreme")
+        await service.generate_text(
+            GenerateTextCommand("{}", model="gpt-test", reasoning_effort="extreme")
+        )
     with pytest.raises(ValueError, match="max_output_tokens"):
-        await service.generate("{}", model="gpt-test", max_output_tokens=0)
+        await service.generate_text(
+            GenerateTextCommand("{}", model="gpt-test", max_output_tokens=0)
+        )
     client.responses.create.assert_not_awaited()
 
 
@@ -181,7 +192,7 @@ async def test_incomplete_and_refusal_responses_keep_usage_and_reason():
     )
     service = LLMService([OpenAIAdapter(client=openai_client(response))])
 
-    result = await service.generate("{}", model="gpt-test")
+    result = await service.generate_text(GenerateTextCommand("{}", model="gpt-test"))
 
     assert result.finish_reason == "refusal"
     assert result.status == "incomplete"
@@ -198,7 +209,7 @@ async def test_provider_errors_are_normalized_without_retrying_in_module():
     service = LLMService([OpenAIAdapter(client=client)])
 
     with pytest.raises(LLMError) as caught:
-        await service.generate("{}", model="gpt-test")
+        await service.generate_text(GenerateTextCommand("{}", model="gpt-test"))
 
     assert caught.value.kind is LLMErrorKind.RATE_LIMIT
     assert caught.value.retryable is True
@@ -273,9 +284,9 @@ async def test_current_sdk_response_models_match_adapter_extraction():
         }
     )
 
-    openai_result = await OpenAIAdapter(
-        client=openai_client(openai_response)
-    ).generate("{}", model="gpt-test")
+    openai_result = await OpenAIAdapter(client=openai_client(openai_response)).generate(
+        "{}", model="gpt-test"
+    )
     anthropic_result = await AnthropicAdapter(
         client=anthropic_client(anthropic_response)
     ).generate("{}", model="claude-test")
@@ -290,7 +301,13 @@ async def test_current_sdk_response_models_match_adapter_extraction():
     "sdk,adapter_class,client_factory,model,provider",
     [
         (openai, OpenAIAdapter, openai_client, "gpt-test", LLMProvider.OPENAI),
-        (anthropic, AnthropicAdapter, anthropic_client, "claude-test", LLMProvider.ANTHROPIC),
+        (
+            anthropic,
+            AnthropicAdapter,
+            anthropic_client,
+            "claude-test",
+            LLMProvider.ANTHROPIC,
+        ),
     ],
 )
 @pytest.mark.parametrize(
@@ -308,8 +325,15 @@ async def test_current_sdk_response_models_match_adapter_extraction():
     ],
 )
 async def test_real_sdk_errors_and_subclasses(
-    sdk, adapter_class, client_factory, model, provider,
-    error_name, status, kind, retryable,
+    sdk,
+    adapter_class,
+    client_factory,
+    model,
+    provider,
+    error_name,
+    status,
+    kind,
+    retryable,
 ):
     # A differently named subclass must retain the SDK parent's classification.
     class CustomSDKError(getattr(sdk, error_name)):
@@ -320,7 +344,9 @@ async def test_real_sdk_errors_and_subclasses(
         error = CustomSDKError(request=request)
     else:
         response = httpx.Response(
-            status, request=request, headers={"x-request-id": "req_sdk", "request-id": "req_sdk"}
+            status,
+            request=request,
+            headers={"x-request-id": "req_sdk", "request-id": "req_sdk"},
         )
         error = CustomSDKError("provider failure", response=response, body=None)
     client = client_factory(None)
@@ -340,12 +366,17 @@ async def test_real_sdk_errors_and_subclasses(
     create.assert_awaited_once()
 
 
-@pytest.mark.parametrize("adapter_class,client_factory,model", [
-    (OpenAIAdapter, openai_client, "gpt-test"),
-    (AnthropicAdapter, anthropic_client, "claude-test"),
-])
+@pytest.mark.parametrize(
+    "adapter_class,client_factory,model",
+    [
+        (OpenAIAdapter, openai_client, "gpt-test"),
+        (AnthropicAdapter, anthropic_client, "claude-test"),
+    ],
+)
 async def test_unrelated_error_name_does_not_impersonate_sdk(
-    adapter_class, client_factory, model,
+    adapter_class,
+    client_factory,
+    model,
 ):
     class APITimeoutError(Exception):
         pass

@@ -1,25 +1,30 @@
-from app.modules.governance.admin import schemas, types
+from app.modules.governance.admin import schemas as Schemas
+from app.modules.governance.admin import types as Types
 
 
 class AdminSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
-    def to_expiry(request: schemas.ExpiryRequest) -> types.ExpiryChange:
-        return types.ExpiryChange(expires_at=request.expires_at, reason=request.reason)
+    def expiry_request_to_command(request: Schemas.ExpiryRequest) -> Types.ExpiryChange:
+        return Types.ExpiryChange(expires_at=request.expires_at, reason=request.reason)
 
     @staticmethod
-    def to_status(request: schemas.StatusRequest) -> types.ProductStatusChange:
-        return types.ProductStatusChange(status=request.status)
+    def status_request_to_command(
+        request: Schemas.StatusRequest,
+    ) -> Types.ProductStatusChange:
+        return Types.ProductStatusChange(status=request.status)
 
     @staticmethod
-    def to_retirement(request: schemas.RetirementRequest) -> types.ModelRetirement:
-        return types.ModelRetirement(
+    def retirement_request_to_command(
+        request: Schemas.RetirementRequest,
+    ) -> Types.ModelRetirement:
+        return Types.ModelRetirement(
             announced_at=request.announced_at, shutdown_at=request.shutdown_at
         )
 
     @staticmethod
-    def expiry_response(
-        result: types.ExpiryChanged,
-    ) -> schemas.ExpiryChangedResponseDto:
-        return schemas.ExpiryChangedResponseDto.model_validate(result)
+    def expiry_info_to_response(
+        result: Types.ExpiryChangedInfo,
+    ) -> Schemas.ExpiryChangedResponseDto:
+        return Schemas.ExpiryChangedResponseDto.model_validate(result)

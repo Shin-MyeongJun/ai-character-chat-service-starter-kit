@@ -2,7 +2,10 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
-from app.modules.llm.replacement import choose_replacement, closest_effort
+from app.modules.llm.service.util.replacement_policy import (
+    choose_replacement,
+    closest_effort,
+)
 
 
 def model(provider, family, efforts=("low", "high")):

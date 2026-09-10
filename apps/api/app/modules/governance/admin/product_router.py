@@ -2,39 +2,45 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.modules.content.product.http import Owner, Session, errors
-from app.modules.governance.admin import schemas
-from app.modules.governance.admin.mapper.schema import AdminSchemaMapper
-from app.modules.governance.admin.product_policy import moderate_product, set_expiry
+from app.http.dependencies import Owner, Session, errors
+from app.modules.governance.admin import schemas as Schemas
+from app.modules.governance.admin import types as Types
+from app.modules.governance.admin.mapper.schema import AdminSchemaMapper as SchemaMapper
+from app.modules.governance.admin.service.command import moderate_product, set_expiry
 
 router = APIRouter(prefix="/admin/products", tags=["product administration"])
 
 
 @router.put(
-    "/versions/{snapshot_id}/expiry", response_model=schemas.ExpiryChangedResponseDto
+    "/versions/{snapshot_id}/expiry", response_model=Schemas.ExpiryChangedResponseDto
 )
 async def expiry(
-    snapshot_id: UUID, body: schemas.ExpiryRequest, session: Session, owner: Owner
+    snapshot_id: UUID, body: Schemas.ExpiryRequest, session: Session, owner: Owner
 ):
-    value = AdminSchemaMapper.to_expiry(body)
+    value = SchemaMapper.expiry_request_to_command(body)
     with errors():
-        return AdminSchemaMapper.expiry_response(
+        return SchemaMapper.expiry_info_to_response(
             await set_expiry(
                 session,
-                snapshot_id=snapshot_id,
-                actor_id=owner,
-                expires_at=value.expires_at,
-                reason=value.reason,
+                Types.SetExpiryCommand(
+                    snapshot_id=snapshot_id,
+                    actor_id=owner,
+                    expires_at=value.expires_at,
+                    reason=value.reason,
+                ),
             )
         )
 
 
 @router.put("/{product_id}/status", status_code=204)
 async def status(
-    product_id: UUID, body: schemas.StatusRequest, session: Session, owner: Owner
+    product_id: UUID, body: Schemas.StatusRequest, session: Session, owner: Owner
 ):
-    value = AdminSchemaMapper.to_status(body)
+    value = SchemaMapper.status_request_to_command(body)
     with errors():
         await moderate_product(
-            session, product_id=product_id, actor_id=owner, status=value.status
+            session,
+            Types.ModerateProductCommand(
+                product_id=product_id, actor_id=owner, status=value.status
+            ),
         )

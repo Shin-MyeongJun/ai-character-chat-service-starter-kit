@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Literal, TypeAlias, TypeVar
@@ -34,7 +35,7 @@ LorebookEntryPlacementValue: TypeAlias = Literal[
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookCreate:
+class CreateLorebookCommand:
     owner_id: UUID
     title: str
     description: str | None = None
@@ -43,7 +44,7 @@ class LorebookCreate:
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookUpdate:
+class UpdateLorebookCommand:
     lorebook_id: UUID
     owner_id: UUID
     title: str
@@ -52,20 +53,20 @@ class LorebookUpdate:
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookStatusChange:
+class ChangeLorebookStatusCommand:
     lorebook_id: UUID
     owner_id: UUID
     status: LorebookStatusValue
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookDelete:
+class DeleteLorebookCommand:
     lorebook_id: UUID
     owner_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookEntryCreate:
+class CreateLorebookEntryCommand:
     lorebook_id: UUID
     owner_id: UUID
     content: str
@@ -82,7 +83,7 @@ class LorebookEntryCreate:
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookEntryUpdate:
+class UpdateLorebookEntryCommand:
     lorebook_id: UUID
     entry_id: UUID
     owner_id: UUID
@@ -100,7 +101,7 @@ class LorebookEntryUpdate:
 
 
 @dataclass(frozen=True, slots=True)
-class LorebookEntryDelete:
+class DeleteLorebookEntryCommand:
     lorebook_id: UUID
     entry_id: UUID
     owner_id: UUID
@@ -138,7 +139,7 @@ class LorebookEntryInfo:
 
 
 @dataclass(frozen=True, slots=True)
-class ActiveLorebookEntry:
+class ActiveLorebookEntryInfo:
     entry_id: UUID
     lorebook_id: UUID
     title: str | None
@@ -168,3 +169,116 @@ class LorebookPage(Generic[TPageItem]):
 class LorebookEntryPage(Generic[TPageItem]):
     items: list[TPageItem]
     next_cursor: LorebookCursor | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListLorebooksCommand:
+    cursor: LorebookCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListLorebooksByOwnerIdCommand:
+    owner_id: UUID
+    cursor: LorebookCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetLorebookByIdCommand:
+    lorebook_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetLorebookByIdAndOwnerIdCommand:
+    lorebook_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListLorebookEntriesCommand:
+    lorebook_id: UUID
+    cursor: LorebookCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListLorebookEntriesByOwnerIdCommand:
+    lorebook_id: UUID
+    owner_id: UUID
+    cursor: LorebookCursor | None = None
+    limit: int = 50
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetLorebookEntryCommand:
+    lorebook_id: UUID
+    entry_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetLorebookEntryByOwnerIdCommand:
+    lorebook_id: UUID
+    entry_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetAlwaysEntriesCommand:
+    lorebook_ids: Sequence[UUID]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ActivateKeywordEntriesCommand:
+    lorebook_ids: Sequence[UUID]
+    text: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListStartSetsCommand:
+    lorebook_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class GetOwnedLorebooksCommand:
+    ids: tuple[UUID, ...]
+    owner_id: UUID
+    lock: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class GetStartEntriesCommand:
+    ids: tuple[UUID, ...]
+    lorebook_ids: tuple[UUID, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FreezeLorebookCommand:
+    lorebook_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class LorebookSnapshotInfo:
+    id: UUID
+    lorebook_id: UUID | None
+    version: int
+    snapshot_data: dict
+
+
+@dataclass(frozen=True, slots=True)
+class GetLorebookSnapshotsCommand:
+    snapshot_ids: tuple[UUID, ...]
+
+
+LOREBOOK_TITLE_MAX_LENGTH = 200
+LOREBOOK_DESCRIPTION_MAX_LENGTH = 4_000
+ENTRY_TITLE_MAX_LENGTH = 200
+ENTRY_CONTENT_MAX_LENGTH = 32_000
+ENTRY_TRIGGER_MAX_COUNT = 64
+ENTRY_TRIGGER_MAX_LENGTH = 256
+ENTRY_METADATA_MAX_BYTES = 16_384
+
+POSTGRES_INTEGER_MIN = -(2**31)
+POSTGRES_INTEGER_MAX = 2**31 - 1

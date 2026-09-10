@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.http.schemas import ModelNoticeResponseDto
+
 Visibility = Literal["private", "public", "unlisted"]
 
 
@@ -32,20 +34,6 @@ class ProductWriteRequestDto(BaseModel):
     description: str | None = Field(default=None, max_length=20000)
     opening_message: str | None = Field(default=None, max_length=20000)
     visibility: Visibility = "private"
-
-
-class ModelNoticeResponseDto(ResponseDto):
-    state: str
-    reason: str | None = None
-    model_id: UUID | None = None
-    model_name: str | None = None
-    announced_at: datetime | None = None
-    shutdown_at: datetime | None = None
-    transition_deadline: datetime | None = None
-    replacement_model_id: UUID | None = None
-    replacement_model_name: str | None = None
-    replacement_reasoning_effort: str | None = None
-    unavailable_policy: str | None = None
 
 
 class ProductInfoResponseDto(ResponseDto):
@@ -111,25 +99,6 @@ class PublishedProductInfoResponseDto(ResponseDto):
     title: str
     description: str | None
     start_options: list[StartOptionInfoResponseDto]
-    model_notice: ModelNoticeResponseDto | None
-
-
-class UpdateInfoResponseDto(ResponseDto):
-    snapshot_id: UUID
-    version: int
-    summary: str
-    body: str
-    change_kind: str
-    update_policy: str
-    expires_at: datetime | None
-
-
-class PendingUpdatesInfoResponseDto(ResponseDto):
-    current_snapshot_id: UUID
-    current_expires_at: datetime | None
-    expiry_reason: str | None
-    latest_snapshot_id: UUID | None
-    updates: list[UpdateInfoResponseDto]
     model_notice: ModelNoticeResponseDto | None
 
 

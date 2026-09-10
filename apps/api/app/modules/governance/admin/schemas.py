@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.http.contracts import character, lorebook
+
 
 class ExpiryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -26,3 +28,6 @@ class ExpiryChangedResponseDto(BaseModel):
     snapshot_id: UUID
     expires_at: datetime | None
     reason: str
+
+
+__all__ = ["character", "lorebook"]

@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, call
 from uuid import uuid4
 
 import pytest
@@ -76,20 +76,20 @@ def entry(lorebook):
 def commands(lorebook, entry):
     owner = {"lorebook_id": lorebook.id, "owner_id": lorebook.owner_id}
     return SimpleNamespace(
-        create=types.LorebookCreate(
+        create=types.CreateLorebookCommand(
             owner_id=lorebook.owner_id,
             title="New lorebook",
             description="New description",
         ),
-        update=types.LorebookUpdate(
+        update=types.UpdateLorebookCommand(
             **owner,
             title="Updated lorebook",
             description=None,
             visibility="public",
         ),
-        status=types.LorebookStatusChange(**owner, status="rejected"),
-        delete=types.LorebookDelete(**owner),
-        create_entry=types.LorebookEntryCreate(
+        status=types.ChangeLorebookStatusCommand(**owner, status="rejected"),
+        delete=types.DeleteLorebookCommand(**owner),
+        create_entry=types.CreateLorebookEntryCommand(
             **owner,
             title="New entry",
             content="New content",
@@ -102,7 +102,7 @@ def commands(lorebook, entry):
             placement="after_memory",
             metadata={"source": "command"},
         ),
-        update_entry=types.LorebookEntryUpdate(
+        update_entry=types.UpdateLorebookEntryCommand(
             **owner,
             entry_id=entry.id,
             title=None,
@@ -117,7 +117,7 @@ def commands(lorebook, entry):
             is_enabled=False,
             metadata=None,
         ),
-        delete_entry=types.LorebookEntryDelete(
+        delete_entry=types.DeleteLorebookEntryCommand(
             **owner,
             entry_id=entry.id,
         ),
@@ -210,8 +210,9 @@ async def test_update_preserves_identity_and_status_and_clears_description(
     assert result.title == commands.update.title
     assert result.visibility == "public"
     assert result.description is None
-    repo.get_lorebook_by_id_and_owner_id.assert_awaited_once_with(
-        session, lorebook.id, lorebook.owner_id, for_update=True
+    assert (
+        repo.get_lorebook_by_id_and_owner_id.await_args_list
+        == [call(session, lorebook.id, lorebook.owner_id, for_update=True)] * 2
     )
     assert transaction_events == ["commit"]
 
@@ -395,11 +396,21 @@ async def test_update_entry_clears_optional_fields_without_changing_scope(
     assert result.content == commands.update_entry.content
     assert not result.is_enabled
     assert entry.embedding is original_embedding
-    repo.get_lorebook_entry.assert_awaited_once_with(
-        session,
-        commands.update_entry.entry_id,
-        commands.update_entry.lorebook_id,
-        for_update=True,
+    repo.get_lorebook_entry.assert_has_awaits(
+        [
+            call(
+                session,
+                commands.update_entry.entry_id,
+                commands.update_entry.lorebook_id,
+                for_update=True,
+            ),
+            call(
+                session,
+                commands.update_entry.entry_id,
+                commands.update_entry.lorebook_id,
+                for_update=True,
+            ),
+        ]
     )
     repo.update_lorebook_entry.assert_awaited_once_with(session, entry)
     assert transaction_events == ["commit"]
@@ -452,11 +463,21 @@ async def test_delete_entry_commits_after_parent_and_entry_scope_checks(
     result = await service.delete_lorebook_entry(session, commands.delete_entry)
 
     assert result is None
-    repo.get_lorebook_entry.assert_awaited_once_with(
-        session,
-        commands.delete_entry.entry_id,
-        commands.delete_entry.lorebook_id,
-        for_update=True,
+    repo.get_lorebook_entry.assert_has_awaits(
+        [
+            call(
+                session,
+                commands.delete_entry.entry_id,
+                commands.delete_entry.lorebook_id,
+                for_update=True,
+            ),
+            call(
+                session,
+                commands.delete_entry.entry_id,
+                commands.delete_entry.lorebook_id,
+                for_update=True,
+            ),
+        ]
     )
     repo.delete_lorebook_entry.assert_awaited_once_with(session, entry)
     assert transaction_events == ["commit"]
