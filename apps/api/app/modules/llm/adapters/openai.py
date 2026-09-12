@@ -5,7 +5,7 @@ from typing import Any
 
 import openai
 
-from app.modules.llm.adapters.base import BaseLLMAdapter
+from app.modules.llm.adapters.base import BaseTextGenerationAdapter
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -23,7 +23,7 @@ def _attr(value: object | None, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
-class OpenAIAdapter(BaseLLMAdapter):
+class OpenAIAdapter(BaseTextGenerationAdapter):
     provider = LLMProvider.OPENAI
     model_prefixes = ("gpt-", "o1", "o3", "o4")
     provider_reasoning_efforts = frozenset(

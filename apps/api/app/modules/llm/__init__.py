@@ -1,5 +1,12 @@
-from app.modules.llm.service import LLMService
+from app.modules.llm.service import EmbeddingService, LLMService, TextGenerationService
 from app.modules.llm.types import (
+    EmbeddingError,
+    EmbeddingErrorKind,
+    EmbeddingProvider,
+    EmbeddingPurpose,
+    EmbeddingResultInfo,
+    EmbeddingUsageInfo,
+    EmbedTextsCommand,
     LLMError,
     LLMErrorKind,
     LLMProvider,
@@ -7,11 +14,20 @@ from app.modules.llm.types import (
     ModelOptionInfo,
     ReasoningEffort,
     TokenUsageInfo,
+    UnsupportedEmbeddingModelError,
     UnsupportedModelError,
     UnsupportedReasoningEffortError,
 )
 
 __all__ = [
+    "EmbedTextsCommand",
+    "EmbeddingError",
+    "EmbeddingErrorKind",
+    "EmbeddingProvider",
+    "EmbeddingPurpose",
+    "EmbeddingResultInfo",
+    "EmbeddingService",
+    "EmbeddingUsageInfo",
     "LLMError",
     "LLMErrorKind",
     "LLMProvider",
@@ -19,7 +35,9 @@ __all__ = [
     "LLMService",
     "ModelOptionInfo",
     "ReasoningEffort",
+    "TextGenerationService",
     "TokenUsageInfo",
+    "UnsupportedEmbeddingModelError",
     "UnsupportedModelError",
     "UnsupportedReasoningEffortError",
 ]

@@ -5,7 +5,7 @@ from typing import Any
 
 import anthropic
 
-from app.modules.llm.adapters.base import BaseLLMAdapter
+from app.modules.llm.adapters.base import BaseTextGenerationAdapter
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -23,7 +23,7 @@ def _attr(value: object | None, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
-class AnthropicAdapter(BaseLLMAdapter):
+class AnthropicAdapter(BaseTextGenerationAdapter):
     provider = LLMProvider.ANTHROPIC
     model_prefixes = ("claude-",)
     provider_reasoning_efforts = frozenset(

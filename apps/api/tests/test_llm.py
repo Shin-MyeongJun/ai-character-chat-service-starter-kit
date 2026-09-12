@@ -6,6 +6,8 @@ import httpx
 import openai
 import pytest
 from anthropic.types import Message
+from openai.types.responses import Response
+
 from app.modules.llm import (
     LLMError,
     LLMErrorKind,
@@ -15,9 +17,12 @@ from app.modules.llm import (
     UnsupportedModelError,
     UnsupportedReasoningEffortError,
 )
-from app.modules.llm.adapters import AnthropicAdapter, OpenAIAdapter
+from app.modules.llm.adapters import (
+    AnthropicAdapter,
+    OpenAIAdapter,
+    TextGenerationAdapter,
+)
 from app.modules.llm.types import GenerateTextCommand
-from openai.types.responses import Response
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,6 +67,8 @@ async def test_service_routes_openai_and_preserves_usage():
         model_reasoning_efforts={"gpt-test": {"low", "high"}},
     )
     service = LLMService([adapter])
+
+    assert isinstance(adapter, TextGenerationAdapter)
 
     result = await service.generate_text(
         GenerateTextCommand(

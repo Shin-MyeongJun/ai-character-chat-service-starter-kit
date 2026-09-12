@@ -15,7 +15,7 @@ from app.modules.llm.types import (
 )
 
 
-class BaseLLMAdapter(ABC):
+class BaseTextGenerationAdapter(ABC):
     provider: LLMProvider
     model_prefixes: tuple[str, ...] = ()
     provider_reasoning_efforts: frozenset[ReasoningEffort] = frozenset()
@@ -150,3 +150,7 @@ class BaseLLMAdapter(ABC):
             request_id=request_id,
             status_code=status_code,
         )
+
+
+# Compatibility import for callers that imported the old implementation class.
+BaseLLMAdapter = BaseTextGenerationAdapter

@@ -4,15 +4,13 @@ Pass owner_id from trusted authentication context. Missing and inaccessible
 records return None for singular reads and empty results for collections.
 """
 
-from collections.abc import Awaitable, Callable, Sequence
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
-
-EmbedQuery = Callable[[str], Awaitable[Sequence[float]]]
+from app.modules.llm import service as LLMService
+from app.modules.llm import types as LLMTypes
 
 
 async def get_memory(
@@ -61,11 +59,11 @@ async def search_memories(
     session: AsyncSession,
     query: Types.SearchMemoriesCommand,
     *,
-    embed_query: EmbedQuery,
+    embedding_service: LLMService.EmbeddingService,
 ) -> list[Types.RetrievedMemoryInfo]:
     """Embed after authorization; provider failures propagate instead of looking empty.
 
-    Caller supplies context-enriched query_text and a model-compatible embedder.
+    Caller supplies context-enriched query_text and configured embedding service.
     Extraction, query rewriting, thresholds and reranking remain deferred.
     """
     if not query.query_text.strip():
@@ -81,12 +79,29 @@ async def search_memories(
         session, conversation_id=query.conversation_id, owner_id=query.owner_id
     ):
         return []
-    vector = await embed_query(query.query_text)
+    embedding = await embedding_service.embed_texts(
+        LLMTypes.EmbedTextsCommand(
+            texts=(query.query_text,),
+            model=query.embedding_model,
+            purpose=LLMTypes.EmbeddingPurpose.QUERY,
+            provider=query.embedding_provider,
+        )
+    )
+    if len(embedding.embeddings) != 1:
+        raise ValueError("Memory query embedding must return exactly one vector.")
+    if embedding.dimension != Repository.MEMORY_EMBEDDING_DIMENSION:
+        raise ValueError(
+            "Memory query embedding dimension is incompatible with stored vectors: "
+            f"expected {Repository.MEMORY_EMBEDDING_DIMENSION}, "
+            f"received {embedding.dimension}."
+        )
     rows = await Repository.search_memories(
         session,
         conversation_id=query.conversation_id,
         owner_id=query.owner_id,
-        query_embedding=vector,
+        query_embedding=embedding.embeddings[0],
+        embedding_provider=embedding.provider.value,
+        embedding_model=embedding.model,
         top_k=query.top_k,
         memory_types=query.memory_types,
     )

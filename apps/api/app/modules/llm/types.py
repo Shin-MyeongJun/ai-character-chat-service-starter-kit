@@ -13,6 +13,16 @@ class LLMProvider(StrEnum):
     MOCK = "mock"
 
 
+class EmbeddingProvider(StrEnum):
+    OPENAI = "openai"
+    VOYAGE = "voyage"
+
+
+class EmbeddingPurpose(StrEnum):
+    QUERY = "query"
+    DOCUMENT = "document"
+
+
 class ReasoningEffort(StrEnum):
     NONE = "none"
     MINIMAL = "minimal"
@@ -32,6 +42,16 @@ class LLMErrorKind(StrEnum):
     PROVIDER = "provider"
 
 
+class EmbeddingErrorKind(StrEnum):
+    AUTHENTICATION = "authentication"
+    RATE_LIMIT = "rate_limit"
+    TIMEOUT = "timeout"
+    INVALID_REQUEST = "invalid_request"
+    CONNECTION = "connection"
+    INVALID_RESPONSE = "invalid_response"
+    PROVIDER = "provider"
+
+
 @dataclass(frozen=True, slots=True)
 class TokenUsageInfo:
     """Provider-reported usage normalized without serializing the SDK response."""
@@ -45,6 +65,22 @@ class TokenUsageInfo:
     cache_creation_1h_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
     reasoning_tokens: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingUsageInfo:
+    """Usage reported by the embedding provider."""
+
+    total_tokens: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingResultInfo:
+    embeddings: tuple[tuple[float, ...], ...]
+    dimension: int
+    provider: EmbeddingProvider
+    model: str
+    usage: EmbeddingUsageInfo
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,11 +127,38 @@ class LLMError(RuntimeError):
         self.usage = usage
 
 
+class EmbeddingError(RuntimeError):
+    """Stable provider-error contract for embedding callers."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: EmbeddingErrorKind,
+        provider: EmbeddingProvider,
+        model: str,
+        retryable: bool,
+        request_id: str | None = None,
+        status_code: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.provider = provider
+        self.model = model
+        self.retryable = retryable
+        self.request_id = request_id
+        self.status_code = status_code
+
+
 class UnsupportedModelError(ValueError):
     pass
 
 
 class UnsupportedReasoningEffortError(ValueError):
+    pass
+
+
+class UnsupportedEmbeddingModelError(ValueError):
     pass
 
 
@@ -191,3 +254,13 @@ class GenerateTextCommand:
     reasoning_effort: ReasoningEffort | str | None = None
     max_output_tokens: int | None = None
     provider: LLMProvider | str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EmbedTextsCommand:
+    texts: tuple[str, ...]
+    model: str
+    purpose: EmbeddingPurpose | str
+    provider: EmbeddingProvider | str | None = None
+    truncation: bool = False
+    output_dimension: int | None = None

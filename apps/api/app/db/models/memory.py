@@ -23,7 +23,16 @@ class ConversationMemory(TimestampMixin, UuidPkMixin, Base):
             "memory_type IN ('summary', 'fact', 'event')",
             name="ck_conversation_memories_memory_type",
         ),
+        CheckConstraint(
+            "(embedding_provider IS NULL) = (embedding_model IS NULL)",
+            name="ck_conversation_memories_embedding_identity",
+        ),
         Index("ix_conversation_memories_conversation_id", "conversation_id"),
+        Index(
+            "ix_conversation_memories_embedding_identity",
+            "embedding_provider",
+            "embedding_model",
+        ),
         Index(
             "ix_conversation_memories_embedding",
             "embedding",
@@ -41,6 +50,8 @@ class ConversationMemory(TimestampMixin, UuidPkMixin, Base):
     memory_type: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
+    embedding_provider: Mapped[str | None] = mapped_column(Text)
+    embedding_model: Mapped[str | None] = mapped_column(Text)
     source_message_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL")
     )

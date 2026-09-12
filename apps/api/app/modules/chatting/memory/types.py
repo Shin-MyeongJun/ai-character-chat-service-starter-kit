@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Generic, Literal, TypeAlias, TypeVar
 from uuid import UUID
+
+from app.modules.llm import types as LLMTypes
 
 # Keep aligned with the database constraint; manual/pinned semantics are deferred.
 MemoryType: TypeAlias = Literal["summary", "fact", "event"]
@@ -40,6 +42,10 @@ class SearchMemoriesCommand:
     owner_id: UUID  # 서비스에서 대화 접근 권한 검증에 사용
     top_k: int = 5
     memory_types: tuple[MemoryType, ...] | None = None  # 필요시 fact/event만 검색 등
+    embedding_model: str = field(kw_only=True)
+    embedding_provider: LLMTypes.EmbeddingProvider | str | None = field(
+        default=None, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)

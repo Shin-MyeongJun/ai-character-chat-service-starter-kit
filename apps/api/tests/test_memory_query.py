@@ -4,17 +4,33 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID
 
 import pytest
-from app.db.models.chat import Conversation
-from app.db.models.memory import ConversationMemory
-from app.modules.chatting.memory import repository, types
-from app.modules.chatting.memory import types as MemoryTypes
-from app.modules.chatting.memory.service import query
 from sqlalchemy import create_engine
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
+from app.db.models.chat import Conversation
+from app.db.models.memory import ConversationMemory
+from app.modules.chatting.memory import repository, types
+from app.modules.chatting.memory import types as MemoryTypes
+from app.modules.chatting.memory.service import query
+from app.modules.llm import types as LLMTypes
+
 pytestmark = pytest.mark.asyncio
+
+EMBEDDING_MODEL = "voyage-large-2"
+
+
+def embedding_service(vector=None):
+    selected_vector = vector if vector is not None else [1.0] * 1536
+    result = LLMTypes.EmbeddingResultInfo(
+        embeddings=(tuple(selected_vector),),
+        dimension=len(selected_vector),
+        provider=LLMTypes.EmbeddingProvider.VOYAGE,
+        model=EMBEDDING_MODEL,
+        usage=LLMTypes.EmbeddingUsageInfo(total_tokens=3),
+    )
+    return SimpleNamespace(embed_texts=AsyncMock(return_value=result))
 
 
 def uid(value):
@@ -145,16 +161,18 @@ async def test_summary_and_type_filters_work_without_embeddings(database):
 
 
 async def test_unauthorized_search_does_not_embed(database):
-    embed = AsyncMock()
+    service = embedding_service()
     assert (
         await query.search_memories(
             database,
-            types.SearchMemoriesCommand(uid(10), "coffee", uid(2)),
-            embed_query=embed,
+            types.SearchMemoriesCommand(
+                uid(10), "coffee", uid(2), embedding_model=EMBEDDING_MODEL
+            ),
+            embedding_service=service,
         )
         == []
     )
-    embed.assert_not_awaited()
+    service.embed_texts.assert_not_awaited()
 
 
 async def test_search_mapping_and_provider_failure(database, monkeypatch):
@@ -163,19 +181,49 @@ async def test_search_mapping_and_provider_failure(database, monkeypatch):
     )
     search = AsyncMock(return_value=[(entity, -0.25)])
     monkeypatch.setattr(repository, "search_memories", search)
-    embed = AsyncMock(return_value=[1.0] * 1536)
+    service = embedding_service()
     request = types.SearchMemoriesCommand(
-        uid(10), "coffee", uid(1), memory_types=("fact",)
+        uid(10),
+        "coffee",
+        uid(1),
+        memory_types=("fact",),
+        embedding_model=EMBEDDING_MODEL,
     )
-    result = await query.search_memories(database, request, embed_query=embed)
+    result = await query.search_memories(database, request, embedding_service=service)
     assert result[0].similarity_score == -0.25
     assert result[0].memory_id == uid(102)
     assert search.await_args.kwargs["owner_id"] == uid(1)
     assert search.await_args.kwargs["memory_types"] == ("fact",)
+    assert search.await_args.kwargs["embedding_provider"] == "voyage"
+    assert search.await_args.kwargs["embedding_model"] == EMBEDDING_MODEL
+    embed_command = service.embed_texts.await_args.args[0]
+    assert embed_command.texts == ("coffee",)
+    assert embed_command.purpose is LLMTypes.EmbeddingPurpose.QUERY
     search.reset_mock()
-    embed.side_effect = RuntimeError("provider unavailable")
+    service.embed_texts.side_effect = RuntimeError("provider unavailable")
     with pytest.raises(RuntimeError, match="provider unavailable"):
-        await query.search_memories(database, request, embed_query=embed)
+        await query.search_memories(database, request, embedding_service=service)
+    search.assert_not_awaited()
+
+
+async def test_incompatible_query_dimension_never_reaches_search(database, monkeypatch):
+    search = AsyncMock()
+    monkeypatch.setattr(repository, "search_memories", search)
+    service = embedding_service([1.0] * 1024)
+    request = types.SearchMemoriesCommand(
+        uid(10), "coffee", uid(1), embedding_model="voyage-4"
+    )
+    service.embed_texts.return_value = LLMTypes.EmbeddingResultInfo(
+        embeddings=(tuple([1.0] * 1024),),
+        dimension=1024,
+        provider=LLMTypes.EmbeddingProvider.VOYAGE,
+        model="voyage-4",
+        usage=LLMTypes.EmbeddingUsageInfo(total_tokens=2),
+    )
+
+    with pytest.raises(ValueError, match="expected 1536, received 1024"):
+        await query.search_memories(database, request, embedding_service=service)
+
     search.assert_not_awaited()
 
 
@@ -186,7 +234,12 @@ async def test_invalid_vectors_fail_before_database(vector):
     session = SimpleNamespace(execute=AsyncMock())
     with pytest.raises(ValueError):
         await repository.search_memories(
-            session, conversation_id=uid(10), owner_id=uid(1), query_embedding=vector
+            session,
+            conversation_id=uid(10),
+            owner_id=uid(1),
+            query_embedding=vector,
+            embedding_provider="voyage",
+            embedding_model=EMBEDDING_MODEL,
         )
     session.execute.assert_not_awaited()
 
@@ -201,6 +254,8 @@ async def test_search_sql_scope_and_distance_conversion():
         conversation_id=uid(10),
         owner_id=uid(1),
         query_embedding=[1.0] * 1536,
+        embedding_provider="voyage",
+        embedding_model=EMBEDDING_MODEL,
         memory_types=("fact",),
         top_k=3,
     )
@@ -210,6 +265,8 @@ async def test_search_sql_scope_and_distance_conversion():
     assert "conversations.user_id =" in sql
     assert "conversation_memories.conversation_id =" in sql
     assert "embedding IS NOT NULL" in sql
+    assert "embedding_provider =" in sql
+    assert "embedding_model =" in sql
     assert "<=>" in sql
     assert uid(10) in compiled.params.values()
     assert uid(1) in compiled.params.values()
@@ -221,27 +278,40 @@ async def test_search_sql_scope_and_distance_conversion():
     [(" ", 5, None), ("x", 0, None), ("x", 101, None), ("x", 5, ("manual",))],
 )
 async def test_invalid_search_request_skips_provider(text, top_k, kinds):
-    embed = AsyncMock()
+    service = embedding_service()
     with pytest.raises(ValueError):
         await query.search_memories(
             object(),
-            types.SearchMemoriesCommand(uid(10), text, uid(1), top_k, kinds),
-            embed_query=embed,
+            types.SearchMemoriesCommand(
+                uid(10),
+                text,
+                uid(1),
+                top_k,
+                kinds,
+                embedding_model=EMBEDDING_MODEL,
+            ),
+            embedding_service=service,
         )
-    embed.assert_not_awaited()
+    service.embed_texts.assert_not_awaited()
 
 
 async def test_empty_type_filter_skips_provider():
-    embed = AsyncMock()
+    service = embedding_service()
     assert (
         await query.search_memories(
             object(),
-            types.SearchMemoriesCommand(uid(10), "x", uid(1), memory_types=()),
-            embed_query=embed,
+            types.SearchMemoriesCommand(
+                uid(10),
+                "x",
+                uid(1),
+                memory_types=(),
+                embedding_model=EMBEDDING_MODEL,
+            ),
+            embedding_service=service,
         )
         == []
     )
-    embed.assert_not_awaited()
+    service.embed_texts.assert_not_awaited()
 
 
 async def test_repository_writes_leave_transaction_to_caller():

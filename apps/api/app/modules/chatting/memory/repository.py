@@ -20,6 +20,9 @@ from app.modules.chatting.memory import types as Types
 DEFAULT_MEMORY_LIST_LIMIT = 50
 MAX_MEMORY_LIST_LIMIT = 100
 MAX_MEMORY_SEARCH_LIMIT = 100
+MEMORY_EMBEDDING_DIMENSION = cast(
+    Vector, ConversationMemory.__table__.c.embedding.type
+).dim
 
 
 async def delete_conversation_memories(session, conversation_id) -> None:
@@ -166,21 +169,30 @@ async def search_memories(
     conversation_id: UUID,
     owner_id: UUID,
     query_embedding: Sequence[float],
+    embedding_provider: str,
+    embedding_model: str,
     top_k: int = 5,
     memory_types: Sequence[Types.MemoryType] | None = None,
 ) -> list[tuple[ConversationMemory, float]]:
     """Return cosine similarities. Existing indexes determine exact/ANN execution.
 
-    Caller must use the same model as stored memories; the schema does not yet
-    track model versions. No threshold or reranking policy is applied.
+    Only rows with exact provider/model metadata are compatible. Legacy rows with
+    unknown metadata are deliberately excluded. No reranking policy is applied.
     """
     validate_memory_types(memory_types)
     if not 1 <= top_k <= MAX_MEMORY_SEARCH_LIMIT:
         raise ValueError(f"top_k must be between 1 and {MAX_MEMORY_SEARCH_LIMIT}.")
+    if not isinstance(embedding_provider, str) or not embedding_provider.strip():
+        raise ValueError("embedding_provider must be a non-blank string.")
+    if not isinstance(embedding_model, str) or not embedding_model.strip():
+        raise ValueError("embedding_model must be a non-blank string.")
     vector = list(query_embedding)
-    dimension = cast(Vector, ConversationMemory.__table__.c.embedding.type).dim
-    if len(vector) != dimension or not all(isfinite(value) for value in vector):
-        raise ValueError(f"Query embedding must contain {dimension} finite values.")
+    if len(vector) != MEMORY_EMBEDDING_DIMENSION or not all(
+        isfinite(value) for value in vector
+    ):
+        raise ValueError(
+            f"Query embedding must contain {MEMORY_EMBEDDING_DIMENSION} finite values."
+        )
     if not any(vector):
         raise ValueError("Cosine search requires a nonzero query embedding.")
     distance = ConversationMemory.embedding.cosine_distance(vector)
@@ -189,7 +201,11 @@ async def search_memories(
         .add_columns(
             distance.label("distance"),
         )
-        .where(ConversationMemory.embedding.is_not(None))
+        .where(
+            ConversationMemory.embedding.is_not(None),
+            ConversationMemory.embedding_provider == embedding_provider,
+            ConversationMemory.embedding_model == embedding_model,
+        )
     )
     if memory_types is not None:
         stmt = stmt.where(ConversationMemory.memory_type.in_(memory_types))

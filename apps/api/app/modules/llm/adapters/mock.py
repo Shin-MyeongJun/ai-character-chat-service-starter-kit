@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from app.modules.llm.adapters.base import BaseLLMAdapter
+from app.modules.llm.adapters.base import BaseTextGenerationAdapter
 from app.modules.llm.types import (
     LLMProvider,
     LLMResultInfo,
@@ -11,7 +11,7 @@ from app.modules.llm.types import (
 )
 
 
-class MockLLMAdapter(BaseLLMAdapter):
+class MockLLMAdapter(BaseTextGenerationAdapter):
     provider = LLMProvider.MOCK
     model_prefixes = ("mock-",)
 

@@ -233,13 +233,20 @@ CREATE TABLE IF NOT EXISTS conversation_memories (
         CHECK (memory_type IN ('summary', 'fact', 'event')),
     content TEXT NOT NULL,
     embedding vector(1536),
+    embedding_provider TEXT,
+    embedding_model TEXT,
     source_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_conversation_memories_embedding_identity
+        CHECK ((embedding_provider IS NULL) = (embedding_model IS NULL))
 );
 
 CREATE INDEX IF NOT EXISTS ix_conversation_memories_conversation_id
     ON conversation_memories (conversation_id);
+
+CREATE INDEX IF NOT EXISTS ix_conversation_memories_embedding_identity
+    ON conversation_memories (embedding_provider, embedding_model);
 
 CREATE INDEX IF NOT EXISTS ix_conversation_memories_embedding
     ON conversation_memories

@@ -121,7 +121,8 @@ def test_public_service_business_inputs_use_commands_and_declare_results():
             business_args = [
                 arg
                 for arg in node.args.args + node.args.kwonlyargs
-                if arg.arg not in {"self", "session", "embed_query", "now"}
+                if arg.arg
+                not in {"self", "session", "embedding_service", "embed_query", "now"}
             ]
             if (
                 any(
