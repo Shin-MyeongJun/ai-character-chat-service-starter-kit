@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from app.db.models.chat import (
     Conversation,
@@ -16,6 +16,16 @@ async def get_owned_conversation(session, conversation_id, user_id, *, lock=Fals
     if lock:
         stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return await session.scalar(stmt)
+
+
+async def advance_history_revision(session, conversation_id):
+    return await session.scalar(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(history_revision=Conversation.history_revision + 1)
+        .returning(Conversation)
+        .execution_options(populate_existing=True)
+    )
 
 
 async def list_conversation_characters(session, conversation_id):

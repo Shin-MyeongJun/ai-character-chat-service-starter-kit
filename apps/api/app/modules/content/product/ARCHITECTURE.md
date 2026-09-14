@@ -16,6 +16,7 @@
 - `service/command/statistics.py`: 수집된 사실의 집계·저장, 상위 트랜잭션의 작업 잠금·완료, 최근 날짜 재요청을 담당한다. 도메인 간 수집 및 배치 반복은 최상위 product_statistics 유스케이스로 이동했다.
 - `service/command/statistics_queue.py`: 다른 모듈이 통계 갱신을 요청하는 Command 경계. queue SQL은 product repository 소유다.
 - `service/query/`: 자기 데이터의 소유자/공개 접근 조회, 구성 및 통계 조회. `service/views/`: 공개 snapshot·LLM·conversation 결과를 조합한 SnapshotRuntimeView, PublishedProductView, PendingUpdatesView, VersionAvailabilityView, MediaReferenceView.
+- `service/views/media.py`: `ProductMediaService.read_product_media(ReadProductMediaCommand)`는 기존 상품 접근 정책, 상품/버전 소속, 버전 만료를 검사하고 해당 버전의 캐릭터 스냅샷 ID를 character 공개 미디어 서비스에 전달한다. 결과는 공개 `AssetReadInfo`이며 adapter·character repository/ORM을 참조하지 않는다. HTTP 바이너리 경로는 `app/http/media.py`에 추가 조립했다.
 - `repository/`: core, composition, publication, releases, statistics로 저장 책임을 분리했다. `__init__.py`는 같은 모듈의 저장소 진입점을 재노출한다.
 - `mapper/persistence.py`: Row/Entity와 공개 Info의 순수 변환. `mapper/statistics.py`: 전달받은 사실 데이터의 집계·표현 변환. DB, 시계, 공급자 호출은 하지 않는다.
 - `router.py`, `mapper/schema.py`, `schemas.py`: HTTP 계약. `statistics_job.py`: 배치 실행 조립 코드.
@@ -28,4 +29,6 @@ Command는 최상위 `use_case_transaction`을 시작하거나 명시적으로 �
 
 statistics의 조회와 일부 command 모듈의 명시적 재노출은 이전 Python import 호출부의 호환 진입점이다. 통계 rebuild_day/process_pending 호출부는 `app/use_cases/product_statistics.py`로 이동해 도메인 간 순환 호출을 추가하지 않았다. HTTP DTO 이름은 기존 OpenAPI와 생성 클라이언트 계약을 보존하기 위해 유지했다. 상품 구성, 발행, 통계는 변경 이유와 의존성이 달라 분리했으며 줄 수를 기준으로 자르지 않았다.
 
-공통 HTTP 의존성의 실제 세션/인증 연결과 운영 스케줄러 배포는 기존 미구현·환경 연결 범위다.
+상품에 독립적인 파일 테이블/업로드 기능은 없다. 상품 미디어는 캐릭터 스냅샷을 통해 참조하므로 product 테이블에는 추가 컬럼이 필요하지 않다. character의 스냅샷 미디어 FK가 불변 저장소 객체를 보존하며, 초안 수정·삭제·다음 게시·버전 만료는 이전 파일을 삭제하지 않는다. 상품 미디어 접근은 인증된 소유자 또는 기존 approved + public/unlisted 접근 정책을 그대로 따른다. 공개 버킷/ACL, 서명 URL, 익명 파일 접근은 추가하지 않았다.
+
+`app.main`이 세션/미디어 저장소를 연결하며 실제 인증 검증기와 운영 스케줄러 배포는 환경 연결 범위다. 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.

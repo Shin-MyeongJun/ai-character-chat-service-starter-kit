@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, Literal, TypeAlias, TypeVar
+from typing import BinaryIO, Generic, Literal, TypeAlias, TypeVar
 from uuid import UUID
 
 # Shared value types
@@ -275,3 +275,61 @@ class MediaReferenceInfo:
 @dataclass(frozen=True, slots=True)
 class GetCharacterSnapshotsCommand:
     snapshot_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class UploadCharacterMediaCommand:
+    character_id: UUID
+    owner_id: UUID
+    request_id: UUID
+    content: BinaryIO
+    content_type: str
+    original_filename: str
+    purpose: str
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterMediaInfo:
+    id: UUID
+    character_id: UUID
+    owner_id: UUID
+    request_id: UUID
+    storage_kind: str
+    storage_id: str
+    object_key: str
+    content_type: str
+    size_bytes: int
+    original_filename: str
+    purpose: str
+    sha256: str
+    state: str
+    binding: str | None
+    updated_at: datetime
+
+    @property
+    def content_url(self) -> str:
+        return f"/characters/media/{self.id}/content"
+
+
+@dataclass(frozen=True, slots=True)
+class ReadCharacterMediaCommand:
+    media_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ReadSnapshotMediaCommand:
+    media_id: UUID
+    snapshot_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupCharacterMediaCommand:
+    media_id: UUID
+    older_than: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupCharacterMediaInfo:
+    deleted: bool
+    reason: str

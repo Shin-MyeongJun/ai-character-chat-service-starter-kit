@@ -8,11 +8,135 @@ from uuid import UUID
 
 from app.modules.llm import types as LLMTypes
 
-# Keep aligned with the database constraint; manual/pinned semantics are deferred.
 MemoryType: TypeAlias = Literal["summary", "fact", "event"]
+MemoryIndexStatus: TypeAlias = Literal["pending", "ready", "failed"]
+
+
+class StaleMemoryWorkError(RuntimeError):
+    """A destructive history change made an in-flight result obsolete."""
+
+
+class ContextBudgetExceededError(RuntimeError):
+    def __init__(self, message: str, *, summary_required: bool) -> None:
+        super().__init__(message)
+        self.summary_required = summary_required
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MemoryPolicy:
+    summarization_threshold_tokens: int = 4000
+    summary_batch_tokens: int = 3000
+    recent_raw_tokens: int = 1200
+    summary_output_tokens: int = 700
+    memory_token_budget: int = 1200
+    retrieval_candidates: int = 20
+    retrieval_limit: int = 8
+    prompt_version: str = "hypha-summary-v1"
 
 
 @dataclass(frozen=True, slots=True)
+class SourceMessageInfo:
+    id: UUID
+    sender_type: str
+    content: str
+    position: int
+    revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryPlanInfo:
+    conversation_id: UUID
+    owner_id: UUID
+    conversation_revision: int
+    source_messages: tuple[SourceMessageInfo, ...]
+    source_digest: str
+    estimated_input_tokens: int
+    prompt_version: str
+
+    @property
+    def source_start_position(self) -> int:
+        return self.source_messages[0].position
+
+    @property
+    def source_end_position(self) -> int:
+        return self.source_messages[-1].position
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PlanSummarizationCommand:
+    conversation_id: UUID
+    owner_id: UUID
+    conversation_revision: int
+    messages: tuple[SourceMessageInfo, ...]
+    policy: MemoryPolicy
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GenerateSummaryCommand:
+    plan: SummaryPlanInfo
+    provider: LLMTypes.LLMProvider | str | None
+    model: str
+    max_output_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedSummaryInfo:
+    plan: SummaryPlanInfo
+    content: str
+    provider: LLMTypes.LLMProvider
+    model: str
+    input_tokens: int | None
+    output_tokens: int | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SaveSummaryCommand:
+    generated: GeneratedSummaryInfo
+    importance: float = 0.5
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ValidateSummarySourceCommand:
+    plan: SummaryPlanInfo
+    current_messages: tuple[SourceMessageInfo, ...]
+    current_conversation_revision: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EmbedSummaryCommand:
+    memory_id: UUID
+    conversation_id: UUID
+    owner_id: UUID
+    content: str
+    content_digest: str
+    conversation_revision: int
+    provider: LLMTypes.EmbeddingProvider | str | None
+    model: str
+    output_dimension: int | None = None
+    truncation: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddedSummaryInfo:
+    memory_id: UUID
+    conversation_id: UUID
+    owner_id: UUID
+    content_digest: str
+    conversation_revision: int
+    vector: tuple[float, ...]
+    provider: LLMTypes.EmbeddingProvider
+    model: str
+    dimension: int
+    settings: dict
+    total_tokens: int | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SaveEmbeddingCommand:
+    value: EmbeddedSummaryInfo
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CreateMemoryCommand:
     conversation_id: UUID
     memory_type: MemoryType
@@ -20,7 +144,7 @@ class CreateMemoryCommand:
     owner_id: UUID
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class UpdateMemoryCommand:
     memory_id: UUID
     conversation_id: UUID
@@ -28,7 +152,7 @@ class UpdateMemoryCommand:
     content: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DeleteMemoryCommand:
     conversation_id: UUID
     memory_id: UUID
@@ -38,14 +162,18 @@ class DeleteMemoryCommand:
 @dataclass(frozen=True, slots=True)
 class SearchMemoriesCommand:
     conversation_id: UUID
-    query_text: str  # 서비스가 내부적으로 임베딩 변환
-    owner_id: UUID  # 서비스에서 대화 접근 권한 검증에 사용
+    query_text: str
+    owner_id: UUID
     top_k: int = 5
-    memory_types: tuple[MemoryType, ...] | None = None  # 필요시 fact/event만 검색 등
+    memory_types: tuple[MemoryType, ...] | None = None
     embedding_model: str = field(kw_only=True)
     embedding_provider: LLMTypes.EmbeddingProvider | str | None = field(
         default=None, kw_only=True
     )
+    output_dimension: int | None = field(default=None, kw_only=True)
+    token_budget: int | None = field(default=None, kw_only=True)
+    result_limit: int | None = field(default=None, kw_only=True)
+    conservative_token_budget: bool = field(default=False, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +181,22 @@ class RetrievedMemoryInfo:
     memory_id: UUID
     memory_type: MemoryType
     content: str
-    similarity_score: float  # 프롬프트 조립 시 임계값 필터링/디버깅용
+    similarity_score: float
+    importance: float = 0.5
+    recency_score: float = 0.0
+    selection_score: float = 0.0
+    estimated_tokens: int = 0
+    source_start_position: int | None = None
+    source_end_position: int | None = None
+    source_digest: str | None = None
+    conversation_revision: int | None = None
+    summary_provider: str | None = None
+    summary_model: str | None = None
+    prompt_version: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = None
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +207,18 @@ class MemoryInfo:
     content: str
     created_at: datetime
     updated_at: datetime
+    index_status: MemoryIndexStatus = "pending"
+    importance: float = 0.5
+    source_start_position: int | None = None
+    source_end_position: int | None = None
+    source_digest: str | None = None
+    conversation_revision: int | None = None
+    summary_provider: str | None = None
+    summary_model: str | None = None
+    prompt_version: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +259,49 @@ class GetLatestSummaryCommand:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class GetPendingIndexCommand:
+    conversation_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class InvalidateConversationMemoriesCommand:
     conversation_id: UUID
     owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ScheduleMemoryWorkCommand:
+    conversation_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClaimMemoryWorkCommand:
+    worker_id: str
+    lease_seconds: int = 300
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWorkInfo:
+    conversation_id: UUID
+    owner_id: UUID
+    scope_generation: int
+    attempt_count: int
+    lease_owner: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CompleteMemoryWorkCommand:
+    work: MemoryWorkInfo
+    more_work: bool = False
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FailMemoryWorkCommand:
+    work: MemoryWorkInfo
+    error_kind: str
+    retryable: bool
+    max_attempts: int = 5
+    base_retry_seconds: int = 5
+    max_retry_seconds: int = 300

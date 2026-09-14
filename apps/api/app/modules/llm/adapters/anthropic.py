@@ -6,6 +6,7 @@ from typing import Any
 import anthropic
 
 from app.modules.llm.adapters.base import BaseTextGenerationAdapter
+from app.modules.llm.adapters.messages import decode_messages
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -72,6 +73,10 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
             "max_tokens": max_output_tokens,
             "messages": [{"role": "user", "content": request_json}],
         }
+        messages = decode_messages(request_json)
+        if messages is not None:
+            params["system"] = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+            params["messages"] = [m for m in messages if m["role"] != "system"]
         if reasoning_effort is not None:
             params["output_config"] = {"effort": reasoning_effort.value}
         try:

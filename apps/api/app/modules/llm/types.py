@@ -198,6 +198,7 @@ class ModelInfo:
     capabilities: dict
     retirement_announced_at: datetime | None
     shutdown_at: datetime | None
+    context_window: int = 8000
 
 
 @dataclass(frozen=True, slots=True)

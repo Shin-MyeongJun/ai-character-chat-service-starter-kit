@@ -27,7 +27,12 @@ async def db():
             text("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public")
         )
         await connection.execute(text(f"CREATE SCHEMA {schema}"))
-        await connection.run_sync(Base.metadata.create_all)
+        # A fresh per-test schema must own every table even when public already
+        # contains migrated tables. checkfirst uses search_path visibility and
+        # would otherwise skip creation and accidentally write to public.
+        await connection.run_sync(
+            lambda conn: Base.metadata.create_all(conn, checkfirst=False)
+        )
     try:
         async with AsyncSession(engine, expire_on_commit=False) as session:
             yield session

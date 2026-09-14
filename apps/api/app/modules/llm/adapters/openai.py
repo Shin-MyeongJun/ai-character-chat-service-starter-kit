@@ -6,6 +6,7 @@ from typing import Any
 import openai
 
 from app.modules.llm.adapters.base import BaseTextGenerationAdapter
+from app.modules.llm.adapters.messages import decode_messages
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -70,7 +71,7 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
     ) -> LLMResultInfo:
         params: dict[str, Any] = {
             "model": model,
-            "input": request_json,
+            "input": decode_messages(request_json) or request_json,
             "max_output_tokens": max_output_tokens,
             "store": False,
         }

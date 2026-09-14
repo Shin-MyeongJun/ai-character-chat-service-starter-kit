@@ -318,17 +318,24 @@ async def test_repository_failure_propagates_and_rolls_back(
 
 
 @pytest.mark.parametrize("kind", ["image", "asset"])
-async def test_storage_placeholders_do_not_start_transaction_or_write(
-    session, transaction_events, commands, repo, kind
+async def test_legacy_media_references_are_added_after_authorization(
+    session, transaction_events, commands, repo, kind, monkeypatch, character
 ):
-    with pytest.raises(NotImplementedError, match="storage is not implemented"):
-        await getattr(service, f"add_character_{kind}")(
-            session, getattr(commands, f"add_{kind}")
-        )
-
-    getattr(repo, f"add_character_{kind}").assert_not_awaited()
-    repo.get_character_by_id_and_owner_id.assert_not_awaited()
-    assert transaction_events == []
+    model = CharacterImage if kind == "image" else CharacterAsset
+    saved = model(
+        id=uuid4(),
+        character_id=character.id,
+        created_at=character.created_at,
+        updated_at=character.updated_at,
+    )
+    persist = AsyncMock(return_value=saved)
+    monkeypatch.setattr(repository, "create_media_attachment", persist)
+    value = getattr(commands, f"add_{kind}")
+    result = await getattr(service, f"add_character_{kind}")(session, value)
+    assert result.id == saved.id
+    persist.assert_awaited_once_with(session, value, None, kind)
+    repo.get_character_by_id_and_owner_id.assert_awaited_once()
+    assert transaction_events == ["commit"]
     assert not session.in_transaction()
 
 

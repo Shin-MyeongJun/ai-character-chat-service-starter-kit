@@ -60,6 +60,11 @@ class CharacterSnapshotImage(UuidPkMixin, Base):
     source_image_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     emotion_tag: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
+    media_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_media.id", ondelete="RESTRICT"),
+        index=True,
+    )
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
@@ -80,3 +85,8 @@ class CharacterSnapshotAsset(UuidPkMixin, Base):
     asset_type: Mapped[str] = mapped_column(Text, nullable=False)
     purpose: Mapped[str] = mapped_column(Text, nullable=False)
     file_url: Mapped[str] = mapped_column(Text, nullable=False)
+    media_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_media.id", ondelete="RESTRICT"),
+        index=True,
+    )

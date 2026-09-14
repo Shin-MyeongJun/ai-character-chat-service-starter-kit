@@ -80,7 +80,12 @@ async def delete_character(
 async def add_character_image(
     session: AsyncSession, command: Types.CreateCharacterImageCommand
 ) -> Types.CharacterImageInfo:
-    raise NotImplementedError("Character image storage is not implemented yet.")
+    from app.modules.content.character.service.media import _attach_character_media
+
+    if not command.emotion_tag.strip():
+        raise ValueError("Emotion tag must not be blank.")
+    async with use_case_transaction(session):
+        return await _attach_character_media(session, command, "image")
 
 
 async def delete_character_image(
@@ -100,7 +105,15 @@ async def delete_character_image(
 async def add_character_asset(
     session: AsyncSession, command: Types.CreateCharacterAssetCommand
 ) -> Types.CharacterAssetInfo:
-    raise NotImplementedError("Character asset storage is not implemented yet.")
+    from app.modules.content.character.service.media import _attach_character_media
+
+    if (
+        command.asset_type not in get_args(Types.CharacterAssetTypeValue)
+        or not command.purpose.strip()
+    ):
+        raise ValueError("Invalid asset metadata.")
+    async with use_case_transaction(session):
+        return await _attach_character_media(session, command, "asset")
 
 
 async def delete_character_asset(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import character as character_models
@@ -13,6 +13,7 @@ from app.db.models.character import (
     CharacterImage,
     CharacterVisibility,
 )
+from app.db.models.character_media import CharacterMedia
 from app.db.models.snapshot.character import (
     CharacterSnapshot,
     CharacterSnapshotAsset,
@@ -534,6 +535,7 @@ async def freeze_character(session, source):
                 source_image_id=image.id,
                 emotion_tag=image.emotion_tag,
                 image_url=image.image_url,
+                media_id=image.media_id,
                 is_default=image.is_default,
             )
         )
@@ -549,6 +551,7 @@ async def freeze_character(session, source):
                 asset_type=asset.asset_type,
                 purpose=asset.purpose,
                 file_url=asset.file_url,
+                media_id=asset.media_id,
             )
         )
     await session.flush()
@@ -599,3 +602,100 @@ async def list_character_snapshots(session, snapshot_ids):
             select(CharacterSnapshot).where(CharacterSnapshot.id.in_(snapshot_ids))
         )
     )
+
+
+# Durable storage intents; no transaction ownership.
+
+
+async def get_media(session, media_id, *, lock=False):
+    stmt = (
+        select(CharacterMedia)
+        .where(CharacterMedia.id == media_id)
+        .execution_options(populate_existing=True)
+    )
+    if lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return (await session.scalars(stmt)).one_or_none()
+
+
+async def get_media_request(session, command):
+    return (
+        await session.scalars(
+            select(CharacterMedia).where(
+                CharacterMedia.character_id == command.character_id,
+                CharacterMedia.owner_id == command.owner_id,
+                CharacterMedia.request_id == command.request_id,
+            )
+        )
+    ).one_or_none()
+
+
+async def create_media(session, info):
+    entity = CharacterMedia(
+        **{name: getattr(info, name) for name in info.__dataclass_fields__}
+    )
+    session.add(entity)
+    await session.flush()
+    return entity
+
+
+async def set_media_state(session, media_id, state):
+    await session.execute(
+        update(CharacterMedia).where(CharacterMedia.id == media_id).values(state=state)
+    )
+
+
+async def bind_media(session, media_id, binding):
+    await session.execute(
+        update(CharacterMedia)
+        .where(CharacterMedia.id == media_id)
+        .values(binding=binding)
+    )
+
+
+async def has_media_references(session, media_id, snapshot_ids=None):
+    models = (
+        CharacterImage,
+        CharacterAsset,
+        CharacterSnapshotImage,
+        CharacterSnapshotAsset,
+    )
+    if snapshot_ids is not None:
+        models = models[2:]
+    for model in models:
+        stmt = select(model.id).where(model.media_id == media_id)
+        if snapshot_ids is not None:
+            stmt = stmt.where(model.character_snapshot_id.in_(snapshot_ids))
+        if await session.scalar(select(exists(stmt))):
+            return True
+    return False
+
+
+async def get_media_attachment(session, media_id, kind):
+    model = CharacterImage if kind == "image" else CharacterAsset
+    return (
+        await session.scalars(select(model).where(model.media_id == media_id))
+    ).one_or_none()
+
+
+async def create_media_attachment(session, command, media_id, kind):
+    if kind == "image":
+        entity = CharacterImage(
+            character_id=command.character_id,
+            emotion_tag=command.emotion_tag,
+            image_url=command.image_url,
+            is_default=command.is_default,
+            media_id=media_id,
+        )
+    else:
+        entity = CharacterAsset(
+            character_id=command.character_id,
+            asset_type=command.asset_type,
+            purpose=command.purpose,
+            file_url=command.file_url,
+            media_id=media_id,
+        )
+    session.add(entity)
+    await session.flush()
+    await session.refresh(entity)
+    return entity

@@ -13,6 +13,14 @@ Visibility = Literal["private", "public", "unlisted"]
 
 
 @dataclass(frozen=True, slots=True)
+class ReadProductMediaCommand:
+    product_id: UUID
+    snapshot_id: UUID
+    media_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
 class ProductProfileCommand:
     title: str
     description: str | None = None

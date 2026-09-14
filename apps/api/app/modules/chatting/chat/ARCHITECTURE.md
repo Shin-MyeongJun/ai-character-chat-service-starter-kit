@@ -12,7 +12,10 @@ chat → conversation / memory / product / billing / llm 방향으로 공개 ser
 
 - `service/command/messages.py`: 사용자 저장·마지막 메시지 교체·되돌리기, 내부 캐릭터 저장/교체, 인가·멱등성·충돌·메모리 무효화 조정.
 - `service/query/messages.py`: 소유권을 확인한 메시지 커서 페이지 조회.
-- `service/command/generation.py`: 기존 생성 예약·완료·실패·취소·stale, 입력/결과 메시지 저장, usage 및 통계 갱신 요청. 외부 LLM 호출은 하지 않는다.
+- `service/query/messages.py`의 내부 공개 `list_memory_source`는 인가된 현재 선형 이력의 정상 저장 메시지를 position 순으로 값 타입으로 제공한다. memory/use_cases는 message ORM을 직접 참조하지 않는다.
+- `service/query/generation.py`의 `get_generation_state`는 최상위 use_case가 응답 저장 뒤 같은 대화의 memory 작업을 예약할 수 있도록 생성의 대화 id를 공개 Info로 제공한다.
+- `service/command/generation.py`: 기존 생성 예약·완료·실패·취소·stale, 입력/결과 메시지 저장, usage 및 통계 갱신 요청. `BeginGenerationCommand`의 선택적 input_message_id/expected_revision은 마지막 사용자 메시지를 검증해 재저장하지 않는다. 미지정인 기존 호출은 종전대로 입력을 저장한다. execution은 신뢰된 최상위 호출자가 확정한 모델이다.
+- `service/command/answers.py`: 최상위 오케스트레이터를 위한 요청/대화 잠금, 입력 참조 검증, metadata/lease 쓰기 및 만료 생성 조회. 새 테이블 없이 `product_generations.answer_metadata`와 `answer_lease_until`을 소유한다.
 - `service/query/generation.py`: 생성 당시의 불변 사실을 통계 Info로 제공한다.
 - `types.py`: 위 기능의 Command와 Info, 커서, 업무 오류. `schemas.py`, `mapper/schema.py`, `router.py`: HTTP DTO·변환·기존 인증/세션 훅 연결.
 
@@ -44,7 +47,7 @@ PUT은 지정한 메시지가 해당 대화의 마지막 메시지이고 예상 
 
 ## 연결 데이터
 
-메모리의 단일 source_message_id로는 요약·파생 사실의 전체 의존 범위를 알 수 없어 교체/되돌리기 때 memory 공개 service가 해당 대화의 모든 기억·요약을 삭제한다. 출처가 없는 legacy 메모리도 포함한다. 다른 방 메모리는 유지한다. 임베딩·요약 재생성은 하지 않는다.
+교체/되돌리기 때 memory 공개 service가 `history_revision`을 증가시키고 해당 대화의 모든 기억·요약·예약을 삭제한다. 출처가 없는 legacy 메모리도 포함하고 다른 방은 유지한다. 실행 중 작업은 결과 저장의 revision/range 검증에서 거절된다. 단순 후속 메시지 append는 revision을 바꾸지 않는다. 성공 응답과 기억 예약의 원자적 조립은 `app/use_cases/memory.py`가 담당한다.
 
 생성 status/result_digest/message_count/finished_at와 usage/payment/credit 기록은 이미 발생한 사실로 유지한다. `history_invalidated_at`은 해당 대화의 원래 생성 맥락이 변경됐음을 보수적으로 표시한다. message_count는 현재 화면의 메시지 수가 아니라 원래 성공 출력 수이며 통계도 그 의미를 유지한다. 완료 재전송은 메시지나 사용량을 다시 쓰지 않는다. messages→generation 및 usage→generation FK는 유지되고, 삭제 시 generation이 역으로 삭제되지 않는다.
 
@@ -52,4 +55,6 @@ version_changes는 메시지를 참조하는 컬럼이 없으며 conversation과
 
 ## 미연결 범위
 
-HTTP는 기존 `app.http.dependencies`를 사용한다. 실제 인증/세션은 여전히 503 미연결 훅이며 우회 인증을 만들지 않았다. 테스트에서 같은 훅에 소유자와 PostgreSQL 세션을 주입해 계약을 확인한다. 외부 LLM/임베딩, 프롬프트·로어 활성화, 새 답변 리롤, 스트리밍·이미지 선택은 이번 범위 밖이다.
+HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에 연결한다. 인증 구현은 없어 기본 인증 훅은 503이며 우회 인증을 만들지 않았다. 배포 앱은 검증된 identity dependency를 `create_app(authenticate=...)`에 제공해야 한다. 비스트리밍 답변은 `app.http.answers` → `app.use_cases.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
+
+답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 기존 finish와 memory 예약을 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.

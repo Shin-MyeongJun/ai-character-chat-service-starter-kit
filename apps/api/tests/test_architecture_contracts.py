@@ -96,15 +96,12 @@ def test_top_level_use_cases_use_only_public_module_services_and_types():
                 parts = (node.module + "." + alias.name).split(".")
                 domain_length = (
                     2
-                    if parts[2]
-                    in {"content", "chatting", "commerce", "governance"}
+                    if parts[2] in {"content", "chatting", "commerce", "governance"}
                     else 1
                 )
                 tail = parts[2 + domain_length :]
                 if not tail or tail[0] not in {"service", "types"}:
-                    violations.append(
-                        f"{path}:{node.lineno}: {'.'.join(parts)}"
-                    )
+                    violations.append(f"{path}:{node.lineno}: {'.'.join(parts)}")
     assert not violations, "\n".join(violations)
 
 
@@ -168,4 +165,14 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
             encoding="utf-8"
         )
     )
-    assert app.openapi() == baseline
+    actual = app.openapi()
+    assert set(actual["paths"]) - set(baseline["paths"]) == {
+        "/conversations/{conversation_id}/answers",
+        "/characters/{character_id}/media/uploads",
+        "/characters/media/{media_id}/content",
+        "/products/{product_id}/versions/{snapshot_id}/media/{media_id}/content",
+    }
+    for path, contract in baseline["paths"].items():
+        assert actual["paths"][path] == contract
+    for name, schema in baseline["components"]["schemas"].items():
+        assert actual["components"]["schemas"][name] == schema

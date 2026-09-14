@@ -31,3 +31,36 @@ async def list_messages(
     return PersistenceMapper.messages_entities_to_page_info(
         rows, command.conversation_id, command.limit
     )
+
+
+async def list_memory_source(
+    session, command: Types.ListMemorySourceCommand
+) -> Types.MemorySourceInfo:
+    if (
+        type(command.after_position) is not int
+        or command.after_position < 0
+        or command.through_position is not None
+        and (
+            type(command.through_position) is not int
+            or command.through_position <= command.after_position
+        )
+        or type(command.limit) is not int
+        or not 1 <= command.limit <= 10000
+    ):
+        raise ValueError("Invalid internal memory source range.")
+    await get_owned_conversation(
+        session,
+        ConversationTypes.OwnedConversationCommand(
+            conversation_id=command.conversation_id, user_id=command.user_id
+        ),
+    )
+    rows = await Repository.list_message_range(
+        session,
+        command.conversation_id,
+        command.after_position,
+        command.through_position,
+        command.limit,
+    )
+    return PersistenceMapper.messages_entities_to_memory_source_info(
+        rows, command.limit
+    )

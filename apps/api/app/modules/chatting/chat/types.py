@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from app.modules.llm.types import ExecutionView
+
 
 class MessageConflictError(Exception):
     """The requested history mutation conflicts with the current state."""
@@ -89,6 +91,21 @@ class MessagePageInfo:
     next_cursor: MessageCursor | None
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListMemorySourceCommand:
+    conversation_id: UUID
+    user_id: UUID
+    after_position: int = 0
+    through_position: int | None = None
+    limit: int = 10000
+
+
+@dataclass(frozen=True, slots=True)
+class MemorySourceInfo:
+    messages: tuple[MessageInfo, ...]
+    truncated: bool
+
+
 @dataclass(frozen=True, slots=True)
 class RewindMessagesInfo:
     deleted_count: int
@@ -157,6 +174,8 @@ class GenerationStateInfo:
     status: str
     message_count: int
     history_invalidated_at: datetime | None
+    answer_metadata: dict | None = None
+    answer_lease_until: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -165,6 +184,9 @@ class BeginGenerationCommand:
     user_id: UUID
     request_key: str
     input_text: str
+    input_message_id: UUID | None = None
+    expected_revision: int | None = None
+    execution: ExecutionView | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -172,3 +194,38 @@ class FinishGenerationCommand:
     generation_id: UUID
     user_id: UUID
     value: GenerationResult
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetGenerationStateCommand:
+    generation_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetAnswerRequestCommand:
+    conversation_id: UUID
+    user_id: UUID
+    request_key: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetAnswerInputCommand:
+    conversation_id: UUID
+    user_id: UUID
+    message_id: UUID
+    expected_revision: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UpdateAnswerCommand:
+    generation_id: UUID
+    user_id: UUID
+    metadata: dict
+    lease_until: datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListExpiredAnswersCommand:
+    now: datetime
+    limit: int = 100

@@ -7,6 +7,7 @@ from app.db.models.billing import (
     UserSubscription,
 )
 from app.db.models.character import Character, CharacterAsset, CharacterImage
+from app.db.models.character_media import CharacterMedia
 from app.db.models.chat import (
     Conversation,
     ConversationCharacter,
@@ -15,7 +16,7 @@ from app.db.models.chat import (
 )
 from app.db.models.identity import User, UserOAuthAccount
 from app.db.models.lorebook import Lorebook, LorebookEntry
-from app.db.models.memory import ConversationMemory
+from app.db.models.memory import ConversationMemory, MemoryJob
 from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
@@ -41,6 +42,7 @@ __all__ = [
     "Character",
     "CharacterAsset",
     "CharacterImage",
+    "CharacterMedia",
     "CharacterSnapshot",
     "Conversation",
     "ConversationCharacter",
@@ -50,6 +52,7 @@ __all__ = [
     "Lorebook",
     "LorebookEntry",
     "LorebookSnapshot",
+    "MemoryJob",
     "Message",
     "MessageRequest",
     "Model",

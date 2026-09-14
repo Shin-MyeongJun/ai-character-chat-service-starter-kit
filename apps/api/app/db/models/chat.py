@@ -71,6 +71,9 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
     initial_snapshot_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product_snapshots.id")
     )
+    history_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
 
 
 class ConversationCharacter(UuidPkMixin, Base):

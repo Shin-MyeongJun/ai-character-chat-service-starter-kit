@@ -175,12 +175,30 @@ async def test_unauthorized_search_does_not_embed(database):
     service.embed_texts.assert_not_awaited()
 
 
+async def test_no_compatible_ready_memory_does_not_embed(database):
+    service = embedding_service()
+    assert (
+        await query.search_memories(
+            database,
+            types.SearchMemoriesCommand(
+                uid(10), "coffee", uid(1), embedding_model=EMBEDDING_MODEL
+            ),
+            embedding_service=service,
+        )
+        == []
+    )
+    service.embed_texts.assert_not_awaited()
+
+
 async def test_search_mapping_and_provider_failure(database, monkeypatch):
     entity = await repository.get_memory(
         database, memory_id=uid(102), conversation_id=uid(10), owner_id=uid(1)
     )
     search = AsyncMock(return_value=[(entity, -0.25)])
     monkeypatch.setattr(repository, "search_memories", search)
+    monkeypatch.setattr(
+        repository, "has_searchable_memories", AsyncMock(return_value=True)
+    )
     service = embedding_service()
     request = types.SearchMemoriesCommand(
         uid(10),
@@ -209,6 +227,9 @@ async def test_search_mapping_and_provider_failure(database, monkeypatch):
 async def test_incompatible_query_dimension_never_reaches_search(database, monkeypatch):
     search = AsyncMock()
     monkeypatch.setattr(repository, "search_memories", search)
+    monkeypatch.setattr(
+        repository, "has_searchable_memories", AsyncMock(return_value=True)
+    )
     service = embedding_service([1.0] * 1024)
     request = types.SearchMemoriesCommand(
         uid(10), "coffee", uid(1), embedding_model="voyage-4"

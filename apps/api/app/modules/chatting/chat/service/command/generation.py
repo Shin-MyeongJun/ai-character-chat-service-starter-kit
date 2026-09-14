@@ -72,7 +72,14 @@ async def begin_generation(
         or (len(input_text) > 200000)
     ):
         raise ValueError("Invalid generation request.")
-    digest = hashlib.sha256(input_text.encode()).hexdigest()
+    digest_input = (
+        input_text
+        if command.input_message_id is None
+        else json.dumps(
+            [str(command.input_message_id), command.expected_revision, input_text]
+        )
+    )
+    digest = hashlib.sha256(digest_input.encode()).hexdigest()
     async with use_case_transaction(session):
         await lock_key(session, "generation", f"{user_id}:{request_key}")
         row = await Repository.get_generation_by_request(session, user_id, request_key)
@@ -91,6 +98,20 @@ async def begin_generation(
             ),
         )
         await _ensure_idle(session, conversation_id)
+        if command.input_message_id is not None:
+            message = PersistenceMapper.message_entity_to_info(
+                await Repository.get_last_message(session, conversation_id)
+            )
+            if (
+                message is None
+                or message.id != command.input_message_id
+                or message.sender_type != "user"
+                or message.revision != command.expected_revision
+                or message.content != input_text
+            ):
+                raise Types.MessageConflictError(
+                    "Input must reference the current last user message and revision."
+                )
         if not conversation.product_snapshot_id:
             raise ValueError("Legacy version must be verified before generation.")
         await ensure_available(
@@ -99,14 +120,21 @@ async def begin_generation(
                 snapshot_id=conversation.product_snapshot_id
             ),
         )
-        execution = await resolve_execution(
+        execution = command.execution or await resolve_execution(
             session,
             LlmTypes.ResolveExecutionCommand(
                 snapshot_id=conversation.product_snapshot_id
             ),
         )
         row = await Repository.create_generation(
-            session, conversation, execution, user_id, request_key, digest, input_text
+            session,
+            conversation,
+            execution,
+            user_id,
+            request_key,
+            digest,
+            input_text,
+            command.input_message_id,
         )
         return generation_record_to_info(row, created=True)
 

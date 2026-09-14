@@ -1,10 +1,11 @@
 # Conversation 모듈
 
-- 소유 테이블: `conversations`, `conversation_characters`, `conversation_version_changes`. 메시지와 `product_generations`는 chat 소유이며 이 모듈에서 읽거나 쓰지 않는다.
+- 소유 테이블: `conversations`, `conversation_characters`, `conversation_version_changes`. 메시지와 `product_generations`는 chat 소유이며 이 모듈에서 읽거나 쓰지 않는다. `conversations.history_revision`은 기존 원문 변경 세대이며 단순 후속 append에는 증가하지 않는다.
 - `service/query.py`: `get_owned_conversation(OwnedConversationCommand)`은 소유 방의 ConversationInfo를 반환하며 lock=true이면 FOR UPDATE를 획득한다. `list_conversation_characters`는 같은 소유권 조건의 실제 참여 캐릭터 Info를 반환한다. 통계 조회는 방 생성/버전 전환 사실만 제공한다.
 - `service/command/__init__.py`: `create_product_conversation(StartConversationCommand)`은 공개 product snapshot/runtime으로 방·상품 버전·참여 캐릭터를 저장하고 PreparedConversationInfo에 검증된 첫 메시지 값도 제공한다. 첫 메시지 저장은 최상위 `app/use_cases/conversations.start_conversation`이 chat 공개 Command를 호출한다. 방 저장 실패나 첫 메시지 저장 실패 시 전체를 롤백한다.
 - `service/command/versions.py`: 순방향 버전 전환, 동의 정책, 대상 구성 검증. 메시지·기억·생성 이력을 수정하지 않는다.
 - `service/command/context.py`: `prepare_runtime_context(PrepareRuntimeContextCommand)`. 기존 모델 대체 계획을 저장할 수 있는 쓰기 유스케이스이며 ConversationRuntimeView를 반환한다. 로어 활성화는 lorebook 공개 서비스에 고정 스냅샷과 `activation_text`를 전달한다.
+- `service/command/history.py`: `advance_history_revision(AdvanceHistoryRevisionCommand)`은 소유 대화를 잠그고 파괴적 chat 변경 세대를 증가시킨다. memory 무효화가 같은 최상위 트랜잭션에서 호출한다.
 - `repository.py`: 자체 테이블만 조회/저장. `mapper/persistence.py`: 자체 Entity와 공개 snapshot/runtime 결과의 순수 변환.
 - `router.py`, `mapper/schema.py`: 시작·버전 전환·업데이트 조회의 기존 HTTP 경로, DTO 이름, 필드, 상태 코드를 유지한다. 시작 라우터는 최상위 유스케이스에 연결한다.
 

@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.http.answers import router as AnswersRouter
+from app.http.media import router as MediaRouter
 from app.modules.chatting.chat.router import router as MessagesRouter
 from app.modules.chatting.conversation.router import router as Router1
 from app.modules.content.character.router import router as Router3
@@ -15,6 +17,7 @@ from app.modules.governance.moderation.lorebook_router import router as Router12
 """Application router assembly: owner routes precede administrative UUID routes."""
 
 router = APIRouter()
+router.include_router(MediaRouter)
 
 router.include_router(Router1)
 
@@ -36,3 +39,4 @@ router.include_router(Router11)
 
 router.include_router(Router12)
 router.include_router(MessagesRouter)
+router.include_router(AnswersRouter)

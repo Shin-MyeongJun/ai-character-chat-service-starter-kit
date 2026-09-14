@@ -50,6 +50,21 @@ async def list_messages(session, conversation_id, after, limit):
     )
 
 
+async def list_message_range(session, conversation_id, after, through, limit):
+    stmt = select(Message).where(
+        Message.conversation_id == conversation_id, Message.position > after
+    )
+    if through is not None:
+        stmt = stmt.where(Message.position <= through)
+    return list(
+        await session.scalars(
+            stmt.order_by(Message.position)
+            .limit(limit + 1)
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
 async def get_message_request(session, conversation_id, request_key):
     return await session.get(
         MessageRequest, (conversation_id, request_key), populate_existing=True
@@ -151,7 +166,14 @@ async def get_owned_generation(session, generation_id, user_id, *, lock=False):
 
 
 async def create_generation(
-    session, conversation, execution, user_id, request_key, digest, input_text
+    session,
+    conversation,
+    execution,
+    user_id,
+    request_key,
+    digest,
+    input_text,
+    input_message_id=None,
 ):
     run = ProductGeneration(
         id=uuid4(),
@@ -169,6 +191,8 @@ async def create_generation(
     )
     session.add(run)
     await session.flush()
+    if input_message_id is not None:
+        return run
     session.add(
         Message(
             conversation_id=conversation.id,
@@ -181,6 +205,28 @@ async def create_generation(
     )
     await session.flush()
     return run
+
+
+async def update_answer(session, generation_id, metadata, lease_until):
+    await session.execute(
+        update(ProductGeneration)
+        .where(ProductGeneration.id == generation_id)
+        .values(answer_metadata=metadata, answer_lease_until=lease_until)
+    )
+
+
+async def list_expired_answers(session, now, limit):
+    return list(
+        await session.scalars(
+            select(ProductGeneration)
+            .where(
+                ProductGeneration.status == "pending",
+                ProductGeneration.answer_lease_until <= now,
+            )
+            .order_by(ProductGeneration.answer_lease_until)
+            .limit(limit)
+        )
+    )
 
 
 async def add_generation_message(session, run, output, character_id) -> None:

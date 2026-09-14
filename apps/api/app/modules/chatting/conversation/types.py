@@ -75,6 +75,7 @@ class ConversationInfo:
     initial_snapshot_id: UUID | None
     start_set_id: UUID | None
     created_at: datetime
+    history_revision: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +115,12 @@ class OwnedConversationCommand:
     conversation_id: UUID
     user_id: UUID
     lock: bool = False
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AdvanceHistoryRevisionCommand:
+    conversation_id: UUID
+    user_id: UUID
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

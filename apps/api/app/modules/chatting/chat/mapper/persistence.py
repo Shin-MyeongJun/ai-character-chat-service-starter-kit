@@ -33,6 +33,21 @@ def messages_entities_to_page_info(
     return Types.MessagePageInfo(items, cursor)
 
 
+def messages_entities_to_memory_source_info(entities, limit) -> Types.MemorySourceInfo:
+    return Types.MemorySourceInfo(
+        messages=tuple(
+            Types.MessageInfo(
+                **{
+                    key: getattr(entity, key)
+                    for key in Types.MessageInfo.__dataclass_fields__
+                }
+            )
+            for entity in entities[:limit]
+        ),
+        truncated=len(entities) > limit,
+    )
+
+
 def message_request_entity_to_info(entity) -> Types.MessageRequestInfo | None:
     return (
         None

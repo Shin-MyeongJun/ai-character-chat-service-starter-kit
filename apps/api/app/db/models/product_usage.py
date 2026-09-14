@@ -16,6 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +70,10 @@ class ProductGeneration(UuidPkMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     history_invalidated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
+    )
+    answer_metadata: Mapped[dict | None] = mapped_column(JSONB)
+    answer_lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
     )
 
 

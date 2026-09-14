@@ -76,7 +76,9 @@ class Character(TimestampMixin, UuidPkMixin, Base):
 class CharacterImage(TimestampMixin, UuidPkMixin, Base):
     __tablename__ = "character_images"
     __table_args__ = (
-        UniqueConstraint("character_id", "emotion_tag", name="uq_character_images_emotion"),
+        UniqueConstraint(
+            "character_id", "emotion_tag", name="uq_character_images_emotion"
+        ),
         Index(
             "uq_character_images_default_per_character",
             "character_id",
@@ -92,7 +94,14 @@ class CharacterImage(TimestampMixin, UuidPkMixin, Base):
     )
     emotion_tag: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
-    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    media_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_media.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
 
 class CharacterAsset(TimestampMixin, UuidPkMixin, Base):
@@ -113,3 +122,8 @@ class CharacterAsset(TimestampMixin, UuidPkMixin, Base):
     asset_type: Mapped[str] = mapped_column(Text, nullable=False)
     purpose: Mapped[str] = mapped_column(Text, nullable=False)
     file_url: Mapped[str] = mapped_column(Text, nullable=False)
+    media_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("character_media.id", ondelete="RESTRICT"),
+        index=True,
+    )

@@ -46,4 +46,7 @@ redis-data/
 contracts/openapi.json
 
 # local reference notes
-references_document/
+references_document/*
+!references_document/work/
+references_document/work/*
+!references_document/work/nonstream-chat-orchestration.md

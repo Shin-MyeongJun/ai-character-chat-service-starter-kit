@@ -1,15 +1,47 @@
-from app.modules.chatting.memory.service.command import invalidate_conversation_memories
+from app.modules.chatting.memory.service.command import (
+    MemoryIndexer,
+    SummaryGenerator,
+    claim_memory_work,
+    complete_memory_work,
+    content_digest,
+    estimate_tokens,
+    fail_memory_work,
+    invalidate_conversation_memories,
+    plan_summarization,
+    save_summary,
+    save_summary_embedding,
+    schedule_memory_work,
+    validate_summary_source,
+)
 from app.modules.chatting.memory.service.query import (
+    MemoryRetriever,
+    estimate_rendered_memory_tokens,
     get_latest_summary,
     get_memory,
+    get_pending_index,
     list_memories,
     search_memories,
 )
 
 __all__ = [
+    "MemoryIndexer",
+    "MemoryRetriever",
+    "SummaryGenerator",
+    "claim_memory_work",
+    "complete_memory_work",
+    "content_digest",
+    "estimate_rendered_memory_tokens",
+    "estimate_tokens",
+    "fail_memory_work",
     "get_latest_summary",
     "get_memory",
+    "get_pending_index",
     "invalidate_conversation_memories",
     "list_memories",
+    "plan_summarization",
+    "save_summary",
+    "save_summary_embedding",
+    "schedule_memory_work",
     "search_memories",
+    "validate_summary_source",
 ]
