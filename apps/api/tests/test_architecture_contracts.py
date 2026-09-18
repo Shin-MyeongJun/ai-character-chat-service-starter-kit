@@ -24,7 +24,27 @@ def test_openapi_contract_is_unchanged():
             encoding="utf-8"
         )
     )
-    assert app.openapi() == baseline
+    # 신규 인증 API만 추가를 허용하고 기존 경로·스키마 계약은 그대로 비교한다.
+    actual = app.openapi()
+    assert set(actual["paths"]) - set(baseline["paths"]) == {
+        "/auth/csrf",
+        "/auth/register",
+        "/auth/email/resend",
+        "/auth/email/verify",
+        "/auth/password/reset/request",
+        "/auth/password/reset",
+        "/auth/login",
+        "/auth/refresh",
+        "/auth/logout",
+        "/auth/logout-all",
+        "/auth/me",
+        "/auth/google/start",
+        "/auth/google/callback",
+    }
+    for path, contract in baseline["paths"].items():
+        assert actual["paths"][path] == contract
+    for name, schema in baseline["components"]["schemas"].items():
+        assert actual["components"]["schemas"][name] == schema
 
 
 def test_services_and_routers_do_not_execute_sql_or_import_orm():

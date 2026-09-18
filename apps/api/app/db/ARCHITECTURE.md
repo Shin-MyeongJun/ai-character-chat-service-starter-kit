@@ -17,7 +17,7 @@
 
 | 모델 파일 | 읽어야 할 연결 |
 | --- | --- |
-| identity.py | users role/status, OAuth 연결 스키마. 현재 런타임 인증 구현과 별개 |
+| identity.py | users 정규화 이메일/인증 상태, OAuth provider/sub, 인증 세션·일회용 토큰·OIDC state·DB 요청 제한. identity 서비스가 소유 |
 | character.py, character_media.py | 원본 이미지/자산의 선택적 media_id. 캐릭터당 감정 태그 UNIQUE, 기본 이미지 부분 UNIQUE. 미디어 예약은 소유자/캐릭터 FK 없이 남음 |
 | lorebook.py | title/token_budget nullable, metadata JSON, 1536차원 벡터. entry_type에 start_set 포함 |
 | product.py | 편집 구성 링크·선택 대상·원본 시작 항목. 복합 FK로 같은 상품에 속한 링크만 연결 |
@@ -54,6 +54,7 @@
 | 0017 | 기억 요약 출처·색인 상태·작업 큐, conversation history_revision |
 | 0018 | 답변 metadata/복구 lease |
 | 0019 | 관리 미디어 예약과 원본/발행 미디어 참조; 기존 URL 유지 |
+| 0020 | 이메일 정규화 사전 충돌 검사, 인증 상태·대기 만료, 인증 세션/증명/OIDC/제한 테이블. 초기 SQL 011과 대응 |
 
 초기 SQL 004는 0002–0014의 누적 변경을 포함한다. 007/008/009/010은 각각 0015/0017/0018/0019 대응이다. SQL 원문과 Python의 SQL 문자열은 이번에 변경하지 않았다. 생성 형태의 고정 DDL 설명은 이 문서에 모았다.
 

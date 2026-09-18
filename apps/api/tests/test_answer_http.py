@@ -130,6 +130,18 @@ async def test_lifespan_connects_sessions_and_closes_owned_clients(
     monkeypatch.setenv("ASSET_STORAGE_KIND", "test_local")
     monkeypatch.setenv("ASSET_TEST_LOCAL_ROOT", str(tmp_path))
     monkeypatch.setenv("ENVIRONMENT", "test")
+    # 인증도 앱 수명에 함께 조립되므로 실제 비밀값 대신 실행마다 만든 테스트 키를 주입한다.
+    import base64
+    import secrets
+
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv(
+        "AUTH_JWT_KEY", base64.b64encode(secrets.token_bytes(32)).decode()
+    )
+    monkeypatch.setenv("AUTH_FLOW_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("SMTP_HOST", "localhost")
+    monkeypatch.setenv("SMTP_FROM", "test@example.com")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     monkeypatch.setenv("VOYAGE_API_KEY", "test-only")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -156,6 +168,8 @@ async def test_lifespan_connects_sessions_and_closes_owned_clients(
     async with app.router.lifespan_context(app):
         assert app.state.answer_orchestrator is not None
         assert app.state.session_factory is not None
+        assert app.state.authentication is not None
+        assert app.state.google_login is not None
         storage_factory.assert_called_once()
         assert (
             app.state.product_media_service.media is app.state.character_media_service

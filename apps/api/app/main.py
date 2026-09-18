@@ -1,15 +1,17 @@
 # ASGI 조립: DB 세션·미디어 저장소·LLM·답변 복구 작업의 수명을 함께 관리한다.
-# create_app(authenticate=...)는 owner 훅만 교체한다. admin/moderator 훅은 별도 연결이 필요하다.
-"""ASGI composition. An identity verifier must be supplied by the deployment."""
+# 기본 owner 훅은 쿠키 인증에 연결하고 명시적인 authenticate 주입 계약은 보존한다.
+"""ASGI 조립과 인증·외부 어댑터의 수명 관리."""
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.http import character_dependencies, dependencies, lorebook_dependencies
@@ -23,6 +25,17 @@ from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.chatting.prompt import service as PromptService
 from app.modules.content.character.service.media import CharacterMediaService
 from app.modules.content.product.service.views.media import ProductMediaService
+from app.modules.identity.adapters import GoogleOIDCVerifier, SMTPMailSender
+from app.modules.identity.dependencies import get_verified_user_id
+from app.modules.identity.http_security import (
+    AuthAccessLogFilter,
+    CookieCSRFMiddleware,
+    error_response,
+)
+from app.modules.identity.router import router as identity_router
+from app.modules.identity.service import AuthenticationService, GoogleLoginService
+from app.modules.identity.settings import load_auth_settings
+from app.modules.identity.types import AuthError
 from app.modules.llm.adapters import (
     AnthropicAdapter,
     MockLLMAdapter,
@@ -51,6 +64,14 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
             stack.push_async_callback(engine.dispose)
             sessions = async_sessionmaker(engine, expire_on_commit=False)
             app.state.session_factory = sessions
+            auth_settings = load_auth_settings()
+            authentication = AuthenticationService(
+                sessions, auth_settings, SMTPMailSender(auth_settings)
+            )
+            app.state.authentication = authentication
+            app.state.google_login = GoogleLoginService(
+                authentication, GoogleOIDCVerifier(auth_settings)
+            )
             asset_settings = load_asset_storage_settings()
             asset_storage = create_asset_storage_service(asset_settings)
             stack.push_async_callback(asset_storage.aclose)
@@ -169,19 +190,40 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
 
     app = FastAPI(lifespan=lifespan)
     app.include_router(router)
+    app.include_router(identity_router)
+
+    async def handle_auth_error(request: Request, error: AuthError):
+        return error_response(error, request)
+
+    app.add_exception_handler(AuthError, handle_auth_error)
+    app.add_middleware(CookieCSRFMiddleware)
+    # 쿠키 CORS는 정확한 출처만 허용한다. '*'과 Origin 반사는 사용하지 않는다.
+    origins = [os.getenv("AUTH_PUBLIC_ORIGIN", "http://localhost:8000").rstrip("/")]
+    origins.extend(
+        x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[x for x in origins if x != "*"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-CSRF-Token"],
+    )
+    logging.getLogger("uvicorn.access").addFilter(AuthAccessLogFilter())
     for hook in (
         dependencies.get_product_session,
         character_dependencies.get_character_session,
         lorebook_dependencies.get_lorebook_session,
     ):
         app.dependency_overrides[hook] = get_database_session
-    if authenticate is not None:
-        for auth_hook in (
-            dependencies.get_current_owner_id,
-            character_dependencies.get_current_owner_id,
-            lorebook_dependencies.get_current_owner_id,
-        ):
-            app.dependency_overrides[auth_hook] = authenticate
+    for auth_hook in (
+        dependencies.get_current_owner_id,
+        character_dependencies.get_current_owner_id,
+        lorebook_dependencies.get_current_owner_id,
+    ):
+        app.dependency_overrides[auth_hook] = (
+            authenticate if authenticate is not None else get_verified_user_id
+        )
     return app
 
 

@@ -31,6 +31,14 @@ services:
       timeout: 5s
       retries: 5
 
+  # 로컬에서 인증/재설정 메일의 실제 링크를 확인하는 개발 전용 SMTP 수신함.
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    profiles: [auth-dev]
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
 volumes:
   postgres_data:
   redis_data:
