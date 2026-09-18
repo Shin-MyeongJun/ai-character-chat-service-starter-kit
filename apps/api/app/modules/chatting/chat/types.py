@@ -1,3 +1,7 @@
+# position은 DB 전역 순번(연속 번호 아님), revision은 개별 메시지 수정 버전이다.
+# product_character_id는 상품 구성 슬롯, character_id는 원본, product_snapshot_id는 사용 버전이다.
+# GenerationInfo.message_count는 원래 성공 출력 수이며 이력 삭제 후에도 유지된다.
+# answer_lease_until=None인 legacy 생성은 답변 lease 복구 대상에서 제외된다.
 from __future__ import annotations
 
 from dataclasses import dataclass

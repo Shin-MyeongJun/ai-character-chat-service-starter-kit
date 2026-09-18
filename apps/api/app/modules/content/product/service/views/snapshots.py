@@ -1,3 +1,4 @@
+# 캐릭터 스냅샷의 URL 참조 여부를 공개 조회로 확인한다. 파일 삭제나 저장소 조회는 하지 않는다.
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service import query as CharacterQueryService
 from app.modules.content.product import types as Types

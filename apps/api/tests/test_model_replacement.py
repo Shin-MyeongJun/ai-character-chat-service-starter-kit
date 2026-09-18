@@ -1,3 +1,4 @@
+# 허용 목록을 벗어나지 않는 후보 선택과 effort 동률의 낮은 단계 우선 규칙을 확인한다.
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4

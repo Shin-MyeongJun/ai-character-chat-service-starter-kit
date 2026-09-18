@@ -1,3 +1,5 @@
+# 발행마다 구성 슬롯·시작 항목은 새 스냅샷 행으로 만든다. 원본 링크 ID와 버전 링크 ID는 다르다.
+# 버전 번호 MAX+1은 상위 상품 잠금을 전제로 한다. 만료 변경은 이전/신규 시각과 사유 이력을 남긴다.
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 

@@ -1,3 +1,5 @@
+# 답변 흐름: 요청 예약 → 세션 종료 → 문맥 검색·LLM → 결과 staging → 메시지·사용량·기억 예약 확정.
+# DB와 공급자 호출은 하나의 원자적 작업이 아니다. lease 복구는 저장된 결과만 사용한다.
 """One durable nonstream answer. Never repeat an uncertain provider call."""
 
 from __future__ import annotations
@@ -94,6 +96,8 @@ class AnswerOrchestrator:
         self.config = config or AnswerConfig()
         self.template = template or PromptService.load_template()
 
+    # 저장된 마지막 사용자 메시지와 지정 캐릭터로 답변 하나를 만든다. 같은 키의 완료/진행 결과는 재사용한다.
+    # 예약 이후 외부 호출과 결과 staging은 별도 단계이며, 저장 실패는 lease 복구로 이어질 수 있다.
     async def generate_answer(self, command: GenerateAnswerCommand) -> AnswerInfo:
         if (
             not command.request_key.strip()
@@ -115,6 +119,7 @@ class AnswerOrchestrator:
                     request_key=command.request_key,
                 ),
             )
+            # 같은 키는 공급자를 다시 호출하지 않는다. 다른 입력·캐릭터 또는 변경된 이력은 충돌이다.
             if existing is not None:
                 if (
                     existing.conversation_id != command.conversation_id
@@ -248,6 +253,7 @@ class AnswerOrchestrator:
                     ).hexdigest(),
                     "estimated_prompt_tokens": prompt.estimated_tokens,
                 }
+                # calling 단계를 먼저 저장한다. 이후 프로세스가 중단되면 호출 성공 여부를 알 수 없다고 복구한다.
                 await self._stage(run.id, command.user_id, metadata, lease)
                 result = await self.text.generate_text(
                     LLMTypes.GenerateTextCommand(
@@ -329,6 +335,8 @@ class AnswerOrchestrator:
                 ),
             )
 
+    # 잠금 아래 생성 상태를 다시 확인하고 staging된 결과를 메시지·usage·memory 예약에 반영한다.
+    # recover=True라도 공급자를 다시 호출하지 않는다.
     async def _finalize(self, generation_id, user_id, *, recover=False):
         async with self.sessions() as session, use_case_transaction(session):
             run = await ChatService.get_generation_state(
@@ -357,6 +365,7 @@ class AnswerOrchestrator:
                 or run.answer_lease_until > datetime.now(UTC)
             ):
                 return _answer_info(run)
+            # 복구 시 결과가 없으면 호출을 재실행하지 않고 preparing/calling에 따라 실패와 불확실성을 기록한다.
             if metadata.get("phase") != "result_ready":
                 if not recover:
                     raise AnswerStorageError("No durable provider result.")
@@ -414,6 +423,8 @@ class AnswerOrchestrator:
             )
             return _answer_info(run)
 
+    # 반환값은 조회한 만료 생성 수다. 개별 복구 실패도 포함하므로 성공 건수로 해석하지 않는다.
+    # lease가 만료된 답변만 순회한다. 결과가 없으면 중단 단계를 구분해 실패 처리하고 저장된 결과는 완료를 재시도한다.
     async def recover_answers(self) -> int:
         async with self.sessions() as session:
             expired = await ChatService.list_expired_answers(

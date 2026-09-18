@@ -1,3 +1,5 @@
+# 편집 로어 항목의 활성화·배치 설정과 선택적 벡터다. metadata_는 DB의 metadata 열에 대응한다.
+# title과 token_budget은 None을 허용한다. 설정 저장과 답변 프롬프트에서의 적용 범위는 별개다.
 from enum import StrEnum
 from uuid import UUID
 

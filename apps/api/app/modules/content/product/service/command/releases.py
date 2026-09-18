@@ -1,3 +1,6 @@
+# 발행마다 새 버전과 릴리스 노트를 저장한다. 같은 요청의 자동 중복 제거 키는 없다.
+# 콘텐츠 변경 또는 기존 미디어 제거는 content, 그 외 후속 발행은 media로 분류한다.
+# media이면서 auto_apply_media=True인 경우에만 automatic으로 기록한다.
 from datetime import UTC, datetime
 
 from app.db.transaction import use_case_transaction
@@ -29,6 +32,7 @@ async def _get_media_manifest(session, sid):
     return info.manifest
 
 
+# 고정 스냅샷·구성·릴리스 노트를 같은 트랜잭션에 만든다. 명시적 요청 키 재사용 계약은 없다.
 async def publish_product(session, command: Types.PublishCommand) -> ReleaseInfo:
     product_id = command.product_id
     owner_id = command.owner_id
@@ -68,6 +72,7 @@ async def publish_product(session, command: Types.PublishCommand) -> ReleaseInfo
         )
 
 
+# 발행 내용은 그대로 두고 안내 문구만 정정한다. 이전 summary/body와 편집자를 별도 이력에 남긴다.
 async def correct_note(session, command: Types.CorrectNoteCommand) -> ReleaseInfo:
     product_id = command.product_id
     snapshot_id = command.snapshot_id

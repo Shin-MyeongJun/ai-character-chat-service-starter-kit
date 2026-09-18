@@ -1,3 +1,4 @@
+# 상품 만료·검수 상태 변경을 product 공개 Command로 위임한다. 관리자 검사는 해당 product 서비스에서 수행한다.
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import command as ProductCommandService
 from app.modules.governance.admin import types as Types

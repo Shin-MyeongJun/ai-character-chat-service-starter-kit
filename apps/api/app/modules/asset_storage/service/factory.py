@@ -1,3 +1,4 @@
+# 앱 시작 시 선택한 저장소의 어댑터 하나를 만든다. 요청마다 클라이언트를 새로 만들지 않는다.
 from __future__ import annotations
 
 from typing import Any

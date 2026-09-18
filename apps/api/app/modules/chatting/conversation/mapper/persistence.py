@@ -1,3 +1,4 @@
+# 상품 구성 슬롯 ID와 원본 character ID를 구분해 참여자 값으로 옮긴다. runtime은 원본 대신 스냅샷 내용을 사용한다.
 from __future__ import annotations
 
 from typing import overload

@@ -1,3 +1,5 @@
+# 상품 초안은 소유자 기준으로 관리하고 발행 이력이 있으면 삭제를 거절한다.
+# 만료/상태 정책 변경은 identity.require_admin으로 DB 사용자 역할·상태를 검사한다.
 "Commands own transactions; owner_id must come from trusted authentication."
 
 from sqlalchemy.ext.asyncio import AsyncSession

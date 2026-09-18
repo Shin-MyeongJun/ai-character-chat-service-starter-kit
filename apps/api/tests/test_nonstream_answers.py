@@ -1,3 +1,4 @@
+# PostgreSQL과 mock 공급자로 중복 요청·취소·결과 staging 실패·복구를 검증한다. 외부 호출 중 대화 잠금도 검사한다.
 """Real PostgreSQL orchestration with mocked external text/embedding calls."""
 
 import asyncio

@@ -1,3 +1,5 @@
+# 저장된 요약을 document 용도로 임베딩한다. 1536차원·유한값·비영 벡터를 확인한다.
+# save_summary_embedding은 원문 세대와 본문 digest를 재확인하며 트랜잭션은 상위 use_case가 소유한다.
 from __future__ import annotations
 
 import hashlib
@@ -65,6 +67,7 @@ class MemoryIndexer:
         )
 
 
+# 대화 소유권·revision·요약 본문 digest가 유효한 경우에만 벡터와 사용량을 저장한다.
 async def save_summary_embedding(
     session, command: Types.SaveEmbeddingCommand
 ) -> Types.MemoryInfo:

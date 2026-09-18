@@ -1,3 +1,4 @@
+# 원본 로어북 조회를 실패 mock으로 막아 런타임이 발행 스냅샷만 활성화하는지 검증한다.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4

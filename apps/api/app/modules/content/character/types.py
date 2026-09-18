@@ -1,3 +1,6 @@
+# CharacterSnapshotInfo.character_id=None은 원본 삭제 후에도 남은 복사본이다. snapshot id와 원본 id는 별개다.
+# CharacterMediaInfo.size_bytes는 바이트 수, binding=None은 아직 연결한 이력이 없는 업로드다.
+# state는 pending(예약), ready(저장 확인), deleting(정리 중), deleted(정리 완료)로 사용한다.
 from __future__ import annotations
 
 from dataclasses import dataclass

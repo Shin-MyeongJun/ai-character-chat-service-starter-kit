@@ -1,3 +1,4 @@
+# main에서 DB 및 선택적 owner 인증을 주입하는 공통 훅. 관리자·모더레이터 가드는 별도다.
 """Integration hooks for the lorebook HTTP adapter.
 
 The application can replace these with FastAPI dependency overrides until

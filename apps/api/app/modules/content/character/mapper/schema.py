@@ -1,3 +1,4 @@
+# 인증 owner를 Command에 명시적으로 합치고 결과를 기존 DTO로 변환한다. 삭제 응답 true는 서비스 정상 종료를 뜻한다.
 from uuid import UUID
 
 from app.modules.content.character import schemas as Schemas

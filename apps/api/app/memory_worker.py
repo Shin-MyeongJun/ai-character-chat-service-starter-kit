@@ -1,3 +1,6 @@
+# 대화별 durable memory_jobs를 claim하여 제한된 동시성으로 요약·색인 유스케이스를 실행한다.
+# lease 갱신 루프는 없으며, 만료 작업은 다른 claim에서 재획득될 수 있다.
+# --once는 한 건만 처리한다는 뜻이 아니라 현재 claim 가능한 작업과 실행 중 작업이 없어질 때 종료한다.
 """Durable Hypha memory worker.
 
 Run from ``apps/api`` with ``python -m app.memory_worker``. Provider keys and

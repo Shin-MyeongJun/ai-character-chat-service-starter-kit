@@ -1,3 +1,6 @@
+# 발행 시 고정한 구성 연결이다. 슬롯·로어 연결·시작 항목 ID는 편집 원본 ID와 다르다.
+# 시작 항목은 발행마다 새 행을 만들며 source_entry_id가 원본 로어 항목을 가리킨다.
+# expires_at=None은 만료 제한 없음이며 만료 정책 변경은 별도 이력에 남긴다.
 from datetime import datetime
 from uuid import UUID
 

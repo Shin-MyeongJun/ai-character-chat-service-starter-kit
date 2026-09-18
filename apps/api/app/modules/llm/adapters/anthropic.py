@@ -1,3 +1,5 @@
+# 중립 봉투의 system 메시지는 합쳐 별도 인자로, 나머지는 messages로 전달한다.
+# text 블록만 답변에 합치며 캐시 생성·읽기 사용량을 포함해 total_tokens를 계산한다.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping

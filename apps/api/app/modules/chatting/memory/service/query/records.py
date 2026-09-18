@@ -1,3 +1,4 @@
+# 소유 대화 범위에 한정한다. 미소유·미존재 단건은 None, 목록은 빈 페이지로 반환한다.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.chatting.memory import repository as Repository

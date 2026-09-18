@@ -1,3 +1,5 @@
+# 호환 ready 기억이 있을 때만 query 임베딩을 호출하고 관련도·중요도·최근성으로 예산 안에서 선택한다.
+# MemoryRetriever는 외부 호출 전 세션을 닫는다. 호환 함수 search_memories는 전달받은 세션을 유지한다.
 """Authorized semantic retrieval and explainable Hypha selection."""
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ class MemoryRetriever:
         self._session_factory = session_factory
         self._embedding_service = embedding_service
 
+    # 인가·호환 기억 존재 확인 후 세션을 닫고 query 임베딩을 호출한다. 없으면 외부 호출 없이 빈 결과다.
     async def retrieve_memories(
         self, command: Types.SearchMemoriesCommand
     ) -> list[Types.RetrievedMemoryInfo]:
@@ -110,6 +113,7 @@ def _validate_query_embedding(embedding: LLMTypes.EmbeddingResultInfo) -> None:
         )
 
 
+# 기존 호출자를 위한 세션 주입 경로다. 외부 호출 전 세션을 닫는 책임까지 맡지 않는다.
 async def search_memories(
     session: AsyncSession,
     query: Types.SearchMemoriesCommand,

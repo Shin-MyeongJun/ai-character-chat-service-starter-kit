@@ -10,3 +10,13 @@
 상품 버전 정보는 product 공개 query에서 받고, 통계 갱신 요청은 product 공개 Command로 전달한다. 타 모듈 ORM/JOIN 예외는 없다. use_case_transaction 및 멱등 잠금으로 재시도와 동시 환불을 처리한다.
 
 이 기능은 이미 확정된 결제 사실의 귀속을 기록한다. 실제 결제 승인·외부 PG 호출·잔액 차감·구독 상태 처리는 구현하지 않는다. 귀속과 사용량 쓰기는 서로 다른 유스케이스이므로 파일을 나눴고 공통 저장소는 규모와 응집도를 고려해 유지했다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: chat.finish_generation → billing.record_usage → repository.create_usage_log. 매출/환불은 별도로 attribution.record_sale/record_refund → 키 잠금 → 결제/원매출 잠금 → 누계 검증 → 귀속 이벤트와 통계 예약을 따라 읽는다.
+
+금액은 currency 단위 Decimal이며 cost_credit과 다르다. refund의 occurred_at은 실제 환불 시각, attributed_at은 원매출 귀속 시각이다. 통계 facts 조회는 [start, end), 사용량 created_at과 결제 attributed_at을 각각 사용한다.
+
+관련 테스트: `test_product_usage`, `test_product_statistics`, `test_use_case_transaction`. billing router/schemas 및 credit service/repository의 빈 파일은 작업 목록에 남겼으며 존재만으로 HTTP 결제나 잔액 차감 기능으로 해석하지 않는다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

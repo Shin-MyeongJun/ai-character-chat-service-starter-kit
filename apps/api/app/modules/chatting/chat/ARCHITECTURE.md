@@ -58,3 +58,11 @@ version_changes는 메시지를 참조하는 컬럼이 없으며 conversation과
 HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에 연결한다. 인증 구현은 없어 기본 인증 훅은 503이며 우회 인증을 만들지 않았다. 배포 앱은 검증된 identity dependency를 `create_app(authenticate=...)`에 제공해야 한다. 비스트리밍 답변은 `app.http.answers` → `app.use_cases.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
 
 답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 기존 finish와 memory 예약을 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: `router.py` → `service/command/messages.py` 또는 `generation.py` → `repository.py` → `mapper/persistence.py` → `types.py`. answers 전용 입력 검증은 `service/command/answers.py`와 최상위 오케스트레이터를 함께 본다.
+
+`get_owned_conversation`은 소유권과 값을 확인하는 조회다. 버전 사용 가능 여부는 생성 경로가 product 공개 서비스로 추가 확인한다. repository만 직접 호출한다고 같은 인가·멱등성·상태 검사를 보장하지 않는다. 대조 테스트는 `test_chat_messages`, `test_chat_http`, `test_product_usage`, `test_nonstream_answers`다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

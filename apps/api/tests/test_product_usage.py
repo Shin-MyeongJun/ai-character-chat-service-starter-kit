@@ -1,3 +1,4 @@
+# 생성 중복 키·완료 상태·사용량 저장과 결제 배분·환불 귀속을 DB에서 확인한다.
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal

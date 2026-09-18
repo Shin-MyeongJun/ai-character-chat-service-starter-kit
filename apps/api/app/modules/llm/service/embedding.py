@@ -1,3 +1,5 @@
+# 문서 색인과 검색 질의의 임베딩을 별도 어댑터로 전달한다.
+# 텍스트 생성 모델 라우팅과 독립적이며, 오류를 그대로 호출자에게 전파한다.
 from __future__ import annotations
 
 from collections.abc import Iterable

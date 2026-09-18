@@ -1,3 +1,6 @@
+# 동기 boto3 작업을 스레드에 넘기고 SDK 오류를 AssetStorageError로 변환한다.
+# 재시도 횟수는 botocore total_max_attempts이며, 존재하지 않는 키 삭제는 성공으로 취급한다.
+# 업로드 길이는 seek 가능한 스트림만 사전 확인한다. 저장과 DB 기록을 묶는 트랜잭션은 없다.
 from __future__ import annotations
 
 import asyncio

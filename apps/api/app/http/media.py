@@ -1,3 +1,6 @@
+# 바이너리 업로드를 최대 32 MiB까지 임시 스트림에 모아 미디어 서비스에 전달한다.
+# 읽기 권한 확인 후 64 KiB씩 전송하며 전송 완료·실패 모두 reader를 닫는다.
+# 전송 시작 뒤 발생한 읽기 오류는 media_errors의 HTTP 변환 범위 밖이다.
 """Additive binary HTTP transport; existing JSON media DTOs remain unchanged."""
 
 from contextlib import contextmanager

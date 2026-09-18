@@ -1,3 +1,5 @@
+# 서울 날짜별 재계산 결과와 사용자 중복 제거용 행, 재계산할 날짜 큐다.
+# revenue는 통화별 금액 묶음이고 cost_credit은 정수 크레딧이다. 날짜별 active_users 합은 기간 순사용자 수와 다르다.
 from datetime import date, datetime
 from uuid import UUID
 

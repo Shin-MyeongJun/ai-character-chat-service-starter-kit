@@ -1,3 +1,5 @@
+# 초안 구성 전체 교체. 상품 → 캐릭터 → 로어북 잠금과 소유권 확인 후 링크를 갱신한다.
+# 초안은 빈 캐릭터·주인공 없음도 허용하며 발행 단계에서 더 강한 조건을 검사한다.
 from app.db.transaction import use_case_transaction
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service import query as CharacterQueryService
@@ -43,6 +45,7 @@ def _validate_composition(value: Types.ProductCompositionInfo):
             raise ValueError("Targets must be distinct characters in this product.")
 
 
+# 소유 상품과 선택 소스를 잠근 뒤 구성을 교체한다. 제거된 로어/캐릭터 연결에 딸린 범위 정보도 함께 바뀐다.
 async def replace_composition(
     session, command: Types.ReplaceCompositionCommand
 ) -> Types.ProductCompositionInfo:

@@ -11,3 +11,11 @@
 콘텐츠의 repository/mapper/schemas를 직접 가져오지 않는다. 공개 service/types만 사용한다. HTTP 오류 변환은 HTTP 계층에 두며 product/llm 내부 service에서는 identity 공개 service로 관리자 DB 인가도 수행한다. 인가 JOIN 예외는 없다.
 
 일반 사용자 라우팅과 관리자 라우팅을 분리하되, 공유 DTO 정의와 의존성 함수의 정체성을 유지해 OpenAPI 이름 및 dependency_overrides가 달라지지 않게 했다. 실제 인증 훅은 기존과 같이 미연결 상태에서 503으로 거절한다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: app/http/routes의 등록 순서 → 각 router → mapper → 공개 product/llm 서비스 또는 content query. character/lorebook 전역 조회는 HTTP 역할 가드에 의존하고, 상품/모델 변경은 도메인 서비스의 identity DB 검사로 이어진다.
+
+일반 authenticate 주입은 character/lorebook 전용 관리자 가드를 자동 구현하지 않는다. 빈 router.py는 별도 등록 API가 아니다. 관련 테스트: `test_content_actor_routes`, `test_product_boundaries`, `test_product_expiry`, `test_architecture_contracts`.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

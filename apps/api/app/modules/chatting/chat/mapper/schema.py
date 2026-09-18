@@ -1,3 +1,4 @@
+# 메시지 커서 v1:conversation_id:position을 변환한다. 대화 일치와 위치 범위 검사는 query 서비스가 한다.
 from dataclasses import asdict
 from uuid import UUID
 

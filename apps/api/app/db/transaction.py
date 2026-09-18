@@ -1,3 +1,6 @@
+# 여러 Command가 같은 세션에서 이 컨텍스트를 중첩하면 최외곽에서 한 번 커밋한다.
+# 안쪽 예외를 호출자가 잡아도 failed가 남아 전체 트랜잭션을 롤백한다. savepoint는 만들지 않는다.
+# 이 범위 밖에서 이미 autobegin된 세션은 채택하지 않으므로 SQLAlchemy가 시작 오류를 낸다.
 """Explicitly composed use cases share one transaction and rollback-only state."""
 
 from contextlib import asynccontextmanager

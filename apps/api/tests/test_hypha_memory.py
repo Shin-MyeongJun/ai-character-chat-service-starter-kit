@@ -1,3 +1,4 @@
+# 요약 임계치·최근 원문 보존·pending 인덱싱 재사용·원문 초과 오류를 검증한다. 큐 세대 테스트만 PostgreSQL이 필요하다.
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock

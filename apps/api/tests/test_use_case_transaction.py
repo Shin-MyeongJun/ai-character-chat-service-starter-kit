@@ -1,3 +1,4 @@
+# 최외곽 한 번 커밋, 잡힌 중첩 예외의 전체 롤백, 기존 autobegin 세션 거절을 실제 DB에서 확인한다.
 from uuid import uuid4
 
 import pytest

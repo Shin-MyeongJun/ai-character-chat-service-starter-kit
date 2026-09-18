@@ -1,3 +1,5 @@
+# ORM 생성·초기 SQL·Alembic 경로의 열/타입/NULL/FK/UNIQUE를 비교하고 기존 대화·메시지 보존을 확인한다.
+# CHECK 제약·일반 인덱스·서버 기본값 전체를 비교하는 검사는 아니다.
 import asyncio
 import os
 import subprocess

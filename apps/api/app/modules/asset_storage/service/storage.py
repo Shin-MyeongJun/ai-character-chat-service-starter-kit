@@ -1,3 +1,5 @@
+# character 미디어 흐름에 저장·읽기·삭제·메타데이터 조회를 제공하는 전달 계층이다.
+# 소유권·DB 상태·파일 내용 검증은 이 클래스에서 수행하지 않는다.
 from __future__ import annotations
 
 from typing import Self

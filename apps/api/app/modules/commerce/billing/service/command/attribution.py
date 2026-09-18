@@ -1,3 +1,6 @@
+# 호출자가 검증한 확정 결제·환불을 상품 버전별 매출에 귀속하는 내부 인터페이스다.
+# 키 잠금 후 동일 요청은 저장된 결과를 반환하고, 다른 내용의 키 재사용은 ValueError로 거절한다.
+# 결제/원매출 행을 잠가 배분·환불 누계를 검사하고 같은 트랜잭션에서 통계 재집계를 요청한다.
 """Internal billing interface; caller must supply a verified settled payment/refund.
 
 This records attribution only. It neither charges a customer nor changes balances.
@@ -38,6 +41,7 @@ def _validate_payment_event(event_key, amount, occurred_at):
         raise ValueError("Event time must be timezone-aware and not in the future.")
 
 
+# 확정 Payment의 미배분 금액 안에서 상품 버전에 매출을 귀속한다. 같은 결제의 배분은 정산 시각을 공유한다.
 async def record_sale(
     session, command: Types.RecordSaleCommand
 ) -> Types.PaymentEventInfo:
@@ -104,6 +108,7 @@ async def record_sale(
         return info
 
 
+# 원매출을 잠그고 누적 환불 한도를 확인한다. 환불 발생일과 달라도 통계는 원매출 귀속일을 갱신한다.
 async def record_refund(
     session, command: Types.RecordRefundCommand
 ) -> Types.PaymentEventInfo:

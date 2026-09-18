@@ -1,3 +1,5 @@
+# 외부 호출 전에 모델명·effort·출력 토큰 상한을 검사한다.
+# SDK 예외 분류는 하위 어댑터가 수행하며, 기본 오류 매핑은 상태 코드로 retryable을 정한다.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

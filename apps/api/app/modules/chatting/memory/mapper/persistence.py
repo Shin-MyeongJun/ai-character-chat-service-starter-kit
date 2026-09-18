@@ -1,3 +1,4 @@
+# 기억·작업 Entity를 공개 값으로 변환한다. 유사도는 DB 거리에서 변환된 값이며 음수도 유지한다.
 from typing import cast, overload
 
 from app.db.models.memory import ConversationMemory, MemoryJob

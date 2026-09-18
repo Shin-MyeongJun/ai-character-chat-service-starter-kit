@@ -1,3 +1,5 @@
+# owner가 없는 전역·프롬프트·미디어 조회는 호출자가 인가를 마쳐야 한다. 함수 이름의 public과 인가를 혼동하지 않는다.
+# get_owned_characters는 요청 개수와 조회 개수를 비교하며 발행 시 ID 순 잠금을 요청할 수 있다.
 """Read use cases shared by HTTP routers and other application modules.
 
 Return Result dataclasses, never ORM entities or HTTP schemas. Singular reads

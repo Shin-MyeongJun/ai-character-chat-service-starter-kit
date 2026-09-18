@@ -1,3 +1,5 @@
+# 기본 훅은 503으로 거절한다. main은 session을 연결하고 authenticate가 있으면 owner를 연결한다.
+# errors는 LookupError→404, ValueError→422만 변환하며 다른 오류는 전달한다.
 """Override with shared identity/DB dependencies at application composition time."""
 
 from contextlib import contextmanager

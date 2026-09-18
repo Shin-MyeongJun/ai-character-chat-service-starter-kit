@@ -1,3 +1,5 @@
+# 고정 상품 스냅샷·활성 로어·실행 모델을 조합한다. 모델 대체 이력을 저장할 수 있어 쓰기 트랜잭션을 사용한다.
+# activation_text만 로어 활성화에 사용하며 메시지 이력을 직접 조회하지 않는다.
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper

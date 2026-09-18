@@ -1,3 +1,4 @@
+# HTTP 경로의 대화 ID와 인증 owner를 요청 DTO에 합쳐 답변 Command로 전달한다.
 from dataclasses import asdict
 from uuid import UUID
 

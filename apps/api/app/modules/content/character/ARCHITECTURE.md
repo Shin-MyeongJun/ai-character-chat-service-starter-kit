@@ -25,3 +25,13 @@
 `app/http/media.py`는 기존 인증 훅을 사용하는 추가 바이너리 업로드/스트리밍 HTTP 조립이다. 소유자 경로는 현재 캐릭터 소유권을 검사한다. 상품 스냅샷 읽기는 신뢰된 product 공개 서비스가 접근 검증한 스냅샷 ID만 받으며 직접 HTTP에 공개하지 않는다. 파일 제공은 `read_asset` reader를 스트리밍하고 연결 종료·오류 시 닫는다. 절대 경로·버킷 URL·서명 URL은 반환하지 않는다. `app.main`이 실제 DB 세션과 저장소를 조립하고 인증 검증기는 배포에서 주입한다.
 
 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: router → command/query → repository → persistence/schema mapper. 업로드는 `http/media.py` → `CharacterMediaService` → asset_storage, 발행은 product → freeze_character → 스냅샷 본문/미디어 저장을 따라 읽는다.
+
+조회마다 소유자 조건이 같지는 않다. owner 없는 관리자/내부 query의 인가는 호출자가 맡으며 공개 캐릭터 목록 쿼리는 visibility 조건을 사용한다. 기본 이미지 최대 하나는 DB 부분 UNIQUE다. 두 번째 기본 이미지 추가의 실패 전달은 별도 점검 F03에 기록했다.
+
+관련 테스트: `test_character_command`, `test_character_query`, `test_character_media`, `test_media_http`, `test_media_migrations`. 파일 저장과 DB 전체의 원자성, 저장소 간 이전을 보장한다고 해석하지 않는다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

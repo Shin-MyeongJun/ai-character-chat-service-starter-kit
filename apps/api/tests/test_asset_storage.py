@@ -1,3 +1,4 @@
+# 임시 로컬 경로와 FakeS3Client로 공통 저장 계약을 확인한다. 로컬 쓰기 실패 시 이전 파일 보존도 검사한다.
 from __future__ import annotations
 
 import io

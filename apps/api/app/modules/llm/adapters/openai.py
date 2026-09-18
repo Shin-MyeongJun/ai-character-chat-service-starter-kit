@@ -1,3 +1,5 @@
+# 중립 메시지 봉투를 Responses 입력으로 변환하고 사용량·거절·종료 사유를 공통 결과에 담는다.
+# SDK 호출 예외만 LLMError로 바꾸며, 입력 봉투 검증 오류는 ValueError로 전달한다.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping

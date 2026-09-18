@@ -1,3 +1,4 @@
+# 인증 owner를 요청과 합쳐 Command로 변환한다. 삭제 응답 deleted=True는 성공 종료이며 반복 삭제 보장이 아니다.
 from uuid import UUID
 
 from app.modules.content.lorebook import schemas as Schemas

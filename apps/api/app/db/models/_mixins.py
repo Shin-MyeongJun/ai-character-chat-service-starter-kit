@@ -1,3 +1,4 @@
+# UUID는 DB gen_random_uuid() 기본값으로 생성된다. updated_at의 onupdate는 ORM UPDATE에 적용되며 DB 트리거가 아니다.
 from datetime import datetime
 from uuid import UUID
 

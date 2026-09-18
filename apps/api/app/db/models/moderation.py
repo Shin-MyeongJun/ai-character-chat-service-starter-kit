@@ -1,3 +1,4 @@
+# 신고·감사 기록을 위한 기존 스키마다. 현재 governance 서비스의 상태 변경이 이 행들을 자동 생성하지는 않는다.
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID

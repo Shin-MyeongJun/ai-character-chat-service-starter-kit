@@ -1,3 +1,5 @@
+# 원본·항목 페이지는 created_at/id 내림차순이다. 활성 원본은 priority 내림차순, created_at/id 오름차순이다.
+# freeze는 disabled/start_set을 포함한 모든 항목을 ID 순서로 복사한다. 활성 필터는 읽기 서비스에서 적용한다.
 from __future__ import annotations
 
 from collections.abc import Sequence

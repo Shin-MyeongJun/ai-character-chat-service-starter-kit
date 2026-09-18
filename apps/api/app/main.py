@@ -1,3 +1,5 @@
+# ASGI 조립: DB 세션·미디어 저장소·LLM·답변 복구 작업의 수명을 함께 관리한다.
+# create_app(authenticate=...)는 owner 훅만 교체한다. admin/moderator 훅은 별도 연결이 필요하다.
 """ASGI composition. An identity verifier must be supplied by the deployment."""
 
 from __future__ import annotations

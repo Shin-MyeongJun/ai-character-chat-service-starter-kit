@@ -18,4 +18,14 @@
 
 원본과 스냅샷의 활성화는 같은 query에서 키워드 매칭 판단을 공유한다. 결과 복사는 persistence mapper에 두어 업무 선택과 구조 변환을 분리한다.
 
-스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 기존 503 응답을 보존한다. 실제 DB/auth 연결은 아직 미구현이다.
+스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 기존 503 응답을 보존한다. `app.main`은 DB 세션을 연결한다. 인증 및 character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: http/contracts/lorebook → router → command/query → util/matching → repository → mapper. 발행본 활성화는 conversation의 command/context에서 호출하고 최종 prompt는 chatting/prompt가 만든다.
+
+항목 본문 수정 시 기존 embedding을 지우거나 재생성하는 동작은 현재 command에 없다. semantic 자동 선택은 구현 범위 밖이다. title=None은 원본 스키마에서 허용되지만 상품 시작 옵션의 응답 계약과 충돌할 수 있어 F02에 기록했다. metadata 크기 제한은 문자 수가 아닌 직렬화한 UTF-8 바이트 수다.
+
+관련 테스트: `test_lorebook_command`, `test_lorebook_query`, `test_lorebook_schema`, `test_lorebook_snapshot_activation`. 빈 함수가 아닌 미구현 기능과 단순 재노출 파일은 전체 목록에서 구분한다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

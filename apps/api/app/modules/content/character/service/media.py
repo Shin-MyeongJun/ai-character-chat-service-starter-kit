@@ -1,3 +1,5 @@
+# 업로드 예약을 먼저 커밋한 뒤 객체 저장·ready 확정을 수행한다. DB 실패 시 pending으로 같은 요청을 재개한다.
+# 객체 저장과 DB는 원자적이지 않으므로 모호한 커밋 실패에 즉시 파일을 보상 삭제하지 않는다.
 """Durable upload intents, immutable objects, authorized reads and explicit GC."""
 
 import asyncio
@@ -31,6 +33,7 @@ MEDIA_CONTENT_TYPES = frozenset(
 )
 
 
+# 취소를 기억하되 공급자 작업 종료까지 기다린다. 동기 SDK 스레드가 끝나기 전에 DB 잠금을 풀지 않기 위한 경계다.
 async def _settle_storage(operation):
     # to_thread-backed providers can keep writing after cancellation. Keep the
     # DB lock until the provider settles so retry/GC cannot race that write.
@@ -102,6 +105,8 @@ class CharacterMediaService:
                 "The recorded media storage is not configured."
             ) from exc
 
+    # 소유 캐릭터의 업로드를 요청 UUID로 예약하고 파일 저장 후 ready로 바꾼다.
+    # 같은 요청의 내용·메타데이터가 달라지면 거절하며 ready 재전송은 다시 업로드하지 않는다.
     async def upload_character_media(
         self, command: Types.UploadCharacterMediaCommand
     ) -> Types.CharacterMediaInfo:
@@ -191,6 +196,7 @@ class CharacterMediaService:
             # no unsafe compensation deletion on an ambiguous commit outcome.
             return result
 
+    # 현재 캐릭터 소유권과 ready 상태·설정된 저장소를 확인한 뒤 열린 reader를 반환한다.
     async def read_character_media(
         self, command: Types.ReadCharacterMediaCommand
     ) -> AssetStorageTypes.AssetReadInfo:
@@ -208,6 +214,7 @@ class CharacterMediaService:
             AssetStorageTypes.ReadAssetCommand(info.object_key)
         )
 
+    # 호출자가 접근을 확인한 캐릭터 스냅샷에 실제 참조된 미디어만 읽는다. 원본 소유자 조회로 대체하지 않는다.
     async def read_snapshot_media(
         self, command: Types.ReadSnapshotMediaCommand
     ) -> AssetStorageTypes.AssetReadInfo:
@@ -225,6 +232,8 @@ class CharacterMediaService:
             AssetStorageTypes.ReadAssetCommand(info.object_key)
         )
 
+    # 명시 ID만 정리한다. 24시간 이상 된 미참조 객체를 deleting으로 확정한 뒤 삭제하며 기존 deleting은 재개한다.
+    # 보존 기한·참조 부재를 검사하고 deleting을 먼저 커밋한다. 파일 삭제 후 deleted로 남겨 재실행을 처리한다.
     async def cleanup_character_media(
         self, command: Types.CleanupCharacterMediaCommand
     ) -> Types.CleanupCharacterMediaInfo:

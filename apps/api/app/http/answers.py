@@ -1,3 +1,5 @@
+# 저장된 사용자 메시지를 참조해 답변 하나를 요청한다. 중복 키 처리·복구는 AnswerOrchestrator가 맡는다.
+# pending은 202와 Retry-After, 저장 복구 대기는 503으로 구분한다.
 from typing import Annotated
 from uuid import UUID
 

@@ -1,3 +1,4 @@
+# 수동 실행 예제다. 설정된 저장소의 manual/example.txt를 쓰고 읽은 뒤 삭제한다.
 """Run with: python -m app.modules.asset_storage.example"""
 
 from __future__ import annotations

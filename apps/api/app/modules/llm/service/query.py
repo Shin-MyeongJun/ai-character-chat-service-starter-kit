@@ -1,3 +1,5 @@
+# DB에 등록된 모델·provider의 활성 여부와 종료 시각, reasoning_effort를 검증한다.
+# SDK 어댑터의 실제 지원 목록과는 별도 검증이므로 등록만으로 외부 호출 성공을 보장하지 않는다.
 from datetime import UTC, datetime
 
 from app.modules.llm import repository as Repository

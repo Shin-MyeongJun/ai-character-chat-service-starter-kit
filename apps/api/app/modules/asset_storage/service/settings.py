@@ -1,3 +1,4 @@
+# 저장소 환경변수를 타입 설정으로 읽는다. production에서 test_local 사용은 설정 생성 시 거절된다.
 from __future__ import annotations
 
 import os

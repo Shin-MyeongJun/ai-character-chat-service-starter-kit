@@ -17,3 +17,11 @@
 - `answer_preparation.prepare_answer_context`: 기존 conversation runtime View, chat 원문 Info, memory 검색 결과를 전체 prompt 예산 안에서 조립한다. 미요약 구간은 절대 자르지 않으며 들어가지 않으면 `ContextBudgetExceededError(summary_required=True)`를 반환한다. 인덱싱 대기 요약은 검색 없이 본문 fallback으로 포함할 수 있고 검색 오류는 전파한다.
 
 대화 시작, 통계 집계, 기억 처리, 답변 문맥 조립은 변경 이유가 달라 별도 파일이다. `app.memory_worker`는 `python -m app.memory_worker`(일회 실행은 `--once`)로 실행하며 DATABASE_URL과 `.env.example`의 MEMORY/VOYAGE 설정을 사용한다. product.statistics_job은 기존 통계 배포 진입점이다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽기는 `answers.generate_answer` → `answer_preparation.prepare_answer_context` → `memory.finish_generation_and_schedule_memory` 순서로 시작한다. 예약/외부 호출/staging/완료는 서로 다른 실패 경계다. DB 완료 트랜잭션의 원자성을 공급자 호출까지 확장해서 해석하지 않는다. `recover_answers`의 반환 건수는 성공 답변 수가 아니라 복구 대상으로 처리한 건수다.
+
+답변 예산은 최종 렌더링 추정, 요약 임계치는 미요약 원문 추정이다. 입력 변경 시 재검증, summary_required 시 실패 확정과 작업 예약, staging 실패 시 lease 복구를 각각 따라 읽는다. `test_nonstream_answers`와 `test_answer_prompt`는 이 구간의 DB/mock 경계를 보여준다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../references_document/backend_review/README.md)에 모았다.

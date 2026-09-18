@@ -1,3 +1,4 @@
+# 사용자 메시지 요청은 extra 필드를 거부한다. expected_revision은 마지막 메시지 동시 편집 충돌 검사값이다.
 from datetime import datetime
 from uuid import UUID
 

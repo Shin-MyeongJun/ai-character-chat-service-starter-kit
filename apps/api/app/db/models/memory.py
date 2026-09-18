@@ -1,3 +1,6 @@
+# 요약 원문 범위·대화 revision·프롬프트 버전과 임베딩 모델을 보존한다. DB 벡터는 1536차원이다.
+# index_status=ready는 검색 준비 상태이며 기존 벡터와 새 모델이 호환된다는 뜻은 아니다.
+# MemoryJob의 generation은 LLM 생성 ID가 아니라 예약 요청 세대다. scope_generation은 claim 시점 세대다.
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID

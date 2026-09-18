@@ -1,3 +1,5 @@
+# 상품 목록은 owner 필터와 created_at/id 내림차순 offset 페이지다.
+# get_owned_product(lock=True)는 FOR UPDATE, get_product(lock=True)는 공유 잠금 FOR SHARE다.
 from dataclasses import asdict
 from uuid import UUID
 

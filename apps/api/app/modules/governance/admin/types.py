@@ -1,3 +1,4 @@
+# actor_id는 작업을 요청한 관리자, snapshot_id는 상품의 특정 발행 버전이다. expires_at=None은 만료 해제다.
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,4 @@
+# 메시지 저장·교체·되돌리기의 소유권과 대화 잠금을 관리한다. 실제 생성 출력은 generation.py에서 저장한다.
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -54,6 +55,7 @@ async def _get_character(session, command):
     return character
 
 
+# 사용자 입력 저장의 공개 경계다. 소유 대화를 잠그고 요청 키 영수증과 현재 생성 상태를 확인한다.
 async def create_message(
     session, command: Types.CreateMessageCommand
 ) -> Types.MessageInfo:
@@ -81,6 +83,7 @@ async def _create_message(session, command, *, character):
             session, command.conversation_id, command.request_key
         )
         receipt = PersistenceMapper.message_request_entity_to_info(row)
+        # 삭제 후에도 receipt는 남는다. 본문 digest나 원본 revision이 다르면 재생성하지 않고 충돌 처리한다.
         if receipt:
             if receipt.input_digest != digest:
                 raise Types.MessageConflictError(
@@ -111,6 +114,7 @@ async def _create_message(session, command, *, character):
         return result
 
 
+# 마지막 사용자 메시지의 예상 revision이 일치할 때만 같은 ID/position으로 내용을 교체한다.
 async def replace_message(
     session, command: Types.ReplaceMessageCommand
 ) -> Types.MessageInfo:
@@ -155,6 +159,7 @@ async def _replace_message(session, command, *, character):
             raise Types.MessageConflictError("Only the last message can be replaced.")
         if target.revision != command.expected_revision:
             raise Types.MessageConflictError("Message revision has changed.")
+        # 교체와 같은 트랜잭션에서 대화 기억 전체를 무효화한다. 생성 비용·통계 사실은 되돌리지 않는다.
         await _invalidate_history(session, command)
         row = await Repository.replace_message(session, target.id, command.content)
         result = PersistenceMapper.message_entity_to_info(row)
@@ -162,6 +167,7 @@ async def _replace_message(session, command, *, character):
         return result
 
 
+# 대상 position을 포함한 뒤쪽 이력을 삭제한다. 대화 버전은 유지하고 기억은 무효화한다.
 async def rewind_messages(
     session, command: Types.RewindMessagesCommand
 ) -> Types.RewindMessagesInfo:

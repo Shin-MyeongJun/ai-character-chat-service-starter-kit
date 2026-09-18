@@ -21,4 +21,12 @@
 
 시작·버전 전환 schema mapper는 인증 사용자와 경로 ID를 받아 최종 Command를 생성한다. 업데이트 응답 변환도 같은 mapper 클래스에서 처리한다. ConversationInfo.product_id는 DB와 동일하게 필수이며 레거시 여부는 product_snapshot_id의 None 여부로 판단한다.
 
-대화 생성·버전 전환·런타임 준비는 변경 이유가 달라 기능 파일로 나눴다. 런타임 준비는 쓰기 부수효과가 있으므로 command에 유지하고 순수 View 조립은 persistence mapper에 둔다. 공개 재노출은 `service/__init__.py`에서 명시한다. 실제 인증/세션 연결은 기존 503 훅 상태이며 운영 인증과 실제 외부 생성은 이번 작업에서 구현하지 않았다.
+대화 생성·버전 전환·런타임 준비는 변경 이유가 달라 기능 파일로 나눴다. 런타임 준비는 쓰기 부수효과가 있으므로 command에 유지하고 순수 View 조립은 persistence mapper에 둔다. 공개 재노출은 `service/__init__.py`에서 명시한다. `app.main`은 실제 DB 세션을 연결하고 인증 검증기를 선택적으로 주입받는다. 기본 인증 훅은 503이다. 외부 답변 생성은 `app/use_cases/answers.py`가 담당하며 conversation 자체는 공급자를 호출하지 않는다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: `router.py` → 최상위 `use_cases/conversations.py` → `command/__init__.py` → `command/versions.py` → `command/context.py` → repository/mapper. `product_snapshot_id`는 현재 버전, `initial_snapshot_id/start_set_id`는 시작 당시 값이다.
+
+현재 runtime mapper는 현재 버전의 시작 목록에서 최초 start_set_id를 찾는다. 전환 후 그 ID가 없는 경우는 전체 점검 문서 F01에 따로 기록했다. 기존 전환 테스트가 시작 ID 보존을 확인한다고 전환 뒤 runtime 준비도 정상임을 뜻하지 않는다. 대조 테스트: `test_conversation_runtime`, `test_product_integration`, `test_product_usage`.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

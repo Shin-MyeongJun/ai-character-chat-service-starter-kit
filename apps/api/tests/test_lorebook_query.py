@@ -1,3 +1,4 @@
+# 원본 조회의 owner 범위와 활성화 매칭을 확인한다. 관리자용 전역 조회는 private 항목도 포함한다.
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, call

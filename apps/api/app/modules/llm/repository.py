@@ -1,3 +1,5 @@
+# 모델 설정과 대체 이력만 저장한다. 후보 조회는 활성 provider만 제한하고 모델 자체 필터는 service가 적용한다.
+# 종료 공지 변경은 모델 행을 잠그며, 대체 이력 조회에는 별도 행 잠금이 없다.
 from sqlalchemy import select
 
 from app.db.models.model_routing import Model, ModelReplacement, Provider

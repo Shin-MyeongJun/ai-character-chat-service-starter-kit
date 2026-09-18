@@ -1,3 +1,6 @@
+# source_start/end_position은 양 끝 포함 근거 구간, conversation_revision은 대화 원문 변경 세대다.
+# 출처·모델의 None은 legacy 또는 아직 기록되지 않은 값이다. ready만 벡터 검색에 참여한다.
+# scope_generation은 claim 당시 예약 세대다. 새 예약은 requested_generation을 올려 후속 처리를 남긴다.
 from __future__ import annotations
 
 from collections.abc import Sequence

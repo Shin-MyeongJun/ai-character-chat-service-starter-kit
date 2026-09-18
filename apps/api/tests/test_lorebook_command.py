@@ -1,3 +1,4 @@
+# 부모 잠금·항목 범위·JSON/정규식 검증 및 트랜잭션 종료를 검사한다. 본문 수정 후 기존 embedding 보존도 현재 계약이다.
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace

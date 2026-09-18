@@ -1,3 +1,4 @@
+# 격리 DB에서 0019 전후 기존 URL 보존과 관리 미디어가 있을 때 downgrade 거절을 확인한다.
 import asyncio
 import os
 import subprocess

@@ -1,3 +1,6 @@
+# object_key는 저장소 내부 상대 키이며 storage_id는 저장소 설정의 식별자다.
+# size_bytes는 스트림 현재 위치 이후의 바이트 수다. 업로드 스트림의 종료 책임은 호출자에게 있다.
+# 읽기 결과는 열린 reader를 보유하므로 async with 또는 aclose로 닫아야 한다. etag는 저장소별 값이다.
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,3 +1,5 @@
+# TEST_DATABASE_URL의 테스트 DB에 UUID 스키마를 만들어 격리한다. 미설정이면 DB 검사를 skip한다.
+# create_all은 현재 ORM 검증용이며 Alembic 업그레이드 검증은 별도 테스트가 담당한다.
 import os
 from uuid import uuid4
 

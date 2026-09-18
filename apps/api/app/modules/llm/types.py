@@ -1,3 +1,6 @@
+# 모델 DB 식별자(model_id)와 공급자에게 보내는 모델명(model)을 구분한다.
+# usage의 None은 공급자가 값을 제공하지 않았다는 뜻이며 0 사용량과 다르다.
+# retryable은 오류 분류 정보다. 이 값 자체가 재시도나 중복 과금 방지를 실행하지 않는다.
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,5 @@
+# 부모 로어북 소유권·잠금 아래 원본과 항목을 변경한다. metadata는 JSON 직렬화 바이트 크기까지 검사한다.
+# 항목 본문 수정은 기존 embedding을 갱신하거나 제거하지 않는다. semantic 활성화는 현재 미연결이다.
 """Write use cases; authorization uses detached values and writes stay in repository."""
 
 import json

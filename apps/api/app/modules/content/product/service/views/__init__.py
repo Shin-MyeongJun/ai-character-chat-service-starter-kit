@@ -1,3 +1,4 @@
+# 상품 스냅샷 링크를 character/lorebook 공개 조회와 조합한다. 접근·만료 확인은 호출자가 선행한다.
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service import query as CharacterQueryService
 from app.modules.content.lorebook import types as LorebookTypes

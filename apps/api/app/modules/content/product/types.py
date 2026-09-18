@@ -1,3 +1,6 @@
+# 원본 구성 ID와 SnapshotCharacterInfo.id 같은 발행 슬롯 ID를 구분한다. 버전마다 슬롯 ID가 새로 생긴다.
+# expires_at=None은 만료 시각 미지정, latest_snapshot_id=None은 발행 버전 없음이다.
+# 통계 date_from/date_to는 서울 날짜 양 끝 포함, active_users는 성공 생성 기준이며 cost_credit은 기록된 크레딧 양이다.
 from __future__ import annotations
 
 from dataclasses import dataclass

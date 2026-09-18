@@ -1,3 +1,6 @@
+# 편집 중 상품 구성이다. 로어 scope=all은 전체 캐릭터, selected는 연결 테이블에 기록한 캐릭터만 적용한다.
+# 복합 FK는 다른 상품의 연결을 섞지 못하게 하고, 대표 캐릭터는 부분 UNIQUE 인덱스로 최대 한 명만 허용한다.
+# 발행 가능 조건 전체(대표 캐릭터 필수 등)는 service/command/publication에서 추가 검사한다.
 from enum import StrEnum
 from uuid import UUID
 

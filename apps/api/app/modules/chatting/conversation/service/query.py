@@ -1,3 +1,5 @@
+# 대화 ID와 user_id를 함께 조회해 미소유·미존재를 같은 LookupError로 처리한다.
+# lock=True는 쓰기 조율용이다. 이 함수 자체는 상품 버전 가용성을 검사하지 않는다.
 from app.modules.chatting.conversation import repository as Repository
 from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper

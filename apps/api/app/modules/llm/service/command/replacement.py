@@ -1,3 +1,6 @@
+# 관리자의 모델 종료 공지와 상품 스냅샷별 실행 모델 결정을 담당한다.
+# resolve_execution은 현재 후보에서 매번 선택하고 동일 스냅샷·원본·대상 조합의 기록을 중복 생성하지 않는다.
+# 기존 기록의 대상을 고정해서 재사용하는 방식은 아니며, 외부 모델 호출은 하지 않는다.
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -39,6 +42,8 @@ async def announce_retirement(
         return model
 
 
+# 현재 가용성과 허용 후보로 실행 설정을 결정한다. 대체 기록은 같은 대상 조합의 중복 삽입만 피한다.
+# 기존 기록이 있어도 후보를 다시 선택하므로 설정 변경 후에도 같은 대상이라는 보장은 없다.
 async def resolve_execution(
     session, command: Types.ResolveExecutionCommand
 ) -> ExecutionView:

@@ -1,3 +1,5 @@
+# 공유 로어북 HTTP 계약. priority·placement·token_budget은 저장 설정이며 현재 답변 조립에서는 정렬·배치·항목 제한에 적용하지 않는다.
+# semantic/manual 값은 저장 가능하지만 현재 자동 활성화는 always/keyword만 처리한다.
 from datetime import datetime
 from typing import Annotated, Literal, Self, TypeAlias
 from uuid import UUID

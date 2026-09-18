@@ -1,3 +1,4 @@
+# 구성·설정·발행·통계·관리 HTTP DTO와 공개 타입 변환, schema 의존 방향을 확인한다.
 """Regression checks for the existing HTTP/application/persistence boundaries."""
 
 import ast

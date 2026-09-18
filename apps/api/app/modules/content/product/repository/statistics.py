@@ -1,3 +1,5 @@
+# 상품/날짜 집계를 삭제 후 다시 저장한다. 트랜잭션 종료는 상위 호출자 책임이다.
+# 작업은 requested_at 순 SKIP LOCKED로 하나를 고른다. 기간 사용자 수는 일별 합이 아니라 DISTINCT다.
 from sqlalchemy import delete, func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 

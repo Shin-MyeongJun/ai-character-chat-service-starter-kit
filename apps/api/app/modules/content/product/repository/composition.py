@@ -1,3 +1,5 @@
+# 유지되는 원본 구성의 링크 ID는 재사용하고 제거된 구성과 대상 링크를 갱신한다.
+# 주인공 플래그를 먼저 비우고 flush한 뒤 새 주인공을 지정해 중간 유일 제약 충돌을 피한다.
 from dataclasses import dataclass
 from uuid import uuid4
 

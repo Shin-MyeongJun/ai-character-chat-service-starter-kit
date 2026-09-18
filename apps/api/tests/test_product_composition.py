@@ -1,3 +1,4 @@
+# 상품 초안 구성의 중복·대표 캐릭터·로어 적용 범위 검증을 확인한다.
 from uuid import uuid4
 
 import pytest

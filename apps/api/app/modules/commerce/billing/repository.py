@@ -1,3 +1,6 @@
+# 결제 배분은 Payment, 환불은 원매출 이벤트 행의 FOR UPDATE 잠금 아래 누계를 조회한다.
+# 통계는 [start, end) 범위이며 사용량은 created_at, 결제는 attributed_at 기준으로 버전별 집계한다.
+# 결제 금액은 통화별로 나누고 스냅샷 없는 사용량은 제외한다.
 from dataclasses import asdict
 
 from sqlalchemy import func, select

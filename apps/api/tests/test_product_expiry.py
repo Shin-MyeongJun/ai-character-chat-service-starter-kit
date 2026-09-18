@@ -1,3 +1,4 @@
+# 만료 시각과 현재 시각의 경계, 무기한 버전, active admin 조건을 확인한다.
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock

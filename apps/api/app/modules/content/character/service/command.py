@@ -1,3 +1,5 @@
+# 캐릭터 원본·미디어 참조 변경은 소유 캐릭터 잠금 아래 수행한다. 삭제 성공은 None, 미존재는 LookupError다.
+# 상태 변경은 허용 문자열만 검사한다. 관리자/모더레이터 역할 검사는 HTTP 훅 책임이다.
 """Write use cases; authorization uses detached values and writes stay in repository."""
 
 from typing import get_args

@@ -1,3 +1,4 @@
+# 의존성 미연결 503과 실제 DB CRUD의 403/404/409/422 경계를 나누어 검증한다.
 from uuid import uuid4
 
 import pytest

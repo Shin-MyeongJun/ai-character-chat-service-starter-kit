@@ -1,3 +1,5 @@
+# 검수 상태 변경 전에 HTTP moderator dependency를 검사한다. 현재 기본 dependency는 503이다.
+# owner_id는 요청 행위자이며 실제 대상 조회는 content의 상태 변경 Command에 위임한다.
 """HTTP adapter for character commands and router-oriented queries."""
 
 from collections.abc import Iterator

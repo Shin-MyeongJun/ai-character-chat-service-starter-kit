@@ -1,3 +1,5 @@
+# version은 원본별 발행 순번, snapshot_schema_version은 JSON 구조 버전이다.
+# 새 행 발행으로 내용을 보존하지만 ORM 선언 자체에 payload UPDATE를 막는 장치는 없다.
 from datetime import datetime
 from typing import Any
 

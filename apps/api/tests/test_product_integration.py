@@ -1,3 +1,5 @@
+# DB 발행·대화 시작·버전 전환·원본 삭제 후 보존을 확인한다.
+# 버전 전환 테스트는 최초 시작 ID 보존을 검사하지만 전환 후 prepare_runtime 재호출까지 검사하지 않는다.
 from types import SimpleNamespace
 from uuid import uuid4
 

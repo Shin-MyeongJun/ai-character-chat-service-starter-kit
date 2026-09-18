@@ -1,3 +1,4 @@
+# DB에서 동시 발행 직렬화, 만료 시 이력 보존, 모델 종료 전 계획·기한 후 전환을 확인한다.
 import asyncio
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4

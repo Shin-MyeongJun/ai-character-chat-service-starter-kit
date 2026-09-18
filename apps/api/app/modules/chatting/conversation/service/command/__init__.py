@@ -1,3 +1,5 @@
+# 상품 최신 발행 버전으로 대화를 만든다. 시작 항목이 하나면 자동 선택하고, 복수면 명시 선택이 필요하다.
+# 첫 메시지 값만 반환하며 실제 메시지 저장은 use_cases/conversations가 이어서 수행한다.
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import repository as Repository
 from app.modules.chatting.conversation import types as Types

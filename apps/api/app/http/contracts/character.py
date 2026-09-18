@@ -1,3 +1,5 @@
+# 일반·관리자 라우트가 공유하는 HTTP DTO. 커서는 생성 시각과 ID를 함께 전달한다.
+# description=None은 설명 없음이며 Update 요청은 전체 필수 필드를 전달하는 계약이다.
 from datetime import datetime
 from typing import Literal, Self, TypeAlias
 from uuid import UUID

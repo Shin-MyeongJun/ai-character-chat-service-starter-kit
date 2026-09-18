@@ -1,3 +1,4 @@
+# SDK 응답 모델·예외를 사용하되 외부 호출은 mock한다. 사용량 필드 보존과 재시도 없는 오류 변환을 확인한다.
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 

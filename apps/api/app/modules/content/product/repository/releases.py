@@ -1,3 +1,5 @@
+# 릴리스 목록은 after_version 초과, through_version 이하를 버전순 반환한다.
+# 노트가 없는 버전도 outer join으로 남겨 서비스가 전환 가능 여부를 판단하게 한다.
 from sqlalchemy import select
 
 from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision

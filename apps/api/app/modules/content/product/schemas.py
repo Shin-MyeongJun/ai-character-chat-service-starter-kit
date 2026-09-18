@@ -1,3 +1,5 @@
+# start_entry_ids는 원본 로어 항목 ID, start_options[].id는 발행된 시작 항목 ID다.
+# 통계 금액은 통화별 문자열, snapshot_id=None은 상품 전체 집계다. 요청 미지정 필드는 DTO 기본값을 따른다.
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID

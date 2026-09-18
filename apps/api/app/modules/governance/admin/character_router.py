@@ -1,3 +1,5 @@
+# 전체 목록·상세 조회는 HTTP 관리자 dependency를 통과한 뒤 소유자 제한 없는 content query를 호출한다.
+# 현재 main은 이 관리자 dependency를 구현으로 교체하지 않으므로 기본 경로는 503이다.
 """HTTP adapter for character commands and router-oriented queries."""
 
 from collections.abc import Iterator

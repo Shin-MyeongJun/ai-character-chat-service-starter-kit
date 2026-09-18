@@ -1,3 +1,4 @@
+# 상품 접근·버전 만료·상품 소속을 확인한 뒤 그 버전 캐릭터 스냅샷에 연결된 미디어만 읽는다.
 from app.db.transaction import use_case_transaction
 from app.modules.asset_storage import types as AssetStorageTypes
 from app.modules.content.character import types as CharacterTypes

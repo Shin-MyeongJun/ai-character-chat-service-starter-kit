@@ -94,3 +94,11 @@ $env:RUN_ASSET_STORAGE_S3_INTEGRATION='1'
 새 공급자를 추가할 때는 `AssetStorageAdapter`를 구현하는 adapter와 필요 설정을 추가하고, `StorageKind`, `AssetStorageSettings`, 환경 loader, `create_asset_storage_service`의 선택 분기 및 공통 계약 테스트 fixture를 갱신한다. 공급자 고유 capability(URL, 보존 정책, 버전 ID 등)가 필요하면 현재 공통 메서드에 억지로 섞지 말고 별도 공개 capability와 명확한 지원 검사를 설계한다.
 
 이 모듈은 DB·마이그레이션을 만들지 않고 기존 파일 참조도 변경하지 않는다. character가 `character_media`와 원본/스냅샷의 참조를 소유한다. 저장소 설정을 test_local에서 S3로 바꾸는 것은 새 업로드의 대상만 바꾸며 기존 파일을 이전하거나 동기화하지 않는다. 기존 저장소는 `create_app(asset_read_settings=...)`의 명시적 설정으로 함께 조립할 수 있으며, 기록된 저장소가 없으면 다른 저장소로 대체하지 않고 실패한다. 같은 storage_id를 다른 root/bucket/prefix에 재사용하면 안 된다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: settings → factory → storage → types → 선택한 adapter. 실제 사용자는 character 미디어 서비스와 http/media이며 상품은 character를 통해 읽는다. `example.py`는 설정 저장소의 고정 예제 키를 쓰고 삭제하는 실행 코드다.
+
+로컬 잠금은 어댑터 인스턴스 안의 asyncio.Lock이다. 메타데이터와 본문을 각각 교체하고 실패 복원을 시도하지만 여러 프로세스와 두 파일 전체의 원자성을 보장하지 않는다. 읽기 시 저장된 크기는 검사하지만 SHA-256을 재계산하지 않는다. S3는 SDK의 최대 시도 횟수와 thread I/O, reader 수명을 별도로 확인한다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../references_document/backend_review/README.md)에 모았다.

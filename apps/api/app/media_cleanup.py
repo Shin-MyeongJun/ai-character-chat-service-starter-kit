@@ -1,3 +1,5 @@
+# 명시적으로 넘긴 media ID만 정리한다. 참조 여부·보존 시간·저장소 일치는 CharacterMediaService가 검사한다.
+# 건별 실패 후 다음 ID를 처리하며 하나라도 예외가 있으면 종료 코드 1을 반환한다.
 """Explicit ID-scoped garbage collection; no bucket/directory enumeration."""
 
 import argparse

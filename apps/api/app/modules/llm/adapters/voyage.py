@@ -1,3 +1,6 @@
+# purpose(query/document)를 Voyage input_type으로 전달한다. 재시도는 SDK 설정에 맡긴다.
+# 응답 개수·유한 수치·동일 차원을 검증하지만 요청 차원과의 일치 여부는 여기서 비교하지 않는다.
+# 주입받은 client는 닫지 않고, 직접 생성한 client만 종료한다.
 from __future__ import annotations
 
 import asyncio

@@ -1,3 +1,4 @@
+# start_set_id=None은 시작 항목이 정확히 하나일 때만 자동 선택된다. changed=False는 동일 버전 재요청 결과다.
 from datetime import datetime
 from uuid import UUID
 

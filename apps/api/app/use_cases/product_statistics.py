@@ -1,3 +1,5 @@
+# 도메인별 사실 조회를 product 일별 집계로 연결한다. 날짜 범위는 day_bounds의 서울 시간 기준이다.
+# 날짜 작업 잠금·전체 재집계·큐 제거를 같은 트랜잭션에서 수행해 실패 시 작업을 남긴다.
 from app.db.product_stats_queue import day_bounds
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import types as ChatTypes
@@ -44,6 +46,7 @@ async def rebuild_day(session, command: Types.RebuildDayCommand) -> None:
         )
 
 
+# 날짜 작업을 잠근 트랜잭션 안에서 사실 조회·재집계·큐 삭제를 처리한다. 실패 시 해당 큐 행도 보존된다.
 async def process_pending(
     session, command: Types.ProcessPendingCommand
 ) -> Types.ProcessedStatisticsInfo:

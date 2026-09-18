@@ -1,3 +1,4 @@
+# 대화 시작은 최상위 use_case, 업데이트 안내는 product View, 실제 버전 전환은 conversation Command에 연결한다.
 from uuid import UUID
 
 from fastapi import APIRouter

@@ -1,3 +1,4 @@
+# 텍스트 생성과 임베딩의 비동기 호출·종료 경계다. DB 모델 등록과 독립적인 지원 모델 검사를 제공한다.
 from __future__ import annotations
 
 from collections.abc import Sequence

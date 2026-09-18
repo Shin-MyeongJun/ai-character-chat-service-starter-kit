@@ -1,3 +1,5 @@
+# product_snapshot_id=None은 버전 매핑이 검증되지 않은 legacy 대화다. initial_snapshot_id는 최초 생성 통계 기준이다.
+# history_revision은 원문 교체·삭제 세대이며 단순 append와 상품 버전 전환에서는 증가하지 않는다.
 from __future__ import annotations
 
 from dataclasses import dataclass

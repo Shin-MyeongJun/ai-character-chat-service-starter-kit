@@ -1,3 +1,5 @@
+# 상위 publish 트랜잭션에서 원본을 잠그고 캐릭터·로어북 복사본과 상품 버전을 만든다.
+# content_digest는 콘텐츠/구성 비교용이며 이미지·에셋 변경은 releases의 별도 manifest로 판정한다.
 "Internal atomic publication builder; public command adds required release notes."
 
 import hashlib

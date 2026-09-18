@@ -1,3 +1,4 @@
+# 발행 JSON은 deepcopy로 분리한다. 미디어 비교 manifest는 URL·태그·출처 ID 등을 사용하며 is_default는 포함하지 않는다.
 from copy import deepcopy
 from typing import cast, overload
 

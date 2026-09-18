@@ -1,3 +1,4 @@
+# 명시적 opt-in 시 고유 prefix 아래 실제 S3 쓰기·조회·삭제를 수행한다. unit mock 결과와 구분한다.
 from __future__ import annotations
 
 import io

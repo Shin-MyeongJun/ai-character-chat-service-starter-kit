@@ -1,3 +1,5 @@
+# 이 파일 자체는 503 훅이다. 현재 main.create_app은 DB 훅을 실제 세션으로 교체한다.
+# owner 인증은 주입 시에만 연결되고 admin/moderator 가드는 기본 앱에서 교체하지 않는다.
 """Integration points for the character HTTP adapter.
 
 TODO: Replace these hooks with shared DB/auth dependencies when those modules

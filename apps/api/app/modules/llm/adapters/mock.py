@@ -1,3 +1,4 @@
+# 외부 호출 없이 responder 결과를 돌려주는 테스트용 어댑터다. 기본 responder는 입력을 그대로 반환한다.
 from __future__ import annotations
 
 from collections.abc import Callable

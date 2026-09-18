@@ -1,3 +1,5 @@
+# 상품 조회에서 현재 모델 가용성·대체 예정 상태를 계산한다.
+# DB를 변경하거나 알림을 발송하지 않으며, 실행 시 resolve_execution에서 다시 판단한다.
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 

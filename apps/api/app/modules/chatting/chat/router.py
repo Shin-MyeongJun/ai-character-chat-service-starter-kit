@@ -1,3 +1,4 @@
+# 사용자 메시지 CRUD HTTP 경계. sender·모델 선택은 입력으로 받지 않으며 충돌은 409, 발신자 위반은 403이다.
 from contextlib import contextmanager
 from uuid import UUID
 

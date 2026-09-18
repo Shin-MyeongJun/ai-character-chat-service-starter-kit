@@ -68,7 +68,7 @@ claim 시 처리 범위인 `scope_generation`을 고정한다. 실행 중 새 �
 동시성을 제한한다. 기본 5회, 5초 시작/최대 300초 지수 backoff이며 정규화 오류의
 `retryable` 값으로 영구 오류를 구별한다.
 
-외부 호출 전에 모든 읽기 세션을 닫고, 결과 저장 시에만 conversation row를
+`app/use_cases/memory.py`와 `MemoryRetriever`는 외부 호출 전에 읽기 세션을 닫고, 결과 저장 시에만 conversation row를
 잠근다. 저장 직전 `history_revision`과 모든 source message id/position/revision/
 content digest를 다시 확인한다. 단순 append는 리비전을 바꾸지 않아 기존 결과를
 허용한다. 수정·되돌리기는 리비전을 올리고 기억/작업을 삭제한다. 대화 삭제는 두
@@ -84,3 +84,13 @@ content digest를 다시 확인한다. 단순 append는 리비전을 바꾸지 �
 conversation 컬럼을 포함하지 않고 `conversations.user_id`로 범위를 제한하는
 용도로만 사용한다. 기억 존재를 확인해 불필요한 외부 호출을 막는 bool 조회도 같은
 인가 가드다. 타 모듈 repository/mapper를 직접 호출하지 않는다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: `use_cases/memory.py` → scheduling/summarization/indexing → query/retrieval → repository → `app.memory_worker`. `test_hypha_memory`는 원문 변경·중복 예약·재시도 흐름, `test_memory_query`는 인가·모델/차원 조건과 선택 예산을 확인한다.
+
+`search_memories(session, ...)` 호환 경로는 호출자가 준 세션을 닫지 않는다. 외부 I/O 전에 세션을 닫는 구현은 `MemoryRetriever`와 상위 기억 처리 유스케이스다. 요약 배치의 첫 메시지는 큰 메시지 하나라도 선택될 수 있어 batch_tokens가 절대 입력 상한은 아니다.
+
+lease는 만료 후 다시 claim할 수 있고 현재 worker에는 주기 갱신이 없다. 완료/실패는 worker와 scope를 확인한다. 저장 출처의 UNIQUE와 외부 호출 중복 여부를 구분한다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

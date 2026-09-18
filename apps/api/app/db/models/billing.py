@@ -1,3 +1,6 @@
+# 사용량·결제·구독·크레딧 스키마다. 현재 billing은 usage와 상품 귀속을 기록하고 credit 서비스는 비어 있다.
+# 금액은 Decimal 통화 값, 크레딧은 정수다. usage의 nullable 참조는 이전 데이터와 삭제된 대화를 허용한다.
+# generation별 사용량 UNIQUE는 중복 행을 막으며 잔액 차감까지 보장하지 않는다.
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum

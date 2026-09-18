@@ -1,3 +1,5 @@
+# 공개 사실 묶음을 일별 집계로 교체한다. claim/complete는 상위 product_statistics의 트랜잭션에 참여한다.
+# enqueue_recent(days)는 오늘을 포함해 days+1개 날짜를 다시 예약한다.
 from datetime import UTC, datetime, timedelta
 
 from app.db.product_stats_queue import day_bounds, statistics_day

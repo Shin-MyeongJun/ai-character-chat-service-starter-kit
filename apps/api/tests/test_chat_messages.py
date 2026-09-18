@@ -1,3 +1,4 @@
+# 별도 DB 세션과 이벤트로 생성/수정 잠금 순서를 재현한다. 되돌리기 후에도 비용·생성·버전 사실이 남는 계약을 확인한다.
 """Real PostgreSQL tests for message ownership, locking and historical facts."""
 
 import asyncio

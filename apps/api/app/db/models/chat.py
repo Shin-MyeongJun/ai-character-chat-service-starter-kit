@@ -1,3 +1,6 @@
+# 대화의 현재 product_snapshot_id와 최초 initial_snapshot_id를 분리한다. start_set_id는 최초 버전에 속한다.
+# 메시지 product_character_id는 원본 캐릭터 ID가 아니라 발행 버전의 참여 슬롯 ID다.
+# position은 전체 messages의 identity 값이며 대화 내 연속 번호가 아니다. 삭제된 메시지의 재요청 영수증은 남는다.
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID

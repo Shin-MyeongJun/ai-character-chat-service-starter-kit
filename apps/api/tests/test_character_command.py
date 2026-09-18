@@ -1,3 +1,4 @@
+# 저장소 mock과 세션 commit/rollback 이벤트로 소유권·검증·예외 전달을 검사한다. 실제 DB 제약은 별도 통합 테스트 대상이다.
 from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace

@@ -1,3 +1,4 @@
+# TemplateInfo.digest는 템플릿 내용 식별값이다. PromptInfo.request_json은 공급자 중립 역할 envelope다.
 from dataclasses import dataclass
 from uuid import UUID
 

@@ -1,3 +1,4 @@
+# 관리 API 입력을 상품 상태·버전 만료 Command로 변환한다. 실패는 공통 errors 경계에서 HTTP로 변환한다.
 from uuid import UUID
 
 from fastapi import APIRouter

@@ -1,3 +1,4 @@
+# 관리자의 종료 공지 요청을 llm.announce_retirement에 전달한다. 날짜·DB 관리자 검사는 llm 서비스가 수행한다.
 from uuid import UUID
 
 from fastapi import APIRouter

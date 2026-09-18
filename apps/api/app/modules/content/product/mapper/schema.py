@@ -1,3 +1,4 @@
+# DTO를 값으로 변환하고 from_attributes로 응답을 만든다. owner와 경로 ID의 최종 조합은 router가 한다.
 from app.modules.content.product import schemas as Schemas
 from app.modules.content.product import types as Types
 

@@ -1,3 +1,5 @@
+# 실행 모델·reasoning effort·시작 원본 항목·대체 정책을 초안에 저장한다.
+# 시작 항목은 구성에 포함된 로어북의 enabled start_set이어야 한다. 발행 직전에도 별도 재검증한다.
 from app.db.transaction import use_case_transaction
 from app.modules.content.lorebook import types as LorebookTypes
 from app.modules.content.lorebook.service import query as LorebookQueryService
@@ -19,6 +21,7 @@ async def _validate_model(session, model_id, effort):
     )
 
 
+# 선택 모델·effort와 연결 로어의 시작 항목, 대체 허용 정책을 확인해 초안 설정을 저장한다.
 async def set_settings(
     session, command: Types.SetSettingsCommand
 ) -> ProductSettingsInfo:

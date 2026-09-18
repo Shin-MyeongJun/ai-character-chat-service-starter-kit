@@ -1,3 +1,4 @@
+# 바이너리 업로드와 기존 JSON 연결, 인증별 읽기, 스트림 전송 실패 시 reader 종료를 확인한다.
 from unittest.mock import AsyncMock
 from uuid import uuid4
 

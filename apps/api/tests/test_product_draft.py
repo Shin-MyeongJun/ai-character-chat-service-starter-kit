@@ -1,3 +1,4 @@
+# 미설정 인증 거절, 타인 수정 거절, 초안 변경과 발행본 분리, 입력 검증을 확인한다.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4

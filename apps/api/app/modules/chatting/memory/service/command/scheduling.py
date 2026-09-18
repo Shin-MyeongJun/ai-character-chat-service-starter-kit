@@ -1,3 +1,4 @@
+# 대화별 기억 작업 예약·claim·완료·실패 경계. 재시도 지연은 초 단위이며 기본 5초부터 최대 300초다.
 from datetime import UTC, datetime
 
 from app.db.transaction import use_case_transaction
@@ -24,6 +25,7 @@ async def schedule_memory_work(
         )
 
 
+# 실행 가능하거나 lease가 만료된 작업 하나를 획득한다. 없으면 None이며 외부 호출은 하지 않는다.
 async def claim_memory_work(
     session, command: Types.ClaimMemoryWorkCommand
 ) -> Types.MemoryWorkInfo | None:
@@ -41,6 +43,7 @@ async def claim_memory_work(
         return PersistenceMapper.memory_job_entity_to_work(row)
 
 
+# claim의 worker와 scope가 여전히 일치할 때 완료한다. 그 뒤 쌓인 요청 세대는 다음 처리로 남긴다.
 async def complete_memory_work(
     session, command: Types.CompleteMemoryWorkCommand
 ) -> None:
@@ -53,6 +56,7 @@ async def complete_memory_work(
         )
 
 
+# 재시도 가능 여부와 최대 시도 횟수로 pending/backoff 또는 failed를 기록한다.
 async def fail_memory_work(session, command: Types.FailMemoryWorkCommand) -> None:
     if not command.error_kind.strip():
         raise ValueError("A nonblank normalized error kind is required.")

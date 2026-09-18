@@ -1,3 +1,4 @@
+# 소유 대화의 현재 선형 이력을 조회한다. 페이지 사이 편집까지 고정한 스냅샷 조회는 아니다.
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper

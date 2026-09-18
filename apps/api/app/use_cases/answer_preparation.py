@@ -1,3 +1,5 @@
+# 답변 오케스트레이터가 호출하는 문맥 조립. 고정 프롬프트·출력 예약·미요약 원문을 먼저 확보한다.
+# 공간이 부족하면 원문을 자르지 않고 ContextBudgetExceededError를 전달한다.
 """Assemble existing runtime settings, recent raw history, and selected memories."""
 
 from __future__ import annotations
@@ -51,6 +53,8 @@ class AnswerContextInfo:
     memory_state: str
 
 
+# 고정 runtime·현재 입력·미요약 원문·기억을 예산 안에 조립한다.
+# 미요약 원문을 조용히 잘라내지 않고 초과하면 summary_required를 포함한 업무 오류를 전달한다.
 async def prepare_answer_context(
     session_factory,
     command: PrepareAnswerContextCommand,

@@ -1,3 +1,4 @@
+# 권한 dependency가 거절하면 변경 서비스가 호출되지 않는지, /me가 UUID 경로에 가려지지 않는지 확인한다.
 """Actor separation must keep the original authorization dependencies and paths."""
 
 from unittest.mock import AsyncMock

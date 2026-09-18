@@ -1,3 +1,4 @@
+# 역할·한국어·현재 입력 ID 중복 제거와 공급자별 역할 변환을 확인한다. 실제 모델 응답 품질은 검증하지 않는다.
 import json
 from dataclasses import replace
 from datetime import UTC, datetime

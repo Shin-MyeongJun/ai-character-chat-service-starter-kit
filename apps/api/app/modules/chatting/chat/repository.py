@@ -1,3 +1,5 @@
+# messages·요청 receipt·생성 사실의 저장소. 대화 소유권과 쓰기 잠금은 상위 서비스가 확보한다.
+# 메시지 조회는 position 오름차순, 경계 초과만 선택하고 limit+1로 다음 페이지/잘림을 판정한다.
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update

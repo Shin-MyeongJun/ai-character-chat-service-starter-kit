@@ -1,3 +1,4 @@
+# DB 결제·귀속·사용량 행을 공개 Info로 변환한다. 집계 튜플 순서는 repository SELECT 순서를 따른다.
 from typing import overload
 
 from app.db.models.billing import Payment

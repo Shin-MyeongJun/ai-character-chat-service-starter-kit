@@ -1,3 +1,5 @@
+# 답변·요약 요청을 지원 모델과 provider가 일치하는 단일 어댑터에 전달한다.
+# provider 생략 시 후보가 둘 이상이면 거절하며, 이 계층은 재시도하지 않는다.
 from __future__ import annotations
 
 from collections.abc import Iterable

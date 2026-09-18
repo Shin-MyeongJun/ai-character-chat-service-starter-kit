@@ -1,3 +1,4 @@
+# 이력 수정 시 대화 revision을 올리고 그 방의 모든 기억과 작업을 삭제한다. legacy 기억도 포함한다.
 """Invalidate all derived history and advance the destructive-edit revision."""
 
 from app.db.transaction import use_case_transaction

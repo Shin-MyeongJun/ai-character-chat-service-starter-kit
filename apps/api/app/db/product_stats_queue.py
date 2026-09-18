@@ -1,3 +1,4 @@
+# 통계 일자는 Asia/Seoul 기준이다. DB 조회 범위는 해당 일자의 UTC [시작, 다음 날 시작)으로 변환한다.
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 

@@ -1,3 +1,6 @@
+# 소유자 초안 조회·고정 버전 조회·접근 정책·만료 검사 경계. 버전 조회 자체는 사용자 인가를 하지 않는다.
+# get_accessible_product는 소유자 또는 approved이면서 private이 아닌 상품을 허용한다.
+# ensure_snapshot_available은 만료만 검사하며 상품 공개/심사 상태는 재검사하지 않는다.
 from datetime import UTC, datetime
 
 from app.modules.content.product import repository as Repository

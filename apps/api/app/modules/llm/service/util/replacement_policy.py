@@ -1,3 +1,5 @@
+# 허용 범위 안에서 같은 계열, 같은 provider, effort 거리, UUID 문자열 순으로 대체 모델을 고른다.
+# 동일 거리의 effort는 낮은 단계를 우선한다. 비용·응답 품질 순위는 사용하지 않는다.
 EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 

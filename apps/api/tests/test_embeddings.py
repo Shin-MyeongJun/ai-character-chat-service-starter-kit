@@ -1,3 +1,4 @@
+# 입력 순서와 query/document 목적, 응답 벡터 검증·클라이언트 소유권을 mock으로 확인한다.
 from __future__ import annotations
 
 from types import SimpleNamespace

@@ -1,3 +1,4 @@
+# SQLite 조회로 커서 동률·owner 범위·정확한 감정 태그와 기본 이미지 무대체 계약을 확인한다.
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace

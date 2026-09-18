@@ -1,3 +1,5 @@
+# 호출자가 정한 소유자·공개 범위를 유지한 채 (created_at, id) 내림차순으로 페이지를 읽는다.
+# 커서 행보다 작은 값만 포함하고 limit+1개로 다음 페이지 존재를 판단한다.
 """Descending (created_at, id) cursor pagination for scoped entity queries."""
 
 from collections.abc import Callable

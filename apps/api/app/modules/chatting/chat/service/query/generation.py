@@ -1,3 +1,4 @@
+# 사용자 범위의 생성 상태와 상품 통계용 생성 사실을 반환한다. 통계 조회는 내부 조율용이다.
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper

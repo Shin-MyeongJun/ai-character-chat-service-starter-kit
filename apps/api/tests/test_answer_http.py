@@ -1,3 +1,4 @@
+# HTTP 상태·인증 훅·수명 정리를 mock으로 확인한다. 실제 DB/공급자 성공 검증과 구분한다.
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4

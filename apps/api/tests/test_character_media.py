@@ -1,3 +1,4 @@
+# PostgreSQL + 로컬/가짜 S3로 예약·저장·커밋 실패·취소·참조 GC 경쟁을 검증한다. 실제 S3 통합과 구분한다.
 """Real PostgreSQL transactions with local and mock S3 storage."""
 
 import asyncio

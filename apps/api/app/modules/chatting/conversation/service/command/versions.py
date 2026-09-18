@@ -1,3 +1,5 @@
+# 소유 대화를 잠그고 같은 상품의 순방향 버전으로 전환한다. 동일 버전이면 changed=False를 반환한다.
+# automatic=True일 때 중간 릴리스 모두 automatic이어야 한다. 메시지·기억·진행 중 생성은 변경하지 않는다.
 from datetime import UTC, datetime
 
 from app.db.transaction import use_case_transaction

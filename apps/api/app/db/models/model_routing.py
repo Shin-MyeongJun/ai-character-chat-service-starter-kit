@@ -1,3 +1,5 @@
+# provider 활성화, 모델 context_window(토큰 수), capability와 종료 일정을 저장한다.
+# 가격 필드는 현재 답변의 cost_credit 계산에 연결되어 있지 않다. 단가 기준은 이 스키마만으로 확정하지 않는다.
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID

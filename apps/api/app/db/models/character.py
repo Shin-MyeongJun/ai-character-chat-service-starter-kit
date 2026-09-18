@@ -1,3 +1,5 @@
+# 편집 캐릭터와 감정 이미지·범용 자산이다. 캐릭터별 감정 태그는 유일하며 기본 이미지는 최대 하나다.
+# media_id=None은 관리 저장소에 등록되지 않은 기존 URL 데이터다.
 from enum import StrEnum
 from uuid import UUID
 

@@ -1,3 +1,5 @@
+# 생성/대화/버전전환/usage/결제 사실을 통화별 Decimal 집계로 합친다. 환율 변환은 하지 않는다.
+# 매출은 문자열로 반환하고 활성 사용자는 성공 생성 사용자의 중복을 제거한다.
 from collections import defaultdict
 from decimal import Decimal
 from typing import Any

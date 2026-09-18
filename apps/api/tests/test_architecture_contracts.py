@@ -1,3 +1,4 @@
+# 모듈 import/테이블 소유 경계와 기존 API 계약을 정적·OpenAPI 검사로 확인한다.
 """Contracts that must survive internal backend restructuring."""
 
 import ast

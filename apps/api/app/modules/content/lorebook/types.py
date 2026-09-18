@@ -1,3 +1,5 @@
+# 문자열 길이 제한은 문자 수, ENTRY_METADATA_MAX_BYTES는 JSON 직렬화 바이트 수다.
+# metadata=None은 저장 시 빈 객체가 된다. token_budget=None은 미지정이며 현재 답변 조립은 지정값도 적용하지 않는다.
 from __future__ import annotations
 
 from collections.abc import Sequence

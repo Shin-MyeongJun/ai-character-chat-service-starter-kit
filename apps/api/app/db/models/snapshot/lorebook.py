@@ -1,3 +1,4 @@
+# 발행 로어북 JSON을 보존한다. 원본 삭제는 lorebook_id를 NULL로 만들고 고정 내용은 남긴다.
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, ForeignKey, UniqueConstraint

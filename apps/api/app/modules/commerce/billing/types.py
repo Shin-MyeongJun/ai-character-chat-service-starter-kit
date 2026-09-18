@@ -1,3 +1,6 @@
+# amount는 currency 단위의 Decimal 금액이며 cost_credit과 다르다. latency_ms의 단위는 밀리초다.
+# sale_id는 환불의 원매출 ID이고 매출 이벤트에서는 None이다.
+# occurred_at은 실제 발생 시각, attributed_at은 통계 귀속 시각으로 환불도 원매출 날짜에 귀속한다.
 from __future__ import annotations
 
 from dataclasses import dataclass

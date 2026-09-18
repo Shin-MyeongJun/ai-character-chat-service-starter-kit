@@ -1,3 +1,6 @@
+# 업로드 예약과 정리 후 tombstone을 남기는 저장소 식별 기록이다. owner/character ID에는 FK가 없다.
+# pending→ready는 객체 저장 완료, deleting→deleted는 정리 진행과 완료를 나타낸다.
+# UUID request_id는 소유자·캐릭터 범위에서 유일하며 sha256은 업로드 본문 비교에 사용한다.
 """Character-owned storage identities and durable upload/cleanup intents."""
 
 from uuid import UUID

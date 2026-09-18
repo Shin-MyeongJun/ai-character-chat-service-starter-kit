@@ -1,3 +1,4 @@
+# 소유 로어북과 그 항목 관리 HTTP 경계. 부모가 미소유이면 항목 조회 전 404로 처리한다.
 """HTTP adapter for lorebook management operations."""
 
 from collections.abc import Iterator

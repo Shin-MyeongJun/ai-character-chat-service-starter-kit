@@ -1,3 +1,5 @@
+# 발행 버전별 변경 안내와 정정 전 문구 이력이다. automatic 정책은 media 변경에만 허용한다.
+# 이 정책 행을 저장하는 것만으로 기존 대화가 자동 전환되지는 않는다.
 from datetime import datetime
 from uuid import UUID
 

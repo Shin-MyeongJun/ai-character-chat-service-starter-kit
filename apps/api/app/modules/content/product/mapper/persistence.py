@@ -1,3 +1,4 @@
+# 초안·스냅샷을 값으로 변환하며 JSON을 deepcopy한다. 업데이트 안내에서는 노트 없는 릴리스를 제외한다.
 from copy import deepcopy
 from typing import overload
 

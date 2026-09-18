@@ -1,3 +1,5 @@
+# 대화와 참여자·버전 전환 이력의 저장소. 참여자는 role_order, id 순으로 반환한다.
+# 전환은 참여자 목록을 교체하고 active_model_id를 비운다. start_set_id와 initial_snapshot_id는 유지한다.
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update

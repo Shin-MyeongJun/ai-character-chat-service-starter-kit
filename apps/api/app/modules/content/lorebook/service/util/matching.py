@@ -1,3 +1,4 @@
+# 대소문자 무시 패턴을 pydantic_core validator로 컴파일해 캐시한다. 잘못된 패턴은 예외, 불일치는 False다.
 from functools import lru_cache
 
 from pydantic_core import SchemaError, SchemaValidator, ValidationError, core_schema

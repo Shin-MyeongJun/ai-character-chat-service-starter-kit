@@ -1,3 +1,4 @@
+# online은 DATABASE_URL로 접속하고 offline은 실행 SQL을 출력한다. ORM import는 metadata 등록용이다.
 import asyncio
 import os
 

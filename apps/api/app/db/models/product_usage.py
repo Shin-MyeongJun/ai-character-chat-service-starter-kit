@@ -1,3 +1,6 @@
+# 생성 상태·재요청 키·외부 결과 staging과 확정 결제 귀속을 저장한다. 실제 차감 구현은 없다.
+# request_key는 사용자 전체 범위에서 유일하다. answer_lease_until=None인 기존 생성은 답변 복구 대상에서 제외된다.
+# history_invalidated_at은 원문 변경 표시이며 기록된 사용량 삭제를 뜻하지 않는다.
 """Execution and payment attribution facts; monetary debits remain in billing."""
 
 from datetime import datetime

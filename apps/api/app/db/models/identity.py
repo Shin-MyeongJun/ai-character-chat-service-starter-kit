@@ -1,3 +1,5 @@
+# 사용자 role/status와 OAuth 연결을 위한 스키마다. 현재 서비스는 관리자 조회만 제공한다.
+# 이 테이블 정의만으로 로그인·OAuth·정지 사용자 인증 차단이 연결되는 것은 아니다.
 from enum import StrEnum
 from uuid import UUID
 

@@ -1,3 +1,6 @@
+# 서버 템플릿만 system 역할로 두고 설정·활성 로어·기억은 user 참조 JSON으로 넣는다.
+# 원문은 position 순 역할 이력으로, 현재 사용자 입력은 ID 기준 한 번만 포함한다.
+# estimated_tokens는 실제 tokenizer 값이 아니라 UTF-8 본문 바이트와 메시지별 여유분의 합이다.
 import hashlib
 import json
 from functools import lru_cache

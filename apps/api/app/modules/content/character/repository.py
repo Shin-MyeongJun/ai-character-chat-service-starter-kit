@@ -1,3 +1,5 @@
+# 원본·이미지·에셋·발행 복사본·업로드 예약의 저장소. 상위 서비스가 소유권과 트랜잭션을 조율한다.
+# 일반 페이지는 created_at/id 내림차순, 이미지는 기본 이미지 우선 후 최신순이다.
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -134,6 +136,7 @@ async def delete_character(
     await session.flush()
 
 
+# visibility=public만 필터한다. approved 조건·owner 조건은 없으므로 공개 노출 정책으로 단독 사용하지 않는다.
 async def list_public_characters(
     session: AsyncSession,
     cursor: CharacterCursor | None = None,
@@ -502,6 +505,7 @@ async def list_owned_characters(
     return list(await session.scalars(stmt))
 
 
+# MAX(version)+1 계산 자체는 잠금을 잡지 않는다. freeze를 호출하는 서비스의 원본 잠금과 함께 읽는다.
 async def next_version(session, cls, column, source_id):
     return (
         await session.scalar(select(func.max(cls.version)).where(column == source_id))

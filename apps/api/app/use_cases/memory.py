@@ -1,3 +1,5 @@
+# 답변 저장과 기억 예약을 조합하고, 워커에서는 읽기 → 외부 요약/임베딩 → 잠금 후 재검증을 수행한다.
+# 외부 호출 성공 뒤 DB 저장이 실패할 수 있으며 작업 실패는 기록한 뒤 다시 전달한다.
 """Coordinate chat persistence, durable memory work, and provider calls."""
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ def _memory_sources(
     )
 
 
+# 성공 생성 저장과 기억 작업 예약을 같은 트랜잭션으로 묶는다. 완료 재전송은 세대를 다시 올리지 않는다.
 async def finish_generation_and_schedule_memory(
     session, command: ChatTypes.FinishGenerationCommand
 ) -> ChatTypes.GenerationInfo:
@@ -84,6 +87,7 @@ async def finish_generation_and_schedule_memory(
         return result
 
 
+# claim된 작업의 미완성 색인을 먼저 처리하고 필요한 요약을 생성한다. 오류 종류에 따라 큐의 실패/재시도를 기록한다.
 async def process_memory_work(
     session_factory: Callable,
     work: MemoryTypes.MemoryWorkInfo,

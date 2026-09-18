@@ -1,3 +1,4 @@
+# 항목 metadata는 얕은 dict 복사, 스냅샷 JSON과 활성 스냅샷 항목은 deepcopy다. 활성화 판단은 query가 수행한다.
 from copy import deepcopy
 from typing import cast, overload
 

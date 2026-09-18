@@ -1,3 +1,5 @@
+# 일반 소유자 관리 HTTP 경계. 전역 조회·상태 변경 경로는 governance에 있다.
+# 서비스 LookupError/ValueError를 404/422로 변환하며 DB 제약 오류는 여기서 변환하지 않는다.
 """HTTP adapter for character commands and router-oriented queries."""
 
 from collections.abc import Iterator

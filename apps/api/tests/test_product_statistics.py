@@ -1,3 +1,4 @@
+# 서울 날짜 경계, 상태별 집계, 통화별 매출·환불 및 기간 사용자 중복 제거를 확인한다.
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4

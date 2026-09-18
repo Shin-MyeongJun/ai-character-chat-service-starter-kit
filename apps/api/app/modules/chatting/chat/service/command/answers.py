@@ -1,3 +1,4 @@
+# AnswerOrchestrator의 영속 경계. 사용자 요청 키 잠금 → 대화 잠금 순으로 중복 요청을 직렬화한다.
 """Persistence boundary for the top-level nonstream answer use case."""
 
 from app.db.idempotency import lock_key

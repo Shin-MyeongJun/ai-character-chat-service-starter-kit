@@ -1,3 +1,5 @@
+# Conversation JOIN은 소유권 범위를 제한하며 다른 모듈의 데이터를 결과에 포함하지 않는다.
+# 벡터 검색은 ready·provider/model/dimension 일치만 포함한다. memory_types=None은 전체, 빈 목록은 제외다.
 """Memory persistence. Services own policy; callers own transactions."""
 
 from __future__ import annotations
@@ -349,6 +351,7 @@ async def schedule_memory_work(
     )
 
 
+# 기한이 된 pending 또는 lease 만료 running 하나를 SKIP LOCKED로 잡는다. claim 자체는 외부 호출 중복 방지 보장이 아니다.
 async def claim_memory_work(
     session: AsyncSession, *, worker_id: str, now: datetime, lease_seconds: int
 ) -> MemoryJob | None:
@@ -377,6 +380,7 @@ async def claim_memory_work(
     return job
 
 
+# 소유 워커와 scope가 같은 running만 완료한다. 처리 중 새 예약이 들어왔으면 pending으로 남긴다.
 async def complete_memory_work(
     session: AsyncSession,
     *,

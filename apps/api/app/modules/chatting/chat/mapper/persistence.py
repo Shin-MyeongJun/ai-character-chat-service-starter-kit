@@ -1,3 +1,4 @@
+# 조회 결과의 추가 한 행으로 다음 커서/원문 잘림을 계산한다. 생성 message_count는 최초 출력 수다.
 from typing import overload
 
 from app.db.models.product_usage import ProductGeneration

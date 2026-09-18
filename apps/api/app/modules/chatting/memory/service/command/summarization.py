@@ -1,3 +1,5 @@
+# 미요약 메시지의 추정 크기로 오래된 배치를 선택한다. 최근 원문은 남기며 요약해도 원문을 삭제하지 않는다.
+# save_summary는 호출자가 잠금·원문 재검증·트랜잭션을 확보한 뒤 사용하는 저장 단계다.
 from __future__ import annotations
 
 import hashlib
@@ -52,6 +54,7 @@ def _source_digest(messages: tuple[Types.SourceMessageInfo, ...]) -> str:
     ).hexdigest()
 
 
+# 미요약 메시지에서 최근 원문을 남기고 오래된 배치를 선택한다. 임계치 미달이면 None이다.
 def plan_summarization(
     command: Types.PlanSummarizationCommand,
 ) -> Types.SummaryPlanInfo | None:
@@ -85,6 +88,7 @@ def plan_summarization(
     selected_tokens = 0
     while end < len(eligible):
         next_tokens = eligible_tokens[end]
+        # 첫 메시지 하나는 배치 예산보다 길어도 통째로 선택한다. 메시지 내부를 자르지 않는 현재 경계다.
         if end and selected_tokens + next_tokens > command.policy.summary_batch_tokens:
             break
         selected_tokens += next_tokens
@@ -101,6 +105,7 @@ def plan_summarization(
     )
 
 
+# 요약 생성 중 원문이 수정·삭제되었는지 revision과 범위 digest로 검사한다. 단순 뒤쪽 append와 구분한다.
 def validate_summary_source(command: Types.ValidateSummarySourceCommand) -> None:
     if command.current_conversation_revision != command.plan.conversation_revision:
         raise Types.StaleMemoryWorkError("Conversation history revision changed.")
@@ -156,6 +161,7 @@ class SummaryGenerator:
         )
 
 
+# 검증된 요약을 임베딩 전 pending 상태로 저장한다. 동일 출처 범위·리비전·프롬프트 버전은 기존 행을 재사용한다.
 async def save_summary(session, command: Types.SaveSummaryCommand) -> Types.MemoryInfo:
     if not 0 <= command.importance <= 1:
         raise ValueError("Memory importance must be between 0 and 1.")

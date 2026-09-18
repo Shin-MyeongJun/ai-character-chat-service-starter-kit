@@ -1,3 +1,5 @@
+# 전체 HTTP 진입점. 고정 media 경로를 캐릭터 UUID 경로보다 먼저 등록한다.
+# commerce.billing.router는 여기에 포함되지 않는다. 노출 여부는 이 목록을 기준으로 확인한다.
 from fastapi import APIRouter
 
 from app.http.answers import router as AnswersRouter

@@ -1,3 +1,4 @@
+# OpenAPI에 상품·대화·관리·모델 종료 경로가 등록되는지 확인한다. 요청 실행이나 DB 권한 검사는 하지 않는다.
 from app.modules.chatting.conversation.router import router as conversations
 from app.modules.content.product.router import router
 from fastapi import FastAPI

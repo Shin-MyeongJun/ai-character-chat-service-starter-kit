@@ -1,3 +1,4 @@
+# 커서 시각/ID 쌍, 인증 owner 주입, embedding 비노출을 확인한다.
 from datetime import UTC, datetime
 from uuid import uuid4
 

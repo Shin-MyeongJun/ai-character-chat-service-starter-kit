@@ -1,3 +1,4 @@
+# 스냅샷 순서와 깊은 복사를 확인한다. priority 숫자가 커도 이 함수가 재정렬하지 않는 사례를 포함한다.
 from copy import deepcopy
 from uuid import uuid4
 

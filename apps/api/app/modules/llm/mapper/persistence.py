@@ -1,3 +1,4 @@
+# DB 모델의 capabilities를 deepcopy하여 세션 밖에 전달할 Info를 만든다.
 from copy import deepcopy
 from typing import overload
 

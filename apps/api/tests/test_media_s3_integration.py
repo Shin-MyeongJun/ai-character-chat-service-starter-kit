@@ -1,3 +1,4 @@
+# 명시적 opt-in과 PostgreSQL이 필요한 실제 S3 왕복 테스트. 생성한 요청의 객체만 finally에서 삭제한다.
 """Opt-in managed-media smoke test; only its unique test prefix is cleaned."""
 
 import io

@@ -1,3 +1,5 @@
+# 초안 → 구성 → 설정 → 발행 → 공개 안내 흐름의 HTTP 경계. 발행과 안내는 인증 owner 훅을 사용한다.
+# 노트 수정으로 자동 적용 정책을 바꿀 수 없으며 상품 삭제 성공은 204다.
 from typing import Annotated
 from uuid import UUID
 

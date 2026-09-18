@@ -1,3 +1,5 @@
+# 외부 스케줄러가 호출하는 일회 실행 진입점이다. 이 파일 자체는 주기 실행을 등록하지 않는다.
+# --repair-recent는 최근 일자 재집계 요청을 추가하고, --limit만큼 큐를 처리한 뒤 종료한다.
 """Run hourly; pass --repair-recent nightly. DATABASE_URL comes from deployment."""
 
 import argparse

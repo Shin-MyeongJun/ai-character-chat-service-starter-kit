@@ -1,3 +1,4 @@
+# SQLite 범위 조회, PostgreSQL SQL 컴파일, mock 임베딩을 조합한다. 실제 pgvector 실행 검증으로 해석하지 않는다.
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock

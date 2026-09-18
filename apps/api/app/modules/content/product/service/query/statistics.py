@@ -1,3 +1,5 @@
+# 소유 상품과 선택 버전 소속을 확인한다. 조회 날짜는 양 끝 포함, 최대 731일이다.
+# 집계가 없는 날짜를 만들어 채우지 않으며 pending_days로 재집계 대기를 표시한다.
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import statistics as StatisticsMapper

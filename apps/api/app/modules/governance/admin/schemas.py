@@ -1,3 +1,4 @@
+# expires_at=None은 버전 만료 시각 해제를 뜻한다. 종료 공지 날짜 순서·시간대는 서비스에서 추가 검사한다.
 from datetime import datetime
 from typing import Literal
 from uuid import UUID

@@ -1,3 +1,4 @@
+# 대화 시작 API의 최상위 트랜잭션. 방·참여자 생성과 opening 메시지 저장을 함께 확정한다.
 """Atomic room creation and opening message; domain modules never call back here."""
 
 from app.db.transaction import use_case_transaction

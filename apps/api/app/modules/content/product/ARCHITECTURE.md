@@ -32,3 +32,13 @@ statistics의 조회와 일부 command 모듈의 명시적 재노출은 이전 P
 상품에 독립적인 파일 테이블/업로드 기능은 없다. 상품 미디어는 캐릭터 스냅샷을 통해 참조하므로 product 테이블에는 추가 컬럼이 필요하지 않다. character의 스냅샷 미디어 FK가 불변 저장소 객체를 보존하며, 초안 수정·삭제·다음 게시·버전 만료는 이전 파일을 삭제하지 않는다. 상품 미디어 접근은 인증된 소유자 또는 기존 approved + public/unlisted 접근 정책을 그대로 따른다. 공개 버킷/ACL, 서명 URL, 익명 파일 접근은 추가하지 않았다.
 
 `app.main`이 세션/미디어 저장소를 연결하며 실제 인증 검증기와 운영 스케줄러 배포는 환경 연결 범위다. 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.
+
+## 현재 구현 점검과 읽는 순서 (2026-09-17)
+
+읽는 순서: 초안 command → composition → settings → releases/publication → views/snapshots → conversation 시작/전환. 저장 동작은 repository의 같은 책임 파일로 내려가고, 공개 응답은 mapper/schema와 schemas에서 확인한다.
+
+발행은 요청 키 기반 멱등 API가 아니다. 같은 내용을 다시 발행하는 것과 구성요소 스냅샷을 재사용하는 것을 구분한다. 접근 가능한 상품(owner 또는 approved 비private) 조회와 버전 만료 검사는 별도 경계다. 시작 옵션의 원본 entry ID와 발행 start ID도 다르다.
+
+통계는 `use_cases/product_statistics` → 각 도메인 facts → mapper/statistics → repository/statistics 순서로 읽는다. 환불은 원매출 귀속일, 활성 사용자는 기간 중복 제거, 금액은 통화별로 확인한다. 관련 테스트는 `test_product_*` 전반이며 파일별 계약은 전체 점검 안내에 연결했다.
+
+전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.

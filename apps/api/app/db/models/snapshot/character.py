@@ -1,3 +1,5 @@
+# 발행 캐릭터의 본문 JSON과 이미지·자산 목록을 보존한다. 원본 삭제 후에도 스냅샷을 남긴다.
+# media_id가 있으면 관리 저장소 참조이며 None이면 기존 URL 필드를 사용하는 데이터다.
 from uuid import UUID
 
 from sqlalchemy import (

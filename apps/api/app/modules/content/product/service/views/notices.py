@@ -1,3 +1,5 @@
+# 공개 상품 안내·대화 업데이트·소유자 버전 가용성 정보를 모델 종료 안내와 합친다.
+# 안내 조회는 만료 버전도 표현하며, 실제 사용 가능 여부는 시작/생성 단계에서 검사한다.
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service import get_owned_conversation
 from app.modules.content.product import types as Types

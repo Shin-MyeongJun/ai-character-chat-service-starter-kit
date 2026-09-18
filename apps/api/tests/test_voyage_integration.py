@@ -1,3 +1,4 @@
+# VOYAGE_API_KEY가 있으면 실제 외부 호출을 수행하는 검사다. 키가 없으면 skip한다.
 """Opt-in live check; unit tests use mocks and never consume Voyage API quota."""
 
 import os
