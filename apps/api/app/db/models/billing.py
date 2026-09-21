@@ -1,5 +1,6 @@
-# 사용량·결제·구독·크레딧 스키마다. 현재 billing은 usage와 상품 귀속을 기록하고 credit 서비스는 비어 있다.
-# 금액은 Decimal 통화 값, 크레딧은 정수다. usage의 nullable 참조는 이전 데이터와 삭제된 대화를 허용한다.
+# 사용량·결제·구독·크레딧 스키마다. billing이 기존 잔액/원장과 예약을 관리한다.
+# 금액은 Decimal 통화 값, 크레딧은 정수다.
+# usage의 nullable 참조는 이전 데이터와 삭제된 대화를 허용한다.
 # generation별 사용량 UNIQUE는 중복 행을 막으며 잔액 차감까지 보장하지 않는다.
 from datetime import datetime
 from decimal import Decimal
@@ -58,6 +59,10 @@ class CreditAccount(Base):
     __tablename__ = "credit_accounts"
     __table_args__ = (
         CheckConstraint("balance >= 0", name="ck_credit_accounts_balance_non_negative"),
+        CheckConstraint(
+            "reserved_credit >= 0 AND reserved_credit <= balance",
+            name="ck_credit_accounts_reserved_credit",
+        ),
     )
 
     user_id: Mapped[UUID] = mapped_column(
@@ -69,6 +74,9 @@ class CreditAccount(Base):
         BigInteger,
         nullable=False,
         server_default=text("0"),
+    )
+    reserved_credit: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default=text("0")
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

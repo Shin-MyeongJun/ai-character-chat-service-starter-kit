@@ -18,7 +18,7 @@
 
 원본과 스냅샷의 활성화는 같은 query에서 키워드 매칭 판단을 공유한다. 결과 복사는 persistence mapper에 두어 업무 선택과 구조 변환을 분리한다.
 
-스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 기존 503 응답을 보존한다. `app.main`은 DB 세션을 연결한다. 인증 및 character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
+스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 미연결 훅의 503 응답을 보존한다. `app.main`은 DB 세션과 일반 소유자의 실제 쿠키 인증을 연결한다. character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
 
 ## 현재 구현 점검과 읽는 순서 (2026-09-17)
 

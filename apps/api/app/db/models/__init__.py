@@ -6,6 +6,8 @@ from app.db.models.billing import (
     UsageLog,
     UserSubscription,
 )
+from app.db.models.billing_credit import CreditReservation
+from app.db.models.billing_quote import BillingQuote
 from app.db.models.character import Character, CharacterAsset, CharacterImage
 from app.db.models.character_media import CharacterMedia
 from app.db.models.chat import (
@@ -39,6 +41,7 @@ from app.db.models.snapshot import (
 
 __all__ = [
     "AuditLog",
+    "BillingQuote",
     "Character",
     "CharacterAsset",
     "CharacterImage",
@@ -48,6 +51,7 @@ __all__ = [
     "ConversationCharacter",
     "ConversationMemory",
     "CreditAccount",
+    "CreditReservation",
     "CreditTransaction",
     "Lorebook",
     "LorebookEntry",

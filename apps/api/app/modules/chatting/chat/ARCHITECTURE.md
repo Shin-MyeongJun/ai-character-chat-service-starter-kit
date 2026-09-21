@@ -55,7 +55,7 @@ version_changes는 메시지를 참조하는 컬럼이 없으며 conversation과
 
 ## 미연결 범위
 
-HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에 연결한다. 인증 구현은 없어 기본 인증 훅은 503이며 우회 인증을 만들지 않았다. 배포 앱은 검증된 identity dependency를 `create_app(authenticate=...)`에 제공해야 한다. 비스트리밍 답변은 `app.http.answers` → `app.use_cases.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
+HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에, 기본 owner 훅을 identity의 쿠키·CSRF·사용자/세션 검증에 연결한다. `create_app(authenticate=...)`는 기존 명시적 주입 계약으로만 유지하며 기본 실행에 필요하지 않다. 개별 라우터만 조립하고 의존성을 연결하지 않으면 기존 503 훅이 적용된다. 비스트리밍 답변은 `app.http.answers` → `app.use_cases.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
 
 답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 기존 finish와 memory 예약을 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.
 

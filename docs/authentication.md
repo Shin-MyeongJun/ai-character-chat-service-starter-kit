@@ -2,6 +2,8 @@
 
 인증 전용 API이며 UI와 상품·채팅 가입 후 흐름은 포함하지 않는다. 기본 배포는 프런트와 API를 같은 origin에서 제공한다. API 자체를 테스트할 때는 `http://localhost:8000`을 사용한다. 개인정보 확장 경계와 잠금 정책은 [Identity 아키텍처](../apps/api/app/modules/identity/ARCHITECTURE.md)에 있다.
 
+가입 이후 상품 준비·첫 채팅 답변까지 이어지는 기본 앱의 쿠키 인증 통합 검증은 [첫 답변 재현 절차](first-answer-integration.md)를 참고한다. `create_app()`은 이미 실제 인증 의존성에 연결되므로 별도 `authenticate` 훅을 주입할 필요가 없다.
+
 ## 설정과 로컬 실행
 
 1. `.env.example`을 `.env`로 복사한다. 실제 `.env`와 비밀값은 커밋하지 않는다.

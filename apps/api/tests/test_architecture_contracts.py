@@ -127,6 +127,23 @@ def test_top_level_use_cases_use_only_public_module_services_and_types():
 
 
 def test_public_service_business_inputs_use_commands_and_declare_results():
+    # Billing's keyword-only configuration/clock are execution dependencies,
+    # not business inputs (architecture B.3). Keep the exception scoped and typed.
+    billing_dependencies = {
+        ("commerce/billing/service/quotes.py", "create_billing_quote"): {
+            "configuration": "PricingService.BillingPricingConfiguration",
+            "clock": "Callable[[], datetime]",
+        },
+        ("commerce/billing/service/quotes.py", "get_billing_quote"): {
+            "clock": "Callable[[], datetime]",
+        },
+        ("commerce/billing/service/quotes.py", "validate_billing_quote"): {
+            "clock": "Callable[[], datetime]",
+        },
+        ("commerce/billing/service/credits.py", "reserve_credit"): {
+            "clock": "Callable[[], datetime]",
+        },
+    }
     violations = []
     for path in MODULES.rglob("*.py"):
         if "service" not in path.parts:
@@ -136,11 +153,19 @@ def test_public_service_business_inputs_use_commands_and_declare_results():
                 continue
             if node.name == "aclose":  # Adapter resource lifetime, not a use case.
                 continue
+            dependencies = billing_dependencies.get(
+                (path.relative_to(MODULES).as_posix(), node.name), {}
+            )
             business_args = [
                 arg
                 for arg in node.args.args + node.args.kwonlyargs
                 if arg.arg
                 not in {"self", "session", "embedding_service", "embed_query", "now"}
+                and not (
+                    arg in node.args.kwonlyargs
+                    and arg.annotation is not None
+                    and dependencies.get(arg.arg) == ast.unparse(arg.annotation)
+                )
             ]
             if (
                 any(

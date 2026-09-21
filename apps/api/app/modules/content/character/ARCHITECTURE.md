@@ -22,7 +22,7 @@
 
 온라인 삭제는 DB 참조만 제거한다. `app.media_cleanup`은 명시적 미디어 ID만 받아 마지막 미디어 갱신 시점이 최소 24시간 이전이고 원본/모든 스냅샷 참조가 없을 때 deleting을 먼저 커밋한 후 파일 삭제 → deleted를 커밋한다. 오류는 전파되고 재실행은 deleting부터 계속한다. 보존된 스냅샷은 만료 여부와 관계없이 정리를 막는다. 기존 URL만 있는 파일은 정리 대상이 아니다.
 
-`app/http/media.py`는 기존 인증 훅을 사용하는 추가 바이너리 업로드/스트리밍 HTTP 조립이다. 소유자 경로는 현재 캐릭터 소유권을 검사한다. 상품 스냅샷 읽기는 신뢰된 product 공개 서비스가 접근 검증한 스냅샷 ID만 받으며 직접 HTTP에 공개하지 않는다. 파일 제공은 `read_asset` reader를 스트리밍하고 연결 종료·오류 시 닫는다. 절대 경로·버킷 URL·서명 URL은 반환하지 않는다. `app.main`이 실제 DB 세션과 저장소를 조립하고 인증 검증기는 배포에서 주입한다.
+`app/http/media.py`는 기존 인증 훅을 사용하는 추가 바이너리 업로드/스트리밍 HTTP 조립이다. 소유자 경로는 현재 캐릭터 소유권을 검사한다. 상품 스냅샷 읽기는 신뢰된 product 공개 서비스가 접근 검증한 스냅샷 ID만 받으며 직접 HTTP에 공개하지 않는다. 파일 제공은 `read_asset` reader를 스트리밍하고 연결 종료·오류 시 닫는다. 절대 경로·버킷 URL·서명 URL은 반환하지 않는다. `app.main`이 실제 DB 세션과 저장소를 조립하고 기본 소유자 인증을 identity의 쿠키·CSRF·세션 검증에 연결한다.
 
 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.
 

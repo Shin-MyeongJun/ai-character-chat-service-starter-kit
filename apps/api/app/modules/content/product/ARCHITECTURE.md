@@ -31,7 +31,7 @@ statistics의 조회와 일부 command 모듈의 명시적 재노출은 이전 P
 
 상품에 독립적인 파일 테이블/업로드 기능은 없다. 상품 미디어는 캐릭터 스냅샷을 통해 참조하므로 product 테이블에는 추가 컬럼이 필요하지 않다. character의 스냅샷 미디어 FK가 불변 저장소 객체를 보존하며, 초안 수정·삭제·다음 게시·버전 만료는 이전 파일을 삭제하지 않는다. 상품 미디어 접근은 인증된 소유자 또는 기존 approved + public/unlisted 접근 정책을 그대로 따른다. 공개 버킷/ACL, 서명 URL, 익명 파일 접근은 추가하지 않았다.
 
-`app.main`이 세션/미디어 저장소를 연결하며 실제 인증 검증기와 운영 스케줄러 배포는 환경 연결 범위다. 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.
+`app.main`이 세션/미디어 저장소와 일반 소유자의 실제 쿠키 인증을 연결한다. 운영 스케줄러 배포는 환경 연결 범위다. 운영/이전/롤백 절차는 `references_document/reference/character-product-asset-storage.md`에 있다.
 
 ## 현재 구현 점검과 읽는 순서 (2026-09-17)
 

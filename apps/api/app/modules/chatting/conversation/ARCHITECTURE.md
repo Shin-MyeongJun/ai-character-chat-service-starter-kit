@@ -21,7 +21,7 @@
 
 시작·버전 전환 schema mapper는 인증 사용자와 경로 ID를 받아 최종 Command를 생성한다. 업데이트 응답 변환도 같은 mapper 클래스에서 처리한다. ConversationInfo.product_id는 DB와 동일하게 필수이며 레거시 여부는 product_snapshot_id의 None 여부로 판단한다.
 
-대화 생성·버전 전환·런타임 준비는 변경 이유가 달라 기능 파일로 나눴다. 런타임 준비는 쓰기 부수효과가 있으므로 command에 유지하고 순수 View 조립은 persistence mapper에 둔다. 공개 재노출은 `service/__init__.py`에서 명시한다. `app.main`은 실제 DB 세션을 연결하고 인증 검증기를 선택적으로 주입받는다. 기본 인증 훅은 503이다. 외부 답변 생성은 `app/use_cases/answers.py`가 담당하며 conversation 자체는 공급자를 호출하지 않는다.
+대화 생성·버전 전환·런타임 준비는 변경 이유가 달라 기능 파일로 나눴다. 런타임 준비는 쓰기 부수효과가 있으므로 command에 유지하고 순수 View 조립은 persistence mapper에 둔다. 공개 재노출은 `service/__init__.py`에서 명시한다. `app.main`은 실제 DB 세션과 기본 쿠키 인증을 연결하고 인증 검증기를 선택적으로 주입받는다. 503은 개별 라우터의 미연결 훅에 해당하며 기본 앱은 실제 identity 검증을 수행한다. 외부 답변 생성은 `app/use_cases/answers.py`가 담당하며 conversation 자체는 공급자를 호출하지 않는다.
 
 ## 현재 구현 점검과 읽는 순서 (2026-09-17)
 

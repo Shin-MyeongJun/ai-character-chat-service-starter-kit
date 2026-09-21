@@ -1,11 +1,18 @@
 # 결제 배분은 Payment, 환불은 원매출 이벤트 행의 FOR UPDATE 잠금 아래 누계를 조회한다.
-# 통계는 [start, end) 범위이며 사용량은 created_at, 결제는 attributed_at 기준으로 버전별 집계한다.
+# 통계는 [start, end) 범위의 버전별 집계다.
+# 사용량은 created_at, 결제는 attributed_at 기준이다.
 # 결제 금액은 통화별로 나누고 스냅샷 없는 사용량은 제외한다.
 from dataclasses import asdict
+from datetime import datetime
+from typing import Any
+from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.billing import Payment, UsageLog
+from app.db.models.billing import CreditAccount, CreditTransaction, Payment, UsageLog
+from app.db.models.billing_credit import CreditReservation
+from app.db.models.billing_quote import BillingQuote
 from app.db.models.product_usage import ProductPaymentEvent
 
 
@@ -104,3 +111,166 @@ async def get_statistics_facts(session, product_id, start, end):
         )
     )
     return usage, payments
+
+
+async def get_billing_quote_by_key(
+    session: AsyncSession, user_id: UUID, request_key: UUID
+) -> BillingQuote | None:
+    return await session.scalar(
+        select(BillingQuote).where(
+            BillingQuote.user_id == user_id,
+            BillingQuote.request_key == request_key,
+        )
+    )
+
+
+async def get_billing_quote(
+    session: AsyncSession, user_id: UUID, quote_id: UUID
+) -> BillingQuote | None:
+    return await session.scalar(
+        select(BillingQuote).where(
+            BillingQuote.user_id == user_id,
+            BillingQuote.id == quote_id,
+        )
+    )
+
+
+async def create_billing_quote(
+    session: AsyncSession,
+    *,
+    quote_id: UUID,
+    user_id: UUID,
+    request_key: UUID,
+    request_snapshot: dict[str, Any],
+    price_snapshot: dict[str, Any],
+    created_at: datetime,
+    expires_at: datetime,
+) -> BillingQuote:
+    entity = BillingQuote(
+        id=quote_id,
+        user_id=user_id,
+        request_key=request_key,
+        request_snapshot=request_snapshot,
+        price_snapshot=price_snapshot,
+        created_at=created_at,
+        expires_at=expires_at,
+    )
+    session.add(entity)
+    await session.flush()
+    return entity
+
+
+async def get_credit_account(
+    session: AsyncSession, user_id: UUID, *, for_update: bool = False
+) -> CreditAccount | None:
+    statement = select(CreditAccount).where(CreditAccount.user_id == user_id)
+    if for_update:
+        statement = statement.with_for_update()
+    return await session.scalar(statement.execution_options(populate_existing=True))
+
+
+async def get_credit_reservation_by_key(
+    session: AsyncSession, user_id: UUID, request_key: UUID
+) -> CreditReservation | None:
+    return await session.scalar(
+        select(CreditReservation)
+        .where(
+            CreditReservation.user_id == user_id,
+            CreditReservation.request_key == request_key,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def get_credit_reservation_by_quote(
+    session: AsyncSession, quote_id: UUID
+) -> CreditReservation | None:
+    return await session.scalar(
+        select(CreditReservation)
+        .where(CreditReservation.quote_id == quote_id)
+        .execution_options(populate_existing=True)
+    )
+
+
+async def change_credit_balance(
+    session: AsyncSession, user_id: UUID, *, balance_delta: int, reserved_delta: int
+) -> None:
+    await session.execute(
+        update(CreditAccount)
+        .where(CreditAccount.user_id == user_id)
+        .values(
+            balance=CreditAccount.balance + balance_delta,
+            reserved_credit=CreditAccount.reserved_credit + reserved_delta,
+        )
+    )
+
+
+async def create_credit_reservation(
+    session: AsyncSession,
+    *,
+    reservation_id: UUID,
+    user_id: UUID,
+    request_key: UUID,
+    quote_id: UUID,
+    reserved_credit: int,
+    created_at: datetime,
+) -> CreditReservation:
+    entity = CreditReservation(
+        id=reservation_id,
+        user_id=user_id,
+        request_key=request_key,
+        quote_id=quote_id,
+        reserved_credit=reserved_credit,
+        status="reserved",
+        created_at=created_at,
+    )
+    session.add(entity)
+    await session.flush()
+    return entity
+
+
+async def create_credit_debit(
+    session: AsyncSession,
+    *,
+    transaction_id: UUID,
+    user_id: UUID,
+    request_key: UUID,
+    result_id: UUID,
+    amount: int,
+) -> None:
+    session.add(
+        CreditTransaction(
+            id=transaction_id,
+            user_id=user_id,
+            amount=-amount,
+            reason="chat_usage",
+            reference_id=result_id,
+            idempotency_key=f"billing:credit-settlement:{user_id}:{request_key}",
+        )
+    )
+    await session.flush()
+
+
+async def finalize_credit_reservation(
+    session: AsyncSession,
+    *,
+    reservation_id: UUID,
+    status: str,
+    result_id: UUID | None,
+    transaction_id: UUID | None,
+    finalized_at: datetime,
+) -> CreditReservation:
+    result = await session.scalars(
+        update(CreditReservation)
+        .where(CreditReservation.id == reservation_id)
+        .values(
+            status=status,
+            result_id=result_id,
+            transaction_id=transaction_id,
+            finalized_at=finalized_at,
+        )
+        .returning(CreditReservation)
+        .execution_options(populate_existing=True)
+    )
+    return result.one()
