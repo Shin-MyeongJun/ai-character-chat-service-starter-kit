@@ -17,6 +17,9 @@ class BillingQuote(UuidPkMixin, Base):
     __tablename__ = "billing_quotes"
     __table_args__ = (
         UniqueConstraint(
+            "id", "user_id", "request_key", name="uq_billing_quotes_identity"
+        ),
+        UniqueConstraint(
             "user_id", "request_key", name="uq_billing_quotes_user_request"
         ),
         CheckConstraint("expires_at > created_at", name="ck_billing_quotes_expiration"),

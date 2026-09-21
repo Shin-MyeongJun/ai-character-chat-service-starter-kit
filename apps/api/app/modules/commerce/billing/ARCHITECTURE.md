@@ -1,7 +1,7 @@
 # Billing 모듈
 
-- 현재 구현에서 사용하는 소유 테이블: `payments`, `usage_logs`, `product_payment_events`, `billing_quotes`, `credit_accounts`, `credit_transactions`, `credit_reservations`.
-- 구독용 `subscription_plans`, `user_subscriptions`는 이 도메인의 기존 미구현 데이터다. 기존 credit 모듈은 빈 서비스/저장소만 있으므로 크레딧 단계에서 기존 잔액/원장을 billing 소유로 재사용한다. credit 모듈 코드와 기존 데이터 의미는 변경하지 않았다.
+- 현재 구현에서 사용하는 소유 테이블: `payments`, `usage_logs`, `product_payment_events`, `billing_quotes`, `billing_credit_bindings`.
+- 구독용 `subscription_plans`, `user_subscriptions`는 이 도메인의 기존 미구현 데이터다. 잔액·원장·예약은 credit이 소유하며 billing은 credit의 공개 service/types만 참조한다. 현재 billing v1은 CREDIT 한 재화를 선택하며 무료/유료 합계만 기존 잔액 Info로 반환한다.
 - `service/command/attribution.py`: 검증된 결제의 상품 버전별 매출 배분·환불 귀속. 모든 요청은 Command, 결과는 저장된 PaymentEventInfo다. 원래 결제/매출 한도를 넘어서는 배분·환불과 멱등 키 재사용 충돌을 거절한다.
 - `service/command/__init__.py`: RecordUsageCommand → UsageRecordedInfo. generation과 같은 트랜잭션 안에서 기록한다.
 - `service/query.py`: 상품 통계에 BillingStatisticsInfo를 제공한다.
@@ -17,7 +17,7 @@
 
 금액은 currency 단위 Decimal이며 cost_credit과 다르다. refund의 occurred_at은 실제 환불 시각, attributed_at은 원매출 귀속 시각이다. 통계 facts 조회는 [start, end), 사용량 created_at과 결제 attributed_at을 각각 사용한다.
 
-관련 테스트: `test_product_usage`, `test_product_statistics`, `test_use_case_transaction`. billing router/schemas 및 credit service/repository의 빈 파일은 HTTP 결제나 잔액 차감 구현이 아니다. 새 크레딧 공개 서비스는 billing/service/credits.py에 있다.
+관련 테스트: `test_product_usage`, `test_product_statistics`, `test_use_case_transaction`. billing router/schemas는 HTTP 결제 구현이 아니다. billing/service/credits.py가 견적을 검증하고 credit 공개 서비스를 호출한다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
 
@@ -37,7 +37,7 @@
 - 가격 정책은 기존 DB 쓰기인 usage/attribution과 다른 책임이므로 독립 service 파일로
   분리했다. 단일 types 파일은 기존 import 계약과 관련 값들의 탐색성을 유지한다.
 - 계약 단계 이후 가격·견적 단계에서 `billing_quotes`를 추가했다. 이후 크레딧 단계에서는
-  기존 잔액/원장을 billing 소유로 재사용했다. 새로운 타 모듈 ORM/JOIN 예외는 없다.
+  잔액/원장을 사용했고 현재 소유권은 credit으로 이전했다. 타 모듈 ORM/JOIN 예외는 없다.
 
 사용자 요청의 유료 생성만 과금하고 내부 임베딩/요약은 별도 청구하지 않는다.
 계산기는 모델·문맥 구간별 고정 정상가격 → 순서 있는 정책 → 원가 보호 하한 →
@@ -92,47 +92,37 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
 검증은 `test_billing_prices.py`, `test_billing_quotes.py`, `test_billing_quote_migrations.py`를 참조한다.
 
 
-## 크레딧 예약과 확정 (2026-09-21)
+## Credit 호출과 기존 계약 호환 (2026-09-22)
 
-- `service/credits.py`: `get_credit_balance(GetCreditBalanceCommand) → CreditBalanceInfo`,
-  `reserve_credit(ReserveCreditCommand)`, `commit_credit_reservation(CommitCreditReservationCommand)`,
-  `release_credit_reservation(ReleaseCreditReservationCommand) → CreditReservationInfo`.
-  실행 의존성인 AsyncSession은 별도 인자다. 모든 업무 판단은 mapper가 변환한 Info로 한다.
-- `mapper/credits.py`: 계정/예약 Entity를 불변 Info로 순수 변환한다.
-  `repository.py`: 계정 잠금/증감, 예약 조회/저장/상태 갱신, 기존 원장의 확정 차감을 담당한다.
-  밀접한 저장 경로는 기존 repository에 추가해 import 경로를 보존했다. 가격/견적과 다른
-  상태 전이 책임인 크레딧 서비스 및 mapper는 별도 기능 파일로 나눴다.
-- 기존 `credit_accounts.balance`는 보유 잔액 그대로다. 추가한 `reserved_credit`은 활성 예약의
-  합계이며 `0 <= reserved_credit <= balance`; 사용 가능 잔액은 두 값의 차이다.
-  계정 미존재는 오류이며 자동 생성/충전하지 않는다. 조회는 한 SQL 문장의 일관된 값이다.
-- `credit_reservations`: 사용자·요청 키 UNIQUE, quote_id UNIQUE, 확정 원장 transaction_id
-  UNIQUE/FK, 상태별 result_id/transaction_id/finalized_at CHECK로 재전송 기록을 보존한다.
-  최초 예약액은 최종 상태에서도 유지한다. 예약/해제는 이 테이블에 기록하며 잔액 증감 원장에
-  가짜 출금/환불을 쓰지 않는다. 확정만 기존 `credit_transactions`에 음수 `chat_usage` 한 건을
-  추가한다. reference_id는 호출자가 저장한 result_id이며 0 가격도 금액 0의 확정 기록을 남긴다.
-  기존 usage/귀속 기능을 호출하거나 그 의미를 변경하지 않는다.
-- 잠금 순서: 계정 `FOR UPDATE` → 해당 사용자·키의 예약 `FOR UPDATE` → 불변 견적 조회 →
-  계정 갱신 → 확정 원장 insert(확정만) → 예약 insert/update. 계정 잠금은 첫 예약 행이 없을 때도
-  사용자별 모든 변경을 직렬화한다. 견적 UPDATE/DELETE 공개 경로는 없고 UNIQUE/FK도 보호한다.
-  동일 트랜잭션에서 여러 사용자 계정을 다룰 장래 호출자는 user_id 오름차순으로 잠근다.
-- RESERVED → COMMITTED 또는 RELEASED만 허용한다. 동일 확정/해제 재전송은 금액 이동 없이
-  기존 결과를 반환하고 서로 다른 최종 상태로의 전이는 충돌이다. 확정 result_id 변경도 충돌이다.
-  예약 재전송은 견적·전체 실행 조건을 비교하고 최초 예약/최종 상태를 그대로 반환한다.
-  신규 예약만 잠금 획득 이후 시각으로 견적 만료를 거절한다. 해제된 견적도 재사용할 수 없다.
-- 쓰기는 호출자가 명시적으로 연 `session.begin()` 또는 `use_case_transaction`이 필수다.
-  서비스 단독 호출 및 조회로 발생한 AUTOBEGIN은 거절한다. 서비스는 내부 SAVEPOINT로 작업
-  실패의 부분 반영을 막되 외부 트랜잭션을 commit/rollback하지 않는다. SAVEPOINT 성공 뒤에도
-  계정 잠금과 원장/잔액 변경은 외부 commit까지 유지된다. 결과 저장과 확정을 함께 rollback하는
-  책임은 조율 계층에 있다. PostgreSQL READ COMMITTED에서 검증했으며 더 강한 격리 수준의
-  serialization failure나 deadlock은 호출자가 전체 트랜잭션을 같은 키로 재시도한다.
-- `db/models/billing_credit.py`, Alembic `0022`, 초기 SQL `013_billing_credits.sql`이 예약을
-  정의한다. 기존 계정에는 reserved_credit=0만 추가하고 잔액/원장 과거 행은 재작성하지 않는다.
-  예약 이력이 있으면 downgrade를 거절한다. 사용자/견적/확정 원장 삭제는 FK가 제한한다.
-- TTL 자동 해제 워커는 없다. 오래된 RESERVED도 실행 중일 수 있어 생성 상태를 확인한 복구는
-  후속 연결이다. 인증·실행 조건 확정, 실제 생성, 결과 저장/usage와의 원자적 확정, HTTP,
-  충전/환불, 사용자 삭제/보존 정책은 [후속 연결 문서](../../../../../../docs/billing-pricing-integration.md)를 따른다.
+- `service/credits.py`의 공개 get_credit_balance/reserve_credit/commit_credit_reservation/
+  release_credit_reservation 이름·인자·clock·billing Command/Info와 오류 계약을 유지한다.
+  credit 공개 service/types만 호출하며 저장 계층에 직접 접근하지 않는다.
+- billing은 견적 사용자·요청 키·실행 조건·최초 예약 만료를 검증하고 현재 v1 재화 CREDIT과
+  확정가격을 결정한다. namespace=billing, reason=chat_usage, 기존 settlement_key 문자열의
+  의미는 billing이 소유한다. credit은 이 값을 불투명 metadata로 저장한다.
+- v1 견적은 CREDIT으로 고정한다. 새 재화를 billing 가격에 도입할 때에는 새 견적 버전과
+  불변 재화 스냅샷을 추가해야 하며 기존 v1 의미를 설정 변경으로 바꿀 수 없다.
+- `repository.py`는 자체 견적/연결/usage/매출·환불만 저장한다. `mapper/credits.py`는 연결
+  Entity와 credit 공개 Info를 기존 billing Info로 변환한다. 잔액은 CREDIT 무료/유료 합계다.
+- billing_credit_bindings는 reservation_id PK, quote_id UNIQUE, user/request UNIQUE와
+  created_at을 보존한다. 복합 FK가 같은 사용자/키를 보장한다. 이는 타 모듈 ORM 접근 허용이 아니다.
+- 잠금 순서는 billing 요청 키 → credit 공개 지갑 잠금 → binding → credit 예약이다.
+  신규 예약은 지갑 잠금을 기다린 뒤 읽은 시각으로 견적 만료를 판단한다. 기존 예약 재전송은
+  만료와 무관하게 전체 견적 요청과 저장된 ID·재화·금액·분류 상태를 확인하고 그대로 반환한다.
+- 확정/해제는 최초 배분을 사용한다. 현재 가격·정책·추가 무료 지급으로 배분을 다시 계산하지 않는다.
+  내부 호출과 연결 insert를 billing SAVEPOINT로 함께 묶어 연결 실패에도 부분 예약을 남기지 않는다.
+- 명시적 session.begin() 또는 use_case_transaction에 참여하고 내부 commit하지 않는다.
+  견적 생성까지 조합할 때에는 기존대로 use_case_transaction을 사용한다.
+- credit의 부족/미존재/충돌 오류는 기존 billing 오류 계열로 변환한다. 미분류 기존 사용자에 대한
+  CreditClassificationRequiredError는 기존 CreditAccountNotFoundError로 변환하며 원인을 보존한다.
+  예상하지 못한 DB 오류와 명시 트랜잭션 오류는 그대로 전파한다.
+- 0023/014는 소유권·연결 이전, 후속 0024/015는 무료/유료 지갑 구조다. 기존 계정/원장/예약은
+  미분류로 보존하고 분류 승인 전 활성화하지 않는다. 상세 정책은
+  [최종 계약](../../../../../../docs/credit-billing-refactor-plan.md)을 따른다.
+- usage·상품별 매출/환불 귀속은 기존 billing 책임이며 credit 지급/소비에 자동 연결하지 않는다.
+  실제 chat/answers 연결, 현금 결제/환불, HTTP/UI, billing_chat 분리는 구현하지 않는다.
 
-검증: `test_billing_credits.py`, `test_billing_credit_migrations.py` 및 기존 과금/usage/스키마 검증.
+원본 검증 결과: [완료 보고](../../../../../../docs/credit-billing-separation-handoff.md).
 
 ## 독립 통합 검증과 연결 경계 (2026-09-21)
 
@@ -144,7 +134,7 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
   이미 영속화된 예약의 상위 확정/해제 rollback과 함께 실행한다. 합성 result_id만 전달하며
   실제 chat 결과 저장의 원자성 또는 생성 흐름 연결을 검증한 것으로 해석하지 않는다.
 - 정책 테스트의 합성 할인은 운영 어댑터가 아니다. 상품/작가·프로모션·비인기 정책은 여전히
-  무효과이며 운영 가격 구성/충전/실제 생성 연결은 없다. 기존 usage는 청구 확정이 아니다.
+  무효과이며 운영 가격 구성/현금 결제/실제 생성 연결은 없다. 내부 재화 지급은 credit에 구현했다. 기존 usage는 청구 확정이 아니다.
 - 외부 연결은 기존 생성 확인 → 신규 요청만 만료 검사 → 생성/크레딧 예약의 원자적 저장 →
   트랜잭션 밖 LLM → 실제 성공 결과 저장/확정 또는 실패 상태 저장/해제 순서다.
   현재 answers의 프롬프트 준비 위치, `cost_credit=0`, chat의 stale 전환과 usage 처리,

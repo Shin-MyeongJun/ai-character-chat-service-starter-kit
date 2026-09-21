@@ -1,0 +1,10 @@
+# SUPERSEDED — DO NOT APPLY
+
+The old single-balance recovery proposal has been replaced by the completed
+currency/free-paid wallet implementation (0024 / 015_credit_wallets.sql).
+Applying the old patch would remove required wallet and allocation models.
+
+See credit-billing-refactor-plan.md for the final contract and
+credit-billing-separation-handoff.md for verification results.
+The original patch is preserved in the pre-work recovery backup:
+C:/Users/smj/AppData/Local/Temp/chat-kit-credit-backup-20260921-222226/files/docs/credit-single-balance-model.patch

@@ -102,6 +102,72 @@ def test_cross_module_imports_use_only_public_services_and_types():
     assert not violations, "\n".join(violations)
 
 
+def test_credit_ownership_and_dependency_direction():
+    violations = []
+    owners = {
+        "CreditAccount": ("commerce", "credit"),
+        "CreditWallet": ("commerce", "credit"),
+        "CreditBalance": ("commerce", "credit"),
+        "CreditTransactionEntry": ("commerce", "credit"),
+        "CreditTransaction": ("commerce", "credit"),
+        "CreditReservation": ("commerce", "credit"),
+        "BillingQuote": ("commerce", "billing"),
+        "BillingCreditBinding": ("commerce", "billing"),
+    }
+    for path in MODULES.rglob("*.py"):
+        own = _module_owner(["modules", *path.relative_to(MODULES).parts])
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            imports = []
+            if isinstance(node, ast.ImportFrom):
+                imports = [node.module or ""]
+                if (node.module or "").startswith("app.db.models"):
+                    for alias in node.names:
+                        if alias.name in owners and own != owners[alias.name]:
+                            violations.append(
+                                f"{path}:{node.lineno}: foreign ORM {alias.name}"
+                            )
+                    if (
+                        own == ("commerce", "credit")
+                        and node.module != "app.db.models.credit"
+                    ):
+                        violations.append(
+                            f"{path}:{node.lineno}: credit imports foreign models"
+                        )
+            elif isinstance(node, ast.Import):
+                imports = [alias.name for alias in node.names]
+                if any(name.startswith("app.db.models") for name in imports):
+                    violations.append(
+                        f"{path}:{node.lineno}: use explicit owned ORM imports"
+                    )
+            for imported in imports:
+                if own == ("commerce", "credit") and imported.startswith(
+                    ("app.modules.commerce.billing", "app.modules.chatting")
+                ):
+                    violations.append(
+                        f"{path}:{node.lineno}: reverse credit dependency"
+                    )
+                if own[0] == "chatting" and imported.startswith(
+                    "app.modules.commerce.credit"
+                ):
+                    violations.append(
+                        f"{path}:{node.lineno}: direct chat-to-credit dependency"
+                    )
+            if (
+                own == ("commerce", "credit")
+                and isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+            ):
+                if (
+                    node.value in {"chat_usage", "billing_quotes", "quote_id"}
+                    or "billing:credit-settlement:" in node.value
+                ):
+                    violations.append(
+                        f"{path}:{node.lineno}: billing meaning in credit"
+                    )
+    assert not violations, "\n".join(violations)
+
+
 def test_top_level_use_cases_use_only_public_module_services_and_types():
     violations = []
     for path in USE_CASES.glob("*.py"):

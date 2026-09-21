@@ -1,4 +1,4 @@
-# 사용량·결제·구독·크레딧 스키마다. billing이 기존 잔액/원장과 예약을 관리한다.
+# 사용량·결제·구독 스키마. 크레딧 모델은 기존 import 호환을 위해 재노출한다.
 # 금액은 Decimal 통화 값, 크레딧은 정수다.
 # usage의 nullable 참조는 이전 데이터와 삭제된 대화를 허용한다.
 # generation별 사용량 UNIQUE는 중복 행을 막으며 잔액 차감까지 보장하지 않는다.
@@ -19,7 +19,6 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
-    func,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -27,13 +26,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.db.models._mixins import TimestampMixin, UuidPkMixin
-
-
-class CreditTransactionReason(StrEnum):
-    CHAT_USAGE = "chat_usage"
-    PURCHASE = "purchase"
-    REFUND = "refund"
-    SUBSCRIPTION_GRANT = "subscription_grant"
+from app.db.models.credit import (  # noqa: F401
+    CreditAccount,
+    CreditTransaction,
+    CreditTransactionReason,
+)
 
 
 class SubscriptionStatus(StrEnum):
@@ -53,68 +50,6 @@ class PaymentStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     REFUNDED = "refunded"
-
-
-class CreditAccount(Base):
-    __tablename__ = "credit_accounts"
-    __table_args__ = (
-        CheckConstraint("balance >= 0", name="ck_credit_accounts_balance_non_negative"),
-        CheckConstraint(
-            "reserved_credit >= 0 AND reserved_credit <= balance",
-            name="ck_credit_accounts_reserved_credit",
-        ),
-    )
-
-    user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    balance: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-        server_default=text("0"),
-    )
-    reserved_credit: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, server_default=text("0")
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-
-
-class CreditTransaction(UuidPkMixin, Base):
-    __tablename__ = "credit_transactions"
-    __table_args__ = (
-        CheckConstraint(
-            "reason IN ('chat_usage', 'purchase', 'refund', 'subscription_grant')",
-            name="ck_credit_transactions_reason",
-        ),
-        # Same chat request retried with the same key can insert only once.
-        # The UNIQUE constraint turns duplicate credit debit attempts into a DB error.
-        UniqueConstraint(
-            "idempotency_key", name="uq_credit_transactions_idempotency_key"
-        ),
-        Index("ix_credit_transactions_user_id_created_at", "user_id", "created_at"),
-    )
-
-    user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    reference_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("now()"),
-    )
 
 
 class UsageLog(UuidPkMixin, Base):

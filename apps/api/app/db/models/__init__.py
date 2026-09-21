@@ -1,12 +1,10 @@
 from app.db.models.billing import (
-    CreditAccount,
-    CreditTransaction,
     Payment,
     SubscriptionPlan,
     UsageLog,
     UserSubscription,
 )
-from app.db.models.billing_credit import CreditReservation
+from app.db.models.billing_credit import BillingCreditBinding
 from app.db.models.billing_quote import BillingQuote
 from app.db.models.character import Character, CharacterAsset, CharacterImage
 from app.db.models.character_media import CharacterMedia
@@ -16,6 +14,7 @@ from app.db.models.chat import (
     Message,
     MessageRequest,
 )
+from app.db.models.credit import CreditAccount, CreditReservation, CreditTransaction
 from app.db.models.identity import User, UserOAuthAccount
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.memory import ConversationMemory, MemoryJob
@@ -41,6 +40,7 @@ from app.db.models.snapshot import (
 
 __all__ = [
     "AuditLog",
+    "BillingCreditBinding",
     "BillingQuote",
     "Character",
     "CharacterAsset",

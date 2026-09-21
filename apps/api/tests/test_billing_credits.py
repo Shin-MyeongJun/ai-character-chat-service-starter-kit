@@ -7,14 +7,15 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from app.db.models.billing import CreditAccount, CreditTransaction
 from app.db.models.billing_credit import CreditReservation
+from app.db.models.credit import CreditBalance, CreditTransaction, CreditWallet
 from app.db.models.identity import User
 from app.db.transaction import use_case_transaction
-from app.modules.commerce.billing import repository as Repository
 from app.modules.commerce.billing import types as Types
 from app.modules.commerce.billing.service import credits as CreditService
 from app.modules.commerce.billing.service import quotes as QuoteService
+from app.modules.commerce.credit import repository as Repository
+from credit_support import fund_credit
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_billing_prices import _configuration, _request_info  # noqa: F401
@@ -22,23 +23,14 @@ from test_billing_prices import _configuration, _request_info  # noqa: F401
 NOW = datetime(2026, 9, 21, tzinfo=UTC)
 
 
-@pytest_asyncio.fixture
-async def credit_fixture(db, request_info, configuration):
+@pytest_asyncio.fixture(name="credit_fixture")
+async def _credit_fixture(db, request_info, configuration):
     async with db.begin():
         db.add(
             User(id=request_info.user_id, email=f"{request_info.user_id}@credit.test")
         )
         await db.flush()
-        # No production grant/charge API: only this fixture initializes credit.
-        db.add(CreditAccount(user_id=request_info.user_id, balance=20))
-        db.add(
-            CreditTransaction(
-                user_id=request_info.user_id,
-                amount=20,
-                reason="purchase",
-                idempotency_key=f"fixture:{request_info.user_id}",
-            )
-        )
+        await fund_credit(db, request_info.user_id)
     quote = await QuoteService.create_billing_quote(
         db,
         Types.CreateBillingQuoteCommand(request=request_info),
@@ -122,7 +114,11 @@ async def _assert_credit_state(db, user_id, *, balance, reserved, reservations, 
 @pytest.mark.asyncio
 async def test_insufficient_credit_has_no_partial_writes(db, credit_fixture):
     async with db.begin():
-        await db.execute(update(CreditAccount).values(balance=9))
+        await db.execute(
+            update(CreditBalance)
+            .where(CreditBalance.bucket == "free")
+            .values(balance=9)
+        )
         await db.execute(update(CreditTransaction).values(amount=9))
     with pytest.raises(Types.InsufficientCreditError):
         await _reserve_credit(db, credit_fixture)
@@ -309,7 +305,7 @@ async def test_owner_and_reservation_identity_checks(db, credit_fixture):
     async with db.begin():
         db.add(User(id=other_user, email=f"{other_user}@credit.test"))
         await db.flush()
-        db.add(CreditAccount(user_id=other_user, balance=0))
+        await fund_credit(db, other_user, 0)
     with pytest.raises(Types.BillingQuoteNotFoundError):
         await _reserve_credit(
             db,
@@ -429,7 +425,7 @@ async def test_expiry_is_checked_after_waiting_for_account_lock(db, credit_fixtu
                 )
 
     async with db.begin():
-        await db.scalar(select(CreditAccount).with_for_update())
+        await db.scalar(select(CreditWallet).with_for_update())
         task = asyncio.create_task(waiter())
         pid = await asyncio.wait_for(waiter_pid, 5)
         try:

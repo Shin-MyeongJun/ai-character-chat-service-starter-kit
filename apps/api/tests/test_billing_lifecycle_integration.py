@@ -11,9 +11,9 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from app.db.models.billing import CreditAccount, CreditTransaction
 from app.db.models.billing_credit import CreditReservation
 from app.db.models.billing_quote import BillingQuote
+from app.db.models.credit import CreditTransaction
 from app.db.models.identity import User
 from app.db.transaction import use_case_transaction
 from app.modules.commerce.billing import types as BillingTypes
@@ -21,6 +21,7 @@ from app.modules.commerce.billing.service import credits as BillingCreditService
 from app.modules.commerce.billing.service import policies as BillingPolicyService
 from app.modules.commerce.billing.service import pricing as BillingPricingService
 from app.modules.commerce.billing.service import quotes as BillingQuoteService
+from credit_support import fund_credit
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_billing_prices import (
@@ -44,15 +45,7 @@ async def funded_request(
             User(id=request_info.user_id, email=f"{request_info.user_id}@test.local")
         )
         await db.flush()
-        db.add(CreditAccount(user_id=request_info.user_id, balance=20))
-        db.add(
-            CreditTransaction(
-                user_id=request_info.user_id,
-                amount=20,
-                reason="purchase",
-                idempotency_key=f"fixture:{request_info.user_id}",
-            )
-        )
+        await fund_credit(db, request_info.user_id)
     return request_info
 
 

@@ -329,3 +329,12 @@ class CreditReservationConflictError(ValueError):
 
 class CreditReservationNotFoundError(LookupError):
     """사용자와 요청 키에 속하는 예약이 없다."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CreditBindingInfo:
+    reservation_id: UUID
+    quote_id: UUID
+    user_id: UUID
+    request_key: UUID
+    created_at: datetime

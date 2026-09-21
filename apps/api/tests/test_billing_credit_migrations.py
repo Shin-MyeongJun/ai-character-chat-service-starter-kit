@@ -134,7 +134,11 @@ async def test_online_credit_migration_preserves_legacy_history_and_guards_downg
                     "credit_reservations", schema=schema
                 )
             )
-            assert actual_checks == expected_checks
+            assert actual_checks == [
+                c
+                for c in expected_checks
+                if c["name"] != "ck_credit_reservations_allocation"
+            ]
             # Empty reservation history can be downgraded and re-upgraded.
             await conn.run_sync(_run_migration, "downgrade")
             await conn.run_sync(_run_migration, "upgrade")
