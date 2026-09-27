@@ -1,4 +1,5 @@
-# PostgreSQL과 mock 공급자로 중복 요청·취소·결과 staging 실패·복구를 검증한다. 외부 호출 중 대화 잠금도 검사한다.
+# PostgreSQL과 mock 공급자로 중복 요청·취소·결과 staging 실패·복구를 검증한다. 외부
+# 호출 중 대화 잠금도 검사한다.
 """Real PostgreSQL orchestration with mocked external text/embedding calls."""
 
 import asyncio
@@ -9,14 +10,16 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from answer_billing_support import answer_pricing
 from app.db.models.billing import UsageLog
 from app.db.models.chat import Message
 from app.db.models.memory import MemoryJob
 from app.db.models.product_usage import ProductGeneration
 from app.modules.chatting.chat import service as ChatService
 from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service.workflow import answers as Answers
 from app.modules.llm import types as LLMTypes
-from app.use_cases import answers as Answers
+from credit_support import fund_credit
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from test_product_usage import scenario
@@ -35,13 +38,15 @@ def result(content='"반가워요, 선배님."'):
     )
 
 
-async def setup_answer(db, *, config=None):
+async def setup_answer(db, *, config=None, balance=20):
     from app.db.models.model_routing import Model, Provider
 
     owner, _product, _release, cid, character_id = await scenario(db)
     async with db.begin():
         await db.execute(update(Provider).values(name="openai"))
         await db.execute(update(Model).values(model_name="gpt-test"))
+        model_id = await db.scalar(select(Model.id))
+        await fund_credit(db, owner.id, balance)
     current = await ChatService.create_message(
         db,
         ChatTypes.CreateMessageCommand(
@@ -51,7 +56,7 @@ async def setup_answer(db, *, config=None):
             content="선배님, 같이 갈까요?",
         ),
     )
-    command = Answers.GenerateAnswerCommand(
+    command = ChatTypes.GenerateAnswerCommand(
         conversation_id=cid,
         user_id=owner.id,
         request_key="answer-1",
@@ -62,7 +67,9 @@ async def setup_answer(db, *, config=None):
     sessions = async_sessionmaker(db.bind, expire_on_commit=False)
     text = SimpleNamespace(generate_text=AsyncMock(return_value=result()))
     retriever = SimpleNamespace(retrieve_memories=AsyncMock(return_value=[]))
-    orchestrator = Answers.AnswerOrchestrator(sessions, text, retriever, config=config)
+    orchestrator = Answers.AnswerOrchestrator(
+        sessions, text, retriever, config=config, pricing=answer_pricing(model_id)
+    )
     return orchestrator, command, text
 
 
@@ -223,7 +230,7 @@ async def test_result_storage_failure_recovers_without_provider_or_duplicate_usa
         "finish_generation_and_schedule_memory",
         AsyncMock(side_effect=RuntimeError("storage down")),
     )
-    with pytest.raises(Answers.AnswerStorageError):
+    with pytest.raises(ChatTypes.AnswerStorageError):
         await orchestrator.generate_answer(command)
     async with db.begin():
         run = await db.scalar(select(ProductGeneration))
@@ -254,7 +261,7 @@ async def test_interrupted_call_is_failed_on_recovery(db, monkeypatch):
         await original_stage(generation_id, user_id, metadata, lease)
 
     monkeypatch.setattr(orchestrator, "_stage", interrupted_stage)
-    with pytest.raises(Answers.AnswerStorageError):
+    with pytest.raises(ChatTypes.AnswerStorageError):
         await orchestrator.generate_answer(command)
     async with db.begin():
         await db.execute(
@@ -302,7 +309,8 @@ async def test_summary_required_finishes_pending_before_scheduling_memory(
 
 async def test_fixed_context_exceeded_without_call_or_memory_job(db):
     orchestrator, command, text = await setup_answer(
-        db, config=Answers.AnswerConfig(max_prompt_tokens=200, response_tokens=100)
+        db,
+        config=ChatTypes.AnswerConfig(max_prompt_tokens=200, response_tokens=100),
     )
     answer = await orchestrator.generate_answer(command)
     assert answer.error_code == "fixed_context_exceeded" and not answer.retryable
@@ -347,7 +355,7 @@ async def test_model_is_pinned_and_external_call_holds_no_conversation_lock(db):
 async def test_memory_failure_rolls_back_answer_and_usage_then_recovers(
     db, monkeypatch
 ):
-    from app.use_cases import memory as MemoryUseCase
+    from app.modules.chatting.chat.service.workflow import memory as MemoryUseCase
 
     orchestrator, command, text = await setup_answer(db)
     original = MemoryUseCase.MemoryService.schedule_memory_work
@@ -356,7 +364,7 @@ async def test_memory_failure_rolls_back_answer_and_usage_then_recovers(
         "schedule_memory_work",
         AsyncMock(side_effect=RuntimeError("queue insert failed")),
     )
-    with pytest.raises(Answers.AnswerStorageError):
+    with pytest.raises(ChatTypes.AnswerStorageError):
         await orchestrator.generate_answer(command)
     async with db.begin():
         assert await db.scalar(select(func.count()).select_from(UsageLog)) == 0
@@ -385,8 +393,8 @@ async def test_memory_failure_rolls_back_answer_and_usage_then_recovers(
 
 async def test_http_to_postgres_returns_one_persisted_answer(db):
     import httpx
-    from app.http.answers import get_answer_orchestrator, router
     from app.http.dependencies import get_current_owner_id
+    from app.modules.chatting.chat.router.answers import get_answer_orchestrator, router
     from fastapi import FastAPI
 
     orchestrator, command, text = await setup_answer(db)

@@ -137,3 +137,33 @@ class CleanupInfo:
     sessions: int
     attempts: int
     rate_limits: int
+
+
+@dataclass(frozen=True, slots=True)
+class ActionMailInfo:
+    email: str
+    purpose: str
+    token: str = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class PrepareActionMailCommand:
+    email: str
+    purpose: str
+
+
+@dataclass(frozen=True, slots=True)
+class IssueSessionCommand:
+    user: CredentialInfo
+    now: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class GoogleStateCommand:
+    state: str
+
+
+@dataclass(frozen=True, slots=True)
+class LinkGoogleAccountCommand:
+    sub: str
+    email: str

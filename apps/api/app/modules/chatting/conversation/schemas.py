@@ -48,3 +48,23 @@ class PendingUpdatesInfoResponseDto(ResponseDto):
     latest_snapshot_id: UUID | None
     updates: list[UpdateInfoResponseDto]
     model_notice: ModelNoticeResponseDto | None
+
+
+class ConversationStartContentResponseDto(BaseModel):
+    title: str
+    content: str
+
+
+class ConversationParticipantResponseDto(BaseModel):
+    character_id: UUID | None
+    product_character_id: UUID | None
+    role_order: int
+
+
+class ConversationStartResponseDto(BaseModel):
+    initial_snapshot_id: UUID | None
+    opening_mode: str
+    opening_message: str | None
+    start: ConversationStartContentResponseDto | None
+    participants: list[ConversationParticipantResponseDto]
+    primary_product_character_id: UUID | None

@@ -118,9 +118,11 @@ async def test_fresh_init_and_alembic_match_models(db):
         )
         await connection.execute(upgrade)
         legacy = await connection.fetchrow(
-            "SELECT product_id,product_snapshot_id FROM conversations WHERE id=$1", cid
+            "SELECT product_id,product_snapshot_id,opening_mode FROM conversations WHERE id=$1",
+            cid,
         )
         assert legacy["product_id"] == pid and legacy["product_snapshot_id"] is None
+        assert legacy["opening_mode"] == "legacy_messages"
         ordered = await connection.fetch(
             "SELECT id,position,revision FROM messages WHERE conversation_id=$1 ORDER BY position",
             cid,

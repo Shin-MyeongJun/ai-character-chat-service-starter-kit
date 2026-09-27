@@ -5,11 +5,13 @@ from fastapi import APIRouter
 
 from app.http.dependencies import Owner, Session, errors
 from app.modules.chatting.conversation import schemas as Schemas
+from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper.schema import (
     ConversationSchemaMapper as SchemaMapper,
 )
+from app.modules.chatting.conversation.service import views as ViewsService
+from app.modules.chatting.conversation.service.command import start_conversation
 from app.modules.content.product import types as ProductTypes
-from app.use_cases.conversations import start_conversation
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -57,3 +59,17 @@ async def switch(
         return SchemaMapper.conversation_switched_info_to_response(
             await switch_version(session, command)
         )
+
+
+@router.get(
+    "/{conversation_id}/start", response_model=Schemas.ConversationStartResponseDto
+)
+async def get_start(conversation_id: UUID, session: Session, owner: Owner):
+    with errors():
+        result = await ViewsService.get_conversation_start(
+            session,
+            Types.OwnedConversationCommand(
+                conversation_id=conversation_id, user_id=owner
+            ),
+        )
+        return SchemaMapper.conversation_start_view_to_response(result)

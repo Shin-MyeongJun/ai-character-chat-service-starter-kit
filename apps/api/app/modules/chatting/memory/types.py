@@ -308,3 +308,12 @@ class FailMemoryWorkCommand:
     max_attempts: int = 5
     base_retry_seconds: int = 5
     max_retry_seconds: int = 300
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MemoryModelConfig:
+    summary_provider: LLMTypes.LLMProvider | str | None
+    summary_model: str
+    embedding_provider: LLMTypes.EmbeddingProvider | str | None
+    embedding_model: str
+    embedding_output_dimension: int | None = None

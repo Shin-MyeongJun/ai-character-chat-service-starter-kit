@@ -23,7 +23,11 @@ from app.main import create_app
 from app.modules.identity import types as Types
 from app.modules.identity.dependencies import get_verified_user_id
 from app.modules.identity.security import token_hash
-from app.modules.identity.service import AuthenticationService, GoogleLoginService
+from app.modules.identity.service import (
+    AuthenticationMailWorkflow,
+    AuthenticationService,
+    GoogleLoginService,
+)
 from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select, text, update
@@ -100,8 +104,9 @@ async def identity_db():
 async def auth_http(identity_db, auth_settings):  # noqa: F811 - pytest 재사용 fixture
     app = create_app()
     mailer, google = RecordingMailer(), FakeGoogleVerifier()
-    auth = AuthenticationService(identity_db, auth_settings, mailer)
+    auth = AuthenticationService(identity_db, auth_settings)
     app.state.authentication = auth
+    app.state.authentication_mail = AuthenticationMailWorkflow(auth, mailer)
     app.state.google_login = GoogleLoginService(auth, google)
 
     @app.get("/verified-identity")
@@ -285,7 +290,9 @@ async def test_duplicate_registration_and_action_token_races(auth_http, identity
         *(client.post("/auth/email/verify", json={"token": token}) for _ in range(2))
     )
     assert sorted(x.status_code for x in responses) == [200, 400]
-    await auth.request_password_reset(Types.EmailCommand(EMAIL))
+    await AuthenticationMailWorkflow(auth, mailer).request_password_reset(
+        Types.EmailCommand(EMAIL)
+    )
     command = Types.ResetPasswordCommand(mailer.token("reset"), PASSWORD + "2")
     results = await asyncio.gather(
         auth.reset_password(command),
@@ -380,7 +387,7 @@ async def test_rate_limit_is_shared_by_independent_service_instances(
     auth_http, identity_db
 ):
     _, auth, mailer, _, _ = auth_http
-    other = AuthenticationService(identity_db, auth.settings, mailer)
+    other = AuthenticationService(identity_db, auth.settings)
     command = Types.RateLimitCommand("parallel-test", "same-actor", 3, 300)
     results = await asyncio.gather(
         *(service.check_rate_limit(command) for service in [auth, other] * 5),
@@ -561,7 +568,9 @@ async def test_suspended_user_and_google_only_reset_token_are_rejected(
     client, auth, mailer, _, _ = auth_http
     await register_verified(client, mailer)
     issued = await auth.login_user(Types.CredentialsCommand(EMAIL, PASSWORD))
-    await auth.request_password_reset(Types.EmailCommand(EMAIL))
+    await AuthenticationMailWorkflow(auth, mailer).request_password_reset(
+        Types.EmailCommand(EMAIL)
+    )
     reset = mailer.token("reset")
     async with identity_db.begin() as session:
         await session.execute(update(User).values(status="suspended"))
@@ -581,9 +590,7 @@ def _check_rate_in_process(url, schema, settings, queue):
         engine = create_async_engine(
             url, connect_args={"server_settings": {"search_path": f"{schema},public"}}
         )
-        service = AuthenticationService(
-            async_sessionmaker(engine), settings, RecordingMailer()
-        )
+        service = AuthenticationService(async_sessionmaker(engine), settings)
         results = []
         try:
             for _ in range(2):

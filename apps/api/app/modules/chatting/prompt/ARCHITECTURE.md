@@ -13,3 +13,8 @@
 설정·시작 장면·활성 로어·기억은 reference_data에 담긴다. 로어에 저장된 placement를 system 권한으로 승격하거나 항목별 token_budget을 여기서 적용하지 않는다. 미요약 원문을 버릴지 판단하는 책임은 앞선 answer_preparation에 있다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+2026-09-22: 비스트리밍 답변은 이 기존 추정을 `utf8-bytes-plus-32-per-message-plus-32-v1`로 식별하여 billing 견적 입력에 사용한다. 견적에 사용한 동일 request_json을 실행하며 실제 usage 토큰으로 예약액을 재계산하지 않는다. 산정 알고리즘 자체는 변경하지 않았다.
+
+
+2026-09-27: 자체 `PromptMessageInfo(id, sender_type, content, position)`를 입력으로 받는다. chat mapper가 순수 변환하며 prompt는 chat.types나 업무 서비스로 재료를 수집하지 않는다. runtime의 opening_message가 있으면 고정 assistant 시작 문맥으로 한 번 넣는다. 현재 버전 settings의 opening_message는 conversation 경계에서 제거하고 start는 최초 선택 장면을 사용한다. legacy에서는 opening_message=null이므로 기존 메시지 이력만 전달된다. 첫 대사도 최종 렌더링 예산에 포함하며 일반 메시지 요약에는 저장하지 않는다.

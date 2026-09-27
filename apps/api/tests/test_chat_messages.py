@@ -27,12 +27,12 @@ from app.modules.chatting.chat.service.command.generation import (
 )
 from app.modules.chatting.chat.service.query.messages import list_messages
 from app.modules.chatting.conversation import types as ConversationTypes
+from app.modules.chatting.conversation.service.command import start_conversation
 from app.modules.chatting.conversation.service.command.versions import switch_version
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.commerce.billing.service.command.attribution import record_sale
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.command.releases import publish_product
-from app.use_cases.conversations import start_conversation
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_product_usage import scenario
@@ -172,8 +172,8 @@ async def test_order_pages_timestamp_ties_and_deleted_cursor(db):
         cursor = page.next_cursor
         if cursor is None:
             break
-    assert [m.id for m in found[1:]] == [m.id for m in saved]
-    assert len({m.id for m in found}) == 6
+    assert [m.id for m in found] == [m.id for m in saved]
+    assert len({m.id for m in found}) == 5
     assert [m.position for m in found] == sorted(m.position for m in found)
     with pytest.raises(ValueError, match="cursor"):
         await history(
@@ -199,7 +199,7 @@ async def test_concurrent_create_retry_conflict_and_tombstone(db):
 
     results = await asyncio.gather(*(save() for _ in range(5)))
     assert len({m.id for m in results}) == 1
-    assert len((await history(db, cid, owner.id)).items) == 2
+    assert len((await history(db, cid, owner.id)).items) == 1
     with pytest.raises(Types.MessageConflictError, match="different input"):
         await CommandService.create_message(db, replace(command, content="different"))
     await CommandService.rewind_messages(db, rewind(results[0], owner.id))
@@ -428,11 +428,11 @@ async def test_correction_and_rewind_preserve_execution_usage_and_version(db):
     )
     page = await history(db, cid, owner.id)
     assert (
-        await CommandService.rewind_messages(db, rewind(page.items[1], owner.id))
+        await CommandService.rewind_messages(db, rewind(page.items[0], owner.id))
     ).deleted_count == 2
     assert (await begin_generation(db, begin)).id == run.id
     assert (await finish_generation(db, finish)).id == run.id
-    assert len((await history(db, cid, owner.id)).items) == 1
+    assert len((await history(db, cid, owner.id)).items) == 0
     async with db.begin():
         assert (
             await db.scalar(
@@ -491,7 +491,7 @@ async def test_correction_and_rewind_preserve_execution_usage_and_version(db):
         assert debit.amount == -3 and debit.idempotency_key == "historical-debit"
 
 
-async def test_memory_failure_rolls_back_history_and_opening_failure_rolls_back_room(
+async def test_memory_failure_rolls_back_history_and_creation_failure_rolls_back_room(
     db, monkeypatch
 ):
     owner, product, _release, cid, character = await scenario(db)
@@ -521,12 +521,12 @@ async def test_memory_failure_rolls_back_history_and_opening_failure_rolls_back_
             await db.scalar(select(func.count()).select_from(ConversationMemory)) == 1
         )
         assert (await db.get(ProductGeneration, run.id)).history_invalidated_at is None
-    from app.use_cases import conversations
+    from app.modules.chatting.conversation.service import command as conversations
 
     async def fail_opening(session, command):
         raise RuntimeError("Opening failure")
 
-    monkeypatch.setattr(conversations, "create_character_message", fail_opening)
+    monkeypatch.setattr(conversations, "mark_statistics_dirty", fail_opening)
     with pytest.raises(RuntimeError, match="Opening"):
         await start_conversation(
             db,

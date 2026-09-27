@@ -6,7 +6,7 @@
 
 conversation의 공개 `get_owned_conversation(OwnedConversationCommand)`으로 소유권·현재 상품 버전을 확인하고, `list_conversation_characters`의 Info로 실제 참여 캐릭터를 확인한다. 별도 대화방 상태 컬럼은 없으며, 생성 시에는 기존 상품 버전 사용 가능 정책도 적용한다. Legacy 대화는 사용자 메시지 CRUD는 가능하고, 검증된 버전이 필요한 생성은 기존대로 거절한다.
 
-chat → conversation / memory / product / billing / llm 방향으로 공개 service/types만 참조한다. conversation은 chat을 호출하지 않는다. 대화방 생성과 첫 캐릭터 메시지 저장은 `app/use_cases/conversations.py`에서 두 공개 Command를 같은 트랜잭션으로 조합한다. 상품 통계도 `app/use_cases/product_statistics.py`가 각 도메인의 사실 조회와 product의 통계 저장을 조정하므로 product → chat 역방향 의존성이 없다.
+chat → conversation / memory / product / billing / llm 방향으로 공개 service/types만 참조한다. conversation은 chat을 호출하지 않는다. 대화방 생성과 고정 시작 내용은 conversation이 소유한다. 신규 첫 대사는 messages에 저장하지 않는다. 상품 통계도 `app/use_cases/product_statistics.py`가 각 도메인의 사실 조회와 product의 통계 저장을 조정하므로 product → chat 역방향 의존성이 없다.
 
 ## 파일별 책임
 
@@ -17,9 +17,9 @@ chat → conversation / memory / product / billing / llm 방향으로 공개 ser
 - `service/command/generation.py`: 기존 생성 예약·완료·실패·취소·stale, 입력/결과 메시지 저장, usage 및 통계 갱신 요청. `BeginGenerationCommand`의 선택적 input_message_id/expected_revision은 마지막 사용자 메시지를 검증해 재저장하지 않는다. 미지정인 기존 호출은 종전대로 입력을 저장한다. execution은 신뢰된 최상위 호출자가 확정한 모델이다.
 - `service/command/answers.py`: 최상위 오케스트레이터를 위한 요청/대화 잠금, 입력 참조 검증, metadata/lease 쓰기 및 만료 생성 조회. 새 테이블 없이 `product_generations.answer_metadata`와 `answer_lease_until`을 소유한다.
 - `service/query/generation.py`: 생성 당시의 불변 사실을 통계 Info로 제공한다.
-- `types.py`: 위 기능의 Command와 Info, 커서, 업무 오류. `schemas.py`, `mapper/schema.py`, `router.py`: HTTP DTO·변환·기존 인증/세션 훅 연결.
+- `types.py`: 메시지/생성/답변/문맥 준비의 Command·Info·오류. `schemas/{messages,answers}.py`, `mapper/schema/{messages,answers}.py`, `router/{messages,answers}.py`: HTTP DTO·변환·실행. `dependencies.py`는 답변 runtime 연결만 담당한다.
 
-메시지 편집과 생성 수명주기는 입력·권한·실패 조건이 달라 기능 파일로 나눴다. 밀접한 메시지/생성 저장소는 단일 repository를 유지했다. 외부 호출·프롬프트·리롤·스트리밍용 빈 계층은 추가하지 않았다.
+메시지 편집과 생성 수명주기는 입력·권한·실패 조건이 달라 기능 파일로 나눴다. 밀접한 메시지/생성 저장소는 단일 repository를 유지했다. 답변의 외부 호출과 복구는 선택적 workflow에 두며 리롤·스트리밍용 빈 계층은 추가하지 않았다.
 
 ## HTTP 및 내부 쓰기 계약
 
@@ -43,11 +43,11 @@ PUT은 지정한 메시지가 해당 대화의 마지막 메시지이고 예상 
 - 저장 키는 대화방 내 유일하며 발신자·캐릭터·내용 digest와 비교한다. 같은 요청은 같은 메시지를 반환한다. 삭제 뒤 receipt의 메시지 FK만 SET NULL로 남기며, 삭제/교체된 원본의 재시도는 409로 거절해 복원하지 않는다. 생성 request_key/digest도 기존대로 보존한다.
 - 모든 쓰기는 `use_case_transaction`을 시작하거나 상위 범위에 참여한다. 생성 시작과 모든 메시지 추가/교체/되돌리기는 같은 conversation row를 FOR UPDATE로 잠근다. 완료도 conversation → generation 순서다. 생성 예약 요청 키 advisory lock은 기존 멱등성 범위다.
 - pending 생성이 있으면 신규 메시지 저장·새 생성·교체·되돌리기를 거절한다. 동일 요청의 멱등 조회는 허용한다. 생성 시작과 변경이 동시에 요청돼도 잠금을 먼저 획득한 트랜잭션이 완료된 상태에서 다음 요청을 검사한다.
-- 예약·완료는 각각 짧은 DB 유스케이스다. 그 사이 호출자가 외부 생성을 수행하더라도 DB 트랜잭션을 유지하지 않아야 한다. 이번 구현에는 외부 호출이 없다.
+- 예약·완료는 각각 짧은 DB 유스케이스다. 그 사이 호출자가 외부 생성을 수행하더라도 DB 트랜잭션을 유지하지 않아야 한다. chat의 AnswerOrchestrator workflow가 예약 commit 뒤 외부 호출을 수행한다.
 
 ## 연결 데이터
 
-교체/되돌리기 때 memory 공개 service가 `history_revision`을 증가시키고 해당 대화의 모든 기억·요약·예약을 삭제한다. 출처가 없는 legacy 메모리도 포함하고 다른 방은 유지한다. 실행 중 작업은 결과 저장의 revision/range 검증에서 거절된다. 단순 후속 메시지 append는 revision을 바꾸지 않는다. 성공 응답과 기억 예약의 원자적 조립은 `app/use_cases/memory.py`가 담당한다.
+교체/되돌리기 때 memory 공개 service가 `history_revision`을 증가시키고 해당 대화의 모든 기억·요약·예약을 삭제한다. 출처가 없는 legacy 메모리도 포함하고 다른 방은 유지한다. 실행 중 작업은 결과 저장의 revision/range 검증에서 거절된다. 단순 후속 메시지 append는 revision을 바꾸지 않는다. 성공 응답과 기억 예약의 원자적 조립은 `service/workflow/answers.py`의 `finish_generation_and_schedule_memory`가 담당한다.
 
 생성 status/result_digest/message_count/finished_at와 usage/payment/credit 기록은 이미 발생한 사실로 유지한다. `history_invalidated_at`은 해당 대화의 원래 생성 맥락이 변경됐음을 보수적으로 표시한다. message_count는 현재 화면의 메시지 수가 아니라 원래 성공 출력 수이며 통계도 그 의미를 유지한다. 완료 재전송은 메시지나 사용량을 다시 쓰지 않는다. messages→generation 및 usage→generation FK는 유지되고, 삭제 시 generation이 역으로 삭제되지 않는다.
 
@@ -55,9 +55,9 @@ version_changes는 메시지를 참조하는 컬럼이 없으며 conversation과
 
 ## 미연결 범위
 
-HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에, 기본 owner 훅을 identity의 쿠키·CSRF·사용자/세션 검증에 연결한다. `create_app(authenticate=...)`는 기존 명시적 주입 계약으로만 유지하며 기본 실행에 필요하지 않다. 개별 라우터만 조립하고 의존성을 연결하지 않으면 기존 503 훅이 적용된다. 비스트리밍 답변은 `app.http.answers` → `app.use_cases.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
+HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에, 기본 owner 훅을 identity의 쿠키·CSRF·사용자/세션 검증에 연결한다. `create_app(authenticate=...)`는 기존 명시적 주입 계약으로만 유지하며 기본 실행에 필요하지 않다. 개별 라우터만 조립하고 의존성을 연결하지 않으면 기존 503 훅이 적용된다. 비스트리밍 답변은 `app.http.answers` → `app.modules.chatting.chat.service.workflow.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
 
-답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 기존 finish와 memory 예약을 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.
+답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 최상위 AnswerOrchestrator가 기존 finish·usage·memory 예약과 billing 확정/해제를 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.
 
 ## 현재 구현 점검과 읽는 순서 (2026-09-17)
 
@@ -66,3 +66,34 @@ HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션�
 `get_owned_conversation`은 소유권과 값을 확인하는 조회다. 버전 사용 가능 여부는 생성 경로가 product 공개 서비스로 추가 확인한다. repository만 직접 호출한다고 같은 인가·멱등성·상태 검사를 보장하지 않는다. 대조 테스트는 `test_chat_messages`, `test_chat_http`, `test_product_usage`, `test_nonstream_answers`다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+## 생성 과금 연결과 실행권 (2026-09-22)
+
+전체 생성 조율은 chat/service/workflow/answers.py가 소유한다. chat은 credit을 직접 호출하지 않으며,
+생성 당시 `answer_metadata` version 2에 실행 token, 준비/prompt digest, 토큰 산정 버전과
+입력/출력 예산, billing 요청 UUID·견적·예약 ID·예약액을 보존한다. 기존 JSONB를 사용해
+신규 migration이나 기존 행 재작성은 없다. 상세 구조는 [생성 연결 문서](../../../../../../docs/billing-generation-integration.md)를 따른다.
+
+`UpdateAnswerCommand`에 선택적 execution_token/recover(default False)를 추가했다.
+신규 token이 있는 생성의 후속 staging은 저장된 token과 유효 lease가 필요하고,
+recover=True는 만료된 lease에서만 허용한다. 실행/과금 스냅샷 변경, 이미 저장된 result_ready
+덮어쓰기, terminal 상태의 늦은 staging을 거절한다. 기존 token 없는 metadata 계약은 보존한다.
+
+finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 usage.cost_credit을 정한다.
+실제 succeeded만 전달된 예약액을 기록하며 failed/cancelled/stale에는 0을 기록한다.
+그 반환 상태를 받은 상위 orchestrator가 billing 공개 서비스를 통해 확정/해제하므로
+답변·usage·memory·차감이 함께 rollback된다. 과거 연결 없는 생성은 청구 0으로 복구하며
+기존 완료 기록/원장을 임의 수정하거나 소급 차감하지 않는다.
+
+
+## 답변 workflow (2026-09-27)
+
+- `service/workflow/answers.py`: 준비 재검증 → 생성·견적·credit 예약 확정 → LLM → result_ready staging → 메시지·usage·기억 예약·과금 확정/해제. 정상 완료와 lease 복구는 동일 `_finalize`와 완료 규칙을 사용한다. 불확실한 공급자 호출을 다시 실행하지 않는다.
+- `service/workflow/answer_preparation.py`: 공개 conversation/memory 서비스와 chat 원문 조회로 문맥을 수집하고 고정 예산과 미요약 원문을 확보한다. 초과 원문을 조용히 잘라내지 않는다.
+- `service/workflow/memory.py`: `ProcessMemoryWorkCommand`로 받은 작업의 pending 색인 재개·요약·임베딩·저장 전 원문/revision 재검증·실패 기록. 요약 정책·검색·임베딩·저장·작업 전이는 memory 소유다.
+- `mapper/prompt.py`: MessageInfo → prompt 자체 PromptMessageInfo 순수 변환. prompt는 chat 타입/서비스를 참조하지 않는다.
+- command/query는 workflow를 호출하지 않는다. workflow는 구체적인 chat command/query 파일을 호출하며 repository를 직접 사용하지 않는다. `main`/`memory_worker`는 의존성과 반복 실행만 조립한다.
+
+답변의 요청 키·실행권·lease·staging·stale/cancelled·가격·사용량·기억 예약 계약은 기존 과금 구현 그대로다. 답변 HTTP 경로와 DTO 필드·상태 코드도 유지한다. 별도 answer 모듈이나 기존 use_cases 재노출은 없다.
+
+새 대화의 고정 첫 대사는 conversation 시작 조회에서 받고 prompt의 고정 assistant 문맥으로 전달한다. 메시지 목록이나 요약 원문에는 들어가지 않는다. legacy_messages 대화의 기존 첫 메시지는 이력으로 보존하며 snapshot 첫 대사를 추가하지 않는다. 기존 이력 요약 의미를 소급 변경하거나 기존 기억을 일괄 재작성하지 않는다.

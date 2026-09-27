@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from app.modules.chatting.chat.mapper.prompt import message_info_to_prompt
 from app.modules.chatting.chat.types import MessageInfo
 from app.modules.chatting.conversation.types import RuntimeCharacter
 from app.modules.chatting.prompt import service as PromptService
@@ -52,8 +53,10 @@ def prompt_command():
         template=PromptService.load_template(),
         runtime=runtime,
         product_character_id=character_id,
-        current_message=current,
-        recent_messages=(first, second, current),
+        current_message=message_info_to_prompt(current),
+        recent_messages=tuple(
+            message_info_to_prompt(m) for m in (first, second, current)
+        ),
     )
 
 

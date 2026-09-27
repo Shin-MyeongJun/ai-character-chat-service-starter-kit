@@ -13,10 +13,9 @@ from app.modules.identity.mapper import persistence as PersistenceMapper
 
 
 class AuthenticationService:
-    def __init__(self, sessions, settings, mailer):
+    def __init__(self, sessions, settings):
         self.sessions = sessions
         self.settings = settings
-        self.mailer = mailer
         self.codec = Security.TokenCodec(settings)
 
     async def check_rate_limit(self, command: Types.RateLimitCommand) -> None:
@@ -52,14 +51,9 @@ class AuthenticationService:
         )
         return token
 
-    async def _send_action_mail(self, email, purpose, token):
-        page = "/verify-email" if purpose == "verify" else "/reset-password"
-        # fragment는 웹서버 요청 로그와 Referer에 토큰이 실리지 않도록 한다.
-        await self.mailer.send_mail(
-            email, purpose, self.settings.public_origin + page + "#token=" + token
-        )
-
-    async def register_user(self, command: Types.CredentialsCommand) -> None:
+    async def register_pending_user(
+        self, command: Types.CredentialsCommand
+    ) -> Types.ActionMailInfo | None:
         email = Security.normalize_email(command.email)
         Security.validate_password(command.password)
         await self._check_email_rate("register", email)
@@ -98,15 +92,15 @@ class AuthenticationService:
                     )
             # 중복 가입은 기존 비밀번호를 덮어쓰거나 이메일 인증 상태를 알려주지 않는다.
         if token is not None:
-            await self._send_action_mail(email, "verify", token)
+            return Types.ActionMailInfo(email, "verify", token)
+        return None
 
-    async def resend_verification(self, command: Types.EmailCommand) -> None:
-        await self._request_action_mail(command, "verify")
-
-    async def request_password_reset(self, command: Types.EmailCommand) -> None:
-        await self._request_action_mail(command, "reset")
-
-    async def _request_action_mail(self, command, purpose):
+    async def prepare_action_mail(
+        self, command: Types.PrepareActionMailCommand
+    ) -> Types.ActionMailInfo | None:
+        purpose = command.purpose
+        if purpose not in {"verify", "reset"}:
+            raise ValueError("Invalid action mail purpose.")
         email = Security.normalize_email(command.email)
         # 가입/재발송은 별도 IP 제한 외에 동일 메일 발송 버킷도 공유한다.
         await self._check_email_rate("mail:" + purpose, email)
@@ -131,7 +125,8 @@ class AuthenticationService:
                         session, user.user.id, purpose, now
                     )
         if token is not None:
-            await self._send_action_mail(email, purpose, token)
+            return Types.ActionMailInfo(email, purpose, token)
+        return None
 
     async def _consume_action(self, session, token, purpose, now):
         info = PersistenceMapper.action_entity_to_info(
@@ -185,7 +180,12 @@ class AuthenticationService:
             await Repository.invalidate_action_tokens(session, user.user.id, None, now)
             await Repository.revoke_user_sessions(session, user.user.id, now)
 
-    async def _issue_session(self, session, user, now):
+    async def issue_session(
+        self, session, command: Types.IssueSessionCommand
+    ) -> Types.LoginInfo:
+        user, now = command.user, command.now
+        if user.status != "active" or not user.user.email_verified:
+            raise Types.AuthError("invalid_session")
         session_id = uuid4()
         expires_at = now + timedelta(seconds=self.settings.session_seconds)
         login = self._encode_login(user.user, session_id, now, expires_at)
@@ -244,7 +244,9 @@ class AuthenticationService:
                         Security.PASSWORD_HASHER.hash, command.password
                     ),
                 )
-            return await self._issue_session(session, user, datetime.now(UTC))
+            return await self.issue_session(
+                session, Types.IssueSessionCommand(user, datetime.now(UTC))
+            )
 
     async def _require_session(self, session, claims, now):
         user = PersistenceMapper.user_entity_to_credential_info(

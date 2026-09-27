@@ -4,7 +4,9 @@ Provider/Model are the only directly inserted prerequisites: no creation API exi
 All user/content/conversation/message data is created through public HTTP APIs.
 """
 
+import json
 import os
+from dataclasses import asdict
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
@@ -12,14 +14,17 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 import voyageai
+from answer_billing_support import answer_pricing
 from app import main
 from app.db.models.billing import UsageLog
 from app.db.models.chat import Conversation, Message
+from app.db.models.credit import CreditReservation, CreditTransaction
 from app.db.models.identity import AuthSession, User
 from app.db.models.memory import MemoryJob
 from app.db.models.model_routing import Model, Provider
 from app.db.models.product_usage import ProductGeneration
 from app.modules.identity.adapters import SMTPMailSender
+from credit_support import fund_credit
 from httpx import ASGITransport, AsyncClient, Cookies
 from openai.resources.responses import AsyncResponses
 from sqlalchemy import func, select, text
@@ -122,6 +127,19 @@ async def first_answer_app(db, auth_settings, monkeypatch, tmp_path):  # noqa: F
         )
         db.add(model)
 
+    pricing = answer_pricing(model.id)
+    pricing_path = tmp_path / "billing-prices.json"
+    pricing_path.write_text(
+        json.dumps(
+            {
+                "price_book": asdict(pricing.price_book),
+                "quote_ttl_seconds": pricing.quote_ttl_seconds,
+            },
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BILLING_PRICING_CONFIG_PATH", str(pricing_path))
     app = main.create_app()
     async with app.router.lifespan_context(app):
         async with app.state.session_factory() as session:
@@ -156,6 +174,8 @@ async def first_chat(first_answer_app):
         transport=ASGITransport(app=env.app), base_url="https://testserver"
     ) as client:
         user = await signup_and_login(client, env.mailer)
+        async with env.app.state.session_factory() as session, session.begin():
+            await fund_credit(session, UUID(user["id"]), 20)
         character = (
             await request(
                 client,
@@ -234,7 +254,9 @@ async def first_chat(first_answer_app):
         assert conversation["product_snapshot_id"] == release["snapshot_id"]
         messages_path = f"/conversations/{cid}/messages"
         opening = (await request(client, "GET", messages_path))["items"]
-        assert len(opening) == 1 and not opening[0]["generated_by_ai"]
+        assert opening == []
+        start = await request(client, "GET", f"/conversations/{cid}/start")
+        assert start["opening_message"] == "어서 와요, 여행자님."
         message = await request(
             client,
             "POST",
@@ -246,7 +268,7 @@ async def first_chat(first_answer_app):
             "request_key": "answer-1",
             "input_message_id": message["id"],
             "expected_revision": message["revision"],
-            "product_character_id": opening[0]["product_character_id"],
+            "product_character_id": start["primary_product_character_id"],
         }
         yield SimpleNamespace(
             **vars(env),
@@ -274,16 +296,18 @@ async def assert_persisted(chat, answer):
         messages = (
             await session.scalars(select(Message).order_by(Message.position))
         ).all()
-        assert len(messages) == 3  # authored opening, user input, generated answer
-        assert [m.sender_type for m in messages] == ["character", "user", "character"]
-        assert messages[1].id == UUID(chat.message["id"])
-        assert messages[1].content == "어디로 갈까요?"
-        assert messages[2].content == answer["content"] == ANSWER
-        assert messages[2].generated_by_ai and not messages[1].generated_by_ai
+        assert (
+            len(messages) == 2
+        )  # user input and generated answer; fixed opening is separate
+        assert [m.sender_type for m in messages] == ["user", "character"]
+        assert messages[0].id == UUID(chat.message["id"])
+        assert messages[0].content == "어디로 갈까요?"
+        assert messages[1].content == answer["content"] == ANSWER
+        assert messages[1].generated_by_ai and not messages[0].generated_by_ai
         assert (
             run.id
             == usage.generation_id
-            == messages[2].generation_id
+            == messages[1].generation_id
             == UUID(answer["generation_id"])
         )
         assert run.user_id == usage.user_id == user.id
@@ -292,13 +316,13 @@ async def assert_persisted(chat, answer):
         assert (
             run.product_snapshot_id
             == usage.product_snapshot_id
-            == messages[2].product_snapshot_id
+            == messages[1].product_snapshot_id
             == UUID(chat.snapshot_id)
         )
         assert (
             run.model_id
             == usage.model_id
-            == messages[2].model_id
+            == messages[1].model_id
             == UUID(chat.model_id)
         )
         assert run.status == "succeeded" and run.message_count == 1
@@ -307,7 +331,16 @@ async def assert_persisted(chat, answer):
         assert (
             run.answer_metadata["usage"]["output_tokens"] == usage.output_tokens == 30
         )
-        assert usage.cost_credit == 0  # existing recording contract, not a price policy
+        reservation = (await session.scalars(select(CreditReservation))).one()
+        debit = (
+            await session.scalars(
+                select(CreditTransaction).where(
+                    CreditTransaction.operation == "consume"
+                )
+            )
+        ).one()
+        assert reservation.status == "committed" and reservation.result_id == run.id
+        assert usage.cost_credit == reservation.reserved_credit == -debit.amount == 10
         assert (
             await session.scalars(select(MemoryJob))
         ).one().requested_generation == 1
@@ -380,7 +413,7 @@ async def assert_no_generation(chat):
         messages = (
             await session.scalars(select(Message).order_by(Message.position))
         ).all()
-        assert len(messages) == 2 and messages[-1].content == "어디로 갈까요?"
+        assert len(messages) == 1 and messages[-1].content == "어디로 갈까요?"
 
 
 async def test_other_verified_user_cannot_access_or_change_conversation(first_chat):

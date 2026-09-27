@@ -5,62 +5,25 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
-from uuid import UUID
+from collections.abc import Callable
+from dataclasses import asdict
 
-from app.modules.chatting.chat import service as ChatService
-from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 from app.modules.chatting.conversation import service as ConversationService
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.memory import service as MemoryService
 from app.modules.chatting.memory import types as MemoryTypes
-from app.modules.llm import types as LLMTypes
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class PrepareAnswerContextCommand:
-    conversation_id: UUID
-    owner_id: UUID
-    current_message: str
-    max_prompt_tokens: int
-    response_tokens: int
-    embedding_model: str
-    embedding_provider: LLMTypes.EmbeddingProvider | str | None = None
-    embedding_output_dimension: int | None = None
-    policy: MemoryTypes.MemoryPolicy = field(default_factory=MemoryTypes.MemoryPolicy)
-    current_message_id: UUID | None = None
-    runtime: ConversationTypes.ConversationRuntimeView | None = None
-    rendered_base_tokens: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class PromptBudgetInfo:
-    maximum: int
-    base: int
-    memories: int
-    recent_messages: int
-    current_message: int
-    response_reserve: int
-
-
-@dataclass(frozen=True, slots=True)
-class AnswerContextInfo:
-    runtime: ConversationTypes.ConversationRuntimeView
-    memories: tuple[MemoryTypes.RetrievedMemoryInfo, ...]
-    recent_messages: tuple[ChatTypes.MessageInfo, ...]
-    current_message: str
-    budget: PromptBudgetInfo
-    memory_state: str
 
 
 # 고정 runtime·현재 입력·미요약 원문·기억을 예산 안에 조립한다.
 # 미요약 원문을 조용히 잘라내지 않고 초과하면 summary_required를 포함한 업무 오류를 전달한다.
 async def prepare_answer_context(
-    session_factory,
-    command: PrepareAnswerContextCommand,
+    session_factory: Callable,
+    command: Types.PrepareAnswerContextCommand,
     *,
     memory_retriever: MemoryService.MemoryRetriever,
-) -> AnswerContextInfo:
+) -> Types.AnswerContextInfo:
     if (
         not command.current_message.strip()
         or command.max_prompt_tokens < 1
@@ -95,9 +58,9 @@ async def prepare_answer_context(
                 conversation_id=command.conversation_id, owner_id=command.owner_id
             ),
         )
-        source = await ChatService.list_memory_source(
+        source = await MessagesQueryService.list_memory_source(
             session,
-            ChatTypes.ListMemorySourceCommand(
+            Types.ListMemorySourceCommand(
                 conversation_id=command.conversation_id, user_id=command.owner_id
             ),
         )
@@ -135,7 +98,7 @@ async def prepare_answer_context(
     # The current input is reserved in the rendered base for orchestration and
     # must never become optional summarized history.
     if command.rendered_base_tokens is not None:
-        source = ChatTypes.MemorySourceInfo(
+        source = Types.MemorySourceInfo(
             tuple(
                 item
                 for item in source.messages
@@ -158,7 +121,7 @@ async def prepare_answer_context(
         )
 
     processed = [item for item in source.messages if item.position <= summary_end]
-    recent_processed: list[ChatTypes.MessageInfo] = []
+    recent_processed: list[Types.MessageInfo] = []
     reserved_raw_tokens = 0
     recent_target = min(
         command.policy.recent_raw_tokens, available - unprocessed_tokens
@@ -256,12 +219,12 @@ async def prepare_answer_context(
         used_raw += tokens
     recent_messages = tuple(reversed(recent_processed)) + unprocessed
     recent_tokens = used_raw + unprocessed_tokens
-    return AnswerContextInfo(
+    return Types.AnswerContextInfo(
         runtime=runtime,
         memories=tuple(memories),
         recent_messages=recent_messages,
         current_message=command.current_message,
-        budget=PromptBudgetInfo(
+        budget=Types.PromptBudgetInfo(
             maximum=command.max_prompt_tokens,
             base=base_tokens,
             memories=memory_tokens,
@@ -273,9 +236,9 @@ async def prepare_answer_context(
     )
 
 
-def _message_tokens(item: ChatTypes.MessageInfo) -> int:
+def _message_tokens(item: Types.MessageInfo) -> int:
     return MemoryService.estimate_tokens(f"{item.sender_type}: {item.content}\n")
 
 
-def _rendered_message_tokens(item: ChatTypes.MessageInfo) -> int:
+def _rendered_message_tokens(item: Types.MessageInfo) -> int:
     return len(item.content.encode()) + 32

@@ -10,6 +10,14 @@ from app.db.models.identity import User
 from app.db.models.memory import MemoryJob
 from app.db.models.product import Product
 from app.db.transaction import use_case_transaction
+from app.modules.chatting.chat.service.workflow import memory as MemoryUseCase
+from app.modules.chatting.chat.service.workflow.answer_preparation import (
+    prepare_answer_context,
+)
+from app.modules.chatting.chat.types import (
+    PrepareAnswerContextCommand,
+    ProcessMemoryWorkCommand,
+)
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.memory import service as MemoryService
 from app.modules.chatting.memory import types as MemoryTypes
@@ -24,14 +32,42 @@ from app.modules.chatting.memory.service.command.summarization import (
 )
 from app.modules.chatting.memory.service.query.retrieval import _select_memories
 from app.modules.llm import types as LLMTypes
-from app.use_cases import memory as MemoryUseCase
-from app.use_cases.answer_preparation import (
-    PrepareAnswerContextCommand,
-    prepare_answer_context,
-)
 from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_public_memory_workflow_records_retryable_failure_before_raising(
+    monkeypatch,
+):
+    work = MemoryTypes.MemoryWorkInfo(
+        conversation_id=uuid4(),
+        owner_id=uuid4(),
+        scope_generation=1,
+        attempt_count=1,
+        lease_owner="worker-a",
+    )
+    models = MemoryTypes.MemoryModelConfig(
+        summary_provider="mock",
+        summary_model="summary",
+        embedding_provider="voyage",
+        embedding_model="voyage-large-2",
+    )
+    failure = TimeoutError("temporary provider failure")
+    execute = AsyncMock(side_effect=failure)
+    record = AsyncMock()
+    monkeypatch.setattr(MemoryUseCase, "_process_memory_work", execute)
+    monkeypatch.setattr(MemoryUseCase.MemoryService, "fail_memory_work", record)
+    command = ProcessMemoryWorkCommand(work, MemoryTypes.MemoryPolicy(), models)
+    with pytest.raises(TimeoutError) as error:
+        await MemoryUseCase.process_memory_work(
+            SessionFactory(), command, summary_generator=object(), indexer=object()
+        )
+    assert error.value is failure
+    recorded = record.await_args.args[1]
+    assert recorded.work == work and recorded.retryable
+    assert recorded.error_kind == "TimeoutError"
+    assert execute.await_args.args[1] == work
 
 
 def messages(count=8, size=40):
@@ -249,7 +285,7 @@ async def test_embedding_retry_reuses_pending_summary_without_regeneration(monke
     )
     factory = SessionFactory()
     policy = MemoryTypes.MemoryPolicy()
-    models = MemoryUseCase.MemoryModelConfig(
+    models = MemoryTypes.MemoryModelConfig(
         summary_provider="mock",
         summary_model="mock-summary",
         embedding_provider="voyage",
@@ -372,15 +408,15 @@ async def test_answer_context_never_drops_unsummarized_messages(monkeypatch):
         source_end_position=1,
     )
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.ConversationService.prepare_runtime_context",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.ConversationService.prepare_runtime_context",
         AsyncMock(return_value=runtime),
     )
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.MemoryService.get_latest_summary",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MemoryService.get_latest_summary",
         AsyncMock(return_value=latest),
     )
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.ChatService.list_memory_source",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.list_memory_source",
         AsyncMock(return_value=source),
     )
     retriever = SimpleNamespace(retrieve_memories=AsyncMock(return_value=[]))
@@ -417,15 +453,15 @@ async def test_answer_context_fails_explicitly_when_unsummarized_text_cannot_fit
 ):
     conversation_id, owner_id = uuid4(), uuid4()
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.ConversationService.prepare_runtime_context",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.ConversationService.prepare_runtime_context",
         AsyncMock(return_value=runtime_view()),
     )
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.MemoryService.get_latest_summary",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MemoryService.get_latest_summary",
         AsyncMock(return_value=None),
     )
     monkeypatch.setattr(
-        "app.use_cases.answer_preparation.ChatService.list_memory_source",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.list_memory_source",
         AsyncMock(
             return_value=SimpleNamespace(
                 truncated=False, messages=(chat_message(1, "x" * 4000),)

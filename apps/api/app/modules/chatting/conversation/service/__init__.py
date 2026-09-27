@@ -1,5 +1,5 @@
 from app.modules.chatting.conversation.service.command import (
-    create_product_conversation,
+    start_conversation,
 )
 from app.modules.chatting.conversation.service.command.context import (
     prepare_runtime_context,
@@ -15,7 +15,7 @@ from app.modules.chatting.conversation.service.query import (
 
 __all__ = [
     "advance_history_revision",
-    "create_product_conversation",
+    "start_conversation",
     "get_owned_conversation",
     "get_statistics_facts",
     "list_conversation_characters",

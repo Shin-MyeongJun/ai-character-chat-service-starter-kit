@@ -1,5 +1,11 @@
 # Billing/Credit 최종 계약과 기존 데이터 전환 보류
 
+> 2026-09-22 생성 연결 후속 갱신: 실제 비스트리밍 답변·앱 설정·차감·해제·복구는
+> [billing-generation-integration.md](billing-generation-integration.md)에 구현했다.
+> 이 문서의 당시 “chat 연결 미구현”, “HTTP 견적/UUID 강제 후속” 및 테스트 수치는 과거 기록이다.
+> 이번 연결에는 billing router가 없으며 원래 문자열 키를 고정 UUIDv5로 호환한다.
+> 아래 가격/지갑 책임과 legacy 분류 승인 보류 정책은 유지한다.
+
 2026-09-22. 현재 원본 구현의 기준 문서다. 과거 “설계만”, “단일 잔액만”, “무료/유료 다음 단계”
 범위와 미적용 단일 잔액 복구 패치는 이 구현으로 대체했다. 최초 자료는 작업 시작 복구 사본에 보존했다.
 
@@ -76,11 +82,11 @@ operation=legacy 거래, currency NULL 예약 중 하나라도 있는 사용자�
 합성 분류 입력은 그 후속 전환 도구를 검증하는 fixture일 뿐 운영 승인으로 간주하지 않는다.
 이번 검증은 실제 과거 DDL·합성 미분류 데이터를 보존하고 신규 경로가 이를 차단함을 검증한다.
 
-## 범위 밖
+## 분리 단계 당시의 범위 밖
 
 실제 chat/answers 생성 연결, payment/현금 결제·환불, HTTP API, UI, 관리자 화면,
 billing_chat 분리, 재화 만료·교환·송금·확정 소비 환급은 구현하지 않았다.
 PAID 지급은 결제 사실을 검증한 것으로 취급하지 않고 usage/매출을 자동 생성하지 않는다.
-[생성 연결 문서](billing-generation-integration.md)는 후속 chat 조율 작업의 기준이다.
+[생성 연결 문서](billing-generation-integration.md)는 후속 작업으로 완료한 chat 조율의 현재 계약이다.
 
 최종 원본 실행 결과와 재실행 명령은 [완료 보고](credit-billing-separation-handoff.md)에 기록한다.

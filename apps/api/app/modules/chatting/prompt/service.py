@@ -88,6 +88,8 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
             "content": json.dumps({"reference_data": references}, ensure_ascii=False),
         },
     ]
+    if runtime.opening_message is not None:
+        messages.append({"role": "assistant", "content": runtime.opening_message})
     seen = set()
     last_position = -1
     for item in command.recent_messages:

@@ -5,7 +5,7 @@
 - 소유 테이블: `characters`, `character_images`, `character_assets`, `character_snapshots`, `character_snapshot_images`, `character_snapshot_assets`, `character_media`.
 - `service/query.py`: 소유자별 조회, 프롬프트·프로모션 조회, 발행 소스 잠금, 스냅샷·미디어 참조 조회. 조회 요청은 Command, 결과는 Info 또는 명시적인 Info 페이지/목록이다.
 - `service/command.py`: 생성·수정·상태 변경·삭제·기본 이미지 선택·`freeze_character`. 쓰기는 `use_case_transaction`으로 조합하며 삭제 성공 시 None을 반환한다. 반복 삭제의 미존재는 기존 LookupError 계약을 유지한다.
-- `service/media.py`: `CharacterMediaService.upload_character_media`, `read_character_media`, `read_snapshot_media`, `cleanup_character_media`. DB 예약과 외부 저장소 수명이 필요한 별도 책임이므로 분리했다. `AssetStorageService`와 공개 types만 사용하고 adapter는 참조하지 않는다. `mapper/media.py`는 저장소 예약 Entity를 불변 Info로 변환한다. 기존 JSON 이미지·에셋 추가는 command에서 이 모듈 내부 미디어 연결 함수를 호출한다.
+- `service/media.py`: `CharacterMediaService`의 읽기·업로드 예약·잠금/상태 검증·정리 조건·첨부 기능. DB 예약과 외부 저장소 수명이 필요한 별도 책임이므로 분리했다. `AssetStorageService`와 공개 types만 사용하고 adapter는 참조하지 않는다. `mapper/media.py`는 저장소 예약 Entity를 불변 Info로 변환한다. 기존 JSON 이미지·에셋 추가는 command에서 이 모듈 내부 미디어 연결 함수를 호출한다.
 - `repository.py`: 인가 조건을 포함한 원본 조회, 변경 저장, 미디어 및 스냅샷 저장. `CharacterPageRow`, `CharacterPromotionRow`, `SnapshotMediaRow`는 이 계층에만 정의한다.
 - `mapper/persistence.py`: 미존재를 포함한 Entity/Row → Info 변환. 서비스는 원본 필드를 읽지 않는다. 스냅샷 JSON은 원본과 공유되지 않도록 복사한다.
 - `mapper/schema.py`, `router.py`: 일반 소유자 HTTP 요청·응답. 관리자 조회는 governance/admin, 상태 변경 라우팅은 governance/moderation에서 공개 서비스를 호출한다.
@@ -35,3 +35,10 @@
 관련 테스트: `test_character_command`, `test_character_query`, `test_character_media`, `test_media_http`, `test_media_migrations`. 파일 저장과 DB 전체의 원자성, 저장소 간 이전을 보장한다고 해석하지 않는다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+
+## 선택적 미디어 workflow (2026-09-27)
+
+`service/workflow/media.py`의 CharacterMediaWorkflow는 하위 CharacterMediaService의 읽기 계약을 유지하며 업로드/정리 실행만 추가한다. 예약 commit → 캐릭터/예약 잠금 → 외부 저장 종료 대기 → ready commit, deleting commit → 잠금 → 외부 삭제 종료 대기 → deleted commit 순서다. workflow는 repository를 호출하지 않는다. 준비/완료 조건은 하위 service/media.py에 있으며 `_attach_character_media`도 그 위치를 유지하여 command가 workflow를 역호출하지 않는다.
+
+취소가 와도 `_settle_storage`는 실제 공급자 작업 종료까지 기다린 후 취소를 전달한다. 다른 업로드 재시도/GC/첨부가 미완료 외부 작업과 경쟁하도록 잠금을 조기 해제하지 않는다. 명시적 저장소 실패/모호한 DB commit/retention/deleting 재개 계약은 유지한다. main/HTTP/cleanup CLI는 CharacterMediaWorkflow를 사용하고 product 읽기는 하위 서비스의 읽기 계약을 사용한다.

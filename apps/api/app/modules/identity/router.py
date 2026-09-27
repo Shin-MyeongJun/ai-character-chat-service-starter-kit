@@ -39,7 +39,7 @@ async def get_csrf(request: Request, response: Response):
     "/register", status_code=202, response_model=Schemas.AuthMessageResponseDto
 )
 async def register_user(body: Schemas.CredentialsRequestDto, request: Request):
-    await get_authentication(request).register_user(
+    await request.app.state.authentication_mail.register_user(
         SchemaMapper.credentials_request_to_command(body)
     )
     return Schemas.AuthMessageResponseDto()
@@ -49,7 +49,7 @@ async def register_user(body: Schemas.CredentialsRequestDto, request: Request):
     "/email/resend", status_code=202, response_model=Schemas.AuthMessageResponseDto
 )
 async def resend_email(body: Schemas.EmailRequestDto, request: Request):
-    await get_authentication(request).resend_verification(
+    await request.app.state.authentication_mail.resend_verification(
         SchemaMapper.email_request_to_command(body)
     )
     return Schemas.AuthMessageResponseDto()
@@ -70,7 +70,7 @@ async def verify_email(body: Schemas.TokenRequestDto, request: Request):
     response_model=Schemas.AuthMessageResponseDto,
 )
 async def request_password_reset(body: Schemas.EmailRequestDto, request: Request):
-    await get_authentication(request).request_password_reset(
+    await request.app.state.authentication_mail.request_password_reset(
         SchemaMapper.email_request_to_command(body)
     )
     return Schemas.AuthMessageResponseDto()

@@ -4,6 +4,7 @@ from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper
 from app.modules.chatting.conversation.service.query import get_owned_conversation
+from app.modules.chatting.conversation.service.views import get_conversation_start
 from app.modules.content.lorebook import types as LorebookTypes
 from app.modules.content.lorebook.service import query as LorebookQueryService
 from app.modules.content.product import types as ProductTypes
@@ -45,6 +46,12 @@ async def prepare_runtime_context(
             ).entries
             for sid, book in runtime.lorebooks.items()
         }
+        start_context = await get_conversation_start(
+            session,
+            Types.OwnedConversationCommand(
+                conversation_id=conversation_id, user_id=user_id
+            ),
+        )
         return PersistenceMapper.conversation_snapshot_infos_to_runtime_view(
-            conversation, snapshot, runtime, execution, active_entries
+            conversation, snapshot, runtime, execution, active_entries, start_context
         )

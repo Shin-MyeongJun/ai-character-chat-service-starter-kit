@@ -47,6 +47,10 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
                 "product_snapshot_start_sets.id",
             ],
         ),
+        CheckConstraint(
+            "opening_mode IN ('legacy_messages', 'snapshot')",
+            name="ck_conversation_opening_mode",
+        ),
         Index("ix_conversations_user_id_created_at", "user_id", "created_at"),
         Index("ix_conversations_product_id_created_at", "product_id", "created_at"),
     )
@@ -73,6 +77,9 @@ class Conversation(TimestampMixin, UuidPkMixin, Base):
     start_set_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     initial_snapshot_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product_snapshots.id")
+    )
+    opening_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'legacy_messages'")
     )
     history_revision: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")

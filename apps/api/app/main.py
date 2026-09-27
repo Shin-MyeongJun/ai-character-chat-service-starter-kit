@@ -20,10 +20,15 @@ from app.modules.asset_storage.service import (
     create_asset_storage_service,
     load_asset_storage_settings,
 )
+from app.modules.chatting.chat.service.workflow.answers import AnswerOrchestrator
+from app.modules.chatting.chat.types import AnswerConfig
 from app.modules.chatting.memory import service as MemoryService
 from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.chatting.prompt import service as PromptService
-from app.modules.content.character.service.media import CharacterMediaService
+from app.modules.commerce.billing.service.configuration import (
+    load_billing_pricing_configuration,
+)
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.product.service.views.media import ProductMediaService
 from app.modules.identity.adapters import GoogleOIDCVerifier, SMTPMailSender
 from app.modules.identity.dependencies import get_verified_user_id
@@ -33,7 +38,11 @@ from app.modules.identity.http_security import (
     error_response,
 )
 from app.modules.identity.router import router as identity_router
-from app.modules.identity.service import AuthenticationService, GoogleLoginService
+from app.modules.identity.service import (
+    AuthenticationMailWorkflow,
+    AuthenticationService,
+    GoogleLoginService,
+)
 from app.modules.identity.settings import load_auth_settings
 from app.modules.identity.types import AuthError
 from app.modules.llm.adapters import (
@@ -43,7 +52,6 @@ from app.modules.llm.adapters import (
     VoyageEmbeddingAdapter,
 )
 from app.modules.llm.service import EmbeddingService, TextGenerationService
-from app.use_cases.answers import AnswerConfig, AnswerOrchestrator
 
 logger = structlog.get_logger(__name__)
 
@@ -65,10 +73,11 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
             sessions = async_sessionmaker(engine, expire_on_commit=False)
             app.state.session_factory = sessions
             auth_settings = load_auth_settings()
-            authentication = AuthenticationService(
-                sessions, auth_settings, SMTPMailSender(auth_settings)
-            )
+            authentication = AuthenticationService(sessions, auth_settings)
             app.state.authentication = authentication
+            app.state.authentication_mail = AuthenticationMailWorkflow(
+                authentication, SMTPMailSender(auth_settings)
+            )
             app.state.google_login = GoogleLoginService(
                 authentication, GoogleOIDCVerifier(auth_settings)
             )
@@ -96,7 +105,7 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
                 old_storage = create_asset_storage_service(old_settings)
                 stack.push_async_callback(old_storage.aclose)
                 read_storages[identity] = old_storage
-            media = CharacterMediaService(
+            media = CharacterMediaWorkflow(
                 sessions,
                 asset_storage,
                 storage_kind=str(asset_settings.storage_kind),
@@ -167,6 +176,7 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
                 MemoryService.MemoryRetriever(sessions, embeddings),
                 config=config,
                 template=template,
+                pricing=load_billing_pricing_configuration(),
             )
             app.state.answer_orchestrator = orchestrator
 

@@ -14,7 +14,9 @@ USE_CASES = Path(__file__).parents[1] / "app" / "use_cases"
 
 def test_openapi_contract_is_unchanged():
     app = FastAPI()
-    for path in sorted(MODULES.rglob("*router.py")):
+    for path in sorted(
+        [*MODULES.rglob("*router.py"), *MODULES.rglob("router/__init__.py")]
+    ):
         name = ".".join(path.relative_to(MODULES.parent.parent).with_suffix("").parts)
         router = getattr(importlib.import_module(name), "router", None)
         if router is not None:
@@ -27,6 +29,8 @@ def test_openapi_contract_is_unchanged():
     # 신규 인증 API만 추가를 허용하고 기존 경로·스키마 계약은 그대로 비교한다.
     actual = app.openapi()
     assert set(actual["paths"]) - set(baseline["paths"]) == {
+        "/conversations/{conversation_id}/answers",
+        "/conversations/{conversation_id}/start",
         "/auth/csrf",
         "/auth/register",
         "/auth/email/resend",
@@ -193,9 +197,21 @@ def test_top_level_use_cases_use_only_public_module_services_and_types():
 
 
 def test_public_service_business_inputs_use_commands_and_declare_results():
-    # Billing's keyword-only configuration/clock are execution dependencies,
-    # not business inputs (architecture B.3). Keep the exception scoped and typed.
-    billing_dependencies = {
+    # Execution dependencies are scoped to exact functions and annotations.
+    # Only session_factory may be positional; existing billing guards stay intact.
+    execution_dependencies = {
+        (
+            "chatting/chat/service/workflow/answer_preparation.py",
+            "prepare_answer_context",
+        ): {
+            "session_factory": "Callable",
+            "memory_retriever": "MemoryService.MemoryRetriever",
+        },
+        ("chatting/chat/service/workflow/memory.py", "process_memory_work"): {
+            "session_factory": "Callable",
+            "summary_generator": "MemoryService.SummaryGenerator",
+            "indexer": "MemoryService.MemoryIndexer",
+        },
         ("commerce/billing/service/quotes.py", "create_billing_quote"): {
             "configuration": "PricingService.BillingPricingConfiguration",
             "clock": "Callable[[], datetime]",
@@ -219,7 +235,7 @@ def test_public_service_business_inputs_use_commands_and_declare_results():
                 continue
             if node.name == "aclose":  # Adapter resource lifetime, not a use case.
                 continue
-            dependencies = billing_dependencies.get(
+            dependencies = execution_dependencies.get(
                 (path.relative_to(MODULES).as_posix(), node.name), {}
             )
             business_args = [
@@ -228,7 +244,7 @@ def test_public_service_business_inputs_use_commands_and_declare_results():
                 if arg.arg
                 not in {"self", "session", "embedding_service", "embed_query", "now"}
                 and not (
-                    arg in node.args.kwonlyargs
+                    (arg in node.args.kwonlyargs or arg.arg == "session_factory")
                     and arg.annotation is not None
                     and dependencies.get(arg.arg) == ast.unparse(arg.annotation)
                 )
@@ -280,6 +296,7 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
     actual = app.openapi()
     assert set(actual["paths"]) - set(baseline["paths"]) == {
         "/conversations/{conversation_id}/answers",
+        "/conversations/{conversation_id}/start",
         "/characters/{character_id}/media/uploads",
         "/characters/media/{media_id}/content",
         "/products/{product_id}/versions/{snapshot_id}/media/{media_id}/content",
@@ -288,3 +305,80 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         assert actual["paths"][path] == contract
     for name, schema in baseline["components"]["schemas"].items():
         assert actual["components"]["schemas"][name] == schema
+
+
+def test_workflow_direction_and_prompt_independence():
+    violations = []
+    for path in MODULES.rglob("*.py"):
+        own = _module_owner(["modules", *path.relative_to(MODULES).parts])
+        relative = path.relative_to(MODULES).as_posix()
+        lower_service = any(
+            part in path.parts for part in ("command", "query")
+        ) or relative in {
+            "identity/service/authentication.py",
+            "identity/service/google.py",
+            "content/character/service/media.py",
+        }
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom):
+                names = [(node.module or "") + "." + alias.name for alias in node.names]
+            elif isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            else:
+                continue
+            for name in names:
+                if ".service.workflow" in name and lower_service:
+                    violations.append(f"{path}: lower service imports workflow {name}")
+                if "workflow" in path.parts and (
+                    "repository" in name or name.startswith("app.db.models")
+                ):
+                    violations.append(f"{path}: workflow bypasses services {name}")
+                if own == ("chatting", "prompt") and name.startswith(
+                    "app.modules.chatting.chat"
+                ):
+                    violations.append(f"{path}: prompt depends on chat {name}")
+                if own == ("chatting", "prompt") and name.startswith(
+                    (
+                        "app.modules.chatting.conversation.service",
+                        "app.modules.chatting.memory.service",
+                    )
+                ):
+                    violations.append(
+                        f"{path}: prompt collects context from services {name}"
+                    )
+                if own == ("chatting", "memory") and name.startswith(
+                    "app.modules.chatting.chat"
+                ):
+                    violations.append(f"{path}: memory depends on chat {name}")
+                if own == ("chatting", "conversation") and name.startswith(
+                    "app.modules.chatting.chat"
+                ):
+                    violations.append(f"{path}: conversation depends on chat {name}")
+                if name.startswith("app.use_cases.") and not (
+                    path.relative_to(MODULES).as_posix()
+                    == "content/product/statistics_job.py"
+                    and name
+                    in {
+                        "app.use_cases.product_statistics.enqueue_recent",
+                        "app.use_cases.product_statistics.process_pending",
+                    }
+                ):
+                    violations.append(
+                        f"{path}: module imports top-level use case {name}"
+                    )
+    assert not violations, "\n".join(violations)
+
+
+def test_moved_implementations_have_no_old_compatibility_copies():
+    app = MODULES.parent
+    for relative in (
+        "use_cases/answers.py",
+        "use_cases/answer_preparation.py",
+        "use_cases/memory.py",
+        "use_cases/conversations.py",
+        "http/answers.py",
+        "http/answer_mapper.py",
+        "http/contracts/answers.py",
+    ):
+        assert not (app / relative).exists()
+    assert (app / "use_cases/product_statistics.py").exists()

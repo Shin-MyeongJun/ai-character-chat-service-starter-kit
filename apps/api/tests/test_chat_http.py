@@ -3,7 +3,9 @@ from uuid import uuid4
 
 import pytest
 from app.http.dependencies import get_current_owner_id, get_product_session
+from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.router import router
+from app.modules.chatting.chat.service.command.messages import create_character_message
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
@@ -32,7 +34,17 @@ def test_message_routes_fail_closed_with_existing_unconfigured_dependencies():
 
 @pytest.mark.asyncio
 async def test_crud_http_contract_uses_existing_auth_and_session_hooks(db):
-    owner, _product, _release, cid, _character = await scenario(db)
+    owner, _product, _release, cid, character = await scenario(db)
+    await create_character_message(
+        db,
+        Types.CreateCharacterMessageCommand(
+            conversation_id=cid,
+            user_id=owner.id,
+            request_key="authored-character",
+            content="Authored character text",
+            product_character_id=character,
+        ),
+    )
     app = FastAPI()
     app.include_router(router)
 
@@ -66,7 +78,7 @@ async def test_crud_http_contract_uses_existing_auth_and_session_hooks(db):
         mid = message["id"]
         page = await client.get(base, params={"limit": 1})
         assert page.status_code == 200
-        opening = page.json()["items"][0]
+        authored = page.json()["items"][0]
         cursor = page.json()["next_cursor"]
         page2 = await client.get(base, params={"cursor": cursor, "limit": 1})
         assert (
@@ -75,7 +87,7 @@ async def test_crud_http_contract_uses_existing_auth_and_session_hooks(db):
         )
         assert (await client.get(base, params={"cursor": "garbage"})).status_code == 422
         response = await client.put(
-            f"{base}/{opening['id']}",
+            f"{base}/{authored['id']}",
             json={"content": "Forged", "expected_revision": 1},
         )
         assert response.status_code == 403

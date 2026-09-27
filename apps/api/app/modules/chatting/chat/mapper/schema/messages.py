@@ -2,8 +2,8 @@
 from dataclasses import asdict
 from uuid import UUID
 
-from app.modules.chatting.chat import schemas as Schemas
 from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.schemas import messages as Schemas
 
 
 def create_message_request_to_command(

@@ -121,7 +121,7 @@ async def test_full_online_alembic_initial_sql_and_orm_match_every_wallet_constr
         )
         assert (
             await connection.fetchval("SELECT version_num FROM alembic_version")
-            == "0024"
+            == "0025"
         )
         await connection.execute("CREATE SCHEMA initial")
         await connection.execute("SET search_path TO initial,public")

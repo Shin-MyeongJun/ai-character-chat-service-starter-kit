@@ -1,3 +1,5 @@
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
+
 # 바이너리 업로드를 최대 32 MiB까지 임시 스트림에 모아 미디어 서비스에 전달한다.
 # 읽기 권한 확인 후 64 KiB씩 전송하며 전송 완료·실패 모두 reader를 닫는다.
 # 전송 시작 뒤 발생한 읽기 오류는 media_errors의 HTTP 변환 범위 밖이다.
@@ -19,7 +21,6 @@ from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service.media import (
     MAX_MEDIA_BYTES,
     MEDIA_CONTENT_TYPES,
-    CharacterMediaService,
 )
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.views.media import ProductMediaService
@@ -37,7 +38,7 @@ class UploadCharacterMediaResponseDto(BaseModel):
     purpose: str
 
 
-def get_character_media_service(request: Request) -> CharacterMediaService:
+def get_character_media_service(request: Request) -> CharacterMediaWorkflow:
     return request.app.state.character_media_service
 
 
@@ -105,7 +106,7 @@ async def upload_character_media(
     character_id: UUID,
     request: Request,
     owner: CharacterOwner,
-    service: Annotated[CharacterMediaService, Depends(get_character_media_service)],
+    service: Annotated[CharacterMediaWorkflow, Depends(get_character_media_service)],
     idempotency_key: Annotated[UUID, Header()],
     content_type: Annotated[str, Header()],
     x_filename: Annotated[str, Header(min_length=1, max_length=255)],
@@ -143,7 +144,7 @@ async def upload_character_media(
 async def read_character_media(
     media_id: UUID,
     owner: CharacterOwner,
-    service: Annotated[CharacterMediaService, Depends(get_character_media_service)],
+    service: Annotated[CharacterMediaWorkflow, Depends(get_character_media_service)],
 ):
     with media_errors():
         opened = await service.read_character_media(

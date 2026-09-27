@@ -2,8 +2,8 @@
 from dataclasses import asdict
 from uuid import UUID
 
-from app.http.contracts import answers as Schemas
-from app.use_cases.answers import AnswerInfo, GenerateAnswerCommand
+from app.modules.chatting.chat.schemas import answers as Schemas
+from app.modules.chatting.chat.types import AnswerInfo, GenerateAnswerCommand
 
 
 def answer_request_to_command(

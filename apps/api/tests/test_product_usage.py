@@ -16,6 +16,7 @@ from app.modules.chatting.chat.service.command.generation import (
 )
 from app.modules.chatting.chat.types import GeneratedMessage, GenerationResult
 from app.modules.chatting.conversation import types as ConversationTypes
+from app.modules.chatting.conversation.service.command import start_conversation
 from app.modules.chatting.conversation.service.command.versions import switch_version
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.commerce.billing.service.command.attribution import (
@@ -25,7 +26,6 @@ from app.modules.commerce.billing.service.command.attribution import (
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.command.releases import publish_product
 from app.modules.content.product.types import ReleaseNoteCommand
-from app.use_cases.conversations import start_conversation
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from test_product_integration import ready_product
@@ -131,7 +131,7 @@ async def test_concurrent_generation_retries_and_atomic_usage(db):
         )
 
 
-async def test_stale_generation_retains_cost_and_old_version(db):
+async def test_stale_generation_retains_tokens_and_old_version_without_charge(db):
     owner, p, release, cid, character_id = await scenario(db)
     run = await begin_generation(
         db,
@@ -170,7 +170,7 @@ async def test_stale_generation_retains_cost_and_old_version(db):
     async with db.begin():
         usage = await db.scalar(select(UsageLog))
         assert (
-            usage.product_snapshot_id == release.snapshot_id and usage.cost_credit == 2
+            usage.product_snapshot_id == release.snapshot_id and usage.cost_credit == 0
         )
         assert (
             await db.scalar(

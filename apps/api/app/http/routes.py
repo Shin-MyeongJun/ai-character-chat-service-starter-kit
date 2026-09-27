@@ -2,7 +2,6 @@
 # commerce.billing.router는 여기에 포함되지 않는다. 노출 여부는 이 목록을 기준으로 확인한다.
 from fastapi import APIRouter
 
-from app.http.answers import router as AnswersRouter
 from app.http.media import router as MediaRouter
 from app.modules.chatting.chat.router import router as MessagesRouter
 from app.modules.chatting.conversation.router import router as Router1
@@ -41,4 +40,3 @@ router.include_router(Router11)
 
 router.include_router(Router12)
 router.include_router(MessagesRouter)
-router.include_router(AnswersRouter)

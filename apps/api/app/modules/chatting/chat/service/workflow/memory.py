@@ -1,15 +1,14 @@
-# 답변 저장과 기억 예약을 조합하고, 워커에서는 읽기 → 외부 요약/임베딩 → 잠금 후 재검증을 수행한다.
+# 워커의 기억 작업: 읽기 → 외부 요약/임베딩 → 잠금 후 원문 재검증을 수행한다.
 # 외부 호출 성공 뒤 DB 저장이 실패할 수 있으며 작업 실패는 기록한 뒤 다시 전달한다.
 """Coordinate chat persistence, durable memory work, and provider calls."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from app.db.transaction import use_case_transaction
-from app.modules.chatting.chat import service as ChatService
-from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 from app.modules.chatting.conversation import service as ConversationService
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.memory import service as MemoryService
@@ -17,17 +16,8 @@ from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.llm import types as LLMTypes
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class MemoryModelConfig:
-    summary_provider: LLMTypes.LLMProvider | str | None
-    summary_model: str
-    embedding_provider: LLMTypes.EmbeddingProvider | str | None
-    embedding_model: str
-    embedding_output_dimension: int | None = None
-
-
 def _memory_sources(
-    value: ChatTypes.MemorySourceInfo,
+    value: Types.MemorySourceInfo,
 ) -> tuple[MemoryTypes.SourceMessageInfo, ...]:
     if value.truncated:
         raise RuntimeError("Memory source safety limit was exceeded.")
@@ -43,61 +33,16 @@ def _memory_sources(
     )
 
 
-# 성공 생성 저장과 기억 작업 예약을 같은 트랜잭션으로 묶는다. 완료 재전송은 세대를 다시 올리지 않는다.
-async def finish_generation_and_schedule_memory(
-    session, command: ChatTypes.FinishGenerationCommand
-) -> ChatTypes.GenerationInfo:
-    """The successful response and queue generation commit atomically."""
-    async with use_case_transaction(session):
-        before = await ChatService.get_generation_state(
-            session,
-            ChatTypes.GetGenerationStateCommand(
-                generation_id=command.generation_id, user_id=command.user_id
-            ),
-        )
-        await ConversationService.get_owned_conversation(
-            session,
-            ConversationTypes.OwnedConversationCommand(
-                conversation_id=before.conversation_id,
-                user_id=command.user_id,
-                lock=True,
-            ),
-        )
-        before = await ChatService.get_generation_state(
-            session,
-            ChatTypes.GetGenerationStateCommand(
-                generation_id=command.generation_id, user_id=command.user_id
-            ),
-        )
-        result = await ChatService.finish_generation(session, command)
-        if result.status == "succeeded" and before.status == "pending":
-            generation = await ChatService.get_generation_state(
-                session,
-                ChatTypes.GetGenerationStateCommand(
-                    generation_id=command.generation_id, user_id=command.user_id
-                ),
-            )
-            await MemoryService.schedule_memory_work(
-                session,
-                MemoryTypes.ScheduleMemoryWorkCommand(
-                    conversation_id=generation.conversation_id,
-                    owner_id=command.user_id,
-                ),
-            )
-        return result
-
-
 # claim된 작업의 미완성 색인을 먼저 처리하고 필요한 요약을 생성한다. 오류 종류에 따라 큐의 실패/재시도를 기록한다.
 async def process_memory_work(
     session_factory: Callable,
-    work: MemoryTypes.MemoryWorkInfo,
+    command: Types.ProcessMemoryWorkCommand,
     *,
-    policy: MemoryTypes.MemoryPolicy,
-    models: MemoryModelConfig,
     summary_generator: MemoryService.SummaryGenerator,
     indexer: MemoryService.MemoryIndexer,
 ) -> None:
     """Process one fixed work generation without holding DB state across I/O."""
+    work, policy, models = command.work, command.policy, command.models
     try:
         await _process_memory_work(
             session_factory,
@@ -136,7 +81,7 @@ async def _process_memory_work(
     work: MemoryTypes.MemoryWorkInfo,
     *,
     policy: MemoryTypes.MemoryPolicy,
-    models: MemoryModelConfig,
+    models: MemoryTypes.MemoryModelConfig,
     summary_generator: MemoryService.SummaryGenerator,
     indexer: MemoryService.MemoryIndexer,
 ) -> None:
@@ -211,9 +156,9 @@ async def _read_unsummarized(session_factory, work):
                 conversation_id=work.conversation_id, owner_id=work.owner_id
             ),
         )
-        source = await ChatService.list_memory_source(
+        source = await MessagesQueryService.list_memory_source(
             session,
-            ChatTypes.ListMemorySourceCommand(
+            Types.ListMemorySourceCommand(
                 conversation_id=work.conversation_id,
                 user_id=work.owner_id,
                 after_position=latest.source_end_position
@@ -235,9 +180,9 @@ async def _persist_summary(session_factory, generated):
                 lock=True,
             ),
         )
-        source = await ChatService.list_memory_source(
+        source = await MessagesQueryService.list_memory_source(
             session,
-            ChatTypes.ListMemorySourceCommand(
+            Types.ListMemorySourceCommand(
                 conversation_id=plan.conversation_id,
                 user_id=plan.owner_id,
                 after_position=plan.source_start_position - 1,

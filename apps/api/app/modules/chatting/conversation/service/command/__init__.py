@@ -1,5 +1,5 @@
 # 상품 최신 발행 버전으로 대화를 만든다. 시작 항목이 하나면 자동 선택하고, 복수면 명시 선택이 필요하다.
-# 첫 메시지 값만 반환하며 실제 메시지 저장은 use_cases/conversations가 이어서 수행한다.
+# 첫 대사는 최초 스냅샷에서 조회하며 messages에는 저장하지 않는다.
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import repository as Repository
 from app.modules.chatting.conversation import types as Types
@@ -12,9 +12,9 @@ from app.modules.content.product.service.command.statistics_queue import (
 )
 
 
-async def create_product_conversation(
+async def start_conversation(
     session, command: Types.StartConversationCommand
-) -> Types.PreparedConversationInfo:
+) -> Types.ConversationStartedInfo:
     product_id = command.product_id
     user_id = command.user_id
     start_set_id = command.start_set_id
@@ -44,7 +44,7 @@ async def create_product_conversation(
         if primary is None:
             raise ValueError("Version has no primary character.")
         create_command = PersistenceMapper.snapshot_runtime_view_to_create_command(
-            runtime, snapshot, user_id, product_id, start_set_id, primary
+            runtime, snapshot, user_id, product_id, start_set_id
         )
         row = await Repository.create_conversation(session, create_command)
         conversation = PersistenceMapper.conversation_entity_to_info(row)
@@ -54,8 +54,4 @@ async def create_product_conversation(
                 product_id, conversation.created_at
             ),
         )
-        return Types.PreparedConversationInfo(
-            Types.ConversationStartedInfo(conversation.id, snapshot.id, start_set_id),
-            create_command.opening_message,
-            create_command.primary_product_character_id,
-        )
+        return Types.ConversationStartedInfo(conversation.id, snapshot.id, start_set_id)

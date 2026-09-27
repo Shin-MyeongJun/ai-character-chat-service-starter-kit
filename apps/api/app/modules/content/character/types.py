@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import BinaryIO, Generic, Literal, TypeAlias, TypeVar
 from uuid import UUID
 
+from app.modules.asset_storage import types as AssetStorageTypes
+
 # Shared value types
 
 CharacterVisibilityValue: TypeAlias = Literal["private", "public", "unlisted"]
@@ -336,3 +338,16 @@ class CleanupCharacterMediaCommand:
 class CleanupCharacterMediaInfo:
     deleted: bool
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class LockMediaUploadCommand:
+    media_id: UUID
+    character_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteMediaUploadCommand:
+    media: CharacterMediaInfo
+    stored: AssetStorageTypes.StoredAssetInfo

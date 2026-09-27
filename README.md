@@ -166,3 +166,10 @@ $env:TEST_DATABASE_URL = "postgresql+asyncpg://chatkit:chatkit@localhost:5432/ch
 ## 라이선스
 
 라이선스 및 이용 조건은 현재 검토 중입니다. 상업적 이용을 포함한 구체적인 허용 범위는 아직 확정하지 않았으며, 외부 사용을 위한 공개 배포 전에 정리할 예정입니다.
+
+
+### 백엔드 업무 흐름 읽기
+
+답변은 `chat/router/answers.py` → `chat/service/workflow/answers.py` 순서로 읽습니다. 문맥 준비와 기억 작업 실행도 chat workflow에 있고, prompt는 전달받은 값만 구성합니다. 단순 CRUD는 command/query로 직접 연결합니다. 미디어 외부 저장/정리는 character workflow, Google 및 메일 조율은 identity workflow입니다.
+
+대화 생성은 conversation command가 담당하며 신규 첫 대사를 messages에 저장하지 않습니다. 클라이언트는 GET `/conversations/{id}/start`에서 최초 시작 내용과 현재 참여자를 받아 별도로 표시합니다. 기존 데이터 호환을 위해 Alembic 0025가 필요합니다. 상세 계약과 실제 검증 결과는 [workflow 진행 기록](docs/backend-workflow-refactor-progress.md)에 있습니다.

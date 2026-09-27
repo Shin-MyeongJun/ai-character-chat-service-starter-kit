@@ -17,13 +17,6 @@ class ConversationStartedInfo:
 
 
 @dataclass(frozen=True, slots=True)
-class PreparedConversationInfo:
-    conversation: ConversationStartedInfo
-    opening_message: str
-    product_character_id: UUID
-
-
-@dataclass(frozen=True, slots=True)
 class ConversationCharacterInfo:
     character_id: UUID | None
     product_character_id: UUID | None
@@ -66,6 +59,7 @@ class ConversationRuntimeView:
     start: RuntimeStart
     characters: list[RuntimeCharacter]
     lorebooks: list[RuntimeLorebook]
+    opening_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +72,7 @@ class ConversationInfo:
     start_set_id: UUID | None
     created_at: datetime
     history_revision: int = 1
+    opening_mode: str = "legacy_messages"
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,8 +89,6 @@ class CreateConversationCommand:
     snapshot_id: UUID
     start_set_id: UUID
     title: str
-    opening_message: str
-    primary_product_character_id: UUID
     characters: tuple[ConversationCharacterCommand, ...]
 
 
@@ -145,3 +138,13 @@ class SwitchVersionCommand:
     user_id: UUID
     target_snapshot_id: UUID
     automatic: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationStartView:
+    initial_snapshot_id: UUID | None
+    opening_mode: str
+    opening_message: str | None
+    start: RuntimeStart | None
+    participants: tuple[ConversationCharacterInfo, ...]
+    primary_product_character_id: UUID | None

@@ -1,4 +1,5 @@
-# 사용자 범위 request_key로 생성 사실을 예약하고 완료 결과 digest로 중복 완료를 비교한다.
+# 사용자 범위 request_key로 생성 사실을 예약하고 완료 결과 digest로 중복 완료를
+# 비교한다.
 # LLM 호출은 하지 않는다. 완료 시 메시지·usage·통계 예약을 같은 DB 트랜잭션에 반영한다.
 "Trusted chat orchestration API: reserve once, then save messages and usage atomically."
 
@@ -61,7 +62,8 @@ def result_digest(value):
 
 
 # 소유 대화와 사용자 범위 요청 키를 확인해 pending 생성을 예약한다.
-# input_message_id가 있으면 기존 마지막 사용자 입력을 재사용하고, 없으면 입력 메시지를 저장한다.
+# input_message_id가 있으면 기존 마지막 사용자 입력을 재사용하고, 없으면 입력 메시지를
+# 저장한다.
 async def begin_generation(
     session, command: Types.BeginGenerationCommand
 ) -> GenerationInfo:
@@ -143,7 +145,8 @@ async def begin_generation(
         return generation_record_to_info(row, created=True)
 
 
-# 생성 결과·사용량을 확정한다. 버전이 바뀐 결과는 stale로 남겨 출력 메시지를 추가하지 않는다.
+# 생성 결과·사용량을 확정한다. 버전이 바뀐 결과는 stale로 남겨 출력 메시지를 추가하지
+# 않는다.
 # 이미 확정된 생성의 재전송은 결과 digest가 같아야 하며 사용량을 다시 쓰지 않는다.
 async def finish_generation(
     session, command: Types.FinishGenerationCommand
@@ -173,7 +176,8 @@ async def finish_generation(
             if run.result_digest != fingerprint:
                 raise ValueError("Generation already finished with different output.")
             return generation_record_to_info(run)
-        # 성공 결과라도 사용 버전이 바뀌거나 만료되면 stale로 저장하고 출력 메시지는 추가하지 않는다.
+        # 성공 결과라도 사용 버전이 바뀌거나 만료되면 stale로 저장하고 출력 메시지는
+        # 추가하지 않는다.
         # 아래 usage 기록은 stale·실패·취소에도 실행된다.
         status: str = value.outcome
         if status == "succeeded":
@@ -218,7 +222,7 @@ async def finish_generation(
                 reasoning_effort=run.reasoning_effort,
                 input_tokens=value.input_tokens,
                 output_tokens=value.output_tokens,
-                cost_credit=value.cost_credit,
+                cost_credit=value.cost_credit if status == "succeeded" else 0,
                 latency_ms=value.latency_ms,
                 created_at=now,
             ),

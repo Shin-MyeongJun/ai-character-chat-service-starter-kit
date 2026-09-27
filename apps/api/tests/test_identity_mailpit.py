@@ -23,13 +23,13 @@ async def test_mailpit_real_smtp_verification_and_reset(auth_http):  # noqa: F81
     url = os.getenv("TEST_MAILPIT_HTTP_URL")
     if not url:
         pytest.skip("TEST_MAILPIT_HTTP_URL required for real local SMTP verification")
-    client, auth, _, _, _ = auth_http
+    client, auth, _, _, app = auth_http
     settings = replace(
         auth.settings,
         smtp_host="127.0.0.1",
         smtp_port=int(os.getenv("TEST_MAILPIT_SMTP_PORT", "1025")),
     )
-    auth.mailer = SMTPMailSender(settings)
+    app.state.authentication_mail.mailer = SMTPMailSender(settings)
     email = f"auth-{uuid4().hex}@example.com"
 
     async def read_token(subject):

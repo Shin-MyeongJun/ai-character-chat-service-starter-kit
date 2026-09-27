@@ -1,4 +1,4 @@
-# 명시적으로 넘긴 media ID만 정리한다. 참조 여부·보존 시간·저장소 일치는 CharacterMediaService가 검사한다.
+# 명시적으로 넘긴 media ID만 정리한다. 참조 여부·보존 시간·저장소 일치는 CharacterMediaWorkflow가 검사한다.
 # 건별 실패 후 다음 ID를 처리하며 하나라도 예외가 있으면 종료 코드 1을 반환한다.
 """Explicit ID-scoped garbage collection; no bucket/directory enumeration."""
 
@@ -14,7 +14,7 @@ from app.modules.asset_storage.service import (
     create_asset_storage_service,
     load_asset_storage_settings,
 )
-from app.modules.content.character.service.media import CharacterMediaService
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.character.types import CleanupCharacterMediaCommand
 
 
@@ -27,7 +27,7 @@ async def run_cleanup(media_ids, cutoff):
     failed = False
     try:
         async with create_asset_storage_service(settings) as storage:
-            service = CharacterMediaService(
+            service = CharacterMediaWorkflow(
                 async_sessionmaker(engine, expire_on_commit=False),
                 storage,
                 storage_kind=str(settings.storage_kind),

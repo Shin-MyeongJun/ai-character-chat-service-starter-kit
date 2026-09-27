@@ -45,7 +45,7 @@
 표시 할인율은 정상가격과 최종가격을 비교한다.
 
 가격 계산 본체와 견적 생성·조회·예약 전 검증 서비스를 구현했다.
-예약/차감/해제와 잔액 조회도 공개 서비스로 구현했다. HTTP 및 실제 생성 연결은 미구현이다.
+예약/차감/해제와 잔액 조회도 공개 서비스로 구현했다. 실제 생성 연결은 아래 2026-09-22 계약을 따르며 billing HTTP router는 만들지 않는다.
 요청 키는 호출자가 작업 시작 시 UUID를 한 번 만들고 재전송에 재사용한다.
 누락 시 자동 생성하지 않으며 기존 API의 문자열 키 계약은 변경하지 않았다.
 견적 저장 서비스는 같은 사용자·요청 키의 다른 작업 정보를 충돌로 거절한다.
@@ -120,11 +120,11 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
   미분류로 보존하고 분류 승인 전 활성화하지 않는다. 상세 정책은
   [최종 계약](../../../../../../docs/credit-billing-refactor-plan.md)을 따른다.
 - usage·상품별 매출/환불 귀속은 기존 billing 책임이며 credit 지급/소비에 자동 연결하지 않는다.
-  실제 chat/answers 연결, 현금 결제/환불, HTTP/UI, billing_chat 분리는 구현하지 않는다.
+  실제 chat/answers 연결은 아래 2026-09-22 계약으로 구현했다. 현금 결제/환불, 별도 billing HTTP/UI, billing_chat 분리는 범위 밖이다.
 
 원본 검증 결과: [완료 보고](../../../../../../docs/credit-billing-separation-handoff.md).
 
-## 독립 통합 검증과 연결 경계 (2026-09-21)
+## 과거 독립 통합 검증과 연결 경계 (2026-09-21)
 
 - `test_billing_lifecycle_integration.py`: 실제 PostgreSQL READ COMMITTED에서 공개
   견적/크레딧 서비스의 연속 호출을 검증한다. 만료 뒤 완료/해제 재전송, 정책 변경 전후
@@ -142,3 +142,21 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
 - [다음 생성 연결 계약](../../../../../../docs/billing-generation-integration.md)에 입력 구성,
   요청 키 보존, 잠금/트랜잭션 순서, 결과 저장 실패/불확실 호출 복구, 리롤/OCP와 정책 데이터,
   실제 검증 기록을 둔다. 기존 설계 이력과 후속 실행 명세의 변경 이유가 달라 문서를 분리했다.
+
+## 실제 답변 호출과 실행 설정 (2026-09-22)
+
+`service/configuration.py`는 공개 `load_billing_pricing_configuration()`으로 승인된
+BILLING_PRICING_CONFIG_PATH의 JSON을 기존 BillingPricingConfiguration/PriceBookInfo에
+변환한다. 가격표/원가/환산율/안전 계수/TTL은 필수이며 운영 기본값은 없다. 금액은 Decimal
+문자열로만 읽는다. 정책은 기존 기본 registry의 순서를 유지한다. 경로 미설정은 None을 반환하여
+기존 결과 조회/복구를 허용하고 신규 답변은 orchestrator가 503으로 거절한다. 지정 파일의 오류는
+앱 시작 오류다. 설정 I/O는 순수 가격 계산/불변 견적 서비스와 변경 이유가 달라 분리했다.
+
+AnswerOrchestrator가 공개 quotes/credits와 types만 사용해 최종 프롬프트의 견적·예약을
+generation과 같은 상위 트랜잭션으로 저장한다. 성공 저장/실패 확정도 billing → credit 공개
+서비스를 통해 처리한다. 실제 출력 토큰 재정산은 없으며 예약액을 그대로 확정한다.
+원래 문자열 키는 orchestrator의 고정 UUIDv5 namespace로 변환하며 billing UUID 계약은 그대로다.
+billing router는 추가/등록하지 않는다. 기존 HTTP 과금 오류 변환은 app/modules/chatting/chat/router/answers.py에 있다.
+
+[현재 생성 연결 계약과 검증](../../../../../../docs/billing-generation-integration.md)이 위 과거
+“외부 연결 미구현” 기록을 대체한다. 소유 테이블/원장/지갑 정책 변경과 migration은 없다.

@@ -1,12 +1,18 @@
 # 과금 공개 계약과 후속 연결
 
+> 2026-09-22 생성 연결 후속 갱신: 실제 비스트리밍 답변·앱 설정·차감·해제·복구는
+> [billing-generation-integration.md](billing-generation-integration.md)에 구현했다.
+> 이 문서의 당시 “chat 연결 미구현”, “HTTP 견적/UUID 강제 후속” 및 테스트 수치는 과거 기록이다.
+> 이번 연결에는 billing router가 없으며 원래 문자열 키를 고정 UUIDv5로 호환한다.
+> 아래 가격/지갑 책임과 legacy 분류 승인 보류 정책은 유지한다.
+
 > 2026-09-22 현재 구현: 재화 관리·지급·조회는 credit의 무료/유료 지갑으로 이전했다.
 > 이 문서의 과거 단일 잔액 소유권·지급 미구현 범위 및 당시 테스트 수치는 역사적 기록이다.
 > 최신 서비스/스키마/기존 데이터 차단 계약은 [최종 계약](credit-billing-refactor-plan.md),
 > 이번 원본 실행 결과는 [완료 보고](credit-billing-separation-handoff.md)를 따른다.
-> 아래 실제 chat/payment 연결은 여전히 후속 작업이며 이번에 구현하지 않았다.
+> 아래 단계별 기록의 범위는 당시 기준이다. 현재 chat 연결은 위 문서를, payment 미구현은 기존 범위를 따른다.
 
-## 이번 단계의 구현 범위
+## 가격 기반 단계 당시의 구현 범위
 
 앞 단계의 불변 Command/Info와 순수 정책 어댑터·등록부에 이어,
 `billing/service/pricing.py`의 가격 계산과 `billing/service/quotes.py`의 견적 저장·조회·검증을 구현했다.

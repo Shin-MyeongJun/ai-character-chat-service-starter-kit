@@ -1,24 +1,20 @@
-# 저장된 사용자 메시지를 참조해 답변 하나를 요청한다. 중복 키 처리·복구는 AnswerOrchestrator가 맡는다.
+# 저장된 사용자 메시지를 참조해 답변 하나를 요청한다. 중복 키 처리·복구는
+# AnswerOrchestrator가 맡는다.
 # pending은 202와 Retry-After, 저장 복구 대기는 503으로 구분한다.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.http import answer_mapper as SchemaMapper
-from app.http.contracts import answers as Schemas
 from app.http.dependencies import Owner
-from app.modules.chatting.chat.types import MessageConflictError
-from app.use_cases.answers import AnswerOrchestrator, AnswerStorageError
+from app.modules.chatting.chat.dependencies import get_answer_orchestrator
+from app.modules.chatting.chat.mapper.schema import answers as SchemaMapper
+from app.modules.chatting.chat.schemas import answers as Schemas
+from app.modules.chatting.chat.service.workflow.answers import AnswerOrchestrator
+from app.modules.chatting.chat.types import AnswerStorageError, MessageConflictError
+from app.modules.commerce.billing import types as BillingTypes
 
 router = APIRouter()
-
-
-def get_answer_orchestrator(request: Request) -> AnswerOrchestrator:
-    value = getattr(request.app.state, "answer_orchestrator", None)
-    if value is None:
-        raise HTTPException(503, "Answer runtime is not configured.")
-    return value
 
 
 @router.post(
@@ -36,6 +32,18 @@ async def generate_answer(
         result = await orchestrator.generate_answer(
             SchemaMapper.answer_request_to_command(value, conversation_id, owner_id)
         )
+    except BillingTypes.InsufficientCreditError as exc:
+        raise HTTPException(402, {"code": "insufficient_credit"}) from exc
+    except BillingTypes.CreditAccountNotFoundError as exc:
+        raise HTTPException(409, {"code": "credit_account_unavailable"}) from exc
+    except BillingTypes.BillingPricingError as exc:
+        raise HTTPException(503, {"code": "billing_not_configured"}) from exc
+    except (
+        BillingTypes.BillingQuoteConflictError,
+        BillingTypes.BillingQuoteExpiredError,
+        BillingTypes.CreditReservationConflictError,
+    ) as exc:
+        raise HTTPException(409, {"code": "billing_conflict"}) from exc
     except LookupError as exc:
         raise HTTPException(404, "Conversation or input not found.") from exc
     except MessageConflictError as exc:

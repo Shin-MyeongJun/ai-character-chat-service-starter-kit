@@ -13,8 +13,8 @@
 - `router.py`, `schemas.py`, `mapper/schema.py`: HTTP 계약, DTO와 Command/Info 순수 변환.
 - `http_security.py`: 쿠키/CSRF/Origin, 공통 오류와 민감 입력의 반사 방지, 요청 제한 연결, access log 쿼리 제거.
 - `dependencies.py`: 검증된 내부 UUID를 기존 owner 의존성에 연결. 업무 조회는 공개 서비스에 위임한다.
-- `service/authentication.py`: 가입·메일 증명·비밀번호·세션 유스케이스, 최상위 트랜잭션과 사용자 잠금. 같은 잠금·폐기 정책을 공유하여 한 서비스에 둔다.
-- `service/google.py`: OIDC 상태 소모, 외부 검증, provider/sub 계정 식별. 네트워크와 콜백 복구 정책이 달라 별도 분리했다.
+- `service/authentication.py`: 가입 DB 확정·메일 증명 발급/소모·비밀번호·세션 유스케이스, 트랜잭션과 사용자 잠금. 같은 잠금·폐기 정책을 공유하여 한 서비스에 둔다.
+- `service/google.py`: OIDC state 생성/선소모 및 provider/sub 계정 식별/연결의 상태 조건. 외부 검증 순서는 workflow/google.py가 맡는다.
 - `service/query.py`: 기존 `require_admin(GetUserCommand)` 계약 유지. 활성 admin 외에는 같은 LookupError. admin/moderator HTTP 훅의 별도 권한 정책은 확장하지 않는다.
 - `repository.py`: 자기 테이블 SQL·잠금, ORM 반환. `mapper/persistence.py`: Entity→Info/스칼라 변환. 서비스는 Entity 필드를 해석하지 않는다.
 - `security.py`: Argon2id, JWT 고정 알고리즘/claim 검증, 이메일·비밀번호·redirect 정책. 자체 암호 알고리즘은 없다.
@@ -25,12 +25,12 @@
 
 ## 공개 서비스 계약
 
-`AuthenticationService(sessions, settings, mailer)`는 실행 의존성을 생성자로 받는다. 모든 요청 값은 `types.py`의 Command로 받으며 HTTP 예외를 사용하지 않는다.
+`AuthenticationService(sessions, settings)`는 실행 의존성을 생성자로 받는다. 모든 요청 값은 `types.py`의 Command로 받으며 HTTP 예외를 사용하지 않는다.
 
 | 메서드 | Command | 결과 |
 |---|---|---|
-| register_user / login_user | CredentialsCommand | None / LoginInfo |
-| resend_verification / request_password_reset | EmailCommand | None |
+| register_pending_user / login_user | CredentialsCommand | ActionMailInfo 또는 None / LoginInfo |
+| prepare_action_mail | PrepareActionMailCommand | ActionMailInfo 또는 None |
 | verify_email | TokenCommand | UserInfo |
 | reset_password | ResetPasswordCommand | None |
 | refresh_session | TokenCommand | LoginInfo |
@@ -63,3 +63,11 @@ Google state는 공급자 통신 전에 원자적으로 사용 처리한다. 통
 자기기입 프로필, 외부 제공자의 검증 결과(검증 종류·시각·최소 증명), 목적별 동의 이력(정책 버전·동의/철회 시각)은 별도 책임으로 구분한다. 향후 휴대폰·연령 확인은 별도 외부 확인 서비스와 교체 가능한 provider 어댑터에서 증명을 검증하고 공개 Info로 전달한다. 인증은 내부 ID 연결만 담당한다. 추가 프로필/검증/동의 정보는 JWT claim에 넣지 않는다. 사용하지 않는 개인정보 컬럼, 동적 필드 엔진, 빈 어댑터는 만들지 않았다.
 
 API·쿠키·실행·외부 검증 절차는 [인증 실행 및 연동 문서](../../../../../docs/authentication.md)를 참고한다. 테스트는 `test_identity_security.py`, `test_identity_auth.py`, `test_identity_migrations.py`, 기존 `test_architecture_contracts.py`에 있다.
+
+
+## 외부 인증 workflow (2026-09-27)
+
+- `service/workflow/mail.py`: `AuthenticationMailWorkflow(authentication, mailer)`의 register_user/resend_verification/request_password_reset가 DB 확정 서비스 → 메일 전송을 조합한다. SMTP 실패 후 계정/증명은 보존하고 기존 mail_unavailable 응답을 유지한다. 증명 원문은 ActionMailInfo에서 repr 제외다.
+- `service/workflow/google.py`: GoogleLoginService가 state 생성·쿠키/PKCE → state 선소모 commit → 외부 검증 → 계정 연결+세션 발급 단일 트랜잭션을 조율한다. 하위 google/authentication 서비스만 호출하며 repository에 접근하지 않는다.
+- 공유 `AuthenticationService.issue_session(session, IssueSessionCommand)`는 하위 세션 기능이다. 일반 로그인/Google 모두 사용하며 workflow끼리 비공개 세션 메서드를 호출하지 않는다. refresh 재사용 폐기 후 오류, 사용자→세션 잠금, 요청 제한과 만료 정리는 기존 하위 서비스에 유지한다.
+- main은 authentication, authentication_mail, google_login을 조립한다. router는 메일 작업만 workflow에 연결하며 비밀번호 확인/변경·토큰 소모·인증/세션은 하위 서비스에 직접 연결한다. HTTP DTO·쿠키·Google 보안 계약은 변경하지 않았다.

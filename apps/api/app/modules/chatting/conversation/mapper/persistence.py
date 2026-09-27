@@ -51,7 +51,7 @@ def snapshot_runtime_view_to_character_commands(
 
 
 def snapshot_runtime_view_to_create_command(
-    runtime, snapshot, user_id, product_id, start_set_id, primary
+    runtime, snapshot, user_id, product_id, start_set_id
 ) -> Types.CreateConversationCommand:
     return Types.CreateConversationCommand(
         user_id,
@@ -59,23 +59,21 @@ def snapshot_runtime_view_to_create_command(
         snapshot.id,
         start_set_id,
         snapshot.snapshot_data["title"],
-        snapshot.snapshot_data["opening_message"],
-        primary.id,
         snapshot_runtime_view_to_character_commands(runtime),
     )
 
 
 def conversation_snapshot_infos_to_runtime_view(
-    conversation, snapshot, runtime, execution, active_entries
+    conversation, snapshot, runtime, execution, active_entries, start_context
 ) -> Types.ConversationRuntimeView:
-    start = next(
-        s for s in runtime.composition.starts if s.id == conversation.start_set_id
-    )
     return Types.ConversationRuntimeView(
         execution=execution,
         product_snapshot_id=str(snapshot.id),
-        settings=snapshot.snapshot_data,
-        start=Types.RuntimeStart(title=start.title, content=start.content),
+        settings={
+            k: v for k, v in snapshot.snapshot_data.items() if k != "opening_message"
+        },
+        start=start_context.start,
+        opening_message=start_context.opening_message,
         characters=[
             Types.RuntimeCharacter(
                 id=str(c.id),
@@ -104,4 +102,21 @@ def conversation_snapshot_infos_to_runtime_view(
 def conversation_statistics_rows_to_info(rows) -> Types.ConversationStatisticsInfo:
     return Types.ConversationStatisticsInfo(
         *[[tuple(row) for row in group] for group in rows]
+    )
+
+
+def conversation_start_infos_to_view(
+    conversation, initial, start, participants, primary_id
+) -> Types.ConversationStartView:
+    return Types.ConversationStartView(
+        initial_snapshot_id=conversation.initial_snapshot_id,
+        opening_mode=conversation.opening_mode,
+        opening_message=initial.snapshot_data["opening_message"]
+        if initial is not None and conversation.opening_mode == "snapshot"
+        else None,
+        start=Types.RuntimeStart(start.title, start.content)
+        if start is not None
+        else None,
+        participants=participants,
+        primary_product_character_id=primary_id,
     )

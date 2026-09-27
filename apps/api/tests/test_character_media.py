@@ -21,7 +21,7 @@ from app.modules.asset_storage.service import AssetStorageService
 from app.modules.content.character import repository as Repository
 from app.modules.content.character import types as Types
 from app.modules.content.character.service import command as Commands
-from app.modules.content.character.service.media import CharacterMediaService
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.command.releases import publish_product
 from app.modules.content.product.service.views.media import ProductMediaService
@@ -41,7 +41,7 @@ async def media(db, tmp_path, request):
         else _s3_adapter(FakeS3Client())
     )
     async with AssetStorageService(adapter) as storage:
-        yield CharacterMediaService(
+        yield CharacterMediaWorkflow(
             async_sessionmaker(db.bind, expire_on_commit=False),
             storage,
             storage_kind=request.param,

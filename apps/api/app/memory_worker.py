@@ -18,8 +18,11 @@ from contextlib import suppress
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service.workflow.memory import process_memory_work
 from app.modules.chatting.memory import service as MemoryService
 from app.modules.chatting.memory import types as MemoryTypes
+from app.modules.chatting.memory.types import MemoryModelConfig
 from app.modules.llm.adapters import (
     AnthropicAdapter,
     MockLLMAdapter,
@@ -28,7 +31,6 @@ from app.modules.llm.adapters import (
 )
 from app.modules.llm.adapters.protocols import TextGenerationAdapter
 from app.modules.llm.service import EmbeddingService, TextGenerationService
-from app.use_cases.memory import MemoryModelConfig, process_memory_work
 
 logger = structlog.get_logger(__name__)
 
@@ -113,9 +115,7 @@ async def run_worker(*, once: bool, concurrency: int, poll_seconds: float) -> No
             try:
                 await process_memory_work(
                     session_factory,
-                    work,
-                    policy=_policy(),
-                    models=models,
+                    ChatTypes.ProcessMemoryWorkCommand(work, _policy(), models),
                     summary_generator=generator,
                     indexer=indexer,
                 )

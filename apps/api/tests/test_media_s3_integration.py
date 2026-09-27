@@ -17,7 +17,7 @@ from app.modules.asset_storage.types import (
     StorageKind,
 )
 from app.modules.content.character import types as Types
-from app.modules.content.character.service.media import CharacterMediaService
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from test_product_integration import seed
@@ -55,7 +55,7 @@ async def test_real_s3_managed_upload_retry_read(db):
         "test",
     )
     async with create_asset_storage_service(settings) as storage:
-        service = CharacterMediaService(
+        service = CharacterMediaWorkflow(
             async_sessionmaker(db.bind, expire_on_commit=False),
             storage,
             storage_kind="s3",

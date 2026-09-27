@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from uuid import UUID
 
 from app.modules.chatting.conversation import schemas as Schemas
@@ -48,3 +49,9 @@ class ConversationSchemaMapper:
         result: ProductTypes.PendingUpdatesView,
     ) -> Schemas.PendingUpdatesInfoResponseDto:
         return Schemas.PendingUpdatesInfoResponseDto.model_validate(result)
+
+    @staticmethod
+    def conversation_start_view_to_response(
+        result: Types.ConversationStartView,
+    ) -> Schemas.ConversationStartResponseDto:
+        return Schemas.ConversationStartResponseDto(**asdict(result))

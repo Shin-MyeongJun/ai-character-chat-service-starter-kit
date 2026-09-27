@@ -1,5 +1,11 @@
 # 회원가입부터 첫 답변까지 통합 검증
 
+> 2026-09-22 갱신: 기본 앱의 첫 답변은 이제 billing 견적 → credit 예약 → 저장·차감 확정을
+> 통과한다. fixture는 승인 운영 요금과 무관한 test 가격 10 및 공개 credit 지급 20을 UUID
+> 테스트 스키마에만 주입한다. 아래 2026-09-20 실행 수치와 cost_credit=0 기록은 과거 결과다.
+> 현재 설정·트랜잭션·키 호환·검증 결과는 [생성 연결 문서](billing-generation-integration.md)를 따른다.
+> 수동 실행에는 승인된 BILLING_PRICING_CONFIG_PATH와 사용 가능한 사용자 지갑이 필요하다.
+
 2026-09-20 현재 기본 `app.main.create_app()`은 identity의 실제 쿠키 인증에 연결되어 있다. `authenticate` 주입이나 인증 dependency override 없이 가입→이메일 인증→로그인→콘텐츠 준비→대화 생성→사용자 메시지 저장→비스트리밍 답변→대화 내역 조회가 동작한다. 외부 API 계약과 상품 이용 권한은 변경하지 않았다.
 
 `references_document/work/nonstream-chat-orchestration.md`의 “인증 미구현/기본 앱 503/검증된 Bearer 주입 필요”는 당시 진행 기록이다. 현재의 실행 지침은 이 문서와 [인증 문서](authentication.md)를 따른다. 개별 라우터의 미연결 훅은 여전히 503이지만 기본 앱이 실제 identity 의존성을 연결한다.
@@ -47,6 +53,7 @@ docker stop chatkit-first-answer-test
 |---|---|
 | Provider | `name=openai`, 활성. 모델 실행 공급자를 결정하는 시스템 설정 |
 | Model | `model_name=gpt-test`, 활성, `context_window=32000`, `reasoning_efforts=[low]`, `model_family=test`, input/output price=1. 상품 설정·발행·실행 모델 검증에 필요하며 실제 공급자 모델명이 아니다 |
+| 테스트 크레딧 | 공개 credit grant 서비스로 FREE 20을 테스트 사용자에게만 지급. 운영 충전 아님 |
 | 사용자·세션·메일 증명 | 직접 INSERT 없음. 회원가입/검증/로그인 API로 생성 |
 | 캐릭터·로어북·시작 항목·상품·발행본 | 직접 INSERT 없음. 소유자 공개 API로 생성 |
 | 대화·메시지·생성·usage·memory 작업 | 직접 INSERT 없음. 실제 유스케이스에서 저장 |
@@ -78,14 +85,14 @@ LLM은 `OpenAI AsyncResponses.create`만 결정적인 결과(한국어 답변, i
 | 11 | `POST /products/P/releases` `{"summary":"첫 발행","body":"여행 시작"}` | 201, 발행 snapshot ID |
 | 12 | `GET /products/P` | `start_options[0].id` → S. 원본 E와 다른 발행 시작 ID |
 | 13 | `POST /conversations` `{"product_id":"P","start_set_id":"S"}` | 201, `id` → CID |
-| 14 | `GET /conversations/CID/messages` | 첫 인사 메시지의 `product_character_id` → PC. 원본 C와 다른 발행 참여 슬롯 ID |
+| 14 | `GET /conversations/CID/start` | 고정 opening_message 별도 표시. primary_product_character_id → PC. messages는 아직 비어 있음 |
 | 15 | `POST /conversations/CID/messages` `{"request_key":"input-1","content":"어디로 갈까요?"}` | 201, `id` → M, `revision` → R |
 | 16 | `POST /conversations/CID/answers` `{"request_key":"answer-1","input_message_id":"M","expected_revision":R,"product_character_id":"PC"}` | 200, `status=succeeded`, 답변/생성 ID |
-| 17 | 같은 answers 요청 재전송 후 `GET /conversations/CID/messages` | 기존 답변 반환, 인사·사용자 입력·AI 답변 3개. `GET /conversations/CID/updates`도 가능 |
+| 17 | 같은 answers 요청 재전송 후 `GET /conversations/CID/messages` | 기존 답변 반환, 사용자 입력·AI 답변 2개. `GET /conversations/CID/updates`도 가능 |
 
-대화 조회는 현재 공개된 messages/updates API를 사용한다. 별도 `GET /conversations/{id}`를 새로 만들지 않았다. 시작 인사는 작성자가 제공한 `generated_by_ai=false` 메시지이고 실제 첫 생성 답변만 true다.
+대화 조회는 start/messages/updates API를 사용한다. 고정 첫 대사는 메시지 ID나 generated_by_ai 필드를 갖지 않는다. 실제 AI 답변은 messages에 generated_by_ai=true로 저장한다. 기존 대화는 opening_mode=legacy_messages이고 원래 메시지 이력을 유지한다.
 
-## 검증 결과
+## 과거 검증 결과 (2026-09-20)
 
 Windows/Python 3.12, 독립 `pgvector/pgvector:pg17` 컨테이너에서 실행했다.
 
@@ -105,7 +112,7 @@ Windows/Python 3.12, 독립 `pgvector/pgvector:pg17` 컨테이너에서 실행�
 
 실행 코드의 연결 오류는 발견되지 않았다. 새 테스트의 초기 기대값 두 곳은 기존 계약에 맞췄다: 완료 생성의 lease 필드는 반드시 NULL이 되는 계약이 아니며, 무인증 쓰기도 먼저 CSRF를 검사하므로 인증 자체의 401 검사는 유효 CSRF와 로그인 쿠키 부재를 조합한다. 최종 테스트는 모두 통과했다. 과거 문서의 인증 미구현 설명을 관련 ARCHITECTURE에 정정했으며 모듈 책임/공개 인터페이스 변경은 없다. 기존 미추적 `references_document/`는 수정하지 않았다.
 
-## 남은 정적 검사와 제한
+## 당시 남은 정적 검사와 제한 (2026-09-20)
 
 현재 앱 소스 전체의 mypy 오류는 boto3/botocore 타입 정보 부재 4건, identity의 Optional 처리 4건, character 미디어의 Optional 처리 22건, HTTP 미디어 BinaryIO 타입 1건, main 예외 핸들러 타입 1건이다. 이번 변경에 실행 Python 소스 수정이 없으며 무관한 미디어 리팩터링이나 검사 옵션 완화로 감추지 않았다. 재현 명령:
 
@@ -117,3 +124,20 @@ Windows/Python 3.12, 독립 `pgvector/pgvector:pg17` 컨테이너에서 실행�
 Docker 조회는 초기 샌드박스의 named pipe 접근 제한 때문에 실패했으나 승인된 Docker 실행 경로로 해결했고, 기존 DB 대신 새 컨테이너를 사용했다. Windows pytest 임시 디렉터리는 저장소 안의 짧고 새로운 `--basetemp` 경로를 사용했다.
 
 실제 OpenAI/Anthropic/Voyage API, 운영 SMTP/HTTPS 프록시·브라우저, 프런트엔드, 스트리밍은 검증 범위 밖이다. billing은 기존 token/`cost_credit=0` 기록 계약을 검증했으며 실제 가격 계산·결제·잔액 차감은 구현하거나 검증하지 않았다. 커밋과 푸시는 수행하지 않았다.
+
+## 현재 과금 연결 검증 (2026-09-22)
+
+기존 첫 답변 10개 테스트는 모두 통과했다. 실제 앱 lifespan에서 테스트 전용 가격 JSON을
+로딩하고, 공개 credit 지급 fixture의 FREE 20 중 10을 예약/확정한다. fresh DB 세션에서
+usage.cost_credit = 예약액 = 차감 원장 절댓값 = 10과 reservation.result_id = generation.id를
+검사한다. 답변·usage·memory 작업은 한 번만 생성되며 LLM 호출도 한 번이다.
+기존 실제 쿠키 인증/CSRF/다른 소유자 거절 검사는 유지한다.
+
+전체 백엔드 최종 결과는 647 passed / 4 skipped, DB skip 0이다. 실 S3 2개, Mailpit 1개,
+Voyage 1개는 opt-in 환경 미설정으로 미실행이다. 당시 444 passed 기록과 혼동하지 않는다.
+설정 및 트랜잭션 상세는 [현재 생성 연결 문서](billing-generation-integration.md)를 따른다.
+
+
+## 고정 시작 내용 계약 (2026-09-27)
+
+신규 대화 POST 후 messages는 비어 있다. GET `/conversations/{id}/start`의 opening_message를 별도로 표시하고 primary_product_character_id로 답변을 요청한다. 정상 첫 답변 후 messages는 사용자 입력+AI 출력 2개이며 고정 첫 대사는 포함하지 않는다. test_first_answer_integration은 이 경로와 기존 인증·CSRF·usage·과금·기억 예약을 함께 검증한다. 전체 이전/검증 결과는 backend-workflow-refactor-progress.md를 따른다.

@@ -50,6 +50,7 @@ async def create_conversation(session, command):
         start_set_id=command.start_set_id,
         is_group=len(command.characters) > 1,
         title=command.title,
+        opening_mode="snapshot",
     )
     session.add(conversation)
     await session.flush()

@@ -5,9 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query
 
 from app.http.dependencies import Owner, Session, errors
-from app.modules.chatting.chat import schemas as Schemas
 from app.modules.chatting.chat import types as Types
-from app.modules.chatting.chat.mapper import schema as SchemaMapper
+from app.modules.chatting.chat.mapper.schema import messages as SchemaMapper
+from app.modules.chatting.chat.schemas import messages as Schemas
 from app.modules.chatting.chat.service.command import messages as MessagesCommandService
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 

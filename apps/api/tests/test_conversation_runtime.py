@@ -70,6 +70,20 @@ async def test_runtime_activates_published_snapshot_without_live_lorebook_reads(
         context.ProductViewsService, "get_snapshot_runtime", get_runtime
     )
     monkeypatch.setattr(context, "resolve_execution", AsyncMock(return_value=execution))
+    monkeypatch.setattr(
+        context,
+        "get_conversation_start",
+        AsyncMock(
+            return_value=ConversationTypes.ConversationStartView(
+                sid,
+                "legacy_messages",
+                None,
+                ConversationTypes.RuntimeStart("Start", "Published opening"),
+                (),
+                None,
+            )
+        ),
+    )
     live_lookup = AsyncMock(side_effect=AssertionError("Must not read live entries"))
     monkeypatch.setattr(
         LorebookRepository, "list_enabled_entries_by_activation_type", live_lookup

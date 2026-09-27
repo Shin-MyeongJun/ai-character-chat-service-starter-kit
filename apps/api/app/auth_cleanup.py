@@ -5,7 +5,6 @@ import os
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.modules.identity.adapters import SMTPMailSender
 from app.modules.identity.service import AuthenticationService
 from app.modules.identity.settings import load_auth_settings
 
@@ -17,7 +16,6 @@ async def main():
         service = AuthenticationService(
             async_sessionmaker(engine, expire_on_commit=False),
             settings,
-            SMTPMailSender(settings),
         )
         # 개인정보/토큰을 출력하지 않고 처리 건수만 보고한다.
         print(await service.cleanup_expired_auth())

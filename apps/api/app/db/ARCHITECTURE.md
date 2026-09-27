@@ -72,3 +72,8 @@
 | app.media_cleanup | 사용자가 지정한 media ID별 처리 | deleting을 먼저 저장하고 외부 삭제 후 deleted. 참조 또는 보존 기간 안이면 삭제하지 않음 |
 
 `memory_worker --once`는 한 건 처리 옵션이 아니다. 현재 claim 가능한 작업과 실행 중 작업이 없어지면 종료하므로 미래 backoff 작업은 남을 수 있다. statistics_job은 스케줄러를 등록하지 않는다. docker-compose.yml은 PostgreSQL/Redis만 정의하며 API·워커·통계/정리 일정은 별도 실행 환경에 달려 있다. 현재 backend 코드에서 Redis 작업 큐 사용은 확인되지 않았다.
+
+
+## 고정 시작 내용 migration (2026-09-27)
+
+0025 / 초기 SQL 016은 conversations.opening_mode를 추가한다. 기존 행과 server default는 legacy_messages, 신규 conversation 서비스는 snapshot을 명시한다. 메시지를 삭제/추정/합성하지 않는다. 최초 initial_snapshot_id/start_set_id를 읽고 현재 버전 변경과 분리한다. snapshot 대화가 있으면 downgrade를 거절한다. test_product_migrations와 test_credit_wallet_migrations는 head/초기 SQL/ORM 경로를 비교하고 test_conversation_opening은 downgrade 손실 방지를 검증한다.

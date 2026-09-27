@@ -5,10 +5,10 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from app.http.answers import get_answer_orchestrator, router
 from app.http.dependencies import get_current_owner_id
 from app.main import create_app
-from app.use_cases.answers import AnswerInfo, AnswerStorageError
+from app.modules.chatting.chat.router.answers import get_answer_orchestrator, router
+from app.modules.chatting.chat.types import AnswerInfo, AnswerStorageError
 from fastapi import FastAPI
 
 

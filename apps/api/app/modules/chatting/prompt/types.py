@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 # TemplateInfo.digest는 템플릿 내용 식별값이다. PromptInfo.request_json은 공급자 중립 역할 envelope다.
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.modules.chatting.chat.types import MessageInfo
 from app.modules.chatting.conversation.types import ConversationRuntimeView
 from app.modules.chatting.memory.types import RetrievedMemoryInfo
 
@@ -25,8 +26,8 @@ class BuildPromptCommand:
     template: TemplateInfo
     runtime: ConversationRuntimeView
     product_character_id: UUID
-    current_message: MessageInfo
-    recent_messages: tuple[MessageInfo, ...] = ()
+    current_message: PromptMessageInfo
+    recent_messages: tuple[PromptMessageInfo, ...] = ()
     memories: tuple[RetrievedMemoryInfo, ...] = ()
 
 
@@ -34,3 +35,11 @@ class BuildPromptCommand:
 class PromptInfo:
     request_json: str
     estimated_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class PromptMessageInfo:
+    id: UUID
+    sender_type: str
+    content: str
+    position: int
