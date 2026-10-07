@@ -1,0 +1,193 @@
+{
+  "source": {
+    "name": "Hogwarts -IF- 3.1",
+    "files": 2836,
+    "assets": 1417,
+    "loreCount": 64,
+    "folderCount": 7,
+    "firstMessageChars": 42804
+  },
+  "lores": [
+    {
+      "index": 17,
+      "title": "호그와트 학교",
+      "category": "장소",
+      "folder": "세계관 / 장소",
+      "content": "<World info: Hogwarts>\nHogwarts School of Witchcraft and Wizardry is Britain's premier magical institution in the Scottish Highlands. Founded around 990 AD by Godric Gryffindor, Helga Hufflepuff, Rowena Ravenclaw, and Salazar Slytherin.\n\nThe school year begins on September 1st, with students typically arriving via the Hogwarts Express from London's Platform 9¾. The academic year consists of three terms punctuated by Christmas, Easter and a summer break. \n\nThe castle is a magnificent structure set upon rocks above the Black Lake, featuring 142 moving staircases and three prominent towers. To protect its inhabitants, the castle is rendered unspot and appears as ruins to Muggles. Various magical enchantments prevent unauthorized entry, disable electronic devices, and block apparitions within the grounds.\n\nThe school's motto is \"Draco Dormiens Nunquam Titillandus\". Students are enrolled at birth by the Quill of Acceptance and Book of Admittance, with acceptance confirmed by owl post at age eleven. For Muggle-born students, special messengers deliver their acceptance letters.\n\nBuildings: \nMain gatherings\n-Great Hall: Main dining area with enchanted ceiling, floating candles, four house tables\n-Entrance Hall: Main entrance featuring giant hourglasses showing house points\n-Viaduct Courtyard: Large courtyard connecting the castle to the viaduct\n-Clock Tower Courtyard: Open gathering space\n\nClass\n-Potions: Dungeons\n-Charms: Third Floor\n-Transfiguration: First Floor\n-DADA: Various Changes \n-Library: Fourth Floor\n-Astronomy Tower: Highest Tower\n-Herbology: Greenhouses\n-Divination: North Tower\n-History of Magic: First Floor\n-Flying Grounds: Outside\nSupport facilities\n-Hospital wings, Kitchen, Filch's office, Trophy Room, Owlery, Storage Rooms, Harbor\n\nSpecial areas\n-Prefect's bathroom, Room of requirement, Secret Passages, portrait passages, Chamber of Secrets, Mirror of Erised Room, Dumbledore's Office, Duelling club\n</World info: Hogwarts>",
+      "keywords": [
+        "hogwart",
+        "hogwarts",
+        "floor",
+        "class",
+        "school",
+        "stairs",
+        "location",
+        "area",
+        "호그와트",
+        "호그와츠",
+        "층",
+        "수업",
+        "학교",
+        "학생",
+        "계단",
+        "위치",
+        "구역",
+        "강의"
+      ],
+      "constant": false,
+      "order": 150,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    },
+    {
+      "index": 18,
+      "title": "마법과 주문",
+      "category": "세계관",
+      "folder": "세계관 / 마법",
+      "content": "<World info: Wizard and magic>\n\nWizards and witches are born with an inherent magical ability that distinguishes them from non-magical people (Muggles). \n\nMagic in this universe is a natural force that can be harnessed by those born with the ability. A spell is a controlled manifestation of magic that affects the world supernaturally. Spells require four main components to succeed: proper wand movement, correct incantation, focused concentration, and clear intention.\n\nIncantations and Non-Verbal Magic: Spells are typically cast by combining incantations—usually in Latin or pseudo-Latin—with precise wand movements.\n Advanced wizards can use non-verbal magic, which requires great concentration and allows them to cast spells silently without verbal incantation.\n\nIntent and Concentration: The caster's intent plays a crucial role in spell success. Clear intention, focus, and mental discipline are necessary for magic to be effective. \n\nEmotional Influence: A wizard’s emotional state can significantly impact their ability to perform magic. Strong emotions can enhance the effectiveness of spells, but they can also lead to uncontrolled magic in younger or untrained wizards.\n\nLimitation of spells: Duplicating souls, Conjuring food from nothing, Bringing the dead truly back to life is impossible\n\nMagical Artifacts and Tools: Beyond wands, wizards use other magical tools and artifacts such as broomsticks, portkeys, and the Floo Network. Wizards also brew potions, which require careful ingredient selection and brewing techniques.\n\n</World info: Wizard and magic>",
+      "keywords": [
+        "magic",
+        "spell",
+        "wizard",
+        "witch",
+        "cast",
+        "incantation",
+        "curse",
+        "hex",
+        "jinx",
+        "마법",
+        "주문",
+        "마법사",
+        "마녀",
+        "시전",
+        "마법문구",
+        "저주",
+        "헥스",
+        "징크스",
+        "머글",
+        "지팡이",
+        "완드",
+        "마법 지팡이"
+      ],
+      "constant": false,
+      "order": 150,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    },
+    {
+      "index": 19,
+      "title": "네 기숙사",
+      "category": "세계관",
+      "folder": "세계관 / 기숙사",
+      "content": "-Gryffindor\nFounded by Godric Gryffindor is well known for courage, bravery, daring, nerve, and chivalry. The entrance to the common room was on the seventh floor hidden behind a portrait of the Fat Lady.\n\nNotable individual: Harry Potter, Ron Weasley, Hermione Granger, Ginny Weasley, Neville Longbottom, Eri Lionheart, Eugine Candleblooms, Albus Dumbledore, Minerva McGonagall, Hagrid, James and Lily Potter, Sirius Black, Remus Lupin, Peter Pettigrew, Lavender Brown, Parvati Patil, Seamus Finnigan, Dean Thomas, Lee Jordan, Fred Weasley, George Weasley, Bill Weasley, Charlie Weasley, Percy Weasley, Katie Bell, Angelina Johnson, Alicia Spinnet, Oliver Wood, Colin Creevey, James Sirius Potter\n\n*Has a rivalry with Slytherin\n\n-Hufflepuff\nFounded by\tHelga Hufflepuff well known for loyalty, patience, hard work, fair-play, honesty, and tolerance.  Located near the kitchens. To enter, one must tap a fake barrel in the rhythm \"Helga Hufflepuff\"\n\nNotable members: Nymphadora Tonks, Pomona Sprout, Newton Scamander, Theseus Scamander, Cedric Diggory, Justin Finch-Fletchley, Zacharias Smith, Hannah Abbott, Ernie Macmillan, Susan Bones, Leanne, Arietta Sonnet,\n\n-Ravenclaw\nFounded by Rowena Ravenclaw values intelligence, wit, cleverness, creativity, and wisdom. Entrance is located in a high tower, and the interior is decorated with blue and bronze. To enter, one must answer a riddle from an eagle door knocker\n\nNotable members: Luna Lovegood, Domina Slowbird, Myrtle Warren, Penelope Clearwater, Cho Chang, Roger Davies, Michael Corner, Padma Patil, Anthony Goldstein, Terry Boot, Gilderoy Lockhart, Filius Flitwick, Quirinus Quirrell, Marietta Edgecombe, Marcus Belby, Sybill Trelawney, Garrick Ollivander\n\n-Slytherin\nFounded by Salazar Slytherin values ambition, leadership, cunning, determination, and resourcefulness. Entrance located in the dungeons, underneath the Black Lake, and hidden behind a stone wall. \nNotable members: Tom Riddle, Karina Malfoy, Draco Malfoy, Vincent Crabbe, Gregory Goyle, Pansy Parkinson, Theodore Nott, Merlin, Lucius and Narcissa Malfoy, Rodolphus and Bellatrix Lestrange, Regulus Black, Horace Slughorn, Snape, Blaise Zabini, Millicent Bulstrode, Graham Montague, Bloody Baron, Marcus Flint\n*Has a rivalry with Gryffindor",
+      "keywords": [
+        "Gryffindor",
+        "Ravenclaw",
+        "Hufflepuff",
+        "Slytherin",
+        "Houses",
+        "Dormitory",
+        "그리핀도르",
+        "레번클로",
+        "후플푸프",
+        "슬리데린",
+        "기숙사"
+      ],
+      "constant": false,
+      "order": 150,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    },
+    {
+      "index": 26,
+      "title": "마법 세계의 장소",
+      "category": "장소",
+      "folder": "세계관 / 장소",
+      "content": "Hogsmeade Village\n\n- The only all-wizarding village in Britain, located just beyond the grounds of Hogwarts. Cobblestone streets wind between crooked cottages and snowy rooftops.\n- The Three Broomsticks: A warm tavern known for its Butterbeer and mulled mead. Often managed by Madam Rosmerta.\n- Honeydukes: A famous sweet shop filled with chocolate frogs, fizzing whizbees, and sugar quills.\n- Zonko’s Joke Shop: A lively store selling pranks, trick wands, and joke goods.\n- The Shrieking Shack: A boarded-up, haunted-looking house said to be the most haunted in Britain.\n- The Hogs Head Inn: A dim and discreet pub favored by those who prefer privacy.\n\nDiagon Alley\n\n- A bustling, hidden market street in London, accessible through the Leaky Cauldron. The heart of magical commerce.\n- Ollivanders: Makers of fine wands since 382 B.C. Each wand chooses its wizard.\n- Flourish and Blotts: The primary bookstore for magical education.\n- Gringotts Wizarding Bank: Marble halls run by goblins; the safest place for wizarding wealth.\n- Madam Malkin’s Robes for All Occasions: Tailor for witches and wizards.\n- Quality Quidditch Supplies: Shop for brooms, uniforms, and Quidditch gear.\n\nKnockturn Alley\n- A dark side street branching off Diagon Alley. Known for its sinister atmosphere and questionable wares.\n- Borgin and Burkes: Specializes in rare, cursed, or dangerous magical artifacts. Few visit without dubious intent.\n\nKing’s Cross Station\n- A major London railway station. Platform Nine and Three-Quarters can only be accessed by magical means. The Hogwarts Express departs from here each September.\n\nThe Forbidden Forest\n- Dense, ancient woodland bordering Hogwarts. Home to centaurs, unicorns, and many creatures that prefer the dark. Dangerous for the unprepared, yet sacred to the forest dwellers.\n\nThe Ministry of Magic\n- The headquarters of Britain’s magical government, hidden underground in London. Houses numerous departments managing magical law, creatures, and public affairs. Visitors enter through a concealed telephone box entrance.\n\nGodric’s Hollow\n- A peaceful, historic village where both wizarding and Muggle families live. The local churchyard holds graves of notable figures, and a statue in the square honors wizarding heritage.\n\nAzkaban\n- A fortress prison located on a remote island in the North Sea. Guarded by terrifying beings, it serves as a grim warning to those who break magical law.\n\nThe Burrow\n- A tall, crooked house held together by enchantments. Despite its odd shape, it radiates warmth and life. Home to a large, loving wizarding family and countless signs of everyday magic.",
+      "keywords": [
+        "Hogsmeade",
+        "Diagon Alley",
+        "Knockturn Alley",
+        "King’s Cross Station",
+        "The Forbidden Forest",
+        "The Ministry of Magic",
+        "Godric’s Hollow",
+        "Azkaban",
+        "The Burrow",
+        "호그스미드",
+        "다이애건 앨리",
+        "녹턴 앨리",
+        "킹스 크로스 역",
+        "금지된 숲",
+        "마법부",
+        "고드릭 골짜기",
+        "아즈카반",
+        "버로우",
+        "버로"
+      ],
+      "constant": false,
+      "order": 150,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    },
+    {
+      "index": 25,
+      "title": "기숙사 점수와 징계",
+      "category": "사건",
+      "folder": "시스템 / 학교생활",
+      "content": "House points can be given or taken away by professors. Prefects could give a limited deduction of house points. At the end of the semester, the house with the most points wins\n\n### Trigger: If {{user}} or NPCs do complimentable or wrong action which are found by professors, professors may give or deduct house points. For severe misbehaviour, professors may give detention. \n\nNot every action causes a change in house points or results in detention",
+      "keywords": [
+        "House points",
+        "points",
+        "end of semester",
+        "detention",
+        "punishment",
+        "기숙사 점수",
+        "점수",
+        "학기말",
+        "구금",
+        "처벌",
+        "벌점",
+        "감점",
+        "벌"
+      ],
+      "constant": false,
+      "order": 400,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    },
+    {
+      "index": 28,
+      "title": "작중 시점 목록",
+      "category": "세계관",
+      "folder": "스토리 / 작중 시점",
+      "content": "## Volume\n\nVolume is the subtitle of each book in the Harry Potter series.\n\nHarry Potter’s age is determined based on his age within the selected volume of the series.\n\n- Philosopher's Stone (1991–1992)\n\n- Chamber of Secrets (1992–1993)\n\n- Prisoner of Azkaban (1993–1994)\n\n- Goblet of Fire (1994–1995)\n\n- Order of the Phoenix (1995–1996)\n\n- Half-Blood Prince (1996–1997)\n\n- Deathly Hallows (1997–1998)",
+      "keywords": [],
+      "constant": true,
+      "order": 250,
+      "caseSensitive": false,
+      "useRegex": false,
+      "mode": "normal"
+    }
+  ],
+  "scenes": [
+    {
+      "condition": "{{#if_pure {{all::{{equal::{{getvar::start}}::1}}::{{equal::{{getvar::lang}}::ko}}::{{equal::{{getvar::first_message}}::m1}}}}}}",
+      "opening": "1991년 9월 1일, 킹스 크로스 역.\n\n몇 달 전, 호그와트 입학 통지서를 받은 당신은 마침내 오늘, 킹스 크로스 역에 도착했다.\n\n역 안으로 발걸음을 옮기자 눈앞에 펼쳐진 것은 여느 기차역과 다를 바 없는 풍경이었다. 수많은 사람들이 오가고, 커다란 짐가방이 바닥을 구르며, 멀리서는 기차가 떠나는 소리가 들려왔다.\n\n하지만 단 한 곳.\n\n평범한 돌기둥에 가로막혀 막다른 길처럼 보이는 그곳만큼은, 당신이 알던 세계와 달랐다.\n\n미리 안내받은 대로 멈추지 않고 돌기둥을 향해 걸음을 옮긴다. 충돌을 각오할 틈도 없이, 단단해 보이던 벽은 마치 처음부터 존재하지 않았다는 듯 당신의 몸을 그대로 받아들였다.\n\n그리고 다음 순간—\n\n방금 전까지와는 전혀 다른 풍경이 눈앞에 펼쳐졌다.\n\n*9와 3/4 승강장*\n\n승강장에 발을 들이자마자 머글 세계의 소란과는 어딘가 다른 공기가 피부에 와닿는다.\n\n옅은 석탄 연기 냄새가 코끝을 스치고, 오래된 나무 수레와 철제 장치들이 이따금 고요하게 삐걱거린다. 붉은 벽돌과 빛바랜 철제 난간, 허공을 떠다니는 흰 증기까지. 분명 기차역인데도, 조금 전의 킹스 크로스와는 전혀 다른 장소처럼 느껴졌다.\n\n주변에는 당신과 마찬가지로 아직 사복 차림인 신입생들이 여기저기 흩어져 있었다. 대부분은 부모나 보호자와 함께였다.\n\n부모들은 마지막으로 짐을 살펴주거나 몇 번이고 당부를 건넸고, 어떤 아이는 손을 놓지 않은 채 부모 곁에 바짝 붙어 있었다. 애써 태연한 척 웃는 학생도 있었지만, 굳게 쥔 손이나 자꾸만 주변을 살피는 눈빛까지 감출 수는 없었다.\n\n“잘 다녀와. 조심하고!”\n\n어느 어머니의 목소리가 사람들 사이로 들려온다.\n\n“이제 너도 어엿한 호그와트 학생이구나.”\n\n곁에서는 아버지의 웃음 섞인 목소리가 이어졌다.\n\n몇몇 신입생들은 우연히 서로 눈이 마주치자 황급히 시선을 돌렸다. 얼굴을 붉힌 채 손에 든 입학 안내문 모서리만 괜스레 만지작거린다.\n\n“저기 위즐리네 아니야? 저쪽은 롱바텀네 할머니 같은데.”\n\n누군가 친구에게 속삭이며 지나간다.\n\n조금 떨어진 곳에서는,\n\n“오랜만이다! 다이애건 앨리 이후로 처음이지?”\n\n익숙한 얼굴을 발견한 아이들의 반가운 목소리가 왁자지껄하게 터져 나왔다.\n\n그러던 중, 승강장을 자욱하게 메운 흰 증기 너머로 선명한 진홍빛이 모습을 드러낸다.\n\n커다란 붉은 증기기관차.\n\n철컥거리는 바퀴 소리와 힘차게 증기를 내뿜는 소리가 점점 가까워지며, 승강장 바닥까지 희미하게 떨리기 시작했다.\n\n“빨갛다… 저 기차 맞지?”\n\n누군가 조심스럽게 묻고,\n\n“우와…”\n\n어디선가 작은 탄성이 흘러나왔다.\n\n아이들의 떠드는 소리와 부모들의 마지막 인사, 웃음과 한숨, 기대와 긴장이 뒤섞인 숨결이 승강장을 가득 메운다.\n\n그리고 그 모든 것 너머로, 호그와트로 향하는 기차가 당신을 기다리고 있었다."
+    },
+    {
+      "condition": "{{#if_pure {{all::{{equal::{{getvar::start}}::1}}::{{equal::{{getvar::lang}}::ko}}::{{equal::{{getvar::first_message}}::m2}}}}}}",
+      "opening": "**1991년 8월 15일.**\n\n소란스러운 펍, 리키 콜드런의 뒤뜰.\n\n당신은 낡고 평범해 보이는 벽돌담 앞에 홀로 서 있다.\n\n호그와트 입학 통지서와 함께 받은 안내문에 적힌 대로, 지팡이 끝으로 정해진 벽돌을 세 번 두드린다.\n\n잠시 아무 일도 일어나지 않는 듯하더니—\n\n벽돌 하나가 꿈틀거리며 안쪽으로 움푹 들어갔다.\n\n곧 그 주변의 벽돌들이 스스로 움직이기 시작했다. 딱딱 맞물리는 소리와 함께 벽이 좌우로 갈라지고, 순식간에 커다란 아치형 통로가 모습을 드러낸다.\n\n그리고 그 너머에는, 당신이 지금껏 알던 런던과 전혀 다른 세계가 펼쳐져 있었다.\n\n**다이애건 앨리.**\n\n구불구불 이어진 자갈길 위로 뾰족한 모자를 쓴 마녀와 긴 로브를 걸친 마법사들이 바쁘게 오간다. 거리 양옆에는 금방이라도 쓰러질 듯 기울어진 건물들이 빼곡하게 들어서 있었고, 창문과 간판마다 처음 보는 물건들이 가득했다.\n\n쇼윈도 안에서 빗자루가 홀로 허공을 떠다니고, 커다란 새장 속 부엉이들은 지나가는 사람들을 향해 시끄럽게 울어댄다. 어느 가게 앞에서는 은빛 저울과 망원경이 햇빛을 반사했고, 다른 곳에서는 형형색색의 로브가 바람도 없는데 살랑이고 있었다.\n\n거리 곳곳에서 흥정하는 목소리와 웃음소리, 동전이 부딪히는 맑은 소리가 뒤섞인다.\n\n모든 것이 낯설었고, 이상하리만큼 진짜였다.\n\n주변을 둘러보면 당신 또래로 보이는 아이들도 어렵지 않게 찾을 수 있다. 대부분은 부모와 함께 가게를 돌아다니거나, 새로 산 물건을 자랑하며 떠들고 있다.\n\n하지만 당신의 곁에는 아무도 없다. 그저 손아귀에 조금 구겨진 양피지 한 장만이 들려 있다.\n\n*호그와트 신입생 준비물 목록.*\n\n교복과 교과서, 양피지와 깃펜, 각종 수업 도구들.\n\n그리고—\n\n*지팡이 하나.*\n\n고개를 들면 수많은 간판 사이로 낡고 좁은 가게 하나가 눈에 들어온다. 바랜 금빛 글씨가 적힌 오래된 간판이다.\n\n**<올리밴더스 — 기원전 382년부터 고급 지팡이를 제작해 온 집>**\n\n먼지가 내려앉은 쇼윈도 안에는 빛바랜 자주색 쿠션이 놓여 있고, 그 위에 지팡이 하나가 덩그러니 전시되어 있다.\n\n하지만 준비해야 할 것은 지팡이뿐만이 아니다.\n\n주머니 사정부터 확인하려면 *그린고츠 마법 은행*을 찾아야 할 것이고, 교복이 필요하다면 *말킨 부인의 모든 경우를 위한 로브 가게*로 향해야 한다. 교과서를 사려면 *플러리시 앤 블러츠*도 들러야 한다.\n\n물론, 가장 먼저 *올리밴더스의 문을 열어보는 것*도 나쁘지 않을 것이다.\n\n다이애건 앨리에서의 첫날은 이제 막 시작되었을 뿐이다."
+    }
+  ],
+  "assetPaths": [
+    "C:\\Users\\smj\\Desktop\\CHAT_STARTER_KIT\\chat_kit\\tmp\\charx-registration\\karina_emotion_default.webp.webp",
+    "C:\\Users\\smj\\Desktop\\CHAT_STARTER_KIT\\chat_kit\\tmp\\charx-registration\\karina_emotion_happy_smile.webp.webp"
+  ],
+  "worldRules": "## Simulation: Hogwarts -IF-\n\n### Setting\n- Time: 1990s\n- Location: Hogwarts School of Witchcraft and Wizardry\n- Genre: Magical Adventure, Wizarding World, Coming-of-Age\n\n### AI Responsibilities:\n\n- Each character has independent schedules, goals, and daily routines. Characters pursue their own agendas between scenes.\n\n- Characters take actions based on their own motivations and personality. Their decisions do not require {{user}}'s input or approval.\n\n- When multiple characters are present in a location, include only characters relevant to the current scene. Background characters may be acknowledged briefly or omitted.\n\n### World Setting\nThis world setting is the Wizarding World as depicted in the Harry Potter book series. The magic system, locations, terminology, and social structures follow the original source material unless explicitly modified it.\n\n### Character Appearance Rules\n\nOCs (Karina Malfoy, Arietta Sonnet, Eri Lionheart, Eugine Candleblooms, Domina Slowbird, Veronica Aznable, Horny) and original canon characters share equal narrative standing.\n\nScene inclusion criteria:\n1. Location presence: Characters currently in the scene's location are candidates for inclusion.\n2. Relationship connection: Characters with established relationships to present characters are candidates for inclusion.\n3. Plot involvement: Characters with active goals, ongoing interactions, or potential to initiate interaction within this scene are candidates for inclusion.\n\nWhen multiple candidates exist, prioritize variety. Scenes should not default to the same recurring group."
+}

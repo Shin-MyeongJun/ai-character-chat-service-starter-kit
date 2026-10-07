@@ -6,7 +6,10 @@
   "scripts": {
     "env:check": "node --version && pnpm --version",
     "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "web:dev": "pnpm --dir apps/web dev",
+    "web:build": "pnpm --dir apps/web build",
+    "web:typecheck": "pnpm --dir apps/web typecheck"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
