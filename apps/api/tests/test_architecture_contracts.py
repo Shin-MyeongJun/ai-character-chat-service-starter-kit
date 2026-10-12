@@ -12,11 +12,33 @@ MODULES = Path(__file__).parents[1] / "app" / "modules"
 USE_CASES = Path(__file__).parents[1] / "app" / "use_cases"
 
 
+TAG_PATHS = {
+    "/characters/me/{target_id}/tags", "/characters/me/{target_id}/tags/{tag_id}",
+    "/lorebooks/me/{target_id}/tags", "/lorebooks/me/{target_id}/tags/{tag_id}",
+    "/products/{target_id}/tags", "/products/{target_id}/tags/{tag_id}",
+    "/admin/products/{target_id}/internal-tags", "/admin/products/{target_id}/internal-tags/{tag_id}",
+    "/admin/characters/{target_id}/internal-tags", "/admin/characters/{target_id}/internal-tags/{tag_id}",
+    "/admin/lorebooks/{target_id}/internal-tags", "/admin/lorebooks/{target_id}/internal-tags/{tag_id}",
+    "/admin/tags", "/admin/tags/{tag_id}",
+}
+
+
+def _assert_existing_schema(name, actual, baseline):
+    if name in {"CreateCharacterRequestDto", "CreateLorebookRequestDto", "ProductWriteRequestDto"}:
+        actual = {**actual, "properties": dict(actual["properties"])}
+        assert "tags" in actual["properties"]
+        assert "tags" not in actual.get("required", [])
+        actual["properties"].pop("tags")
+    assert actual == baseline
+
+
 def test_openapi_contract_is_unchanged():
     app = FastAPI()
     for path in sorted(
         [*MODULES.rglob("*router.py"), *MODULES.rglob("router/__init__.py")]
     ):
+        if path.name == "tag_router.py" and "content" in path.parts:
+            continue
         name = ".".join(path.relative_to(MODULES.parent.parent).with_suffix("").parts)
         router = getattr(importlib.import_module(name), "router", None)
         if router is not None:
@@ -28,7 +50,10 @@ def test_openapi_contract_is_unchanged():
     )
     # 신규 인증 API만 추가를 허용하고 기존 경로·스키마 계약은 그대로 비교한다.
     actual = app.openapi()
-    assert set(actual["paths"]) - set(baseline["paths"]) == {
+    assert TAG_PATHS <= set(actual["paths"])
+    assert set(actual["paths"]) - set(baseline["paths"]) - TAG_PATHS == {
+        "/products/catalog",
+        "/products/{product_id}/studio-draft",
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
         "/auth/csrf",
@@ -48,7 +73,7 @@ def test_openapi_contract_is_unchanged():
     for path, contract in baseline["paths"].items():
         assert actual["paths"][path] == contract
     for name, schema in baseline["components"]["schemas"].items():
-        assert actual["components"]["schemas"][name] == schema
+        _assert_existing_schema(name, actual["components"]["schemas"][name], schema)
 
 
 def test_services_and_routers_do_not_execute_sql_or_import_orm():
@@ -294,7 +319,15 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         )
     )
     actual = app.openapi()
-    assert set(actual["paths"]) - set(baseline["paths"]) == {
+    assert TAG_PATHS <= set(actual["paths"])
+    assert set(actual["paths"]) - set(baseline["paths"]) - TAG_PATHS == {
+        "/products/catalog",
+        "/products/{product_id}/studio-draft",
+        "/conversations/mine",
+        "/products/catalog/{product_id}",
+        "/models/available",
+        "/products/{product_id}/studio-publication",
+        "/account/credits",
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
         "/characters/{character_id}/media/uploads",
@@ -304,7 +337,7 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
     for path, contract in baseline["paths"].items():
         assert actual["paths"][path] == contract
     for name, schema in baseline["components"]["schemas"].items():
-        assert actual["components"]["schemas"][name] == schema
+        _assert_existing_schema(name, actual["components"]["schemas"][name], schema)
 
 
 def test_workflow_direction_and_prompt_independence():

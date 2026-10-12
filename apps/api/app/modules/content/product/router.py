@@ -22,9 +22,53 @@ from app.modules.content.product.service.command import (
 from app.modules.content.product.service.command import (
     settings as SettingsCommandService,
 )
+from app.modules.content.product.service.command.studio import save_studio_draft
+from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.views import notices as NoticesViewsService
+from app.modules.content.product.tag_router import router as TagsRouter
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+@router.get("/{product_id}/studio-draft", response_model=Schemas.StudioDraftResponseDto)
+async def read_studio_draft(product_id: UUID, session: Session, owner: Owner):
+    with errors():
+        return SchemaMapper.studio_draft_info_to_response(
+            await get_studio_draft(session, Types.GetStudioDraftCommand(product_id, owner))
+        )
+
+
+@router.put("/{product_id}/studio-draft", response_model=Schemas.StudioDraftResponseDto)
+async def write_studio_draft(
+    product_id: UUID, body: Schemas.SaveStudioDraftRequestDto, session: Session, owner: Owner
+):
+    with errors():
+        try:
+            info = await save_studio_draft(
+                session,
+                Types.SaveStudioDraftCommand(product_id, owner, body.expected_revision, body.document),
+            )
+        except Types.StudioDraftConflictError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return SchemaMapper.studio_draft_info_to_response(info)
+
+
+@router.get("/catalog", response_model=Schemas.CatalogPageResponseDto)
+async def catalog(
+    session: Session,
+    limit: int = Query(default=30, ge=1, le=100),
+    cursor_created_at: str | None = None,
+    cursor_id: UUID | None = None,
+):
+    from datetime import datetime
+
+    with errors():
+        created_at = datetime.fromisoformat(cursor_created_at) if cursor_created_at else None
+        return SchemaMapper.catalog_page_info_to_response(
+            await QueryService.list_catalog(
+                session, Types.ListCatalogCommand(limit, created_at, cursor_id)
+            )
+        )
 
 
 @router.get("/mine", response_model=list[Schemas.ProductInfoResponseDto])
@@ -52,7 +96,8 @@ async def create(body: Schemas.ProductWriteRequestDto, session: Session, owner: 
             await CommandService.create_product(
                 session,
                 Types.CreateProductCommand(
-                    owner_id=owner, value=SchemaMapper.product_request_to_command(body)
+                    owner_id=owner, value=SchemaMapper.product_request_to_command(body),
+                    tags=tuple(body.tags or ()),
                 ),
             )
         )
@@ -84,6 +129,7 @@ async def update(
                     product_id=product_id,
                     owner_id=owner,
                     value=SchemaMapper.product_request_to_command(body),
+                    tags=tuple(body.tags) if body.tags is not None else None,
                 ),
             )
         )
@@ -250,3 +296,6 @@ async def version_availability(
                 ),
             )
         )
+
+
+router.include_router(TagsRouter)

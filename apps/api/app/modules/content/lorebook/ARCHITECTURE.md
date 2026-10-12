@@ -1,5 +1,6 @@
 # Lorebook 모듈
 
+- 태그 연결 소유 테이블: `lorebook_tags`, `lorebook_internal_tags`. 사전 `tags`는 content/tag 영역 소유이며 ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 sort_order·assigned_by, 내부 연결은 source(admin/system)·assigned_by·갱신 시각을 기록한다. 같은 태그 ID를 양쪽에서 사용할 수 있다. 대상 삭제는 연결만 CASCADE, 연결된 사전 삭제는 RESTRICT, 부여 사용자 삭제는 SET NULL이다. 개수 제한·태그 snapshot은 없고 기존 API 응답/발행 snapshot 구조를 유지하며 태그 전용 서비스가 인가·활성 상태·관리자 지정 보호 정책을 검사한다.
 - 소유 테이블: `lorebooks`, `lorebook_entries`, `lorebook_snapshots`.
 - `service/query.py`: 소유자 조회, 시작 항목 조회, 활성 항목 선택, 발행용 소스 잠금·스냅샷 조회. 원본 키워드 업무 판단은 EntryInfo로 변환한 뒤 실행한다. `activate_snapshot_entries(ActivateSnapshotEntriesCommand)`는 전달된 LorebookSnapshotInfo와 text만 사용하는 동기 공개 서비스이며 ActivatedSnapshotEntriesInfo를 반환한다.
 - `service/command.py`: 원본·항목 생성/수정/삭제, 상태 변경, `freeze_lorebook`. 입력은 Command, 생성·수정 결과는 Info, 삭제 결과는 None이다. 미존재 삭제는 기존 오류를 유지한다.
@@ -29,3 +30,14 @@
 관련 테스트: `test_lorebook_command`, `test_lorebook_query`, `test_lorebook_schema`, `test_lorebook_snapshot_activation`. 빈 함수가 아닌 미구현 기능과 단순 재노출 파일은 전체 목록에서 구분한다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+
+## 현재 태그 관리
+
+생성 Command/DTO의 선택 tags로 공개 태그를 생성 트랜잭션에 함께 연결한다. 미지정/빈 목록은 기존 생성 동작이다. 공개 태그 전용 API는 조회·추가·전체 교체/정렬·해제를 제공한다. 연결을 제거해도 사전 항목은 남는다. 태그 수정은 현재 연결에 즉시 반영하고 발행 snapshot에는 넣지 않는다.
+
+`service/tags.py`는 부모 잠금·인가·트랜잭션 및 사전 공개 service 호출을 소유한다. `mapper/tags.py`는 연결 Entity → 값, 사전 Info와의 조합만 담당한다. `mapper/tag_schema.py`는 HTTP 요청/응답 변환이다. 연결 SQL은 해당 모듈 repository에 있고 tags 테이블을 직접 읽거나 JOIN하지 않는다. 내부 쓰기는 admin/system 출처를 분리하고 관리자 source를 시스템이 덮어쓰거나 제거하지 못한다. 시스템 Command는 신뢰된 애플리케이션 호출 전용이며 HTTP에 노출하지 않는다. 관리자는 identity.require_admin으로 재검증한다. 공개 응답에는 내부 태그가 포함되지 않는다.
+
+공개 태그 HTTP는 기존 /me 콘텐츠 조회와 같은 소유자 정책이다. 일반 소유자 라우터와 관리자 내부 태그 라우터는 분리한다. 기존 생성·상세 응답의 구조는 바꾸지 않는다.
+
+API 경로·예제·검증은 [태그 관리](../../../../../../references_document/reference/content-tags.md)에 정리했다.

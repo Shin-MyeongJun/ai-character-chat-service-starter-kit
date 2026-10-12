@@ -338,3 +338,18 @@ class CreditBindingInfo:
     user_id: UUID
     request_key: UUID
     created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class GetAccountUsageStatisticsCommand:
+    user_id: UUID
+    start: datetime
+    end: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AccountUsageStatisticsInfo:
+    usage_records: int
+    input_tokens: int
+    output_tokens: int
+    recorded_cost_credit: int

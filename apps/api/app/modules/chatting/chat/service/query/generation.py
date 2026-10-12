@@ -23,3 +23,22 @@ async def get_statistics_facts(
         session, command.product_id, command.start, command.end
     )
     return PersistenceMapper.generation_statistics_rows_to_info(rows)
+
+
+async def get_account_generation_statistics(
+    session, command: Types.GetAccountGenerationStatisticsCommand
+) -> Types.AccountGenerationStatisticsInfo:
+    """활성 사용자의 생성 예약 [start,end) 코호트에 대한 현재 상태별 건수를 조회한다."""
+    from app.core.reporting import validate_reporting_times
+    from app.modules.identity import types as IdentityTypes
+    from app.modules.identity.service import query as IdentityQueryService
+
+    with session.no_autoflush:
+        validate_reporting_times(command.start, command.end)
+        await IdentityQueryService.require_active_user(
+            session, IdentityTypes.GetUserCommand(command.user_id)
+        )
+        rows = await Repository.get_account_generation_statistics(
+            session, command.user_id, command.start, command.end
+        )
+        return PersistenceMapper.account_generation_statistics_rows_to_info(rows)

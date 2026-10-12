@@ -22,3 +22,4 @@ class GenerateAnswerResponseDto(BaseModel):
     error_code: str | None
     retryable: bool
     uncertain: bool
+    price_credit: int | None = None

@@ -30,6 +30,7 @@ class CreateCharacterCommand:
     visibility: CharacterVisibilityValue = "private"
     status: CharacterStatusValue = "draft"
     default_model_id: UUID | None = None
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -351,3 +352,26 @@ class LockMediaUploadCommand:
 class CompleteMediaUploadCommand:
     media: CharacterMediaInfo
     stored: AssetStorageTypes.StoredAssetInfo
+
+
+@dataclass(frozen=True, slots=True)
+class PublicTagsCommand:
+    target_id: UUID
+    user_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InternalTagsCommand:
+    target_id: UUID
+    actor_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SystemTagsCommand:
+    target_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None

@@ -21,6 +21,7 @@
 | character.py, character_media.py | 원본 이미지/자산의 선택적 media_id. 캐릭터당 감정 태그 UNIQUE, 기본 이미지 부분 UNIQUE. 미디어 예약은 소유자/캐릭터 FK 없이 남음 |
 | lorebook.py | title/token_budget nullable, metadata JSON, 1536차원 벡터. entry_type에 start_set 포함 |
 | product.py | 편집 구성 링크·선택 대상·원본 시작 항목. 복합 FK로 같은 상품에 속한 링크만 연결 |
+| tag.py | 공용 tags 사전과 작품·캐릭터·로어북의 공개/내부 연결 6개. 정확한 이름 UNIQUE, 대상 CASCADE·사전 RESTRICT·부여 사용자 SET NULL FK. tags는 content/tag, 각 연결은 해당 콘텐츠 모듈 소유. normalized_name·kind·태그 snapshot·개수 제한 없음 |
 | snapshot/ | 원본별 version과 JSON schema version 구분. 원본 삭제 시 SET NULL, 참조된 구성요소 스냅샷은 RESTRICT |
 | chat.py | 현재 버전과 최초 버전 분리, 시작 FK는 최초 버전. 메시지 position은 전역 identity, revision은 메시지 변경 번호 |
 | product_usage.py | 사용자별 요청 키 UNIQUE, 생성-버전 복합 FK, answer metadata/lease, 매출/환불 귀속 |
@@ -64,6 +65,8 @@
 
 ## 작업 실행과 장애 후 재개
 
+태그 스키마의 기존 revision `0028` 및 고정 SQL은 유지한다. `0029`는 kind/tag_kind를 제거하고 이름 UNIQUE·단일 사전 FK로 전환하며 캐릭터·로어북의 공개/내부 연결을 추가한다. 종류 간 동일 이름이 있으면 ID·설명·연결을 임의 병합하지 않고 upgrade를 거절한다. 이름/연결 정리 후 재시도한다. 태그 데이터가 있으면 종류를 재구성할 수 없어 downgrade를 거절한다. `alembic/sql/0029_content_tags.sql`은 신규 4개 연결의 고정 DDL이며 새 DB 초기 SQL `019_tags.sql`은 현재 7개 테이블을 생성한다. 기존 DB에 자동 실행하지 않는다. 현재 태그 API는 콘텐츠/tag 및 각 콘텐츠 service와 governance/admin/tag_router.py에서 제공하며 [태그 관리](../../../../references_document/reference/content-tags.md)에 정리했다. 유저/작가 태그는 추가하지 않았다.
+
 | 진입점 | 실행 단위 | 재개 경계 |
 | --- | --- | --- |
 | main의 답변 supervisor | 15초 주기로 만료 답변 조회 | 저장 결과가 있으면 완료 저장, 없으면 preparing/calling 단계별 중단 실패. legacy lease 없음은 제외 |
@@ -77,3 +80,13 @@
 ## 고정 시작 내용 migration (2026-09-27)
 
 0025 / 초기 SQL 016은 conversations.opening_mode를 추가한다. 기존 행과 server default는 legacy_messages, 신규 conversation 서비스는 snapshot을 명시한다. 메시지를 삭제/추정/합성하지 않는다. 최초 initial_snapshot_id/start_set_id를 읽고 현재 버전 변경과 분리한다. snapshot 대화가 있으면 downgrade를 거절한다. test_product_migrations와 test_credit_wallet_migrations는 head/초기 SQL/ORM 경로를 비교하고 test_conversation_opening은 downgrade 손실 방지를 검증한다.
+
+## Moderation review migration (2026-10-14)
+
+0027 (`down_revision=0026`) / 초기 SQL 018은 reports, assessments,
+assessment_reports, actions를 추가한다. 고정 SQL은 alembic/sql/0027_moderation_review.sql에
+있고 초기 SQL과 동일하다. moderation_review.py가 ORM 정의와 모델 등록을 담당한다.
+기존 moderation_flags/audit_logs는 보존하며 flags를 같은 ID/request_key의 reports로
+한 번 복사한다. 원래 검토 메타데이터는 legacy provenance JSON으로 보존하고 위반
+평가를 추정하지 않는다. 신규 데이터가 존재하면 downgrade는 손실 방지를 위해 거절한다.
+상세 이관·서비스 경계는 moderation/ARCHITECTURE.md를 따른다.

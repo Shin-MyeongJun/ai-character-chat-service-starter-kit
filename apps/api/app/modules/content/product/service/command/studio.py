@@ -1,0 +1,80 @@
+"""Owner-scoped studio document writes with optimistic concurrency."""
+
+import hashlib
+import json
+
+from app.db.transaction import use_case_transaction
+from app.db.idempotency import lock_key
+from app.modules.content.product import repository as Repository
+from app.modules.content.product import types as Types
+from app.modules.content.product.mapper import persistence as PersistenceMapper
+
+
+async def save_studio_draft(session, command: Types.SaveStudioDraftCommand) -> Types.StudioDraftInfo:
+    raw = json.dumps(command.document, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if len(raw) > 2 * 1024 * 1024 or command.document.get("version") != 2:
+        raise ValueError("Invalid or oversized studio document.")
+    if command.expected_revision is not None and command.expected_revision < 1:
+        raise ValueError("Invalid studio revision.")
+    work = command.document.get("work")
+    if not isinstance(work, dict):
+        raise ValueError("Studio work profile is required.")
+    title = work.get("title")
+    description = work.get("introduction")
+    visibility = {"비공개": "private", "링크 공개": "unlisted", "전체 공개": "public"}.get(work.get("visibility"))
+    if not isinstance(title, str) or not 1 <= len(title.strip()) <= 200 or not isinstance(description, str) or len(description) > 20000 or visibility is None:
+        raise ValueError("Invalid studio work profile.")
+    scenes = command.document.get("scenes")
+    if not isinstance(scenes, list):
+        raise ValueError("Studio scenes are required.")
+    default_scene = next((scene for scene in scenes if isinstance(scene, dict) and scene.get("id") == work.get("defaultSceneId")), None)
+    opening = default_scene.get("opening") if default_scene else None
+    if opening is not None and (not isinstance(opening, str) or len(opening) > 20000):
+        raise ValueError("Invalid studio opening.")
+    profile = Types.ProductProfileCommand(title=title, description=description or None, opening_message=opening, visibility=visibility)
+    digest = hashlib.sha256(raw).hexdigest()
+    async with use_case_transaction(session):
+        await lock_key(session, "product-studio-draft", str(command.product_id))
+        product_row = await Repository.get_product_for_update(session, command.product_id)
+        product = PersistenceMapper.product_entity_to_state_info(product_row)
+        if product is None:
+            if command.expected_revision is not None:
+                raise Types.StudioDraftConflictError("Studio product was removed.")
+            await Repository.create_product(session, command.owner_id, profile, product_id=command.product_id)
+        elif product.owner_id != command.owner_id:
+            raise LookupError("Product not found.")
+        existing = await Repository.get_studio_draft(session, command.product_id, lock=True)
+        if existing is not None and existing.content_digest == digest:
+            return PersistenceMapper.studio_draft_entity_to_info(existing)
+        if (existing.revision if existing else None) != command.expected_revision:
+            raise Types.StudioDraftConflictError("Studio draft changed on the server.")
+        if existing is not None and existing.publication_release:
+            raise Types.StudioDraftConflictError("Published studio work cannot be edited until follow-up releases are supported.")
+        if product is not None:
+            await Repository.update_product(session, command.product_id, command.owner_id, profile)
+        if "tags" in work:
+            from app.modules.content.product.service import tags as TagsCommandService
+            await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(command.product_id, command.owner_id, work["tags"]))
+        row = await Repository.save_studio_draft(
+            session, command.product_id,
+            (existing.revision + 1) if existing else 1,
+            digest, command.document, existing,
+        )
+        return PersistenceMapper.studio_draft_entity_to_info(row)
+
+
+async def mark_studio_publication(session, command: Types.MarkStudioPublicationCommand) -> Types.ReleaseInfo:
+    async with use_case_transaction(session):
+        product = await Repository.get_product_for_update(session, command.product_id)
+        if product is None or product.owner_id != command.owner_id:
+            raise LookupError("Product not found.")
+        row = await Repository.get_studio_draft(session, command.product_id, lock=True)
+        if row is None or row.content_digest != command.content_digest:
+            raise Types.StudioDraftConflictError("Studio draft changed before publication.")
+        release = command.release
+        await Repository.mark_studio_publication(session, row, command.content_digest, {
+            "snapshot_id": str(release.snapshot_id), "version": release.version,
+            "summary": release.summary, "body": release.body,
+            "change_kind": release.change_kind, "update_policy": release.update_policy,
+        })
+        return release

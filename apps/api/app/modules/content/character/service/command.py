@@ -48,7 +48,13 @@ async def create_character(
         _validate_character_profile(command)
         _validate_character_status(command.status)
         row = await Repository.create_character_command(session, command)
-        return PersistenceMapper.character_entity_to_info(row)
+        info = PersistenceMapper.character_entity_to_info(row)
+        if command.tags:
+            from app.modules.content.character.service import tags as TagsCommandService
+            await TagsCommandService.replace_public_tags(
+                session, Types.PublicTagsCommand(info.id, command.owner_id, command.tags)
+            )
+        return info
 
 
 async def update_character(

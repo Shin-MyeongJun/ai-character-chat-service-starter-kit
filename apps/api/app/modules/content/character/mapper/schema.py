@@ -16,6 +16,7 @@ class CharacterSchemaMapper:
         owner_id: UUID,
     ) -> Types.CreateCharacterCommand:
         return Types.CreateCharacterCommand(
+            tags=tuple(request.tags),
             owner_id=owner_id,
             name=request.name,
             persona_prompt=request.persona_prompt,

@@ -15,6 +15,7 @@ CharacterAssetTypeDto: TypeAlias = Literal["image", "audio", "video"]
 
 
 class CreateCharacterRequestDto(BaseModel):
+    tags: list[str] = Field(default_factory=list)
     name: str = Field(min_length=1)
     persona_prompt: str = Field(min_length=1)
     description: str | None = None

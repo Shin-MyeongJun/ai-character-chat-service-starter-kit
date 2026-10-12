@@ -7,11 +7,17 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from sqlalchemy import Select, func, select
+
+# This module owns these connections; dictionary data is read through tag service.
+from sqlalchemy import delete as tag_delete
+from sqlalchemy import select as tag_select
+from sqlalchemy.dialects.postgresql import insert as tag_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import lorebook as lorebook_models
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.snapshot.lorebook import LorebookSnapshot
+from app.db.models.tag import LorebookInternalTag, LorebookTag
 from app.db.pagination import fetch_cursor_page
 from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.types import (
@@ -455,5 +461,93 @@ async def list_lorebook_snapshots(session, snapshot_ids):
     return list(
         await session.scalars(
             select(LorebookSnapshot).where(LorebookSnapshot.id.in_(snapshot_ids))
+        )
+    )
+
+
+
+
+
+async def get_target_for_tag_access(session, target_id, *, lock=False):
+    stmt = tag_select(Lorebook).where(Lorebook.id == target_id)
+    if lock:
+        stmt = stmt.with_for_update()
+    return await session.scalar(stmt.execution_options(populate_existing=True))
+
+
+async def list_public_tag_links(session, target_id):
+    return list(
+        await session.scalars(
+            tag_select(LorebookTag)
+            .where(LorebookTag.lorebook_id == target_id)
+            .order_by(
+                LorebookTag.sort_order, LorebookTag.created_at, LorebookTag.tag_id
+            )
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
+async def list_internal_tag_links(session, target_id):
+    return list(
+        await session.scalars(
+            tag_select(LorebookInternalTag)
+            .where(LorebookInternalTag.lorebook_id == target_id)
+            .order_by(LorebookInternalTag.created_at, LorebookInternalTag.tag_id)
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
+async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
+    await session.execute(
+        tag_delete(LorebookTag).where(
+            LorebookTag.lorebook_id == target_id, LorebookTag.tag_id.not_in(tag_ids)
+        )
+    )
+    for order, tag_id in enumerate(tag_ids):
+        stmt = tag_insert(LorebookTag).values(
+            lorebook_id=target_id, tag_id=tag_id, sort_order=order, assigned_by=actor_id
+        )
+        await session.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[LorebookTag.lorebook_id, LorebookTag.tag_id],
+                set_={"sort_order": order},
+            )
+        )
+
+
+async def remove_public_tag_link(session, target_id, tag_id):
+    await session.execute(
+        tag_delete(LorebookTag).where(
+            LorebookTag.lorebook_id == target_id, LorebookTag.tag_id == tag_id
+        )
+    )
+
+
+async def remove_internal_tag_links(session, target_id, tag_ids):
+    await session.execute(
+        tag_delete(LorebookInternalTag).where(
+            LorebookInternalTag.lorebook_id == target_id,
+            LorebookInternalTag.tag_id.in_(tag_ids),
+        )
+    )
+
+
+async def set_internal_tag_link(session, target_id, tag_id, source, actor_id):
+    stmt = tag_insert(LorebookInternalTag).values(
+        lorebook_id=target_id, tag_id=tag_id, source=source, assigned_by=actor_id
+    )
+    values = {"source": source, "assigned_by": actor_id, "updated_at": func.now()}
+    await session.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[
+                LorebookInternalTag.lorebook_id,
+                LorebookInternalTag.tag_id,
+            ],
+            set_=values,
+            where=(LorebookInternalTag.source != "admin")
+            if source == "system"
+            else None,
         )
     )

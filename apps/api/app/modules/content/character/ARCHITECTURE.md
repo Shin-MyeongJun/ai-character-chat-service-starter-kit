@@ -2,6 +2,7 @@
 
 캐릭터 원본과 이미지·에셋 및 이들의 발행 스냅샷을 소유한다.
 
+- 태그 연결 소유 테이블: `character_tags`, `character_internal_tags`. 사전 `tags`는 content/tag 영역 소유이며 ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 sort_order·assigned_by, 내부 연결은 source(admin/system)·assigned_by·갱신 시각을 기록한다. 같은 태그 ID를 양쪽에서 사용할 수 있다. 대상 삭제는 연결만 CASCADE, 연결된 사전 삭제는 RESTRICT, 부여 사용자 삭제는 SET NULL이다. 개수 제한·태그 snapshot은 없고 기존 API 응답/발행 snapshot 구조를 유지하며 태그 전용 서비스가 인가·활성 상태·관리자 지정 보호 정책을 검사한다.
 - 소유 테이블: `characters`, `character_images`, `character_assets`, `character_snapshots`, `character_snapshot_images`, `character_snapshot_assets`, `character_media`.
 - `service/query.py`: 소유자별 조회, 프롬프트·프로모션 조회, 발행 소스 잠금, 스냅샷·미디어 참조 조회. 조회 요청은 Command, 결과는 Info 또는 명시적인 Info 페이지/목록이다.
 - `service/command.py`: 생성·수정·상태 변경·삭제·기본 이미지 선택·`freeze_character`. 쓰기는 `use_case_transaction`으로 조합하며 삭제 성공 시 None을 반환한다. 반복 삭제의 미존재는 기존 LookupError 계약을 유지한다.
@@ -42,3 +43,14 @@
 `service/workflow/media.py`의 CharacterMediaWorkflow는 하위 CharacterMediaService의 읽기 계약을 유지하며 업로드/정리 실행만 추가한다. 예약 commit → 캐릭터/예약 잠금 → 외부 저장 종료 대기 → ready commit, deleting commit → 잠금 → 외부 삭제 종료 대기 → deleted commit 순서다. workflow는 repository를 호출하지 않는다. 준비/완료 조건은 하위 service/media.py에 있으며 `_attach_character_media`도 그 위치를 유지하여 command가 workflow를 역호출하지 않는다.
 
 취소가 와도 `_settle_storage`는 실제 공급자 작업 종료까지 기다린 후 취소를 전달한다. 다른 업로드 재시도/GC/첨부가 미완료 외부 작업과 경쟁하도록 잠금을 조기 해제하지 않는다. 명시적 저장소 실패/모호한 DB commit/retention/deleting 재개 계약은 유지한다. main/HTTP/cleanup CLI는 CharacterMediaWorkflow를 사용하고 product 읽기는 하위 서비스의 읽기 계약을 사용한다.
+
+
+## 현재 태그 관리
+
+생성 Command/DTO의 선택 tags로 공개 태그를 생성 트랜잭션에 함께 연결한다. 미지정/빈 목록은 기존 생성 동작이다. 공개 태그 전용 API는 조회·추가·전체 교체/정렬·해제를 제공한다. 연결을 제거해도 사전 항목은 남는다. 태그 수정은 현재 연결에 즉시 반영하고 발행 snapshot에는 넣지 않는다.
+
+`service/tags.py`는 부모 잠금·인가·트랜잭션 및 사전 공개 service 호출을 소유한다. `mapper/tags.py`는 연결 Entity → 값, 사전 Info와의 조합만 담당한다. `mapper/tag_schema.py`는 HTTP 요청/응답 변환이다. 연결 SQL은 해당 모듈 repository에 있고 tags 테이블을 직접 읽거나 JOIN하지 않는다. 내부 쓰기는 admin/system 출처를 분리하고 관리자 source를 시스템이 덮어쓰거나 제거하지 못한다. 시스템 Command는 신뢰된 애플리케이션 호출 전용이며 HTTP에 노출하지 않는다. 관리자는 identity.require_admin으로 재검증한다. 공개 응답에는 내부 태그가 포함되지 않는다.
+
+공개 태그 HTTP는 기존 /me 콘텐츠 조회와 같은 소유자 정책이다. 일반 소유자 라우터와 관리자 내부 태그 라우터는 분리한다. 기존 생성·상세 응답의 구조는 바꾸지 않는다.
+
+API 경로·예제·검증은 [태그 관리](../../../../../../references_document/reference/content-tags.md)에 정리했다.

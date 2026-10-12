@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from sqlalchemy import Select, exists, func, select, update
+
+# This module owns these connections; dictionary data is read through tag service.
+from sqlalchemy import delete as tag_delete
+from sqlalchemy import select as tag_select
+from sqlalchemy.dialects.postgresql import insert as tag_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import character as character_models
@@ -21,6 +26,7 @@ from app.db.models.snapshot.character import (
     CharacterSnapshotAsset,
     CharacterSnapshotImage,
 )
+from app.db.models.tag import CharacterInternalTag, CharacterTag
 from app.db.pagination import fetch_cursor_page
 from app.modules.content.character import types as Types
 from app.modules.content.character.types import CharacterCursor
@@ -703,3 +709,94 @@ async def create_media_attachment(session, command, media_id, kind):
     await session.flush()
     await session.refresh(entity)
     return entity
+
+
+
+
+
+async def get_target_for_tag_access(session, target_id, *, lock=False):
+    stmt = tag_select(Character).where(Character.id == target_id)
+    if lock:
+        stmt = stmt.with_for_update()
+    return await session.scalar(stmt.execution_options(populate_existing=True))
+
+
+async def list_public_tag_links(session, target_id):
+    return list(
+        await session.scalars(
+            tag_select(CharacterTag)
+            .where(CharacterTag.character_id == target_id)
+            .order_by(
+                CharacterTag.sort_order, CharacterTag.created_at, CharacterTag.tag_id
+            )
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
+async def list_internal_tag_links(session, target_id):
+    return list(
+        await session.scalars(
+            tag_select(CharacterInternalTag)
+            .where(CharacterInternalTag.character_id == target_id)
+            .order_by(CharacterInternalTag.created_at, CharacterInternalTag.tag_id)
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
+async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
+    await session.execute(
+        tag_delete(CharacterTag).where(
+            CharacterTag.character_id == target_id, CharacterTag.tag_id.not_in(tag_ids)
+        )
+    )
+    for order, tag_id in enumerate(tag_ids):
+        stmt = tag_insert(CharacterTag).values(
+            character_id=target_id,
+            tag_id=tag_id,
+            sort_order=order,
+            assigned_by=actor_id,
+        )
+        await session.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[CharacterTag.character_id, CharacterTag.tag_id],
+                set_={"sort_order": order},
+            )
+        )
+
+
+async def remove_public_tag_link(session, target_id, tag_id):
+    await session.execute(
+        tag_delete(CharacterTag).where(
+            CharacterTag.character_id == target_id, CharacterTag.tag_id == tag_id
+        )
+    )
+
+
+async def remove_internal_tag_links(session, target_id, tag_ids):
+    await session.execute(
+        tag_delete(CharacterInternalTag).where(
+            CharacterInternalTag.character_id == target_id,
+            CharacterInternalTag.tag_id.in_(tag_ids),
+        )
+    )
+
+
+async def set_internal_tag_link(session, target_id, tag_id, source, actor_id):
+    stmt = tag_insert(CharacterInternalTag).values(
+        character_id=target_id, tag_id=tag_id, source=source, assigned_by=actor_id
+    )
+    values = {"source": source, "assigned_by": actor_id, "updated_at": func.now()}
+    await session.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[
+                CharacterInternalTag.character_id,
+                CharacterInternalTag.tag_id,
+            ],
+            set_=values,
+            where=(CharacterInternalTag.source != "admin")
+            if source == "system"
+            else None,
+        )
+    )

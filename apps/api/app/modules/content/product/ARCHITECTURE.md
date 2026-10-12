@@ -2,6 +2,12 @@
 
 ## 소유 데이터
 
+`product_tags`, `product_internal_tags`: 작품의 현재 공개/내부 태그 연결. 공통 사전 `tags`는 content/tag 영역이 소유한다. ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 표시 순서·부여 사용자, 내부 연결은 admin/system 출처·부여 사용자·갱신 시각을 기록한다. 양쪽에서 같은 사전 ID를 사용할 수 있고 연결은 작품·태그당 각 테이블에 한 행이다. 관리자 지정값은 시스템 쓰기/삭제에서 보호하며 DB만으로 인가를 보장하지 않는다.
+
+normalized_name·동의어 통합·개수 제한·태그 snapshot은 없다. 작품 삭제는 연결만 CASCADE하고 연결된 사전 항목 삭제는 RESTRICT한다. 부여 사용자 삭제는 assigned_by를 SET NULL하되 연결은 보존한다. 공개 태그는 작품의 현재 분류 정보로 사용하며 내부 태그는 운영/추천에 사용한다. 공개 태그 전용 API가 현재 연결을 조립하며 기존 콘텐츠 응답·목록·발행 snapshot 구조는 유지한다.
+
+`product_studio_drafts`: 상품별 스튜디오 편집 문서(JSONB), revision·digest, 최초 발행 digest·결과. 상품 삭제 시 함께 삭제된다.
+
 `products`, `product_characters`, `product_lorebooks`, `product_lorebook_characters`, `product_start_sets`; `product_snapshots`, `product_snapshot_characters`, `product_snapshot_lorebooks`, `product_snapshot_lorebook_characters`, `product_snapshot_start_sets`, `product_snapshot_policy_changes`; `product_release_notes`, `product_release_note_revisions`; `product_daily_stats`, `product_version_daily_stats`, `product_user_daily_activity`, `product_version_user_daily_activity`, `product_stats_dirty_days`.
 
 이름이 product로 시작해도 `product_generations`는 chat, `product_payment_events`는 billing 소유다. 통계의 도메인 간 사실 수집은 최상위 `app/use_cases/product_statistics.py`가 공개 service로 처리한다. product는 수집된 값만 받아 집계·저장하며 chat에 대한 역방향 의존성이 없다. 타 모듈 인가 JOIN 예외는 없다.
@@ -11,6 +17,7 @@
 - `service/command/__init__.py`: draft 생성·수정·삭제, identity 인가를 거친 관리자 정책 변경.
 - `service/command/composition.py`: 구성 검증·변경. 캐릭터·로어북 소유권과 잠금을 각 공개 서비스로 확인한다.
 - `service/command/settings.py`: 모델·시작 항목·대체 정책 설정. `_validate_*`는 같은 모듈의 발행에서 쓰는 내부 검증이다.
+- `service/command/studio.py`, `service/query/studio.py`, `repository/studio.py`: 소유권 확인 후 스튜디오 JSON 문서를 비교 갱신하거나 조회한다. revision 충돌은 409, 동일 문서 재전송은 같은 결과다. 최대 2 MiB다. 최초 발행 결과를 문서 digest와 함께 기록해 응답 유실 재호출을 중복 발행하지 않는다. 후속 발행 경로가 없는 동안 이미 발행한 문서의 변경은 409로 거절해 미발행 편집이 상품 공개 설정을 바꾸지 못하게 한다. 실제 교차 도메인 조합은 최상위 `use_cases/studio_publication.py`가 소유한다.
 - `service/command/publication.py`: 잠긴 소스의 발행 스냅샷 조합 및 digest. 상위 publish 유스케이스가 트랜잭션을 소유하며 character/lorebook freeze도 같은 범위에 참여한다.
 - `service/command/releases.py`: `publish_product`, `correct_note`; 내용·미디어 비교에 따른 업데이트 정책과 릴리스 노트 이력.
 - `service/command/statistics.py`: 수집된 사실의 집계·저장, 상위 트랜잭션의 작업 잠금·완료, 최근 날짜 재요청을 담당한다. 도메인 간 수집 및 배치 반복은 최상위 product_statistics 유스케이스로 이동했다.
@@ -42,3 +49,41 @@ statistics의 조회와 일부 command 모듈의 명시적 재노출은 이전 P
 통계는 `use_cases/product_statistics` → 각 도메인 facts → mapper/statistics → repository/statistics 순서로 읽는다. 환불은 원매출 귀속일, 활성 사용자는 기간 중복 제거, 금액은 통화별로 확인한다. 관련 테스트는 `test_product_*` 전반이며 파일별 계약은 전체 점검 안내에 연결했다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+공개 목록 `GET /products/catalog`은 승인된 public 발행본만 생성 시각·ID 내림차순으로 조회한다. 커서는 두 값을 함께 전달한다. 초안·비공개·링크 공개·최신 버전 만료 상품은 목록에 포함하지 않는다. 제목·설명·snapshot_id는 목록 조회 당시 최신 발행본에서 읽는다.
+
+
+## 사용자 영역별 reporting 조회 연결 (2026-10-15)
+
+기존 통계 저장·worker·get_statistics 계약은 유지한다.
+service/query/reporting.py에 get_owner_reporting_statistics,
+get_admin_reporting_statistics, get_recorded_service_statistics, get_statistics_queue를
+추가했다. repository/reporting.py는 product 소유 통계 테이블만 읽고
+mapper/reporting.py는 revenue를 제외한 집계·누락 날짜·dirty·갱신 범위를 변환한다.
+역방향으로 reporting 모듈을 import하지 않는다. 데이터 소유권/마이그레이션 변경은 없다.
+
+소유자 조회는 최신 활성 상태와 소유권, 관리자 조회는 최신 active admin과 작품 존재,
+공통 읽기는 snapshot의 작품 소속을 확인한다. 날짜는 서울 기준 포함 최대 731일이다.
+일별 active_users를 더하지 않고 activity에서 기간 DISTINCT를 조회한다. 전체 서비스
+조회도 작품 간 DISTINCT를 사용한다. parent 일별 집계 없는 날을 0으로 만들지 않고,
+parent 집계가 있는 무활동 버전만 0으로 표현한다. 누락/dirty가 있으면 확정 totals는 None이다.
+recorded_totals는 기록된 부분 합계이고 oldest/newest_updated_at은 포함한 행의 갱신 범위다.
+전체 registry의 과거 집계 완전성은 증명하지 않는다. 집계 없는 생성/발행 이전 날짜도
+보수적으로 missing 처리한다. 금액/신고/내부 태그/개인정보는 이 경계에서 반환하지 않는다.
+
+새 공개 조회는 no_autoflush에서 read만 수행한다. 기존 source 사실별 시간 기준은
+완료 생성 finished_at, 방 생성/버전 전환 created_at, usage.created_at이다. payments의
+attributed_at 매출은 새 reporting 반환에서 제외한다. 조회 간 일관된 스냅샷이 필요하면
+호출자가 읽기 전용 REPEATABLE READ를 제공한다. 큐 요청 시각은 재요청으로 갱신되므로
+min(requested_at)은 최초 적체 시각이 아니다.
+
+
+## 현재 태그 관리
+
+생성 Command/DTO의 선택 tags로 공개 태그를 생성 트랜잭션에 함께 연결한다. 미지정/빈 목록은 기존 생성 동작이다. 공개 태그 전용 API는 조회·추가·전체 교체/정렬·해제를 제공한다. 연결을 제거해도 사전 항목은 남는다. 태그 수정은 현재 연결에 즉시 반영하고 발행 snapshot에는 넣지 않는다.
+
+`service/tags.py`는 부모 잠금·인가·트랜잭션 및 사전 공개 service 호출을 소유한다. `mapper/tags.py`는 연결 Entity → 값, 사전 Info와의 조합만 담당한다. `mapper/tag_schema.py`는 HTTP 요청/응답 변환이다. 연결 SQL은 해당 모듈 repository에 있고 tags 테이블을 직접 읽거나 JOIN하지 않는다. 내부 쓰기는 admin/system 출처를 분리하고 관리자 source를 시스템이 덮어쓰거나 제거하지 못한다. 시스템 Command는 신뢰된 애플리케이션 호출 전용이며 HTTP에 노출하지 않는다. 관리자는 identity.require_admin으로 재검증한다. 공개 응답에는 내부 태그가 포함되지 않는다.
+
+공개 조회는 기존 get_accessible_product와 같은 소유자 또는 approved + 비private 정책을 따른다. 기존 ProductWriteRequestDto의 tags 생략/NULL은 수정 시 유지, []는 모두 해제다. 스튜디오 저장의 work.tags도 현재 연결에 반영하고 필드 생략 시 유지한다. 기존 생성·상세 응답의 구조는 바꾸지 않는다.
+
+API 경로·예제·검증은 [태그 관리](../../../../../../references_document/reference/content-tags.md)에 정리했다.

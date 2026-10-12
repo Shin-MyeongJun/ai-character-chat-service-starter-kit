@@ -52,6 +52,22 @@ async def list_products(
     return PersistenceMapper.products_entities_to_info(rows)
 
 
+async def list_catalog(session, command: Types.ListCatalogCommand) -> Types.CatalogPageInfo:
+    if not 1 <= command.limit <= 100 or (
+        (command.cursor_created_at is None) != (command.cursor_id is None)
+    ) or (
+        command.cursor_created_at is not None
+        and command.cursor_created_at.utcoffset() is None
+    ):
+        raise ValueError("Invalid catalog cursor or limit.")
+    rows = await Repository.list_catalog(
+        session, limit=command.limit,
+        cursor_created_at=command.cursor_created_at,
+        cursor_id=command.cursor_id,
+    )
+    return PersistenceMapper.catalog_entities_to_page_info(rows, command.limit)
+
+
 async def ensure_snapshot_available(
     session, command: Types.ProductSnapshotCommand, *, now=None
 ) -> Types.ProductSnapshotInfo:

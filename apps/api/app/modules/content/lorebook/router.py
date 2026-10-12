@@ -20,6 +20,7 @@ from app.modules.content.lorebook.mapper.schema import (
 )
 from app.modules.content.lorebook.service import command as CommandService
 from app.modules.content.lorebook.service import query as QueryService
+from app.modules.content.lorebook.tag_router import router as TagsRouter
 
 router = APIRouter(prefix="/lorebooks", tags=["lorebooks"])
 SessionDependency = Annotated[AsyncSession, Depends(get_lorebook_session)]
@@ -199,3 +200,6 @@ async def delete_lorebook_entry(
     with _service_errors():
         await CommandService.delete_lorebook_entry(session, value)
     return SchemaMapper.delete_entry_result_to_response(None)
+
+
+router.include_router(TagsRouter)

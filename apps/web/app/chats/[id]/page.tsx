@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUp, RotateCcw, Sparkles } from "lucide-react";
-import { ApiError, createMessage, generateAnswer, getConversationStart, getMe, listMessages, type ChatMessage, type ConversationStart } from "@/lib/api";
+import { ApiError, createMessage, generateAnswer, getConversationStart, getCreditBalance, getMe, listConversationMessages, type ChatMessage, type ConversationStart, type CreditBalance } from "@/lib/api";
 import { demoWorkById, isDemoWork } from "@/lib/works";
 import { SiteHeader } from "@/components/site-header";
 import { updateRecentChatMessage } from "@/lib/recent-chats";
@@ -15,8 +15,11 @@ type Pending = { ownerId: string; content: string; messageKey: string; answerKey
 function errorText(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 401) return "로그인이 만료되었어요. 다시 로그인한 뒤 대화를 확인해 주세요.";
+    if (cause.code === "csrf_failed") return "요청 인증을 갱신하지 못했어요. 저장된 요청으로 다시 시도해 주세요.";
     if (cause.status === 402) return "이용 가능한 크레딧이 부족해요.";
+    if (cause.code === "credit_account_unavailable") return "크레딧 지갑을 사용할 수 없어요. 계정 상태를 확인해 주세요.";
     if (cause.code === "billing_not_configured") return "이 작품의 가격 설정이 준비되지 않았어요.";
+    if (cause.code === "billing_conflict") return "가격 또는 결제 상태가 바뀌었어요. 같은 요청으로 결과를 다시 확인해 주세요.";
     if (cause.code === "storage_pending_recovery") return "답변 저장을 확인 중이에요. 같은 요청으로 다시 확인할 수 있습니다.";
     if (cause.code === "summary_required") return "긴 대화를 정리하는 중이에요. 잠시 후 다시 시도해 주세요.";
     if (cause.status === 429) return "요청이 많아요. 잠시 후 다시 시도해 주세요.";
@@ -44,22 +47,30 @@ function ChatContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [balance, setBalance] = useState<CreditBalance | null>(null);
+  const [balanceUnavailable, setBalanceUnavailable] = useState(false);
+  const [answerPrice, setAnswerPrice] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const answerController = useRef<AbortController | null>(null);
+  const running = useRef(false);
 
-  const pendingKey = `moseori_pending_${id}`;
-  const draftKey = `moseori_draft_${id}`;
+  const pendingKey = (userId: string) => `moseori_pending_${userId}_${id}`;
+  const draftKey = demo ? `moseori_draft_${id}` : ownerId ? `moseori_draft_${ownerId}_${id}` : null;
 
   const refreshMessages = useCallback(async () => {
-    const page = await listMessages(id);
-    setMessages([...page.items].sort((a, b) => a.position - b.position));
-    const latest = [...page.items].sort((a, b) => b.position - a.position)[0];
-    if (latest) updateRecentChatMessage(id, latest.content);
-    if (page.next_cursor) setNotice("이전 대화 일부가 목록 밖에 있어요. 긴 대화 페이지 이동은 다음 단계에서 연결합니다.");
-  }, [id]);
+    const items = await listConversationMessages(id);
+    setMessages(items);
+    const latest = items.at(-1);
+    if (latest) updateRecentChatMessage(id, latest.content, ownerId);
+  }, [id, ownerId]);
+
+  useEffect(() => {
+    setDraft(draftKey ? localStorage.getItem(draftKey) ?? "" : "");
+  }, [draftKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setDraft(localStorage.getItem(draftKey) ?? "");
+    setLoading(true); setMessages([]); setStart(null); setOwnerId(null); setPending(null); setError(null); setNotice(null); setAnswerPrice(null); setBalance(null); setBalanceUnavailable(false);
     if (demo) {
       try {
         const saved = JSON.parse(localStorage.getItem(`moseori_demo_${id}`) ?? "[]") as DisplayMessage[];
@@ -70,24 +81,38 @@ function ChatContent() {
       return;
     }
     let active = true;
-    Promise.all([getMe(), getConversationStart(id), listMessages(id)]).then(([user, opening, page]) => {
+    getMe().then(async (user) => {
+      const [opening, items] = await Promise.all([getConversationStart(id), listConversationMessages(id)]);
       if (!active) return;
-      setOwnerId(user.id); setStart(opening); setMessages([...page.items].sort((a, b) => a.position - b.position));
-      const latest = [...page.items].sort((a, b) => b.position - a.position)[0];
-      if (latest) updateRecentChatMessage(id, latest.content);
-      if (page.next_cursor) setNotice("최근 메시지만 표시 중입니다. 이전 메시지 페이지는 다음 단계에 연결합니다.");
-      try { const stored = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null") as Pending | null; if (stored?.ownerId === user.id) setPending(stored); }
-      catch { sessionStorage.removeItem(pendingKey); }
+      void getCreditBalance().then(value => { if (active) { setBalance(value); setBalanceUnavailable(false); } }).catch(() => { if (active) setBalanceUnavailable(true); });
+      setOwnerId(user.id); setStart(opening); setMessages(items);
+      const latest = items.at(-1);
+      if (latest) updateRecentChatMessage(id, latest.content, user.id);
+      const key = `moseori_pending_${user.id}_${id}`;
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(key) ?? sessionStorage.getItem(`moseori_pending_${id}`) ?? "null") as Pending | null;
+        if (stored?.ownerId === user.id) setPending(stored);
+      } catch { sessionStorage.removeItem(key); }
     }).catch((cause) => { if (active) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [demo, draftKey, id, pendingKey]);
+  }, [demo, id]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, busy]);
 
-  function setDraftValue(value: string) { setDraft(value); localStorage.setItem(draftKey, value); }
-  function savePending(value: Pending | null) { setPending(value); if (value) sessionStorage.setItem(pendingKey, JSON.stringify(value)); else sessionStorage.removeItem(pendingKey); }
+  function setDraftValue(value: string) { setDraft(value); if (draftKey) localStorage.setItem(draftKey, value); }
+  function savePending(value: Pending | null) {
+    setPending(value);
+    if (value) sessionStorage.setItem(pendingKey(value.ownerId), JSON.stringify(value));
+    else if (ownerId) sessionStorage.removeItem(pendingKey(ownerId));
+    // The legacy value has been migrated only after checking its owner.
+    sessionStorage.removeItem(`moseori_pending_${id}`);
+  }
 
   async function continuePending(value: Pending) {
+    if (running.current) return;
+    running.current = true;
+    const controller = new AbortController();
+    answerController.current = controller;
     setBusy(true); setError(null); setNotice(null);
     try {
       let message = value.message;
@@ -98,10 +123,13 @@ function ChatContent() {
         await refreshMessages();
       }
       for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (controller.signal.aborted) { setNotice("대기만 중단했어요. 저장된 요청으로 결과를 다시 확인할 수 있어요."); return; }
         try {
-          const answer = await generateAnswer(id, message, value.participant, value.answerKey);
+          const answer = await generateAnswer(id, message, value.participant, value.answerKey, controller.signal);
+          if (typeof answer.price_credit === "number") setAnswerPrice(answer.price_credit);
           if (answer.status === "pending") { await new Promise((resolve) => setTimeout(resolve, 3000)); continue; }
           await refreshMessages();
+          void getCreditBalance().then(value => { setBalance(value); setBalanceUnavailable(false); }).catch(() => setBalanceUnavailable(true));
           if (answer.status !== "succeeded") {
             if (answer.retryable) savePending({ ...value, answerKey: crypto.randomUUID(), retryFailed: true });
             else savePending(null);
@@ -112,13 +140,16 @@ function ChatContent() {
           return;
         } catch (cause) {
           if (cause instanceof ApiError && cause.code === "storage_pending_recovery") { await new Promise((resolve) => setTimeout(resolve, 3000)); continue; }
-          if (cause instanceof ApiError && ![401, 402, 429].includes(cause.status) && cause.status < 500) { savePending(null); await refreshMessages(); }
+          if (cause instanceof ApiError && ![401, 402, 429].includes(cause.status) && cause.code !== "csrf_failed" && cause.status < 500) { savePending(null); await refreshMessages(); }
           throw cause;
         }
       }
       setNotice("답변을 계속 처리 중이에요. 같은 요청으로 다시 확인해 주세요.");
-    } catch (cause) { setError(errorText(cause)); }
-    finally { setBusy(false); }
+    } catch (cause) {
+      if (controller.signal.aborted) setNotice("대기만 중단했어요. 저장된 요청으로 결과를 다시 확인할 수 있어요.");
+      else setError(errorText(cause));
+    }
+    finally { answerController.current = null; running.current = false; setBusy(false); }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -146,19 +177,19 @@ function ChatContent() {
   const hasOpening = Boolean(opening?.trim());
 
   return <div className="chat-layout"><SiteHeader />
-    <main className="chat-main"><header className="chat-header"><Link href="/chats" className="icon-button" aria-label="내 대화로 돌아가기"><ArrowLeft size={21} /></Link><div><strong>{title}</strong><small>{demo ? "화면 시연 · 실제 AI 아님" : "연결된 대화"}</small></div><span className="chat-header-star">✳</span></header>
+    <main id="user-content" tabIndex={-1} className="chat-main"><header className="chat-header"><Link href="/chats" className="icon-button" aria-label="내 대화로 돌아가기"><ArrowLeft size={21} /></Link><div><strong>{title}</strong><small>{demo ? "화면 시연 · 실제 AI 아님" : "연결된 대화"}</small></div><span className="chat-header-star">✳</span></header>
       <div className="chat-scroll"><div className="chat-content">
         {loading && <div className="loading-panel">대화를 불러오는 중...</div>}
         {!loading && <><div className="chat-welcome"><span className="welcome-symbol">✳</span><span className="section-kicker">A STORY BEGINS</span><h1>{demo ? demo.title : start?.start?.title ?? "당신의 이야기"}</h1><p>{demo ? "이 화면의 대화는 시연용입니다. 실제 AI 답변은 생성되지 않습니다." : "대화가 시작되었습니다. 첫 문장을 보내보세요."}</p></div>
           {hasOpening && <div className="opening-card"><span>첫 장면</span><p>{opening}</p></div>}
           {messages.map((message) => <div key={message.id} className={`message-row ${message.sender_type === "user" ? "user" : "character"}`}><div className="message-avatar">{message.sender_type === "user" ? "나" : "✳"}</div><div className="message-body"><span className="message-name">{message.sender_type === "user" ? "나" : demo?.title ?? "캐릭터"}</span><div className="message-text">{message.content}</div></div></div>)}
-          {busy && <div className="thinking-row"><span>✳</span><div><strong>이야기를 이어가고 있어요</strong><div className="thinking-dots"><i /><i /><i /></div></div></div>}
+          {busy && <div className="thinking-row"><span>✳</span><div><strong>이야기를 이어가고 있어요</strong><div className="thinking-dots"><i /><i /><i /></div></div><button type="button" onClick={() => answerController.current?.abort()}>대기 중단</button></div>}
           {notice && <div className="chat-notice" role="status">{notice}</div>}
           {error && <div className="chat-error" role="alert"><span>{error}</span>{!demo && error.includes("로그인") && <Link href={`/login?next=${encodeURIComponent(`/chats/${id}`)}`}>로그인</Link>}</div>}
           {pending && !busy && <button className="resume-button" type="button" onClick={() => continuePending(pending)}><RotateCcw size={16} /> {pending.retryFailed ? "저장된 메시지로 답변 다시 시도하기" : "같은 요청으로 결과 확인하기"}</button>}
         </>}
         <div ref={bottomRef} /></div></div>
-      <div className="composer-wrap"><form className="composer" onSubmit={submit}><textarea aria-label="메시지 입력" placeholder={loading ? "대화를 불러오는 중..." : "당신의 다음 장면을 적어보세요..."} value={draft} disabled={loading || busy || !!pending || !!error && !demo && !start} onChange={(event) => setDraftValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={2} /><div className="composer-bottom"><span><Sparkles size={14} /> {demo ? "시연 대화" : "실제 답변은 크레딧을 사용할 수 있어요"}</span><button type="submit" disabled={loading || busy || !!pending || !draft.trim()} aria-label="메시지 보내기"><ArrowUp size={20} /></button></div></form><p className="composer-hint">Enter로 전송 · Shift+Enter로 줄바꿈</p></div>
+      <div className="composer-wrap"><form className="composer" onSubmit={submit}><textarea aria-label="메시지 입력" placeholder={loading ? "대화를 불러오는 중..." : "당신의 다음 장면을 적어보세요..."} value={draft} disabled={loading || busy || !!pending || !!error && !demo && !start} onChange={(event) => setDraftValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={2} /><div className="composer-bottom"><span><Sparkles size={14} /> {demo ? "시연 대화" : balance ? `사용 가능 ${balance.available_credit.toLocaleString("ko-KR")} 크레딧` : balanceUnavailable ? "크레딧 잔액 확인 불가" : "크레딧 잔액 확인 중"}</span><button type="submit" disabled={loading || busy || !!pending || !draft.trim()} aria-label="메시지 보내기"><ArrowUp size={20} /></button></div></form><p className="composer-hint">Enter로 전송 · Shift+Enter로 줄바꿈{answerPrice !== null ? ` · 최근 답변 예약 가격 ${answerPrice.toLocaleString("ko-KR")} 크레딧` : " · 가격은 답변 요청 시 서버가 계산합니다."}</p></div>
     </main>
   </div>;
 }

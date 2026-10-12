@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update
 
-from app.db.models.chat import Message, MessageRequest
+from app.db.models.chat import Conversation, Message, MessageRequest
 from app.db.models.product_usage import ProductGeneration
 
 
@@ -50,6 +50,18 @@ async def list_messages(session, conversation_id, after, limit):
             .execution_options(populate_existing=True)
         )
     )
+
+
+async def list_latest_message_previews(session, user_id, conversation_ids):
+    if not conversation_ids:
+        return []
+    return list(await session.execute(
+        select(Message.conversation_id, Message.content)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Conversation.user_id == user_id, Message.conversation_id.in_(conversation_ids))
+        .distinct(Message.conversation_id)
+        .order_by(Message.conversation_id, Message.position.desc())
+    ))
 
 
 async def list_message_range(session, conversation_id, after, through, limit):
@@ -284,3 +296,17 @@ async def get_statistics_facts(session, product_id, start, end):
         )
     )
     return generations, users
+
+
+async def get_account_generation_statistics(session, user_id, start, end):
+    """사용자의 생성 예약 시각 범위 안에서 현재 상태별 건수를 DB에서 집계한다."""
+    g = ProductGeneration
+    return list(
+        (
+            await session.execute(
+                select(g.status, func.count(g.id))
+                .where(g.user_id == user_id, g.created_at >= start, g.created_at < end)
+                .group_by(g.status)
+            )
+        ).all()
+    )

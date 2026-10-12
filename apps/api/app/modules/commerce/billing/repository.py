@@ -201,3 +201,18 @@ async def create_credit_binding(
     session.add(entity)
     await session.flush()
     return entity
+
+
+async def get_account_usage_statistics(session, user_id, start, end):
+    """사용자 스코프의 저장된 usage만 생성 시각 [start,end)로 합산한다."""
+    u = UsageLog
+    return (
+        await session.execute(
+            select(
+                func.count(u.id),
+                func.coalesce(func.sum(u.input_tokens), 0),
+                func.coalesce(func.sum(u.output_tokens), 0),
+                func.coalesce(func.sum(u.cost_credit), 0),
+            ).where(u.user_id == user_id, u.created_at >= start, u.created_at < end)
+        )
+    ).one()

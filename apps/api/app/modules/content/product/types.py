@@ -38,6 +38,64 @@ class ProductPaginationCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class ListCatalogCommand:
+    limit: int = 30
+    cursor_created_at: datetime | None = None
+    cursor_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogProductInfo:
+    id: UUID
+    title: str
+    description: str | None
+    snapshot_id: UUID
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogPageInfo:
+    items: tuple[CatalogProductInfo, ...]
+    next_cursor_created_at: datetime | None = None
+    next_cursor_id: UUID | None = None
+
+
+class StudioDraftConflictError(Exception):
+    """The server draft changed since the client last read it."""
+
+
+@dataclass(frozen=True, slots=True)
+class GetStudioDraftCommand:
+    product_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class SaveStudioDraftCommand(GetStudioDraftCommand):
+    expected_revision: int | None
+    document: dict
+
+
+@dataclass(frozen=True, slots=True)
+class StudioDraftInfo:
+    product_id: UUID
+    revision: int
+    document: dict
+    updated_at: datetime
+    content_digest: str = ""
+    publication_digest: str | None = None
+    publication_release: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MarkStudioPublicationCommand:
+    product_id: UUID
+    owner_id: UUID
+    content_digest: str
+    release: ReleaseInfo
+
+
+@dataclass(frozen=True, slots=True)
 class ProductStatisticsRangeCommand:
     date_from: date
     date_to: date
@@ -354,6 +412,7 @@ class StatisticsWorkInfo:
 class CreateProductCommand:
     owner_id: UUID
     value: ProductProfileCommand
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -361,6 +420,7 @@ class UpdateProductCommand:
     product_id: UUID
     owner_id: UUID
     value: ProductProfileCommand
+    tags: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -385,7 +445,7 @@ class GetCompositionCommand:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PublishedProductCommand:
     product_id: UUID
-    user_id: UUID
+    user_id: UUID | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -423,7 +483,7 @@ class ListProductsCommand:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GetAccessibleProductCommand:
     product_id: UUID
-    user_id: UUID
+    user_id: UUID | None
     lock: bool = False
 
 
@@ -525,3 +585,103 @@ class ReplaceStatisticsDayCommand:
     transitions: list[tuple]
     usage: list[tuple]
     payments: list[tuple]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetReportingStatisticsCommand:
+    actor_id: UUID
+    product_id: UUID
+    date_from: date
+    date_to: date
+    snapshot_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GetServiceReportingStatisticsCommand:
+    actor_id: UUID
+    date_from: date
+    date_to: date
+
+
+@dataclass(frozen=True, slots=True)
+class GetStatisticsQueueCommand:
+    actor_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ReportingMetricsInfo:
+    active_users: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    stale: int
+    messages: int
+    conversations: int
+    transitions: int
+    input_tokens: int
+    output_tokens: int
+    cost_credit: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReportingDayInfo:
+    day: date
+    metrics: ReportingMetricsInfo | None
+    updated_at: datetime | None
+    state: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReportingStatisticsInfo:
+    product_id: UUID
+    snapshot_id: UUID | None
+    date_from: date
+    date_to: date
+    recorded_totals: ReportingMetricsInfo | None
+    totals: ReportingMetricsInfo | None
+    days: tuple[ReportingDayInfo, ...]
+    missing_days: tuple[date, ...]
+    pending_days: tuple[date, ...]
+    oldest_updated_at: datetime | None
+    newest_updated_at: datetime | None
+    state: str
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceReportingStatisticsInfo:
+    recorded_totals: ReportingMetricsInfo | None
+    product_days: int
+    products_with_rows: int
+    oldest_updated_at: datetime | None
+    newest_updated_at: datetime | None
+    pending_product_days: int
+    oldest_pending_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class StatisticsQueueInfo:
+    pending_product_days: int
+    oldest_requested_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class PublicTagsCommand:
+    target_id: UUID
+    user_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InternalTagsCommand:
+    target_id: UUID
+    actor_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SystemTagsCommand:
+    target_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None

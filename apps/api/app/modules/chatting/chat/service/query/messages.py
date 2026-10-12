@@ -34,6 +34,17 @@ async def list_messages(
     )
 
 
+async def list_conversation_previews(
+    session, command: Types.ListConversationPreviewsCommand
+) -> dict:
+    if len(command.conversation_ids) > 100:
+        raise ValueError("Too many conversation previews.")
+    rows = await Repository.list_latest_message_previews(
+        session, command.user_id, command.conversation_ids
+    )
+    return PersistenceMapper.conversation_preview_rows_to_info(rows)
+
+
 async def list_memory_source(
     session, command: Types.ListMemorySourceCommand
 ) -> Types.MemorySourceInfo:

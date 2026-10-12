@@ -21,6 +21,7 @@ from app.modules.content.character.mapper.schema import (
 )
 from app.modules.content.character.service import command as CommandService
 from app.modules.content.character.service import query as QueryService
+from app.modules.content.character.tag_router import router as TagsRouter
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 SessionDependency = Annotated[AsyncSession, Depends(get_character_session)]
@@ -190,3 +191,6 @@ async def delete_character_asset(
     with _service_errors():
         await CommandService.delete_character_asset(session, value)
     return SchemaMapper.delete_character_asset_result_to_response(None)
+
+
+router.include_router(TagsRouter)

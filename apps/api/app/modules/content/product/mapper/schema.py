@@ -7,6 +7,14 @@ class ProductSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
+    def catalog_page_info_to_response(result: Types.CatalogPageInfo) -> Schemas.CatalogPageResponseDto:
+        return Schemas.CatalogPageResponseDto.model_validate(result)
+
+    @staticmethod
+    def studio_draft_info_to_response(result: Types.StudioDraftInfo) -> Schemas.StudioDraftResponseDto:
+        return Schemas.StudioDraftResponseDto.model_validate(result)
+
+    @staticmethod
     def product_list_request_to_command(
         request: Schemas.ListProductsRequestDto,
     ) -> Types.ProductPaginationCommand:

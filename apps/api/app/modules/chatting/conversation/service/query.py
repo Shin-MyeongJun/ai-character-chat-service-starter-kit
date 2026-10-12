@@ -20,6 +20,23 @@ async def get_owned_conversation(
     return info
 
 
+async def list_owned_conversations(
+    session, command: Types.ListOwnedConversationsCommand
+) -> Types.ConversationListPageInfo:
+    if not 1 <= command.limit <= 100 or (
+        (command.cursor_created_at is None) != (command.cursor_id is None)
+    ) or (
+        command.cursor_created_at is not None
+        and command.cursor_created_at.utcoffset() is None
+    ):
+        raise ValueError("Invalid conversation cursor or limit.")
+    rows = await Repository.list_owned_conversations(
+        session, command.user_id, limit=command.limit,
+        cursor_created_at=command.cursor_created_at, cursor_id=command.cursor_id,
+    )
+    return PersistenceMapper.conversations_entities_to_page_info(rows, command.limit)
+
+
 async def get_statistics_facts(
     session, command: Types.GetStatisticsFactsCommand
 ) -> Types.ConversationStatisticsInfo:

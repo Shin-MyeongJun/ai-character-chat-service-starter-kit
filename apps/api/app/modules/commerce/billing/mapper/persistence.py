@@ -52,3 +52,9 @@ def billing_statistics_rows_to_info(rows) -> Types.BillingStatisticsInfo:
 
 def usage_entity_to_info(entity) -> Types.UsageRecordedInfo:
     return Types.UsageRecordedInfo(entity.id)
+
+
+
+def account_usage_statistics_row_to_info(row) -> Types.AccountUsageStatisticsInfo:
+    """저장된 사용량 합계와 행 수를 변환한다. 잔액·환불·공급자 비용은 계산하지 않는다."""
+    return Types.AccountUsageStatisticsInfo(*(int(value) for value in row))

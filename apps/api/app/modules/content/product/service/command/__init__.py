@@ -32,7 +32,11 @@ async def create_product(
     validate_profile(value)
     async with use_case_transaction(session):
         row = await Repository.create_product(session, owner_id, value)
-        return product_entity_to_info(row)
+        info = product_entity_to_info(row)
+        if command.tags:
+            from app.modules.content.product.service import tags as TagsCommandService
+            await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(info.id, owner_id, command.tags))
+        return info
 
 
 async def update_product(
@@ -47,7 +51,11 @@ async def update_product(
             session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
         )
         row = await Repository.update_product(session, product_id, owner_id, value)
-        return product_entity_to_info(row)
+        info = product_entity_to_info(row)
+        if command.tags is not None:
+            from app.modules.content.product.service import tags as TagsCommandService
+            await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(info.id, owner_id, command.tags))
+        return info
 
 
 async def delete_product(

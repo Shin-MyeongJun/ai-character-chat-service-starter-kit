@@ -160,3 +160,14 @@ billing router는 추가/등록하지 않는다. 기존 HTTP 과금 오류 변�
 
 [현재 생성 연결 계약과 검증](../../../../../../docs/billing-generation-integration.md)이 위 과거
 “외부 연결 미구현” 기록을 대체한다. 소유 테이블/원장/지갑 정책 변경과 migration은 없다.
+
+
+## 본인 reporting 사용량 조회 (2026-10-15)
+
+get_account_usage_statistics(GetAccountUsageStatisticsCommand)는 최신 활성 사용자 확인 후
+UsageLog.user_id 및 created_at [start,end)로 SQL 스코핑해 행 수·입출력 토큰·저장된
+cost_credit 합계만 반환한다. 최대 731일 timezone-aware 범위다. no_autoflush 조회이며
+지갑 생성·잔액 변경·견적/예약 쓰기를 하지 않는다. 행이 없으면 recorded 사용량이 0이고
+전체 공급자 사용량이 0이었다고 해석하지 않는다. 생성 예약 날짜와 usage 기록 날짜가
+다를 수 있으며 legacy 포함 저장 값만 제공한다. 재화는 현 billing의 CREDIT 청구 단위다.
+실제 현금 매출·환불 후 순소비·요약/임베딩/실패 호출 비용과 구분한다.

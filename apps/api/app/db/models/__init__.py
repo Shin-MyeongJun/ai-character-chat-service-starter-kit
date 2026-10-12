@@ -20,6 +20,12 @@ from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.memory import ConversationMemory, MemoryJob
 from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
+from app.db.models.moderation_review import (
+    ModerationAction,
+    ModerationAssessment,
+    ModerationAssessmentReport,
+    ModerationReport,
+)
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
 from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision
 from app.db.models.product_statistics import (
@@ -37,6 +43,15 @@ from app.db.models.snapshot import (
     ProductSnapshotCharacter,
     ProductSnapshotLorebook,
 )
+from app.db.models.tag import (
+    CharacterInternalTag,
+    CharacterTag,
+    LorebookInternalTag,
+    LorebookTag,
+    ProductInternalTag,
+    ProductTag,
+    Tag,
+)
 
 __all__ = [
     "AuditLog",
@@ -45,8 +60,10 @@ __all__ = [
     "Character",
     "CharacterAsset",
     "CharacterImage",
+    "CharacterInternalTag",
     "CharacterMedia",
     "CharacterSnapshot",
+    "CharacterTag",
     "Conversation",
     "ConversationCharacter",
     "ConversationMemory",
@@ -55,17 +72,24 @@ __all__ = [
     "CreditTransaction",
     "Lorebook",
     "LorebookEntry",
+    "LorebookInternalTag",
     "LorebookSnapshot",
+    "LorebookTag",
     "MemoryJob",
     "Message",
     "MessageRequest",
     "Model",
+    "ModerationAction",
+    "ModerationAssessment",
+    "ModerationAssessmentReport",
     "ModerationFlag",
+    "ModerationReport",
     "Payment",
     "Product",
     "ProductCharacter",
     "ProductDailyStats",
     "ProductGeneration",
+    "ProductInternalTag",
     "ProductLorebook",
     "ProductPaymentEvent",
     "ProductReleaseNote",
@@ -74,11 +98,13 @@ __all__ = [
     "ProductSnapshotCharacter",
     "ProductSnapshotLorebook",
     "ProductStatsDirtyDay",
+    "ProductTag",
     "ProductUserDailyActivity",
     "ProductVersionDailyStats",
     "ProductVersionUserDailyActivity",
     "Provider",
     "SubscriptionPlan",
+    "Tag",
     "UsageLog",
     "User",
     "UserOAuthAccount",

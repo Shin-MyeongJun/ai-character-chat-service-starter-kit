@@ -17,8 +17,9 @@ from app.db.models.identity import (
 )
 
 
-async def get_user(session: AsyncSession, user_id: UUID) -> User | None:
-    return await session.get(User, user_id)
+async def get_user(session: AsyncSession, user_id: UUID, *, refresh=False) -> User | None:
+    """사용자를 조회하고 인가 재검증 시 세션 캐시를 최신 DB 값으로 갱신한다."""
+    return await session.get(User, user_id, populate_existing=refresh)
 
 
 async def lock_identity(session, key: str) -> None:

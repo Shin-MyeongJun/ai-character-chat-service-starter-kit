@@ -10,6 +10,7 @@ export type Work = {
   symbol: string;
   popularity: string;
   badge?: string;
+  coverImage?: string;
   opening: string;
   startOptions: { id: string; title: string; preview: string }[];
 };
@@ -17,6 +18,7 @@ export type Work = {
 export const demoWorks: Work[] = [
   {
     id: "demo-archive",
+    coverImage: "/images/stories/archive.png",
     title: "밤의 기록 보관소",
     subtitle: "사라진 기억을 보관하는 도서관에서 당신 앞으로 온 편지 한 통.",
     genre: "미스터리",
@@ -36,6 +38,7 @@ export const demoWorks: Work[] = [
   },
   {
     id: "demo-bluehour",
+    coverImage: "/images/stories/bluehour.png",
     title: "푸른 시간의 역",
     subtitle: "막차가 떠난 플랫폼에서 다시 만난 오래된 친구.",
     genre: "로맨스",
@@ -51,6 +54,7 @@ export const demoWorks: Work[] = [
   },
   {
     id: "demo-garden",
+    coverImage: "/images/stories/garden.png",
     title: "유리 온실의 계약",
     subtitle: "꽃이 사람의 비밀을 기억한다는 도시의 작은 온실.",
     genre: "판타지",
@@ -67,6 +71,7 @@ export const demoWorks: Work[] = [
   },
   {
     id: "demo-radio",
+    coverImage: "/images/stories/radio.png",
     title: "새벽 2시 라디오",
     subtitle: "전파가 닿지 않는 곳에서 들려온 당신만의 방송.",
     genre: "일상",

@@ -12,6 +12,7 @@ class LorebookSchemaMapper:
         owner_id: UUID,
     ) -> Types.CreateLorebookCommand:
         return Types.CreateLorebookCommand(
+            tags=tuple(request.tags),
             owner_id=owner_id,
             title=request.title,
             description=request.description,

@@ -123,7 +123,13 @@ async def create_lorebook(
         _validate_lorebook_profile(command)
         _validate_lorebook_status(command.status)
         row = await Repository.create_lorebook_command(session, command)
-        return PersistenceMapper.lorebook_entity_to_info(row)
+        info = PersistenceMapper.lorebook_entity_to_info(row)
+        if command.tags:
+            from app.modules.content.lorebook.service import tags as TagsCommandService
+            await TagsCommandService.replace_public_tags(
+                session, Types.PublicTagsCommand(info.id, command.owner_id, command.tags)
+            )
+        return info
 
 
 async def update_lorebook(

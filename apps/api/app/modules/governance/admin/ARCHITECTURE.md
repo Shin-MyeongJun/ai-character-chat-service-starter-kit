@@ -19,3 +19,10 @@
 일반 authenticate 주입은 character/lorebook 전용 관리자 가드를 자동 구현하지 않는다. 빈 router.py는 별도 등록 API가 아니다. 관련 테스트: `test_content_actor_routes`, `test_product_boundaries`, `test_product_expiry`, `test_architecture_contracts`.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+
+## 태그 관리
+
+`tag_router.py`는 /admin/tags 사전 생성·단건 조회·수정·비활성화와 /admin/{products|characters|lorebooks}/{id}/internal-tags 조회·추가·전체 교체·해제를 제공한다. 공통 세션과 검증된 owner 인증 훅을 재사용하며 콘텐츠/tag 공개 서비스가 identity.require_admin으로 최신 DB 역할·활성 상태를 재검증한다. 기존 미연결 character/lorebook 관리자 훅을 우회해 관리자라고 가정하지 않는다. source와 assigned_by는 요청 본문에서 받지 않는다. mapper/tags.py는 공개 Info만 DTO로 변환한다. SQL/콘텐츠 repository/ORM은 참조하지 않는다.
+
+API 및 예제: [태그 관리](../../../../../../references_document/reference/content-tags.md).

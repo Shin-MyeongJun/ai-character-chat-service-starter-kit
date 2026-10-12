@@ -1,0 +1,18 @@
+{
+  "user_id": "0de46f9f-5e2a-4e7b-9a86-1e6046714364",
+  "product_id": "219bb761-5b38-4f70-ae6a-75f783d9c832",
+  "model_id": "738ba281-763c-5e58-8d91-bac939360c7a",
+  "revision": 2,
+  "characters": 15,
+  "lore_entries": 37,
+  "scenes": 16,
+  "real_model_id": "8e061ffc-b91a-598b-adb3-9af83a76a6ba",
+  "real_release": {
+    "snapshot_id": "e1de73e7-71da-4567-b06e-fc79c77f8eda",
+    "version": 2,
+    "summary": "\uc2e4\uc81c gpt-4o-mini \ucc44\ud305 \uac80\uc99d",
+    "body": "\ube44\uc131\uc801 CHARX \ubcc0\ud658 \uc124\uc815\uc744 \uadf8\ub300\ub85c \ubcf4\uc874\ud558\uace0 \uc2e4\ud589 \ubaa8\ub378\uc744 OpenAI gpt-4o-mini\ub85c \ubcc0\uacbd\ud55c \ub85c\uceec \ud14c\uc2a4\ud2b8 \ubc84\uc804.",
+    "change_kind": "content",
+    "update_policy": "choice"
+  }
+}

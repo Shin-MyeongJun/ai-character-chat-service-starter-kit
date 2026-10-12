@@ -43,6 +43,7 @@ class CreateLorebookCommand:
     description: str | None = None
     visibility: LorebookVisibilityValue = "private"
     status: LorebookStatusValue = "draft"
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,3 +296,26 @@ ENTRY_METADATA_MAX_BYTES = 16_384
 
 POSTGRES_INTEGER_MIN = -(2**31)
 POSTGRES_INTEGER_MAX = 2**31 - 1
+
+
+@dataclass(frozen=True, slots=True)
+class PublicTagsCommand:
+    target_id: UUID
+    user_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InternalTagsCommand:
+    target_id: UUID
+    actor_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SystemTagsCommand:
+    target_id: UUID
+    names: tuple[str, ...] = ()
+    tag_id: UUID | None = None

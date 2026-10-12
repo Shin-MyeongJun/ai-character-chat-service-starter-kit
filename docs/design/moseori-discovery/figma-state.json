@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-12",
+  "fileKey": "7qPZlWp2GdMcrGgFbLSgVw",
+  "fileUrl": "https://www.figma.com/design/7qPZlWp2GdMcrGgFbLSgVw",
+  "status": "blocked_by_figma_starter_mcp_quota",
+  "canvasStatus": "Four raster cover assets uploaded; no UI frames or components created",
+  "assets": [
+    {
+      "success": true,
+      "imageHash": "314ee1b35ddd7d95d85271cb7c52062ee642eaec",
+      "sizeBytes": 2547908,
+      "contentType": "image/png",
+      "placedOnNodeId": "2:4"
+    },
+    {
+      "success": true,
+      "imageHash": "c98a1e6ab33181da15f3a67a53a008fd46809ea0",
+      "sizeBytes": 2298471,
+      "contentType": "image/png",
+      "placedOnNodeId": "2:5"
+    },
+    {
+      "success": true,
+      "imageHash": "667e5654cacd18c0fde1e6b1edc025664faa3c64",
+      "sizeBytes": 3009107,
+      "contentType": "image/png",
+      "placedOnNodeId": "2:3"
+    },
+    {
+      "success": true,
+      "imageHash": "45e3f5794cc5fd7bcbe6a6d504e193a9ebc0598a",
+      "sizeBytes": 2224525,
+      "contentType": "image/png",
+      "placedOnNodeId": "2:2"
+    }
+  ],
+  "localDeliverables": [
+    "preview.html",
+    "manifest.json",
+    "plugin.js",
+    "plugin-ui.html",
+    "README.md"
+  ],
+  "nativeFigmaExecutionVerified": false
+}

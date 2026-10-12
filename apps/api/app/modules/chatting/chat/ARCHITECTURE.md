@@ -94,6 +94,17 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 - `mapper/prompt.py`: MessageInfo → prompt 자체 PromptMessageInfo 순수 변환. prompt는 chat 타입/서비스를 참조하지 않는다.
 - command/query는 workflow를 호출하지 않는다. workflow는 구체적인 chat command/query 파일을 호출하며 repository를 직접 사용하지 않는다. `main`/`memory_worker`는 의존성과 반복 실행만 조립한다.
 
-답변의 요청 키·실행권·lease·staging·stale/cancelled·가격·사용량·기억 예약 계약은 기존 과금 구현 그대로다. 답변 HTTP 경로와 DTO 필드·상태 코드도 유지한다. 별도 answer 모듈이나 기존 use_cases 재노출은 없다.
+답변의 요청 키·실행권·lease·staging·stale/cancelled·가격·사용량·기억 예약 계약은 기존 과금 구현 그대로다. 답변 HTTP 경로와 상태 코드를 유지하고, 응답 DTO에 선택적 `price_credit`를 추가해 기록된 예약 견적 금액을 보여준다. 별도 answer 모듈이나 기존 use_cases 재노출은 없다.
 
 새 대화의 고정 첫 대사는 conversation 시작 조회에서 받고 prompt의 고정 assistant 문맥으로 전달한다. 메시지 목록이나 요약 원문에는 들어가지 않는다. legacy_messages 대화의 기존 첫 메시지는 이력으로 보존하며 snapshot 첫 대사를 추가하지 않는다. 기존 이력 요약 의미를 소급 변경하거나 기존 기억을 일괄 재작성하지 않는다.
+`list_conversation_previews`는 소유 대화 목록 페이지에 대해 마지막 메시지 문구만 조회한다. chat repository의 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 상위 `use_cases/conversation_directory.py`가 두 모듈의 공개 결과를 조합한다.
+
+
+## 본인 reporting 사실 조회 (2026-10-15)
+
+get_account_generation_statistics(GetAccountGenerationStatisticsCommand)는 identity의
+최신 활성 사용자 확인 후 자기 소유 ProductGeneration을 user_id 및 created_at [start,end)로
+SQL 스코핑해 현재 상태별 건수를 제공한다. 최대 731일 timezone-aware 범위이며
+pending도 포함한다. 기존 작품 통계의 finished_at 완료 코호트와 기간 기준이 다르다.
+repository/mapper/types에 최소 연산을 추가했고 메시지·metadata·다른 사용자·모델 내부
+정보는 반환하지 않는다. 읽기 중 autoflush를 금지하며 생성 쓰기나 회복은 수행하지 않는다.

@@ -366,6 +366,57 @@ async def test_signup_to_first_answer_and_completed_replay(first_chat):
     chat.embedding.assert_not_awaited()
 
 
+async def test_studio_draft_to_first_answer_with_mock_provider(first_answer_app):
+    env = first_answer_app
+    async with AsyncClient(transport=ASGITransport(app=env.app), base_url="https://testserver") as client:
+        user = await signup_and_login(client, env.mailer)
+        async with env.app.state.session_factory() as session, session.begin():
+            await fund_credit(session, UUID(user["id"]), 20)
+        pid = str(uuid4())
+        project = {
+            "version": 2, "clientWorkId": "browser-work",
+            "work": {"title": "스튜디오 이야기", "introduction": "첫 작품", "tags": [],
+                     "worldRules": "독자의 선택을 기다린다.", "visibility": "비공개", "defaultSceneId": "first"},
+            "characters": [{"id": "hero", "name": "길잡이", "role": "안내자", "introduction": "친절한 안내자",
+                            "persona": "친절하게 대답한다.", "dialogue": "반가워요.", "relationships": "", "tags": [], "assets": []}],
+            "lorebooks": [],
+            "scenes": [{"id": "first", "title": "첫 만남", "background": "광장에 도착한다.",
+                        "opening": "어서 와요.", "characterId": "hero", "placeId": "", "initialNotes": "",
+                        "language": "한국어", "storyTime": "아침", "perspective": "2인칭", "variants": ""}],
+        }
+        draft_path = f"/products/{pid}/studio-draft"
+        draft = await request(client, "PUT", draft_path, json={"expected_revision": None, "document": project})
+        assert draft["revision"] == 1
+        assert (await request(client, "PUT", draft_path, json={"expected_revision": None, "document": project}))["revision"] == 1
+        async with AsyncClient(transport=ASGITransport(app=env.app), base_url="https://testserver", cookies=client.cookies) as second:
+            assert pid in {row["id"] for row in await request(second, "GET", "/products/mine")}
+            assert (await request(second, "GET", draft_path))["document"] == project
+        assert env.model_id in {row["id"] for row in await request(client, "GET", "/models/available")}
+        release_path = f"/products/{pid}/studio-publication"
+        publication = {"expected_revision": 1, "model_id": env.model_id, "reasoning_effort": "low",
+                       "summary": "첫 발행", "body": "첫 장면을 공개합니다."}
+        release = await request(client, "POST", release_path, json=publication)
+        assert (await request(client, "POST", release_path, json=publication))["snapshot_id"] == release["snapshot_id"]
+        assert pid not in {row["id"] for row in (await request(client, "GET", "/products/catalog"))["items"]}
+        published = await request(client, "GET", f"/products/{pid}")
+        conversation = await request(client, "POST", "/conversations", 201, json={
+            "product_id": pid, "start_set_id": published["start_options"][0]["id"],
+        })
+        cid = conversation["id"]
+        assert cid in {row["id"] for row in (await request(client, "GET", "/conversations/mine"))["items"]}
+        start = await request(client, "GET", f"/conversations/{cid}/start")
+        assert start["opening_message"] == "어서 와요."
+        message = await request(client, "POST", f"/conversations/{cid}/messages", 201,
+                                json={"request_key": "studio-input", "content": "어디로 갈까요?"})
+        answer = await request(client, "POST", f"/conversations/{cid}/answers", json={
+            "request_key": "studio-answer", "input_message_id": message["id"],
+            "expected_revision": message["revision"],
+            "product_character_id": start["primary_product_character_id"],
+        })
+        assert answer["status"] == "succeeded" and answer["price_credit"] == 10
+        assert (await request(client, "GET", "/account/credits"))["available_credit"] == 10
+
+
 @pytest.mark.parametrize(
     "field", ["input_message_id", "expected_revision", "product_character_id"]
 )

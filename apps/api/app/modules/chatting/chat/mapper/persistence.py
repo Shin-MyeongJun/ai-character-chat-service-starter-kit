@@ -34,6 +34,10 @@ def messages_entities_to_page_info(
     return Types.MessagePageInfo(items, cursor)
 
 
+def conversation_preview_rows_to_info(rows) -> dict:
+    return {conversation_id: content for conversation_id, content in rows}
+
+
 def messages_entities_to_memory_source_info(entities, limit) -> Types.MemorySourceInfo:
     return Types.MemorySourceInfo(
         messages=tuple(
@@ -97,5 +101,19 @@ def generation_entity_to_state_info(
         **{
             key: getattr(entity, key)
             for key in Types.GenerationStateInfo.__dataclass_fields__
+        }
+    )
+
+
+
+def account_generation_statistics_rows_to_info(
+    rows,
+) -> Types.AccountGenerationStatisticsInfo:
+    """상태별 집계 행을 본인 생성 건수로 변환하고 실제 미기록 상태는 0건으로 표현한다."""
+    counts = dict(rows)
+    return Types.AccountGenerationStatisticsInfo(
+        **{
+            name: int(counts.get(name, 0))
+            for name in ("pending", "succeeded", "failed", "cancelled", "stale")
         }
     )

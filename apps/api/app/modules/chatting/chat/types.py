@@ -99,6 +99,12 @@ class MessagePageInfo:
     next_cursor: MessageCursor | None
 
 
+@dataclass(frozen=True, slots=True)
+class ListConversationPreviewsCommand:
+    user_id: UUID
+    conversation_ids: tuple[UUID, ...]
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ListMemorySourceCommand:
     conversation_id: UUID
@@ -260,6 +266,7 @@ class AnswerInfo:
     error_code: str | None
     retryable: bool
     uncertain: bool
+    price_credit: int | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -329,3 +336,19 @@ class ProcessMemoryWorkCommand:
     work: MemoryTypes.MemoryWorkInfo
     policy: MemoryTypes.MemoryPolicy
     models: MemoryTypes.MemoryModelConfig
+
+
+@dataclass(frozen=True, slots=True)
+class GetAccountGenerationStatisticsCommand:
+    user_id: UUID
+    start: datetime
+    end: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AccountGenerationStatisticsInfo:
+    pending: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    stale: int
