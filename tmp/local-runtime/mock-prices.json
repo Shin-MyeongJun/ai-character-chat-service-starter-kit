@@ -1,0 +1,47 @@
+{
+  "price_book": {
+    "version": "local-mock-v1",
+    "currency": "TEST",
+    "credits_per_currency_unit": "1",
+    "safety_factor": "1",
+    "models": [
+      {
+        "execution": {
+          "model_id": "738ba281-763c-5e58-8d91-bac939360c7a",
+          "provider": "mock",
+          "model": "mock-hogwarts",
+          "reasoning_effort": "none"
+        },
+        "input_cost_per_token": "0",
+        "output_cost_per_token": "0",
+        "tiers": [
+          {
+            "tier_id": "local-test",
+            "min_context_tokens": 0,
+            "max_context_tokens_exclusive": 524288,
+            "normal_price_credit": "10"
+          }
+        ]
+      },
+      {
+        "execution": {
+          "model_id": "8e061ffc-b91a-598b-adb3-9af83a76a6ba",
+          "provider": "openai",
+          "model": "gpt-4o-mini",
+          "reasoning_effort": "none"
+        },
+        "input_cost_per_token": "0.00000015",
+        "output_cost_per_token": "0.00000060",
+        "tiers": [
+          {
+            "tier_id": "local-real-test",
+            "min_context_tokens": 0,
+            "max_context_tokens_exclusive": 128000,
+            "normal_price_credit": "10"
+          }
+        ]
+      }
+    ]
+  },
+  "quote_ttl_seconds": 60
+}

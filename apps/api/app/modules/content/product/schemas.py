@@ -24,6 +24,32 @@ class ListProductsRequestDto(RequestDto):
     limit: int = Field(default=50, ge=1, le=100)
 
 
+class CatalogItemResponseDto(ResponseDto):
+    id: UUID
+    title: str
+    description: str | None
+    snapshot_id: UUID
+    created_at: datetime
+
+
+class CatalogPageResponseDto(ResponseDto):
+    items: list[CatalogItemResponseDto]
+    next_cursor_created_at: datetime | None = None
+    next_cursor_id: UUID | None = None
+
+
+class SaveStudioDraftRequestDto(RequestDto):
+    expected_revision: int | None = Field(default=None, ge=1)
+    document: dict
+
+
+class StudioDraftResponseDto(ResponseDto):
+    product_id: UUID
+    revision: int
+    document: dict
+    updated_at: datetime
+
+
 class ProductStatisticsRequestDto(RequestDto):
     date_from: date
     date_to: date

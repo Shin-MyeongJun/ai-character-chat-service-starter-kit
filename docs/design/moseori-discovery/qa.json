@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-12",
+  "previewChecks": [
+    {
+      "imagesMissing": 0,
+      "textOverflow": 0,
+      "view": "Desktop Light · 성인 확인"
+    },
+    {
+      "imagesMissing": 0,
+      "textOverflow": 0,
+      "view": "Mobile Light · 성인 확인"
+    },
+    {
+      "imagesMissing": 0,
+      "textOverflow": 0,
+      "view": "Components Light · 성인 확인"
+    },
+    {
+      "imagesMissing": 0,
+      "textOverflow": 0,
+      "view": "States Light · 성인 확인"
+    },
+    {
+      "imagesMissing": 0,
+      "textOverflow": 0,
+      "view": "Handoff notes · 성인 확인"
+    }
+  ],
+  "minorFilterCount": 0,
+  "unknownAgeFilterCount": 0,
+  "contrast": {
+    "Light": {
+      "primary": 14.48,
+      "secondary": 5.23,
+      "button": 5.13,
+      "accent": 4.96
+    },
+    "Dark": {
+      "primary": 16.47,
+      "secondary": 8.58,
+      "button": 7.44,
+      "accent": 9.33
+    }
+  },
+  "nativeFigmaExecuted": false,
+  "blocker": "Figma MCP Starter tool call quota reached"
+}

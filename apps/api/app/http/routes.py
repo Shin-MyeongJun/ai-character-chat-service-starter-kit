@@ -3,6 +3,11 @@
 from fastapi import APIRouter
 
 from app.http.media import router as MediaRouter
+from app.http.conversation_directory import router as ConversationDirectoryRouter
+from app.http.public_catalog import router as PublicCatalogRouter
+from app.http.model_catalog import router as ModelCatalogRouter
+from app.http.studio_publication import router as StudioPublicationRouter
+from app.http.account_credits import router as AccountCreditsRouter
 from app.modules.chatting.chat.router import router as MessagesRouter
 from app.modules.chatting.conversation.router import router as Router1
 from app.modules.content.character.router import router as Router3
@@ -19,6 +24,11 @@ from app.modules.governance.moderation.lorebook_router import router as Router12
 
 router = APIRouter()
 router.include_router(MediaRouter)
+router.include_router(ConversationDirectoryRouter)
+router.include_router(PublicCatalogRouter)
+router.include_router(ModelCatalogRouter)
+router.include_router(StudioPublicationRouter)
+router.include_router(AccountCreditsRouter)
 
 router.include_router(Router1)
 

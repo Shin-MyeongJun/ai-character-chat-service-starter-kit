@@ -38,6 +38,64 @@ class ProductPaginationCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class ListCatalogCommand:
+    limit: int = 30
+    cursor_created_at: datetime | None = None
+    cursor_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogProductInfo:
+    id: UUID
+    title: str
+    description: str | None
+    snapshot_id: UUID
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogPageInfo:
+    items: tuple[CatalogProductInfo, ...]
+    next_cursor_created_at: datetime | None = None
+    next_cursor_id: UUID | None = None
+
+
+class StudioDraftConflictError(Exception):
+    """The server draft changed since the client last read it."""
+
+
+@dataclass(frozen=True, slots=True)
+class GetStudioDraftCommand:
+    product_id: UUID
+    owner_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class SaveStudioDraftCommand(GetStudioDraftCommand):
+    expected_revision: int | None
+    document: dict
+
+
+@dataclass(frozen=True, slots=True)
+class StudioDraftInfo:
+    product_id: UUID
+    revision: int
+    document: dict
+    updated_at: datetime
+    content_digest: str = ""
+    publication_digest: str | None = None
+    publication_release: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MarkStudioPublicationCommand:
+    product_id: UUID
+    owner_id: UUID
+    content_digest: str
+    release: ReleaseInfo
+
+
+@dataclass(frozen=True, slots=True)
 class ProductStatisticsRangeCommand:
     date_from: date
     date_to: date
@@ -385,7 +443,7 @@ class GetCompositionCommand:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PublishedProductCommand:
     product_id: UUID
-    user_id: UUID
+    user_id: UUID | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -423,7 +481,7 @@ class ListProductsCommand:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GetAccessibleProductCommand:
     product_id: UUID
-    user_id: UUID
+    user_id: UUID | None
     lock: bool = False
 
 

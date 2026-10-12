@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update
 
-from app.db.models.chat import Message, MessageRequest
+from app.db.models.chat import Conversation, Message, MessageRequest
 from app.db.models.product_usage import ProductGeneration
 
 
@@ -50,6 +50,18 @@ async def list_messages(session, conversation_id, after, limit):
             .execution_options(populate_existing=True)
         )
     )
+
+
+async def list_latest_message_previews(session, user_id, conversation_ids):
+    if not conversation_ids:
+        return []
+    return list(await session.execute(
+        select(Message.conversation_id, Message.content)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Conversation.user_id == user_id, Message.conversation_id.in_(conversation_ids))
+        .distinct(Message.conversation_id)
+        .order_by(Message.conversation_id, Message.position.desc())
+    ))
 
 
 async def list_message_range(session, conversation_id, after, through, limit):

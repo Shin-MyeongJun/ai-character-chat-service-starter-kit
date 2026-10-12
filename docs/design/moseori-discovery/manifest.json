@@ -1,0 +1,10 @@
+{
+  "name": "모서리 · 발견 화면 시안 가져오기",
+  "id": "moseori-discovery-design-import",
+  "api": "1.0.0",
+  "main": "plugin.js",
+  "ui": "plugin-ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["none"] }
+}

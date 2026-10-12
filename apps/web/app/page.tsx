@@ -5,25 +5,31 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ChevronRight, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { WorkCard, WorkCover } from "@/components/work-card";
-import { ApiError, getPublishedWork, type PublishedWork } from "@/lib/api";
+import { ApiError, getPublishedWork, listCatalog, type PublishedWork } from "@/lib/api";
 import { demoWorks } from "@/lib/works";
 
 const featuredIds = (process.env.NEXT_PUBLIC_FEATURED_PRODUCT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
 
 export default function Home() {
-  const [liveWorks, setLiveWorks] = useState<PublishedWork[]>([]);
+  const [liveWorks, setLiveWorks] = useState<{ id: string; title: string }[]>([]);
   const [liveError, setLiveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!featuredIds.length) return;
-    Promise.allSettled(featuredIds.map(getPublishedWork)).then((results) => {
-      const found = results.filter((item): item is PromiseFulfilledResult<PublishedWork> => item.status === "fulfilled").map((item) => item.value);
-      setLiveWorks(found);
+    let active = true;
+    void listCatalog().then(page => {
+      if (active) setLiveWorks(current => [...new Map([...current, ...page.items].map(item => [item.id, { id: item.id, title: item.title }])).values()]);
+    }).catch(() => { if (active) setLiveError("공개 작품을 불러오지 못했어요."); });
+    if (!featuredIds.length) return () => { active = false; };
+    void Promise.allSettled(featuredIds.map(getPublishedWork)).then((results) => {
+      if (!active) return;
+      const found = results.filter((item): item is PromiseFulfilledResult<PublishedWork> => item.status === "fulfilled").map((item) => ({ id: item.value.product_id, title: item.value.title }));
+      setLiveWorks(current => [...new Map([...found, ...current].map(item => [item.id, item])).values()]);
       if (results.some((item) => item.status === "rejected")) {
         const first = results.find((item): item is PromiseRejectedResult => item.status === "rejected");
         setLiveError(first?.reason instanceof ApiError && first.reason.status === 401 ? "로그인하면 연결된 작품을 볼 수 있어요." : "일부 연결된 작품을 불러오지 못했어요.");
       }
     });
+    return () => { active = false; };
   }, []);
 
   const lead = demoWorks[0];
@@ -49,6 +55,6 @@ export default function Home() {
     </section>
     <section className="quote-band"><div className="page-container quote-inner"><span className="quote-icon">✳</span><p>새로운 세계의 문은<br /><strong>언제나 첫 문장부터</strong> 열립니다.</p><Link href="/explore">이야기 찾아보기 <ArrowRight size={18} /></Link></div></section>
     <section className="page-container discovery-section"><div className="section-heading"><div><span className="section-kicker">MORE TO EXPLORE</span><h2>이런 이야기는 어때요?</h2></div></div><div className="work-grid compact-grid">{demoWorks.slice(2).map((work) => <WorkCard key={work.id} work={work} />)}</div></section>
-    {featuredIds.length > 0 && <section className="page-container live-section"><div className="section-heading"><div><span className="section-kicker">CONNECTED TO YOUR API</span><h2>연결된 작품</h2></div></div>{liveError && <p className="inline-notice">{liveError} <Link href="/login">로그인하기</Link></p>}<div className="live-list">{liveWorks.map((work) => <Link key={work.product_id} href={`/works/${work.product_id}`}><span>{work.title}</span><ArrowRight size={18} /></Link>)}</div></section>}
+    {(liveWorks.length > 0 || liveError) && <section className="page-container live-section"><div className="section-heading"><div><span className="section-kicker">CONNECTED TO YOUR API</span><h2>연결된 작품</h2></div></div>{liveError && <p className="inline-notice">{liveError} <Link href="/explore">작품 둘러보기</Link></p>}<div className="live-list">{liveWorks.map((work) => <Link key={work.id} href={`/works/${work.id}`}><span>{work.title}</span><ArrowRight size={18} /></Link>)}</div></section>}
   </main><footer className="site-footer"><div className="page-container"><span>✳ 모서리</span><p>이야기가 시작되는 곳 · 프런트 프로토타입</p></div></footer></>;
 }

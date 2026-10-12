@@ -29,6 +29,8 @@ def test_openapi_contract_is_unchanged():
     # 신규 인증 API만 추가를 허용하고 기존 경로·스키마 계약은 그대로 비교한다.
     actual = app.openapi()
     assert set(actual["paths"]) - set(baseline["paths"]) == {
+        "/products/catalog",
+        "/products/{product_id}/studio-draft",
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
         "/auth/csrf",
@@ -295,6 +297,13 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
     )
     actual = app.openapi()
     assert set(actual["paths"]) - set(baseline["paths"]) == {
+        "/products/catalog",
+        "/products/{product_id}/studio-draft",
+        "/conversations/mine",
+        "/products/catalog/{product_id}",
+        "/models/available",
+        "/products/{product_id}/studio-publication",
+        "/account/credits",
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
         "/characters/{character_id}/media/uploads",

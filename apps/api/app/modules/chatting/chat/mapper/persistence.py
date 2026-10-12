@@ -34,6 +34,10 @@ def messages_entities_to_page_info(
     return Types.MessagePageInfo(items, cursor)
 
 
+def conversation_preview_rows_to_info(rows) -> dict:
+    return {conversation_id: content for conversation_id, content in rows}
+
+
 def messages_entities_to_memory_source_info(entities, limit) -> Types.MemorySourceInfo:
     return Types.MemorySourceInfo(
         messages=tuple(

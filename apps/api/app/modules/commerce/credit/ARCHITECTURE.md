@@ -15,7 +15,7 @@ credit은 재화별 무료/유료 보유·예약·사용 가능량, 지갑 준�
 - `types.py`: 불변 Command/Info, bucket/status enum, 업무 오류. ORM 노출 없음.
 
 쓰기와 조회는 변경 이유가 달라 분리했다. 각각의 밀접한 기능은 한 파일에 유지한다.
-빈 기존 service.py는 service 디렉터리로 대체했다. HTTP 계층은 만들지 않는다.
+빈 기존 service.py는 service 디렉터리로 대체했다. 모듈 내부 HTTP 계층은 만들지 않는다. 최상위 `app/http/account_credits.py`가 billing의 공개 잔액 조회 서비스를 인증된 사용자에게 읽기 전용으로 연결한다.
 
 ## 소유 테이블
 

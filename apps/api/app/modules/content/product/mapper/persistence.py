@@ -19,6 +19,36 @@ def product_entity_to_info(entity):
     )
 
 
+def catalog_entities_to_page_info(rows, limit) -> Types.CatalogPageInfo:
+    selected = rows[:limit]
+    items = tuple(
+        Types.CatalogProductInfo(
+            id=product.id,
+            title=snapshot.snapshot_data["product"]["title"],
+            description=snapshot.snapshot_data["product"].get("description"),
+            snapshot_id=snapshot.id, created_at=product.created_at,
+        ) for product, snapshot in selected
+    )
+    last = selected[-1][0] if len(rows) > limit else None
+    return Types.CatalogPageInfo(
+        items=items,
+        next_cursor_created_at=last.created_at if last else None,
+        next_cursor_id=last.id if last else None,
+    )
+
+
+def studio_draft_entity_to_info(entity) -> Types.StudioDraftInfo | None:
+    if entity is None:
+        return None
+    return Types.StudioDraftInfo(
+        product_id=entity.product_id, revision=entity.revision,
+        document=deepcopy(entity.document), updated_at=entity.updated_at,
+        content_digest=entity.content_digest,
+        publication_digest=entity.publication_digest,
+        publication_release=deepcopy(entity.publication_release),
+    )
+
+
 def statistics_values_to_metrics_info(values: dict) -> StatisticsMetricsInfo:
     return StatisticsMetricsInfo(
         **{

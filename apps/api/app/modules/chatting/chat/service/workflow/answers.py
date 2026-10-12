@@ -738,6 +738,8 @@ def _failure(
 
 def _answer_info(run):
     metadata = run.answer_metadata or {}
+    billing = metadata.get("billing")
+    price_credit = billing.get("reserved_credit") if isinstance(billing, dict) else None
     return Types.AnswerInfo(
         run.id,
         run.status,
@@ -746,6 +748,7 @@ def _answer_info(run):
         "stale" if run.status == "stale" else metadata.get("error_code"),
         metadata.get("retryable", False),
         metadata.get("uncertain", False),
+        price_credit if isinstance(price_credit, int) and price_credit >= 0 else None,
     )
 
 

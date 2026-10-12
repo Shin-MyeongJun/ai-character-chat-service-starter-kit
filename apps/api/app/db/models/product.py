@@ -91,6 +91,20 @@ class Product(TimestampMixin, UuidPkMixin, Base):
     latest_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
 
+class ProductStudioDraft(TimestampMixin, Base):
+    __tablename__ = "product_studio_drafts"
+    __table_args__ = (CheckConstraint("revision > 0", name="ck_product_studio_drafts_revision"),)
+
+    product_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), primary_key=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_digest: Mapped[str] = mapped_column(Text, nullable=False)
+    document: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    publication_digest: Mapped[str | None] = mapped_column(Text)
+    publication_release: Mapped[dict | None] = mapped_column(JSONB)
+
+
 class ProductCharacter(UuidPkMixin, Base):
     __tablename__ = "product_characters"
     __table_args__ = (

@@ -1,9 +1,10 @@
 # 상품 목록은 owner 필터와 created_at/id 내림차순 offset 페이지다.
 # get_owned_product(lock=True)는 FOR UPDATE, get_product(lock=True)는 공유 잠금 FOR SHARE다.
 from dataclasses import asdict
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product import (
@@ -24,6 +25,24 @@ async def list_owned(session: AsyncSession, owner_id: UUID, *, offset=0, limit=5
             .limit(limit)
         )
     )
+
+
+async def list_catalog(session: AsyncSession, *, limit, cursor_created_at=None, cursor_id=None):
+    stmt = select(Product, ProductSnapshot).join(
+        ProductSnapshot, Product.latest_snapshot_id == ProductSnapshot.id
+    ).where(
+        Product.status == "approved",
+        Product.visibility == "public",
+        or_(ProductSnapshot.expires_at.is_(None), ProductSnapshot.expires_at > datetime.now(UTC)),
+    )
+    if cursor_created_at is not None:
+        stmt = stmt.where(or_(
+            Product.created_at < cursor_created_at,
+            and_(Product.created_at == cursor_created_at, Product.id < cursor_id),
+        ))
+    return list((await session.execute(
+        stmt.order_by(Product.created_at.desc(), Product.id.desc()).limit(limit + 1)
+    )).all())
 
 
 async def save_product(session: AsyncSession, entity):
@@ -49,9 +68,15 @@ async def get_product(session: AsyncSession, product_id: UUID, *, lock=False):
     return await session.scalar(stmt)
 
 
-async def create_product(session: AsyncSession, owner_id: UUID, value):
+async def get_product_for_update(session: AsyncSession, product_id: UUID):
+    return await session.scalar(
+        select(Product).where(Product.id == product_id).with_for_update().execution_options(populate_existing=True)
+    )
+
+
+async def create_product(session: AsyncSession, owner_id: UUID, value, *, product_id=None):
     return await save_product(
-        session, Product(owner_id=owner_id, status="draft", **asdict(value))
+        session, Product(**({"id": product_id} if product_id is not None else {}), owner_id=owner_id, status="draft", **asdict(value))
     )
 
 

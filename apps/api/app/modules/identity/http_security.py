@@ -118,11 +118,13 @@ def error_response(error, request):
     if error.code == "rate_limited":
         response.headers["Retry-After"] = "900"
     service = getattr(request.app.state, "authentication", None)
-    if service is not None and error.code in {
-        "invalid_token",
-        "invalid_session",
-        "refresh_reused",
-    }:
+    # An expired/missing access token must not erase the refresh cookie.
+    # Do not emit cookie deletion here: a concurrent successful refresh may
+    # already have installed new cookies before this 401 reaches the browser.
+    if service is not None and (
+        error.code in {"invalid_session", "refresh_reused"}
+        or (error.code == "invalid_token" and request.url.path == "/auth/refresh")
+    ):
         clear_session_cookies(response, service.settings)
     if service is not None and request.url.path == "/auth/google/callback":
         delete_cookie(response, service.settings, "flow")

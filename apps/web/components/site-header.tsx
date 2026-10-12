@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Compass, House, Menu, MessageCircle, PanelLeftClose, PanelLeftOpen, PencilLine, Search, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RecentConversations } from "@/components/recent-conversations";
+import { getMe, logout } from "@/lib/api";
 
 const SIDEBAR_STATE_KEY = "moseori_sidebar_open";
 
@@ -12,11 +13,23 @@ export function SiteHeader() {
   const path = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [authError, setAuthError] = useState("");
   const activeChatId = path.startsWith("/chats/") ? path.slice("/chats/".length) : undefined;
 
   useEffect(() => {
     setSidebarOpen(localStorage.getItem(SIDEBAR_STATE_KEY) === "true");
+    void getMe().then(() => setSignedIn(true)).catch(() => setSignedIn(false));
   }, []);
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try { await logout(); setSignedIn(false); setMobileMenuOpen(false); setAuthError(""); }
+    catch { setAuthError("로그아웃에 실패했어요. 다시 시도해 주세요."); }
+    finally { setSigningOut(false); }
+  }
 
   function toggleSidebar() {
     setSidebarOpen((current) => {
@@ -44,7 +57,7 @@ export function SiteHeader() {
         </nav>
         <div className="header-actions">
           <Link className="header-search" href="/explore"><Search size={18} /><span>작품 검색</span></Link>
-          <Link className="header-login" href="/login"><UserRound size={18} /><span>로그인</span></Link>
+          {signedIn ? <button className="header-login" type="button" disabled={signingOut} onClick={() => void signOut()}><UserRound size={18} /><span>{signingOut ? "로그아웃 중" : "로그아웃"}</span></button> : <Link className="header-login" href="/login"><UserRound size={18} /><span>로그인</span></Link>}
         </div>
       </div>
       <div className="mobile-header">
@@ -53,12 +66,13 @@ export function SiteHeader() {
         <Link className="mobile-search" href="/explore" aria-label="작품 검색"><Search size={21} /></Link>
       </div>
     </header>
-    {mobileMenuOpen && <div className="mobile-menu"><Link href="/" onClick={() => setMobileMenuOpen(false)}>발견</Link><Link href="/explore" onClick={() => setMobileMenuOpen(false)}>둘러보기</Link><Link href="/studio" onClick={() => setMobileMenuOpen(false)}>제작 스튜디오</Link><Link href="/chats" onClick={() => setMobileMenuOpen(false)}>내 대화</Link><Link href="/login" onClick={() => setMobileMenuOpen(false)}>로그인</Link></div>}
+    {authError && <p className="inline-notice" role="alert">{authError}</p>}
+    {mobileMenuOpen && <div className="mobile-menu"><Link href="/" onClick={() => setMobileMenuOpen(false)}>발견</Link><Link href="/explore" onClick={() => setMobileMenuOpen(false)}>둘러보기</Link><Link href="/studio" onClick={() => setMobileMenuOpen(false)}>제작 스튜디오</Link><Link href="/chats" onClick={() => setMobileMenuOpen(false)}>내 대화</Link>{signedIn ? <button type="button" onClick={() => void signOut()}>로그아웃</button> : <Link href="/login" onClick={() => setMobileMenuOpen(false)}>로그인</Link>}</div>}
     <nav className="bottom-nav" aria-label="모바일 메뉴">
       <Link href="/" className={path === "/" ? "active" : ""}><Compass size={21} /><span>발견</span></Link>
       <Link href="/explore" className={path === "/explore" ? "active" : ""}><Search size={21} /><span>둘러보기</span></Link>
       <Link href="/chats" className={path.startsWith("/chats") ? "active" : ""}><MessageCircle size={21} /><span>내 대화</span></Link>
-      <Link href="/login" className={path === "/login" ? "active" : ""}><UserRound size={21} /><span>내 정보</span></Link>
+      {signedIn ? <button type="button" onClick={() => void signOut()}><UserRound size={21} /><span>로그아웃</span></button> : <Link href="/login" className={path === "/login" ? "active" : ""}><UserRound size={21} /><span>로그인</span></Link>}
     </nav>
   </>;
 }

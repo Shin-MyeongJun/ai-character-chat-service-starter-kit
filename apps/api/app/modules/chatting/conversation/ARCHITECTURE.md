@@ -42,4 +42,6 @@ runtime은 최초 snapshot의 시작 옵션을 조회한다. 현재 버전에서
 - runtime은 현재 캐릭터/모델/로어와 최초 start/첫 대사를 조합한다. settings에서 현재 opening_message를 제거하여 최초 첫 대사와 충돌하지 않는다. 고정 첫 대사는 요약 범위에서 제외하고 매 답변의 고정 프롬프트 예산에 포함한다. legacy 이력/기억은 기존 의미로 보존한다.
 - Alembic `0025`와 초기 SQL `016_conversation_opening.sql`을 적용한다. snapshot 대화가 있으면 downgrade를 거절한다. 구형 API writer를 중지하고 migration → 새 API/클라이언트 순서로 배포한다. 서버 default는 legacy를 보수적으로 판정하기 위해 유지한다.
 
-현재 클라이언트는 `.local_test/static/app.js`다. 고정 내용을 별도 aside로 표시하고 답변 대상은 시작 조회의 primary_product_character_id로 정한다. apps/web에는 아직 구현된 화면이 없다.
+현재 클라이언트는 `.local_test/static/app.js`와 `apps/web`이다. 고정 내용을 별도 aside로 표시하고 답변 대상은 시작 조회의 primary_product_character_id로 정한다.
+
+소유 대화 목록 `GET /conversations/mine`은 사용자 ID로 제한하고 생성 시각·ID 내림차순 커서를 사용한다. 대화 제목은 생성 당시 상품 스냅샷의 고정 제목이다. 마지막 메시지 문구는 상위 use case가 chat 공개 서비스를 통해 결합한다. 이미지 정보는 현재 계약에 없다.

@@ -76,6 +76,29 @@ class ConversationInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class ListOwnedConversationsCommand:
+    user_id: UUID
+    limit: int = 30
+    cursor_created_at: datetime | None = None
+    cursor_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationListItemInfo:
+    id: UUID
+    product_id: UUID
+    title: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationListPageInfo:
+    items: tuple[ConversationListItemInfo, ...]
+    next_cursor_created_at: datetime | None = None
+    next_cursor_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ConversationCharacterCommand:
     character_id: UUID | None
     product_character_id: UUID

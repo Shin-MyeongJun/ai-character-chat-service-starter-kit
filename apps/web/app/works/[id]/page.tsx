@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, Compass, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { WorkCover } from "@/components/work-card";
-import { ApiError, getPublishedWork, startConversation, type PublishedWork } from "@/lib/api";
+import { ApiError, getMe, getPublishedWork, startConversation, type PublishedWork } from "@/lib/api";
 import { demoWorkById, isDemoWork, type Work } from "@/lib/works";
 import { upsertRecentChat } from "@/lib/recent-chats";
 
@@ -44,8 +44,9 @@ export default function WorkDetail() {
     }
     setStarting(true); setError(null);
     try {
+      const user = await getMe();
       const conversation = await startConversation(work.id, selectedOption?.id ?? null);
-      upsertRecentChat({ id: conversation.id, title: work.title, lastMessage: "대화를 시작했어요", color: work.color, accent: work.accent, symbol: work.symbol });
+      upsertRecentChat({ id: conversation.id, title: work.title, lastMessage: "대화를 시작했어요", color: work.color, accent: work.accent, symbol: work.symbol }, user.id);
       router.push(`/chats/${conversation.id}`);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {

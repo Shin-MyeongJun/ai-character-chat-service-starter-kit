@@ -25,6 +25,22 @@ class ConversationStartedResponseDto(BaseModel):
     start_set_id: UUID
 
 
+class ConversationListItemResponseDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    product_id: UUID
+    title: str | None
+    created_at: datetime
+    last_message: str | None = None
+
+
+class ConversationListPageResponseDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    items: list[ConversationListItemResponseDto]
+    next_cursor_created_at: datetime | None = None
+    next_cursor_id: UUID | None = None
+
+
 class VersionSwitchedResponseDto(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     snapshot_id: UUID

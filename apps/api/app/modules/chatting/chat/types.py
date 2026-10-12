@@ -99,6 +99,12 @@ class MessagePageInfo:
     next_cursor: MessageCursor | None
 
 
+@dataclass(frozen=True, slots=True)
+class ListConversationPreviewsCommand:
+    user_id: UUID
+    conversation_ids: tuple[UUID, ...]
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ListMemorySourceCommand:
     conversation_id: UUID
@@ -260,6 +266,7 @@ class AnswerInfo:
     error_code: str | None
     retryable: bool
     uncertain: bool
+    price_credit: int | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

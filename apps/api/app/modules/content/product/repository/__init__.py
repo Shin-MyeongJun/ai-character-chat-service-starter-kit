@@ -12,8 +12,10 @@ from .core import (
     delete_product,
     get_owned_product,
     get_product,
+    get_product_for_update,
     has_product_snapshot,
     list_owned,
+    list_catalog,
     save_product,
     set_product_status,
     update_product,
@@ -44,8 +46,12 @@ from .statistics import (
     list_published_product_ids,
     replace_statistics_day,
 )
+from .studio import get_studio_draft, mark_studio_publication, save_studio_draft
 
 __all__ = [
+    "get_studio_draft",
+    "mark_studio_publication",
+    "save_studio_draft",
     "ProductCompositionRow",
     "SnapshotCompositionRow",
     "add_snapshot_character",
@@ -62,6 +68,7 @@ __all__ = [
     "get_owned_product",
     "get_pending_statistics_work",
     "get_product",
+    "get_product_for_update",
     "get_product_composition",
     "get_product_snapshot",
     "get_release_note",
@@ -69,6 +76,7 @@ __all__ = [
     "get_statistics_report",
     "has_product_snapshot",
     "list_owned",
+    "list_catalog",
     "list_product_release_rows",
     "list_product_start_sets",
     "list_published_product_ids",

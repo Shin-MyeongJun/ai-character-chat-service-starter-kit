@@ -188,6 +188,34 @@ async def test_register_verify_login_refresh_logout_http(auth_http):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("missing_access", [True, False])
+async def test_expired_access_preserves_refresh_and_recovers(auth_http, missing_access):
+    client, auth, mailer, _, _ = auth_http
+    await register_verified(client, mailer)
+    assert (await login(client)).status_code == 200
+    access_name = auth.settings.cookie_name("access")
+    refresh_name = auth.settings.cookie_name("refresh")
+    refresh = client.cookies[refresh_name]
+    claims = auth.codec.decode_token(client.cookies[access_name], "access")
+    client.cookies.delete(access_name)
+    if not missing_access:
+        expired = auth.codec.encode_token(
+            kind="access",
+            subject=claims["sub"],
+            session_id=claims["sid"],
+            expires_at=datetime.now(UTC) - timedelta(minutes=1),
+        )
+        client.cookies.set(access_name, expired, domain="testserver.local", path="/")
+    response = await client.get("/auth/me")
+    assert response.status_code == 401
+    assert client.cookies[refresh_name] == refresh
+    assert "set-cookie" not in response.headers
+    assert (await client.post("/auth/refresh")).status_code == 200
+    assert client.cookies[refresh_name] != refresh
+    assert (await client.get("/auth/me")).json()["email"] == EMAIL
+
+
+@pytest.mark.asyncio
 async def test_reset_revokes_every_session_and_is_single_use(auth_http):
     client, auth, mailer, _, _ = auth_http
     await register_verified(client, mailer)
@@ -558,7 +586,7 @@ async def test_tampered_and_wrong_type_cookies_fail_at_http_boundary(auth_http):
         )
         response = await client.get("/auth/me")
         assert response.status_code == 401 and token not in response.text
-        assert "Max-Age=0" in response.headers["set-cookie"]
+        assert "set-cookie" not in response.headers
 
 
 @pytest.mark.asyncio

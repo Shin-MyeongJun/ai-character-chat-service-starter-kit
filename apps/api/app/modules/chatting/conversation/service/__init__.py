@@ -11,6 +11,7 @@ from app.modules.chatting.conversation.service.query import (
     get_owned_conversation,
     get_statistics_facts,
     list_conversation_characters,
+    list_owned_conversations,
 )
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "get_owned_conversation",
     "get_statistics_facts",
     "list_conversation_characters",
+    "list_owned_conversations",
     "prepare_runtime_context",
 ]

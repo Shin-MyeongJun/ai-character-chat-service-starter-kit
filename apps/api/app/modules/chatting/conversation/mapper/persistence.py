@@ -39,6 +39,17 @@ def conversation_entity_to_info(
     )
 
 
+def conversations_entities_to_page_info(rows, limit) -> Types.ConversationListPageInfo:
+    selected = rows[:limit]
+    items = tuple(Types.ConversationListItemInfo(
+        id=row.id, product_id=row.product_id, title=row.title, created_at=row.created_at,
+    ) for row in selected)
+    last = selected[-1] if len(rows) > limit else None
+    return Types.ConversationListPageInfo(
+        items, last.created_at if last else None, last.id if last else None
+    )
+
+
 def snapshot_runtime_view_to_character_commands(
     runtime,
 ) -> tuple[Types.ConversationCharacterCommand, ...]:

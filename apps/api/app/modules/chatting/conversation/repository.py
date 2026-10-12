@@ -2,7 +2,7 @@
 # 전환은 참여자 목록을 교체하고 active_model_id를 비운다. start_set_id와 initial_snapshot_id는 유지한다.
 from uuid import uuid4
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 
 from app.db.models.chat import (
     Conversation,
@@ -18,6 +18,18 @@ async def get_owned_conversation(session, conversation_id, user_id, *, lock=Fals
     if lock:
         stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return await session.scalar(stmt)
+
+
+async def list_owned_conversations(session, user_id, *, limit, cursor_created_at=None, cursor_id=None):
+    stmt = select(Conversation).where(Conversation.user_id == user_id)
+    if cursor_created_at is not None:
+        stmt = stmt.where(or_(
+            Conversation.created_at < cursor_created_at,
+            and_(Conversation.created_at == cursor_created_at, Conversation.id < cursor_id),
+        ))
+    return list(await session.scalars(
+        stmt.order_by(Conversation.created_at.desc(), Conversation.id.desc()).limit(limit + 1)
+    ))
 
 
 async def advance_history_revision(session, conversation_id):
