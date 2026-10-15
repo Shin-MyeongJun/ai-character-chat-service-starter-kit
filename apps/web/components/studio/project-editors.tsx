@@ -26,7 +26,7 @@ export function WorkEditor({ project, update, onCharacter, onLore, onScene, onOp
       {tab === "basic" && <>
         <StudioField label="작품 제목"><input value={work.title} onChange={event => update({ title: event.target.value })} /></StudioField>
         <StudioField label="공개 소개" help="작품 상세 화면에 표시됩니다."><textarea className={styles.mediumText} value={work.introduction} onChange={event => update({ introduction: event.target.value })} /></StudioField>
-        <ChipEditor label="정리 태그" values={work.tags} onChange={tags => update({ tags })} />
+        <ChipEditor label="분류 태그" reorderable values={work.tags} onChange={tags => update({ tags })} />
         <StudioFold title="세계관과 진행 규칙" description="AI에 전달할 비공개 설정을 편집해요." onClick={() => setTab("world")} />
         <StudioFold title="연결 자료" description={`캐릭터 ${characters.length}명 · 로어 폴더 ${new Set(lorebooks.map(entry => entry.folder)).size}개 · 로어 항목 ${lorebooks.length}개`} onClick={() => setTab("links")} />
         {defaultScene ? <StudioFold title="시작 장면과 플레이 옵션" description={`${defaultScene.title || "이름 없는 장면"}${scenes.length > 1 ? ` 외 ${scenes.length - 1}개` : ""} · 언어와 작중 시점`} onClick={onOptions} /> : <p className={styles.help}>자료 추가에서 첫 시작 장면을 만들어 주세요.</p>}

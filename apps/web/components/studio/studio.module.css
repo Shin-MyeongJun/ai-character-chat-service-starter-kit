@@ -102,6 +102,10 @@
 .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .chip { display: inline-flex; gap: 5px; align-items: center; min-height: 36px; padding: 8px 10px; border-radius: 999px; background: var(--hover); color: var(--secondary); font-size: 12px; line-height: 20px; max-width: 100%; overflow-wrap: anywhere; font-weight: 400; }
 .chip button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--secondary); min-width: 20px; min-height: 20px; padding: 0; flex-shrink: 0; }
+.draggableChip { position: relative; cursor: grab; transition: opacity 120ms, box-shadow 120ms; }
+.draggableChip:active { cursor: grabbing; }
+.draggingChip { opacity: 0; }
+.draggableChip:focus-visible { outline: 2px solid var(--action); outline-offset: 3px; }
 .chipInput { display: flex; align-items: center; min-width: 80px; max-width: 100%; gap: 6px; }
 .chipInput input { min-height: 36px !important; padding: 8px 12px !important; border-radius: 999px !important; width: 135px !important; max-width: 100%; background: var(--hover) !important; border-color: transparent !important; font-size: 12px !important; }
 .chipInput button { border: 0; background: var(--action); color: var(--on-action); border-radius: 8px; padding: 8px 10px; font-size: 12px; white-space: nowrap; }

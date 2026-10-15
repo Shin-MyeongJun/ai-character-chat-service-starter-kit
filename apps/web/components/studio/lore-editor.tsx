@@ -36,17 +36,17 @@ export function LoreEditor({ entry, tab, setTab, update, onTest, canTest = true 
         </div>
         <StudioField label="설정 내용" help="이 내용은 AI에 전달되며 독자에게 그대로 공개되지 않습니다."><textarea rows={7} value={entry.content} placeholder="이 장소나 세계에 대해 AI가 알아야 할 내용을 적어 주세요." onChange={event => update({ content: event.target.value })} /></StudioField>
         <div className={styles.callout}>
-          <div className={styles.inline}><strong>언제 적용할까요?</strong><StudioButton onClick={() => setTab("conditions")}>조건 편집</StudioButton></div>
+          <div className={styles.inline}><strong>활성화 키워드 · 적용 조건</strong><StudioButton onClick={() => setTab("conditions")}>조건 편집</StudioButton></div>
           <div className={styles.chips}><span className={styles.chip}>{entry.activation === "keyword" ? "특정 단어가 나오면" : entry.activation === "always" ? "항상 적용" : "수동 적용"}</span></div>
           {entry.activation === "keyword" && <div className={styles.chips}>{entry.keywords.length ? entry.keywords.map(keyword => <span key={keyword} className={styles.chip}>{keyword}</span>) : <span className={styles.help}>키워드를 등록해 주세요.</span>}</div>}
-          <small className={styles.help}>{entry.activation === "keyword" ? `등록한 키워드 중 ${entry.match === "any" ? "하나가" : "모두가"} 검색되면 적용해요.` : entry.activation === "always" ? "매 대화에 이 설정을 포함해요." : "필요한 순간에 제작자가 선택해 적용하는 설정이에요."}</small>
+          <small className={styles.help}>{entry.activation === "keyword" ? entry.match === "any" ? "대화에 등록한 문구가 등장하면 이 항목을 활성화해요. 분류 태그와 별개예요." : "대화에 등록한 문구가 모두 등장하면 이 항목을 활성화해요. 분류 태그와 별개예요." : entry.activation === "always" ? "매 대화에 이 설정을 포함해요." : "필요한 순간에 제작자가 선택해 적용하는 설정이에요."}</small>
         </div>
-        <ChipEditor key={`${entry.id}-tags`} label="정리 태그" values={entry.tags} onChange={tags => update({ tags })} help="정리 태그는 검색용이며 활성화 키워드와 별개입니다." />
+        <ChipEditor key={`${entry.id}-tags`} label="로어북 분류 태그 · 공개" reorderable values={entry.tags} onChange={tags => update({ tags })} help="로어북을 분류하는 공개 태그예요. 활성화 조건에는 영향을 주지 않아요." />
         <button type="button" className={styles.fold} onClick={() => setTab("advanced")}><span><strong>고급 설정</strong><small>포함 우선도 · 검색 범위 · 문맥 예산</small></span><ChevronRight size={18} /></button>
         <div className={styles.inline}><button type="button" className={`${styles.statusToggle} ${entry.enabled ? styles.positive : ""}`} aria-pressed={entry.enabled} onClick={() => update({ enabled: !entry.enabled })}>{entry.enabled && <Check size={15} />}{entry.enabled ? "활성화됨" : "비활성화됨"}</button>{canTest && <StudioButton primary onClick={onTest}>다음: 테스트하기</StudioButton>}</div>
       </>}
       {tab === "conditions" && <>
-        <div className={styles.callout}><strong>설정이 필요한 순간을 정해요.</strong><small className={styles.help}>정리 태그를 바꿔도 적용 조건은 바뀌지 않아요.</small></div>
+        <div className={styles.callout}><strong>설정이 필요한 순간을 정해요.</strong><small className={styles.help}>분류 태그를 바꿔도 적용 조건은 바뀌지 않아요.</small></div>
         <div className={styles.field}><span>언제 적용할까요?</span><ChoiceChips label="적용 방식" value={entry.activation} onChange={activation => update({ activation })} options={[{ value: "keyword", label: "특정 단어" }, { value: "always", label: "항상" }, { value: "manual", label: "수동" }]} /></div>
         {entry.activation === "keyword" ? <>
           <ChipEditor key={`${entry.id}-keywords`} label="활성화 키워드" values={entry.keywords} onChange={keywords => update({ keywords })} help="Enter 또는 쉼표로 추가해요. 한글 이름, 별칭, 다른 언어도 함께 등록할 수 있어요." />
