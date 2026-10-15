@@ -13,6 +13,8 @@ from app.modules.content.product.mapper.schema import (
 )
 from app.modules.content.product.service import command as CommandService
 from app.modules.content.product.service import query as QueryService
+from app.modules.content.product.service.command.studio import save_studio_draft
+from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.command import (
     composition as CompositionCommandService,
 )
@@ -22,8 +24,6 @@ from app.modules.content.product.service.command import (
 from app.modules.content.product.service.command import (
     settings as SettingsCommandService,
 )
-from app.modules.content.product.service.command.studio import save_studio_draft
-from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.views import notices as NoticesViewsService
 from app.modules.content.product.tag_router import router as TagsRouter
 
