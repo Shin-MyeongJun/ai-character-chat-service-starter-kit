@@ -1,0 +1,40 @@
+{
+  "id": "erd-chatting-conversation-2",
+  "title": "chatting/conversation 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "conversations",
+      "parent": "product_snapshots",
+      "columns": "initial_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversations",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversations",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    }
+  ]
+}

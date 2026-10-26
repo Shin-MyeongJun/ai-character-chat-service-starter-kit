@@ -1,0 +1,62 @@
+{
+  "id": "erd-chatting-chat-2",
+  "title": "chatting/chat 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "product_generations",
+      "parent": "models",
+      "columns": "model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/chat"
+    },
+    {
+      "child": "product_generations",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/chat"
+    },
+    {
+      "child": "product_generations",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/chat"
+    },
+    {
+      "child": "product_generations",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/chat"
+    },
+    {
+      "child": "product_generations",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/chat"
+    }
+  ]
+}

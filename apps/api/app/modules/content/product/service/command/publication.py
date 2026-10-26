@@ -82,6 +82,7 @@ async def _build_publication(
     row = await Repository.create_product_snapshot(session, product_id, data)
     snapshot = PersistenceMapper.product_snapshot_entity_to_info(row)
     chars, books, canonical_chars, canonical_books = ({}, {}, [], [])
+    scene_options = {}
     for c in char_links:
         component = await CharacterCommandService.freeze_character(
             session, CharacterTypes.FreezeCharacterCommand(c.character_id, owner_id)
@@ -143,6 +144,8 @@ async def _build_publication(
             entry,
             start.sort_order,
         )
+        if "studio_scene_v1" in entry.metadata:
+            scene_options[str(entry.id)] = entry.metadata["studio_scene_v1"]
     canonical = {
         "product": data,
         "characters": canonical_chars,
@@ -151,6 +154,7 @@ async def _build_publication(
     }
     final_data = {
         **data,
+        **({"studio_start_options": scene_options} if scene_options else {}),
         "content_digest": hashlib.sha256(
             json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
         ).hexdigest(),

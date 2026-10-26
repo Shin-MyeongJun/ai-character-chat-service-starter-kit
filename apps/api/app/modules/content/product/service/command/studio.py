@@ -3,14 +3,15 @@
 import hashlib
 import json
 
-from app.db.transaction import use_case_transaction
 from app.db.idempotency import lock_key
+from app.db.transaction import use_case_transaction
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
 
 
 async def save_studio_draft(session, command: Types.SaveStudioDraftCommand) -> Types.StudioDraftInfo:
+    """CAS-save editor JSON; published profile and approval remain untouched until release."""
     raw = json.dumps(command.document, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     if len(raw) > 2 * 1024 * 1024 or command.document.get("version") != 2:
         raise ValueError("Invalid or oversized studio document.")
@@ -43,38 +44,59 @@ async def save_studio_draft(session, command: Types.SaveStudioDraftCommand) -> T
             await Repository.create_product(session, command.owner_id, profile, product_id=command.product_id)
         elif product.owner_id != command.owner_id:
             raise LookupError("Product not found.")
-        existing = await Repository.get_studio_draft(session, command.product_id, lock=True)
+        existing_row = await Repository.get_studio_draft(session, command.product_id, lock=True)
+        existing = PersistenceMapper.studio_draft_entity_to_info(existing_row)
         if existing is not None and existing.content_digest == digest:
-            return PersistenceMapper.studio_draft_entity_to_info(existing)
+            return existing
         if (existing.revision if existing else None) != command.expected_revision:
             raise Types.StudioDraftConflictError("Studio draft changed on the server.")
-        if existing is not None and existing.publication_release:
-            raise Types.StudioDraftConflictError("Published studio work cannot be edited until follow-up releases are supported.")
-        if product is not None:
+        if product is not None and product.latest_snapshot_id is None:
             await Repository.update_product(session, command.product_id, command.owner_id, profile)
-        if "tags" in work:
+        if "tags" in work and (product is None or product.latest_snapshot_id is None):
             from app.modules.content.product.service import tags as TagsCommandService
             await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(command.product_id, command.owner_id, work["tags"]))
         row = await Repository.save_studio_draft(
             session, command.product_id,
             (existing.revision + 1) if existing else 1,
-            digest, command.document, existing,
+            digest, command.document, existing_row,
         )
         return PersistenceMapper.studio_draft_entity_to_info(row)
 
 
 async def mark_studio_publication(session, command: Types.MarkStudioPublicationCommand) -> Types.ReleaseInfo:
+    """Record the committed release receipt and stable component mapping in existing JSONB."""
     async with use_case_transaction(session):
-        product = await Repository.get_product_for_update(session, command.product_id)
+        product = PersistenceMapper.product_entity_to_state_info(await Repository.get_product_for_update(session, command.product_id))
         if product is None or product.owner_id != command.owner_id:
             raise LookupError("Product not found.")
         row = await Repository.get_studio_draft(session, command.product_id, lock=True)
-        if row is None or row.content_digest != command.content_digest:
+        draft = PersistenceMapper.studio_draft_entity_to_info(row)
+        if draft is None or draft.content_digest != command.content_digest:
             raise Types.StudioDraftConflictError("Studio draft changed before publication.")
         release = command.release
         await Repository.mark_studio_publication(session, row, command.content_digest, {
             "snapshot_id": str(release.snapshot_id), "version": release.version,
             "summary": release.summary, "body": release.body,
             "change_kind": release.change_kind, "update_policy": release.update_policy,
+            "_studio": command.mapping or {},
         })
         return release
+
+
+async def set_studio_components(session, command: Types.SetStudioComponentsCommand) -> Types.StudioDraftInfo:
+    """Persist server-owned component identities without changing document revision/digest.
+
+    The upper workflow owns the transaction and product-first lock order. Keeping
+    upload preparation here makes response-loss retries reuse the same characters.
+    """
+    async with use_case_transaction(session):
+        product = PersistenceMapper.product_entity_to_state_info(await Repository.get_product_for_update(session, command.product_id))
+        if product is None or product.owner_id != command.owner_id:
+            raise LookupError("Product not found.")
+        row = await Repository.get_studio_draft(session, command.product_id, lock=True)
+        draft = PersistenceMapper.studio_draft_entity_to_info(row)
+        if draft is None or draft.revision != command.expected_revision:
+            raise Types.StudioDraftConflictError("Studio draft changed before component preparation.")
+        receipt = {**(draft.publication_release or {}), "_studio": command.mapping}
+        await Repository.mark_studio_publication(session, row, draft.publication_digest, receipt)
+        return PersistenceMapper.studio_draft_entity_to_info(row)

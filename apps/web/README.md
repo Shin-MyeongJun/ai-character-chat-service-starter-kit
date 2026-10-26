@@ -47,6 +47,8 @@ API가 `http://127.0.0.1:8000`에서 실행 중인 경우 Next.js는 `/backend/*
 
 ## 확인
 
+계정·크레딧 v10 화면은 `/account`에서, 개발 전용 상태 시연은 `/dev/design-v10`에서 확인한다. 작품별 진입은 `/studio?work={browserWorkId}` 또는 `/studio?product={serverProductId}`를 사용한다. 실제 연결 범위, 결제/프로필 미연동 항목, 검증 결과는 [v10 구현 기록](../../docs/design-account-credit-v10-implementation.md)에 정리했다.
+
 ```powershell
 pnpm web:typecheck
 pnpm web:build

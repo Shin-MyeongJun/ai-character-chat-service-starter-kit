@@ -8,9 +8,11 @@ import { EditorHeading, StudioFold } from "./project-editors";
 import styles from "./studio.module.css";
 
 function AssetImage({ asset }: { asset: CharacterAsset }) {
+  // Managed IDs restore across devices; browser IDs continue to address IndexedDB only.
   const [url, setUrl] = useState("");
   const [missing, setMissing] = useState(false);
   useEffect(() => {
+    if (asset.mediaId) { setUrl(`/backend/characters/media/${encodeURIComponent(asset.mediaId)}/content`); setMissing(false); return; }
     let disposed = false;
     let objectUrl = "";
     readImage(asset.id).then(blob => {
@@ -19,7 +21,7 @@ function AssetImage({ asset }: { asset: CharacterAsset }) {
       objectUrl = URL.createObjectURL(blob); setUrl(objectUrl);
     }).catch(() => { if (!disposed) setMissing(true); });
     return () => { disposed = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [asset.id]);
+  }, [asset.id, asset.mediaId]);
   // Browser-local object URLs cannot use Next's remote image optimizer.
   return url ? <img className={styles.assetImage} src={url} alt={asset.name} /> : <span className={styles.help}>{missing ? "이미지를 다시 등록해 주세요." : "이미지 불러오는 중"}</span>;
 }

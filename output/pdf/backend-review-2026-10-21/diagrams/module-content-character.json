@@ -1,0 +1,73 @@
+{
+  "id": "module-content-character",
+  "title": "content/character 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "dependencies",
+    "mapper",
+    "repository",
+    "router",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "dependencies": 1,
+    "mapper": 5,
+    "repository": 1,
+    "router": 2,
+    "schemas": 1,
+    "service": 6,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "repository"
+    ],
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "repository",
+      "types"
+    ],
+    [
+      "router",
+      "dependencies"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

@@ -57,6 +57,11 @@ def load_template() -> Types.TemplateInfo:
 
 
 def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
+    """Render v1 lore at its selected history boundary, preserving legacy envelopes.
+
+    Lore remains user reference data at both positions. Only server template rules
+    receive system authority; entry budgets have already been checked by selection.
+    """
     runtime = command.runtime
     target = str(command.product_character_id)
     if target not in {item.id for item in runtime.characters}:
@@ -76,6 +81,8 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
         ],
         "memories": [item.content for item in command.memories],
     }
+    positioned = [entry for entry in references["active_lore"] if entry.get("metadata", {}).get("activation_options")]
+    references["active_lore"] = [entry for entry in references["active_lore"] if not entry.get("metadata", {}).get("activation_options")]
     messages = [
         {
             "role": "system",
@@ -90,6 +97,10 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
     ]
     if runtime.opening_message is not None:
         messages.append({"role": "assistant", "content": runtime.opening_message})
+    before = [entry for entry in positioned if entry.get("placement") != "near_user_message"]
+    after = [entry for entry in positioned if entry.get("placement") == "near_user_message"]
+    if before:
+        messages.append({"role": "user", "content": json.dumps({"reference_data": {"active_lore": before, "position": "before_history"}}, ensure_ascii=False)})
     seen = set()
     last_position = -1
     for item in command.recent_messages:
@@ -109,6 +120,8 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
                 "content": item.content,
             }
         )
+    if after:
+        messages.append({"role": "user", "content": json.dumps({"reference_data": {"active_lore": after, "position": "after_history"}}, ensure_ascii=False)})
     messages.append({"role": "user", "content": command.current_message.content})
     request = json.dumps(
         {"chat_message_format": 1, "messages": messages}, ensure_ascii=False

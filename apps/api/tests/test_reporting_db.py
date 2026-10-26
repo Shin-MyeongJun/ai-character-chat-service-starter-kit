@@ -19,12 +19,14 @@ from app.db.models.product_statistics import (
 )
 from app.db.models.product_usage import ProductGeneration
 from app.db.models.snapshot.product import ProductSnapshot
-from app.modules.account_reporting import types as AccountTypes
-from app.modules.account_reporting.service import views as AccountViewsService
-from app.modules.creator_reporting import types as CreatorTypes
-from app.modules.creator_reporting.service import views as CreatorViewsService
-from app.modules.operations_reporting import types as OperationsTypes
-from app.modules.operations_reporting.service import views as OperationsViewsService
+from app.modules.reporting.account_reporting import types as AccountTypes
+from app.modules.reporting.account_reporting.service import views as AccountViewsService
+from app.modules.reporting.creator_reporting import types as CreatorTypes
+from app.modules.reporting.creator_reporting.service import views as CreatorViewsService
+from app.modules.reporting.operations_reporting import types as OperationsTypes
+from app.modules.reporting.operations_reporting.service import (
+    views as OperationsViewsService,
+)
 from sqlalchemy import func, select, text
 from test_product_usage import scenario
 

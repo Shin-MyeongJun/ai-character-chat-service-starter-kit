@@ -25,6 +25,7 @@
 | snapshot/ | 원본별 version과 JSON schema version 구분. 원본 삭제 시 SET NULL, 참조된 구성요소 스냅샷은 RESTRICT |
 | chat.py | 현재 버전과 최초 버전 분리, 시작 FK는 최초 버전. 메시지 position은 전역 identity, revision은 메시지 변경 번호 |
 | product_usage.py | 사용자별 요청 키 UNIQUE, 생성-버전 복합 FK, answer metadata/lease, 매출/환불 귀속 |
+| generation_prompt.py | chat 소유의 생성 ID PK/FK(CASCADE), 최종 pre-adapter 원문 TEXT·SHA-256·형식/시각·provider/출력 예산 |
 | memory.py | 원문 범위·revision·prompt 버전 UNIQUE, ready 벡터 조건, 대화당 작업 하나와 요청/처리 세대 |
 | billing.py | generation별 usage UNIQUE. 기존 nullable 참조·0 사용량과 실제 과금 부재를 구분 |
 | product_release.py | media 변경만 automatic 허용, 노트 정정 전 이력 |
@@ -90,3 +91,12 @@ assessment_reports, actions를 추가한다. 고정 SQL은 alembic/sql/0027_mode
 한 번 복사한다. 원래 검토 메타데이터는 legacy provenance JSON으로 보존하고 위반
 평가를 추정하지 않는다. 신규 데이터가 존재하면 downgrade는 손실 방지를 위해 거절한다.
 상세 이관·서비스 경계는 moderation/ARCHITECTURE.md를 따른다.
+
+## 최종 답변 프롬프트 migration (2026-10-21)
+
+0030 (`down_revision=0029`) / 초기 SQL 020은 generation_prompts와 생성 시각·대화/시각
+목록 인덱스를 추가한다. 고정 DDL `alembic/sql/0030_generation_prompts.sql`과 초기 SQL은
+동일하다. 기존 행 backfill이나 answer_metadata 변경은 없다. 기존 생성에 FK로 연결하며
+generation 삭제 시 프롬프트만 CASCADE한다. 기록이 존재하면 downgrade는 거절한다.
+애플리케이션이 불변 snapshot 쓰기를 소유하며 별도 UPDATE 방지 트리거는 없다.
+ORM/초기 SQL/head 비교와 생성·결제·복구 DB 테스트는 PostgreSQL 환경을 필요로 한다.

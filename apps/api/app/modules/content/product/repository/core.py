@@ -4,7 +4,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import and_, exists, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product import (
@@ -13,13 +13,28 @@ from app.db.models.product import (
 from app.db.models.snapshot.product import (
     ProductSnapshot,
 )
+from app.db.models.tag import ProductTag
 
 
-async def list_owned(session: AsyncSession, owner_id: UUID, *, offset=0, limit=50):
+def _owned_conditions(owner_id, search):
+    """Keep owner counts and pages scoped identically; search metacharacters are literal."""
+    conditions = [Product.owner_id == owner_id]
+    if search:
+        conditions.append(or_(Product.title.icontains(search, autoescape=True), Product.description.icontains(search, autoescape=True)))
+    return conditions
+
+
+async def count_owned(session, owner_id, *, search="") -> int:
+    """Count every matching owned work, including drafts and private works."""
+    return await session.scalar(select(func.count()).select_from(Product).where(*_owned_conditions(owner_id, search)))
+
+
+async def list_owned(session: AsyncSession, owner_id: UUID, *, offset=0, limit=50, search=""):
+    """Search before pagination with a deterministic creation-time/ID tie breaker."""
     return list(
         await session.scalars(
             select(Product)
-            .where(Product.owner_id == owner_id)
+            .where(*_owned_conditions(owner_id, search))
             .order_by(Product.created_at.desc(), Product.id.desc())
             .offset(offset)
             .limit(limit)
@@ -27,7 +42,8 @@ async def list_owned(session: AsyncSession, owner_id: UUID, *, offset=0, limit=5
     )
 
 
-async def list_catalog(session: AsyncSession, *, limit, cursor_created_at=None, cursor_id=None):
+async def list_catalog(session: AsyncSession, *, limit, cursor_created_at=None, cursor_id=None, search="", tag_id=None):
+    """Filter published text and current public tag links before the keyset boundary."""
     stmt = select(Product, ProductSnapshot).join(
         ProductSnapshot, Product.latest_snapshot_id == ProductSnapshot.id
     ).where(
@@ -35,6 +51,10 @@ async def list_catalog(session: AsyncSession, *, limit, cursor_created_at=None, 
         Product.visibility == "public",
         or_(ProductSnapshot.expires_at.is_(None), ProductSnapshot.expires_at > datetime.now(UTC)),
     )
+    if search:
+        stmt = stmt.where(or_(ProductSnapshot.snapshot_data["title"].astext.icontains(search, autoescape=True), ProductSnapshot.snapshot_data["description"].astext.icontains(search, autoescape=True)))
+    if tag_id is not None:
+        stmt = stmt.where(exists().where(ProductTag.product_id == Product.id, ProductTag.tag_id == tag_id))
     if cursor_created_at is not None:
         stmt = stmt.where(or_(
             Product.created_at < cursor_created_at,
@@ -43,6 +63,11 @@ async def list_catalog(session: AsyncSession, *, limit, cursor_created_at=None, 
     return list((await session.execute(
         stmt.order_by(Product.created_at.desc(), Product.id.desc()).limit(limit + 1)
     )).all())
+
+
+async def list_catalog_tag_ids(session):
+    """Read only public tag links belonging to currently listable published products."""
+    return tuple(await session.scalars(select(ProductTag.tag_id).join(Product, Product.id == ProductTag.product_id).join(ProductSnapshot, ProductSnapshot.id == Product.latest_snapshot_id).where(Product.status == "approved", Product.visibility == "public", or_(ProductSnapshot.expires_at.is_(None), ProductSnapshot.expires_at > datetime.now(UTC))).distinct()))
 
 
 async def save_product(session: AsyncSession, entity):

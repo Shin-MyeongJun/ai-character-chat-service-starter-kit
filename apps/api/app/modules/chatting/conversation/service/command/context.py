@@ -17,6 +17,11 @@ from app.modules.llm.service.replacement import resolve_execution
 async def prepare_runtime_context(
     session, command: Types.PrepareRuntimeContextCommand
 ) -> Types.ConversationRuntimeView:
+    """Authorize the pinned snapshot before selecting lore from supplied message facts.
+
+    Chat supplies history through this public boundary; conversation never reads
+    message tables. Manual IDs must belong to this exact runtime snapshot.
+    """
     async with use_case_transaction(session):
         conversation_id = command.conversation_id
         user_id = command.user_id
@@ -41,11 +46,15 @@ async def prepare_runtime_context(
         active_entries = {
             sid: LorebookQueryService.activate_snapshot_entries(
                 LorebookTypes.ActivateSnapshotEntriesCommand(
-                    snapshot=book, text=command.activation_text
+                    snapshot=book, text=command.activation_text, messages=command.activation_messages,
+                    manual_entry_ids=tuple(value for value in command.manual_entry_ids if value in {str(entry["id"]) for entry in book.snapshot_data["entries"]}),
                 )
             ).entries
             for sid, book in runtime.lorebooks.items()
         }
+        known_ids = {str(entry["id"]) for book in runtime.lorebooks.values() for entry in book.snapshot_data["entries"] if entry["entry_type"] != "start_set"}
+        if set(command.manual_entry_ids) - known_ids:
+            raise ValueError("Manual lore ID is outside the conversation snapshot.")
         start_context = await get_conversation_start(
             session,
             Types.OwnedConversationCommand(

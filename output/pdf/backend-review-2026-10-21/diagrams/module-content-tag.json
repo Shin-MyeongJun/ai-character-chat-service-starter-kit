@@ -1,0 +1,35 @@
+{
+  "id": "module-content-tag",
+  "title": "content/tag 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "repository",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 1,
+    "repository": 1,
+    "service": 2,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

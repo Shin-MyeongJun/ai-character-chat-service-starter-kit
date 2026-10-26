@@ -1,0 +1,93 @@
+{
+  "id": "module-identity",
+  "title": "identity 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "adapters",
+    "dependencies",
+    "http_security",
+    "mapper",
+    "repository",
+    "router",
+    "schemas",
+    "security",
+    "service",
+    "settings",
+    "types"
+  ],
+  "counts": {
+    "adapters": 1,
+    "dependencies": 1,
+    "http_security": 1,
+    "mapper": 2,
+    "repository": 1,
+    "router": 1,
+    "schemas": 1,
+    "security": 1,
+    "service": 7,
+    "settings": 1,
+    "types": 1
+  },
+  "edges": [
+    [
+      "adapters",
+      "types"
+    ],
+    [
+      "dependencies",
+      "http_security"
+    ],
+    [
+      "dependencies",
+      "types"
+    ],
+    [
+      "http_security",
+      "types"
+    ],
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "http_security"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "security",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "security"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

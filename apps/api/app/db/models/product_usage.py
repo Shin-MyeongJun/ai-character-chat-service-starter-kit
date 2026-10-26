@@ -42,6 +42,8 @@ class ProductGeneration(UuidPkMixin, Base):
         ),
         CheckConstraint("message_count >= 0", name="ck_generation_messages"),
         Index("ix_generation_product_finished", "product_id", "finished_at"),
+        Index("ix_generation_created_id", "created_at", "id"),
+        Index("ix_generation_conversation_created", "conversation_id", "created_at"),
     )
     user_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False

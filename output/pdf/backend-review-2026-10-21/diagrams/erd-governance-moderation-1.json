@@ -1,0 +1,106 @@
+{
+  "id": "erd-governance-moderation-1",
+  "title": "governance/moderation 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "audit_logs",
+      "parent": "users",
+      "columns": "admin_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_actions",
+      "parent": "moderation_assessments",
+      "columns": "assessment_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_actions",
+      "parent": "moderation_actions",
+      "columns": "reverses_action_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_assessment_reports",
+      "parent": "moderation_assessments",
+      "columns": "assessment_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_assessment_reports",
+      "parent": "moderation_reports",
+      "columns": "report_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_assessments",
+      "parent": "users",
+      "columns": "evaluator_user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_assessments",
+      "parent": "moderation_assessments",
+      "columns": "supersedes_assessment_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_flags",
+      "parent": "users",
+      "columns": "reviewed_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_flags",
+      "parent": "users",
+      "columns": "flagged_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    }
+  ]
+}

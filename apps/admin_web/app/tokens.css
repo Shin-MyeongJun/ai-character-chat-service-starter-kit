@@ -1,0 +1,35 @@
+:root {
+  color-scheme: light;
+  --canvas: #fff;
+  --sidebar: #f7f7f8;
+  --hover: #f1f1f3;
+  --border: #e5e5e8;
+  --text: #202024;
+  --secondary: #65656f;
+  --action: #252529;
+  --action-hover: #3e3e44;
+  --on-action: #fff;
+  --selection: #eeeef1;
+  --positive: #3b6550;
+  --danger: #9d493e;
+  --radius: 8px;
+  --card-radius: 12px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --font: "Noto Sans KR", sans-serif;
+  --body: 14px;
+  --small: 12px;
+  --font-size-compact: 13px;
+  --font-size-title: 24px;
+  --font-size-section: 18px;
+  --font-size-brand: 20px;
+  --line-height-title: 34px;
+  --line-height-section: 28px;
+  --line-height-body: 22px;
+  --line-height-small: 20px;
+  --line-height-prompt: 24px;
+}

@@ -1,0 +1,308 @@
+{
+  "responsiveResults": [
+    {
+      "overflow": false,
+      "path": "/dev/design-v10",
+      "scrollWidth": 305,
+      "title": "서리님의 마이페이지",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/settings",
+      "scrollWidth": 305,
+      "title": "계정 설정",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/works",
+      "scrollWidth": 305,
+      "title": "내 작품 관리",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/wallet",
+      "scrollWidth": 305,
+      "title": "크레딧 지갑",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases",
+      "scrollWidth": 305,
+      "title": "구매 내역",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/topup",
+      "scrollWidth": 320,
+      "title": "크레딧 충전",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/checkout",
+      "scrollWidth": 305,
+      "title": "상품 요약과 결제",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/chat",
+      "scrollWidth": 305,
+      "title": "별빛 기록실",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases/MC-20261018-014/result",
+      "scrollWidth": 305,
+      "title": "✓ 충전이 완료됐어요",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10",
+      "scrollWidth": 768,
+      "title": "서리님의 이야기 공간",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/settings",
+      "scrollWidth": 753,
+      "title": "계정 설정",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/works",
+      "scrollWidth": 753,
+      "title": "내 작품 관리",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/wallet",
+      "scrollWidth": 753,
+      "title": "크레딧 지갑",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases",
+      "scrollWidth": 753,
+      "title": "구매 내역",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/topup",
+      "scrollWidth": 768,
+      "title": "크레딧 충전",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/checkout",
+      "scrollWidth": 753,
+      "title": "상품 요약과 결제",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/chat",
+      "scrollWidth": 753,
+      "title": "별빛 기록실",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases/MC-20261018-014/result",
+      "scrollWidth": 768,
+      "title": "✓ 충전이 완료됐어요",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10",
+      "scrollWidth": 1440,
+      "title": "서리님의 이야기 공간",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/settings",
+      "scrollWidth": 1425,
+      "title": "계정 설정",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/works",
+      "scrollWidth": 1425,
+      "title": "내 작품 관리",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/wallet",
+      "scrollWidth": 1440,
+      "title": "크레딧 지갑",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases",
+      "scrollWidth": 1425,
+      "title": "구매 내역",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/topup",
+      "scrollWidth": 1440,
+      "title": "크레딧 충전",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/checkout",
+      "scrollWidth": 1440,
+      "title": "상품 요약과 결제",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/chat",
+      "scrollWidth": 1440,
+      "title": "별빛 기록실",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "path": "/dev/design-v10/purchases/MC-20261018-014/result",
+      "scrollWidth": 1440,
+      "title": "✓ 충전이 완료됐어요",
+      "width": 1440
+    }
+  ],
+  "workChecks": [
+    {
+      "cards": 3,
+      "scrollWidth": 305,
+      "title": "내 작품 관리",
+      "width": 320
+    },
+    {
+      "cards": 3,
+      "scrollWidth": 375,
+      "title": "내 작품 관리",
+      "width": 390
+    },
+    {
+      "cards": 3,
+      "scrollWidth": 753,
+      "title": "내 작품 관리",
+      "width": 768
+    },
+    {
+      "cards": 3,
+      "scrollWidth": 1425,
+      "title": "내 작품 관리",
+      "width": 1440
+    }
+  ],
+  "studioResponsive": [
+    {
+      "overflow": false,
+      "scrollWidth": 320,
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "scrollWidth": 375,
+      "width": 390
+    },
+    {
+      "overflow": false,
+      "scrollWidth": 753,
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "scrollWidth": 1425,
+      "width": 1440
+    }
+  ],
+  "stateResults": [
+    {
+      "route": "/wallet",
+      "state": "empty",
+      "text": "‹ 마이페이지\n크레딧 지갑\n\n이야기에 사용한 크레딧과 남은 잔액을 확인하세요.\n\n전체\n사용\n획득\n총 보유 크레딧\n12,570 크레딧 · 가용 12,450 / 예약 120\n최근 이용 내역\n표시할 이용 내역이 없어요\n조회 기간\n전체 기간\n7일\n30일\n구매 내역\n충전 상품 보기\n크레딧 충전하기 →\n나의 크레딧 · 12,450\n\n사용 가능　12,450 크레딧\n\n사용 예약 중　120 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    },
+    {
+      "route": "/works",
+      "state": "empty",
+      "text": "내 작품 관리\n\n직접 만든 세계를 이어서 다듬고, 새로운 이야기를 시작하세요.\n\n작품 검색\n서버에 저장한 작품\n서버에 저장한 작품이 없어요\n제작 스튜디오 · 새 작품 만들기 →",
+      "overflow": false
+    },
+    {
+      "route": "/purchases",
+      "state": "empty",
+      "text": "‹ 마이페이지\n구매 내역\n\n충전 주문과 결제 결과를 확인하세요. 확인 중인 주문은 다시 결제하지 않아도 돼요.\n\n전체\n확인 중\n완료\n실패\n구매 요약\n전체 0건 · 완료 0건 / 확인 중 0건 / 실패 0건\n주문 목록\n조건에 맞는 구매 내역이 없어요\n조회 기간\n전체 기간\n7일\n30일\n내 지갑 보기\n충전 상품 보기\n상품 요약과 결제 · 시연 →\n나의 크레딧 · 12,450\n\n사용 가능　12,450 크레딧\n\n사용 예약 중　120 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    },
+    {
+      "route": "/wallet",
+      "state": "loading",
+      "text": "‹ 마이페이지\n크레딧 지갑\n\n이야기에 사용한 크레딧과 남은 잔액을 확인하세요.\n\n전체\n사용\n획득\n총 보유 크레딧\n크레딧 잔액을 불러오는 중…\n최근 이용 내역\n이용 내역을 불러오는 중…\n조회 기간\n전체 기간\n7일\n30일\n구매 내역\n충전 상품 보기\n크레딧 충전하기 →\n나의 크레딧 · —\n\n사용 가능　— 크레딧\n\n사용 예약 중　— 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    },
+    {
+      "route": "/works",
+      "state": "loading",
+      "text": "내 작품 관리\n\n직접 만든 세계를 이어서 다듬고, 새로운 이야기를 시작하세요.\n\n작품 검색\n서버에 저장한 작품\n작품을 불러오는 중…\n제작 스튜디오 · 새 작품 만들기 →",
+      "overflow": false
+    },
+    {
+      "route": "/purchases",
+      "state": "loading",
+      "text": "‹ 마이페이지\n구매 내역\n\n충전 주문과 결제 결과를 확인하세요. 확인 중인 주문은 다시 결제하지 않아도 돼요.\n\n전체\n확인 중\n완료\n실패\n구매 요약\n구매 내역을 불러오는 중…\n주문 목록\n구매 내역을 불러오는 중…\n조회 기간\n전체 기간\n7일\n30일\n내 지갑 보기\n충전 상품 보기\n상품 요약과 결제 · 시연 →\n나의 크레딧 · —\n\n사용 가능　— 크레딧\n\n사용 예약 중　— 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    },
+    {
+      "route": "/wallet",
+      "state": "error",
+      "text": "‹ 마이페이지\n크레딧 지갑\n\n이야기에 사용한 크레딧과 남은 잔액을 확인하세요.\n\n전체\n사용\n획득\n총 보유 크레딧\n잔액을 불러오지 못했어요. 다시 조회\n최근 이용 내역\n이용 내역을 불러오지 못했어요. 다시 조회\n조회 기간\n전체 기간\n7일\n30일\n구매 내역\n충전 상품 보기\n크레딧 충전하기 →\n나의 크레딧 · —\n\n사용 가능　— 크레딧\n\n사용 예약 중　— 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    },
+    {
+      "route": "/works",
+      "state": "error",
+      "text": "내 작품 관리\n\n직접 만든 세계를 이어서 다듬고, 새로운 이야기를 시작하세요.\n\n작품 검색\n서버에 저장한 작품\n서버 작품을 불러오지 못했어요. 다시 조회\n제작 스튜디오 · 새 작품 만들기 →",
+      "overflow": false
+    },
+    {
+      "route": "/purchases",
+      "state": "error",
+      "text": "‹ 마이페이지\n구매 내역\n\n충전 주문과 결제 결과를 확인하세요. 확인 중인 주문은 다시 결제하지 않아도 돼요.\n\n전체\n확인 중\n완료\n실패\n구매 요약\n구매 내역을 불러오지 못했어요.\n주문 목록\n구매 내역을 불러오지 못했어요.\n조회 기간\n전체 기간\n7일\n30일\n내 지갑 보기\n충전 상품 보기\n상품 요약과 결제 · 시연 →\n나의 크레딧 · —\n\n사용 가능　— 크레딧\n\n사용 예약 중　— 크레딧\n\n충전·사용 내역 보기 →\n예약 금액은 답변 처리 후 확정됩니다. 표시된 잔액은 개발 시연용입니다.",
+      "overflow": false
+    }
+  ],
+  "interactionAssertions": {
+    "modalTabContained": true,
+    "escapeRestoresOpener": true,
+    "failedOrderIdentityPreserved": true,
+    "recheckRemainsUncertain": true,
+    "productionPreview404": true,
+    "existingLocalWorkDeepLink": true,
+    "loginFormDoesNotAuthenticate": true,
+    "realAccountConnectionFailureIsError": true,
+    "longMessageNoHorizontalOverflow": true
+  }
+}

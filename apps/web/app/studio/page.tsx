@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "작품과 캐릭터, 로어북과 시작 장면을 만드는 나의 창작 공간",
 };
 
-export default function StudioPage() {
-  return <CreatorStudio />;
+export default async function StudioPage({ searchParams }: { searchParams: Promise<{ work?: string; product?: string }> }) {
+  const { work, product } = await searchParams;
+  return <CreatorStudio initialWorkId={work} initialProductId={product} />;
 }

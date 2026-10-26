@@ -1,0 +1,95 @@
+{
+  "id": "erd-content-character-2",
+  "title": "content/character 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "character_snapshot_images",
+      "parent": "character_snapshots",
+      "columns": "character_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "character_snapshot_images",
+      "parent": "character_media",
+      "columns": "media_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "character_snapshots",
+      "parent": "characters",
+      "columns": "character_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "character_tags",
+      "parent": "tags",
+      "columns": "tag_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "character_tags",
+      "parent": "users",
+      "columns": "assigned_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "character_tags",
+      "parent": "characters",
+      "columns": "character_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "characters",
+      "parent": "models",
+      "columns": "default_model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    },
+    {
+      "child": "characters",
+      "parent": "users",
+      "columns": "owner_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/character"
+    }
+  ]
+}

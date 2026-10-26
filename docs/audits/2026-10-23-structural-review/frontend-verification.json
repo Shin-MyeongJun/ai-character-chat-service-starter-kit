@@ -1,0 +1,12 @@
+{
+  "harness": "actual hook with minimal useState/useEffect and deferred API doubles",
+  "before_old_response": [
+    "B-first"
+  ],
+  "after_old_response": [
+    "B-first",
+    "A-old-page"
+  ],
+  "api_requests": 3,
+  "browser_e2e": false
+}

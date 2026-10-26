@@ -45,6 +45,15 @@ async def list_conversation_previews(
     return PersistenceMapper.conversation_preview_rows_to_info(rows)
 
 
+async def list_conversation_activity(session, command: Types.ListConversationPreviewsCommand) -> dict:
+    """Expose chat-owned activity for an owner-scoped batch of at most 100 rooms."""
+    if len(command.conversation_ids) > 100:
+        raise ValueError("Too many conversation activities.")
+    return PersistenceMapper.conversation_activity_rows_to_info(
+        await Repository.list_conversation_activity(session, command.user_id, command.conversation_ids)
+    )
+
+
 async def list_memory_source(
     session, command: Types.ListMemorySourceCommand
 ) -> Types.MemorySourceInfo:

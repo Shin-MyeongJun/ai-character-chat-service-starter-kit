@@ -1,0 +1,140 @@
+﻿child,parent,columns,target,child_per_parent,parent_per_child,delete,update,owner
+audit_logs,users,admin_id,id,0..N,1,RESTRICT,NO ACTION,governance/moderation
+auth_action_tokens,users,user_id,id,0..N,1,CASCADE,NO ACTION,identity
+auth_sessions,users,user_id,id,0..N,1,CASCADE,NO ACTION,identity
+billing_credit_bindings,billing_quotes,"quote_id,user_id,request_key","id,user_id,request_key",0..1,1,RESTRICT,NO ACTION,commerce/billing
+billing_credit_bindings,credit_reservations,"reservation_id,user_id,request_key","id,user_id,request_key",0..1,1,RESTRICT,NO ACTION,commerce/billing
+billing_quotes,users,user_id,id,0..N,1,RESTRICT,NO ACTION,commerce/billing
+character_assets,characters,character_id,id,0..N,1,CASCADE,NO ACTION,content/character
+character_assets,character_media,media_id,id,0..N,0..1,RESTRICT,NO ACTION,content/character
+character_images,character_media,media_id,id,0..N,0..1,RESTRICT,NO ACTION,content/character
+character_images,characters,character_id,id,0..N,1,CASCADE,NO ACTION,content/character
+character_internal_tags,characters,character_id,id,0..N,1,CASCADE,NO ACTION,content/character
+character_internal_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/character
+character_internal_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/character
+character_snapshot_assets,character_snapshots,character_snapshot_id,id,0..N,1,CASCADE,NO ACTION,content/character
+character_snapshot_assets,character_media,media_id,id,0..N,0..1,RESTRICT,NO ACTION,content/character
+character_snapshot_images,character_snapshots,character_snapshot_id,id,0..N,1,CASCADE,NO ACTION,content/character
+character_snapshot_images,character_media,media_id,id,0..N,0..1,RESTRICT,NO ACTION,content/character
+character_snapshots,characters,character_id,id,0..N,0..1,SET NULL,NO ACTION,content/character
+character_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/character
+character_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/character
+character_tags,characters,character_id,id,0..N,1,CASCADE,NO ACTION,content/character
+characters,models,default_model_id,id,0..N,0..1,SET NULL,NO ACTION,content/character
+characters,users,owner_id,id,0..N,1,CASCADE,NO ACTION,content/character
+chat_message_requests,messages,message_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/chat
+chat_message_requests,conversations,conversation_id,id,0..N,1,CASCADE,NO ACTION,chatting/chat
+conversation_characters,characters,character_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/conversation
+conversation_characters,conversations,conversation_id,id,0..N,1,CASCADE,NO ACTION,chatting/conversation
+conversation_characters,product_snapshot_characters,product_character_id,id,0..N,0..1,NO ACTION,NO ACTION,chatting/conversation
+conversation_memories,conversations,conversation_id,id,0..N,1,CASCADE,NO ACTION,chatting/memory
+conversation_memories,messages,source_message_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/memory
+conversation_version_changes,conversations,conversation_id,id,0..N,1,CASCADE,NO ACTION,chatting/conversation
+conversation_version_changes,product_snapshots,to_snapshot_id,id,0..N,1,NO ACTION,NO ACTION,chatting/conversation
+conversation_version_changes,product_snapshots,from_snapshot_id,id,0..N,1,NO ACTION,NO ACTION,chatting/conversation
+conversations,product_snapshot_start_sets,"initial_snapshot_id,start_set_id","product_snapshot_id,id",0..N,0..1,NO ACTION,NO ACTION,chatting/conversation
+conversations,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,0..1,NO ACTION,NO ACTION,chatting/conversation
+conversations,models,active_model_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/conversation
+conversations,product_snapshots,initial_snapshot_id,id,0..N,0..1,NO ACTION,NO ACTION,chatting/conversation
+conversations,users,user_id,id,0..N,1,CASCADE,NO ACTION,chatting/conversation
+conversations,products,product_id,id,0..N,1,RESTRICT,NO ACTION,chatting/conversation
+credit_accounts,users,user_id,id,0..1,1,CASCADE,NO ACTION,commerce/credit
+credit_balances,credit_wallets,"user_id,currency_code","user_id,currency_code",0..N,1,RESTRICT,NO ACTION,commerce/credit
+credit_reservations,credit_transactions,"transaction_id,user_id,currency_code","id,user_id,currency_code",0..1,0..1,RESTRICT,NO ACTION,commerce/credit
+credit_reservations,credit_wallets,"user_id,currency_code","user_id,currency_code",0..N,0..1,RESTRICT,NO ACTION,commerce/credit
+credit_reservations,users,user_id,id,0..N,1,RESTRICT,NO ACTION,commerce/credit
+credit_reservations,credit_transactions,transaction_id,id,0..1,0..1,RESTRICT,NO ACTION,commerce/credit
+credit_transaction_entries,credit_balances,"user_id,currency_code,bucket","user_id,currency_code,bucket",0..N,1,RESTRICT,NO ACTION,commerce/credit
+credit_transaction_entries,credit_transactions,"transaction_id,user_id,currency_code","id,user_id,currency_code",0..N,1,RESTRICT,NO ACTION,commerce/credit
+credit_transactions,credit_wallets,"user_id,currency_code","user_id,currency_code",0..N,0..1,RESTRICT,NO ACTION,commerce/credit
+credit_transactions,users,user_id,id,0..N,1,CASCADE,NO ACTION,commerce/credit
+credit_wallets,users,user_id,id,0..N,1,RESTRICT,NO ACTION,commerce/credit
+generation_prompts,product_generations,generation_id,id,0..1,1,CASCADE,NO ACTION,chatting/chat
+lorebook_entries,lorebooks,lorebook_id,id,0..N,1,CASCADE,NO ACTION,content/lorebook
+lorebook_internal_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/lorebook
+lorebook_internal_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/lorebook
+lorebook_internal_tags,lorebooks,lorebook_id,id,0..N,1,CASCADE,NO ACTION,content/lorebook
+lorebook_snapshots,lorebooks,lorebook_id,id,0..N,0..1,SET NULL,NO ACTION,content/lorebook
+lorebook_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/lorebook
+lorebook_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/lorebook
+lorebook_tags,lorebooks,lorebook_id,id,0..N,1,CASCADE,NO ACTION,content/lorebook
+lorebooks,users,owner_id,id,0..N,1,CASCADE,NO ACTION,content/lorebook
+memory_jobs,conversations,conversation_id,id,0..1,1,CASCADE,NO ACTION,chatting/memory
+memory_jobs,users,owner_id,id,0..N,1,CASCADE,NO ACTION,chatting/memory
+messages,characters,character_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/chat
+messages,product_generations,"generation_id,product_snapshot_id","id,product_snapshot_id",0..N,0..1,NO ACTION,NO ACTION,chatting/chat
+messages,product_snapshot_characters,"product_snapshot_id,product_character_id","product_snapshot_id,id",0..N,0..1,NO ACTION,NO ACTION,chatting/chat
+messages,conversations,conversation_id,id,0..N,1,CASCADE,NO ACTION,chatting/chat
+messages,product_snapshots,product_snapshot_id,id,0..N,0..1,NO ACTION,NO ACTION,chatting/chat
+messages,models,model_id,id,0..N,0..1,SET NULL,NO ACTION,chatting/chat
+model_replacements,models,from_model_id,id,0..N,1,NO ACTION,NO ACTION,llm
+model_replacements,product_snapshots,product_snapshot_id,id,0..N,1,NO ACTION,NO ACTION,llm
+model_replacements,models,to_model_id,id,0..N,1,NO ACTION,NO ACTION,llm
+models,providers,provider_id,id,0..N,1,RESTRICT,NO ACTION,llm
+moderation_actions,moderation_assessments,assessment_id,id,0..N,1,RESTRICT,NO ACTION,governance/moderation
+moderation_actions,moderation_actions,reverses_action_id,id,0..N,0..1,RESTRICT,NO ACTION,governance/moderation
+moderation_assessment_reports,moderation_assessments,assessment_id,id,0..N,1,RESTRICT,NO ACTION,governance/moderation
+moderation_assessment_reports,moderation_reports,report_id,id,0..N,1,RESTRICT,NO ACTION,governance/moderation
+moderation_assessments,users,evaluator_user_id,id,0..N,0..1,SET NULL,NO ACTION,governance/moderation
+moderation_assessments,moderation_assessments,supersedes_assessment_id,id,0..N,0..1,RESTRICT,NO ACTION,governance/moderation
+moderation_flags,users,reviewed_by,id,0..N,0..1,SET NULL,NO ACTION,governance/moderation
+moderation_flags,users,flagged_by,id,0..N,0..1,SET NULL,NO ACTION,governance/moderation
+moderation_reports,users,reporter_user_id,id,0..N,0..1,SET NULL,NO ACTION,governance/moderation
+moderation_reports,moderation_reports,duplicate_of_report_id,id,0..N,0..1,RESTRICT,NO ACTION,governance/moderation
+payments,user_subscriptions,subscription_id,id,0..N,0..1,SET NULL,NO ACTION,commerce/billing
+payments,users,user_id,id,0..N,1,CASCADE,NO ACTION,commerce/billing
+product_characters,characters,character_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_characters,products,product_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_daily_stats,products,product_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+product_generations,models,model_id,id,0..N,1,NO ACTION,NO ACTION,chatting/chat
+product_generations,users,user_id,id,0..N,1,NO ACTION,NO ACTION,chatting/chat
+product_generations,conversations,conversation_id,id,0..N,1,NO ACTION,NO ACTION,chatting/chat
+product_generations,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,1,NO ACTION,NO ACTION,chatting/chat
+product_generations,products,product_id,id,0..N,1,NO ACTION,NO ACTION,chatting/chat
+product_internal_tags,products,product_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_internal_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/product
+product_internal_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/product
+product_lorebook_characters,product_characters,"product_id,product_character_id","product_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_lorebook_characters,product_lorebooks,"product_id,product_lorebook_id","product_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_lorebooks,lorebooks,lorebook_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_lorebooks,products,product_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_payment_events,product_payment_events,sale_id,id,0..N,0..1,NO ACTION,NO ACTION,commerce/billing
+product_payment_events,products,product_id,id,0..N,1,NO ACTION,NO ACTION,commerce/billing
+product_payment_events,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,1,NO ACTION,NO ACTION,commerce/billing
+product_payment_events,payments,payment_id,id,0..N,1,NO ACTION,NO ACTION,commerce/billing
+product_release_note_revisions,product_release_notes,product_snapshot_id,product_snapshot_id,0..N,1,CASCADE,NO ACTION,content/product
+product_release_note_revisions,users,editor_id,id,0..N,0..1,SET NULL,NO ACTION,content/product
+product_release_notes,product_snapshots,product_snapshot_id,id,0..1,1,CASCADE,NO ACTION,content/product
+product_snapshot_characters,character_snapshots,character_snapshot_id,id,0..N,1,RESTRICT,NO ACTION,content/product
+product_snapshot_characters,product_snapshots,product_snapshot_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_snapshot_lorebook_characters,product_snapshot_lorebooks,"product_snapshot_id,product_lorebook_id","product_snapshot_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_snapshot_lorebook_characters,product_snapshot_characters,"product_snapshot_id,product_character_id","product_snapshot_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_snapshot_lorebooks,product_snapshots,product_snapshot_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_snapshot_lorebooks,lorebook_snapshots,lorebook_snapshot_id,id,0..N,1,RESTRICT,NO ACTION,content/product
+product_snapshot_policy_changes,users,actor_id,id,0..N,0..1,SET NULL,NO ACTION,content/product
+product_snapshot_policy_changes,product_snapshots,product_snapshot_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+product_snapshot_start_sets,product_snapshot_lorebooks,"product_snapshot_id,product_lorebook_id","product_snapshot_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_snapshots,products,product_id,id,0..N,0..1,SET NULL,NO ACTION,content/product
+product_start_sets,lorebook_entries,"lorebook_id,entry_id","lorebook_id,id",0..N,1,CASCADE,NO ACTION,content/product
+product_start_sets,product_lorebooks,"product_id,lorebook_id","product_id,lorebook_id",0..N,1,CASCADE,NO ACTION,content/product
+product_stats_dirty_days,products,product_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+product_studio_drafts,products,product_id,id,0..1,1,CASCADE,NO ACTION,content/product
+product_tags,products,product_id,id,0..N,1,CASCADE,NO ACTION,content/product
+product_tags,tags,tag_id,id,0..N,1,RESTRICT,NO ACTION,content/product
+product_tags,users,assigned_by,id,0..N,0..1,SET NULL,NO ACTION,content/product
+product_user_daily_activity,users,user_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+product_user_daily_activity,products,product_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+product_version_daily_stats,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,1,NO ACTION,NO ACTION,content/product
+product_version_user_daily_activity,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,1,NO ACTION,NO ACTION,content/product
+product_version_user_daily_activity,users,user_id,id,0..N,1,NO ACTION,NO ACTION,content/product
+products,users,owner_id,id,0..N,1,CASCADE,NO ACTION,content/product
+products,models,default_model_id,id,0..N,0..1,SET NULL,NO ACTION,content/product
+products,product_snapshots,"id,latest_snapshot_id","product_id,id",0..1,0..1,NO ACTION,NO ACTION,content/product
+usage_logs,product_generations,"generation_id,product_snapshot_id","id,product_snapshot_id",0..1,0..1,NO ACTION,NO ACTION,commerce/billing
+usage_logs,product_snapshots,"product_id,product_snapshot_id","product_id,id",0..N,0..1,NO ACTION,NO ACTION,commerce/billing
+usage_logs,users,user_id,id,0..N,1,CASCADE,NO ACTION,commerce/billing
+usage_logs,conversations,conversation_id,id,0..N,0..1,SET NULL,NO ACTION,commerce/billing
+usage_logs,models,model_id,id,0..N,1,RESTRICT,NO ACTION,commerce/billing
+user_oauth_accounts,users,user_id,id,0..N,1,CASCADE,NO ACTION,identity
+user_subscriptions,subscription_plans,plan_id,id,0..N,1,RESTRICT,NO ACTION,commerce/billing
+user_subscriptions,users,user_id,id,0..N,1,CASCADE,NO ACTION,commerce/billing

@@ -1,0 +1,106 @@
+{
+  "id": "erd-commerce-credit-1",
+  "title": "commerce/credit 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "credit_accounts",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_balances",
+      "parent": "credit_wallets",
+      "columns": "user_id,currency_code",
+      "target": "user_id,currency_code",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_reservations",
+      "parent": "credit_transactions",
+      "columns": "transaction_id,user_id,currency_code",
+      "target": "id,user_id,currency_code",
+      "child_per_parent": "0..1",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_reservations",
+      "parent": "credit_wallets",
+      "columns": "user_id,currency_code",
+      "target": "user_id,currency_code",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_reservations",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_reservations",
+      "parent": "credit_transactions",
+      "columns": "transaction_id",
+      "target": "id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_transaction_entries",
+      "parent": "credit_balances",
+      "columns": "user_id,currency_code,bucket",
+      "target": "user_id,currency_code,bucket",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_transaction_entries",
+      "parent": "credit_transactions",
+      "columns": "transaction_id,user_id,currency_code",
+      "target": "id,user_id,currency_code",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_transactions",
+      "parent": "credit_wallets",
+      "columns": "user_id,currency_code",
+      "target": "user_id,currency_code",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    }
+  ]
+}

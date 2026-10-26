@@ -1,0 +1,35 @@
+{
+  "id": "module-commerce-billing",
+  "title": "commerce/billing 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "repository",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 3,
+    "repository": 1,
+    "service": 9,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

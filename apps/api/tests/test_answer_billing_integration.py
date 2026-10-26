@@ -579,7 +579,8 @@ async def test_cancel_is_atomic_release_and_cannot_be_reexecuted(db):
     await check_state(
         orchestrator, command, status="cancelled", balance=20, reserved=0, charge=0
     )
-    assert (await orchestrator.generate_answer(command)).status == "cancelled"
+    replay = await orchestrator.generate_answer(command)
+    assert replay.status == "cancelled" and replay.uncertain
     assert text.generate_text.await_count == 1
 
 

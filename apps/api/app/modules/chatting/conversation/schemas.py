@@ -32,6 +32,7 @@ class ConversationListItemResponseDto(BaseModel):
     title: str | None
     created_at: datetime
     last_message: str | None = None
+    last_activity_at: datetime | None = None
 
 
 class ConversationListPageResponseDto(BaseModel):
@@ -39,6 +40,7 @@ class ConversationListPageResponseDto(BaseModel):
     items: list[ConversationListItemResponseDto]
     next_cursor_created_at: datetime | None = None
     next_cursor_id: UUID | None = None
+    total: int = 0
 
 
 class VersionSwitchedResponseDto(BaseModel):

@@ -1,0 +1,1034 @@
+[
+  {
+    "path": "apps/api/pyproject.toml",
+    "line": 1,
+    "symbol": "file",
+    "sha256": null
+  },
+  {
+    "path": "apps/api/requirements.txt",
+    "line": 1,
+    "symbol": "file",
+    "sha256": null
+  },
+  {
+    "path": "apps/api/app/main.py",
+    "line": 64,
+    "symbol": "create_app",
+    "sha256": "d6217b6198c92db275d647f75cfa2dcd70fccd46868dfc792e82aae3b03c33b3"
+  },
+  {
+    "path": "apps/api/app/memory_worker.py",
+    "line": 79,
+    "symbol": "run_worker",
+    "sha256": "a646d0a2106b2ad93819361242e497ae73aa184fdf52bbafe17e102ca8b0ba38"
+  },
+  {
+    "path": "apps/api/app/db/transaction.py",
+    "line": 14,
+    "symbol": "use_case_transaction",
+    "sha256": "a5a0e8d577a274c7b2bb1bb42b35c4958935a0d8d776ff5cf38f102264020733"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/command.py",
+    "line": 44,
+    "symbol": "create_character",
+    "sha256": "c046d0738530225806178264785ac22493bb794951a7adc45a566777dcea01c8"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+    "line": 49,
+    "symbol": "AnswerOrchestrator",
+    "sha256": "3667aa2f58fabcbbfc41370d45e9383c20d76d4beb0ffb4396c476daf3b0d7d1"
+  },
+  {
+    "path": "apps/api/app/modules/asset_storage/service/storage.py",
+    "line": 19,
+    "symbol": "AssetStorageService",
+    "sha256": "587b86eef07d1f0c280808c92d760678d540df25e999baefb9c6aeaa7a2aa792"
+  },
+  {
+    "path": "apps/api/app/modules/asset_storage/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "ab9d7bd16f64b10134338784704e41e632253d721f32a734f5c7367f7d3c4057"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+    "line": 163,
+    "symbol": "generate_answer",
+    "sha256": "3667aa2f58fabcbbfc41370d45e9383c20d76d4beb0ffb4396c476daf3b0d7d1"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "8e0ddf08f9fcee0ca9e37c94feb572e9fb9735f3c52842b1c8cdebdf0fb36f56"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/conversation/service/command/context.py",
+    "line": 17,
+    "symbol": "prepare_runtime_context",
+    "sha256": "536b3a18b32ca6dbb3a1059112c9af8d619cc7397e78db8e71d4b155046e6f56"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/conversation/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "5a26e7d9198c30cab43e9322029e3ba6ebeab3116d42aa4f7d9a96f9bd5d9759"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/memory/service/command/scheduling.py",
+    "line": 29,
+    "symbol": "claim_memory_work",
+    "sha256": "83486dc23c190e41291addcdb3e96b4553f89546f9ca4dbbd68fab7c96257354"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/memory/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "43e1096404770258892587934d434cdc09031278485b24e2f52267aca15ab7a0"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/prompt/service.py",
+    "line": 59,
+    "symbol": "build_prompt",
+    "sha256": "4edc47e7f168700efa73b6f8bbf8d1dbeab6def31124dfae11ff92a73c647cda"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/prompt/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "eae6efd339d0c1c59777da8a78c3ad326f1ef47281fb0835bfca8fdf4da8646d"
+  },
+  {
+    "path": "apps/api/app/modules/commerce/billing/service/credits.py",
+    "line": 79,
+    "symbol": "reserve_credit",
+    "sha256": "255598c770ca6f0df7ee102d1a65b3568305279f015f019f97af5794121ce1f6"
+  },
+  {
+    "path": "apps/api/app/modules/commerce/billing/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "e05fba6645803ef01c1fe4216155746da6ea1f6394b15b163f65bbf550d57ef7"
+  },
+  {
+    "path": "apps/api/app/modules/commerce/credit/service/command.py",
+    "line": 64,
+    "symbol": "reserve_credit",
+    "sha256": "0fdc0d53aa4840652aa0c34a6ad2e0d8ecc93482186e828f1a54e379d368d156"
+  },
+  {
+    "path": "apps/api/app/modules/commerce/credit/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "f7929d6e390cc1f98b40562d049fffc07830b620ed84371f0542d7fd0d9a2b4a"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/workflow/media.py",
+    "line": 34,
+    "symbol": "upload_character_media",
+    "sha256": "ed8fa0cda7dffbe080252ce25cc9eddab4e74f1965dc11c8e128e11e41f28c4b"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "072724ed28051ac863946c0024b3c25dce8f77e60c5eb32be0929df982dd112c"
+  },
+  {
+    "path": "apps/api/app/modules/content/lorebook/service/activation.py",
+    "line": 54,
+    "symbol": "diagnose_entries",
+    "sha256": "b107dcc0e901d9b5dcdc28ae74ef56ef17532c37bf3bafba14317f36845b9281"
+  },
+  {
+    "path": "apps/api/app/modules/content/lorebook/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "4b8601701812fdd20271652c83123cfd632c8c49476e668d1b0a884b14099b9a"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/service/command/publication.py",
+    "line": 25,
+    "symbol": "_build_publication",
+    "sha256": "db792f36040c17b6496ec8ce6e5894206064df63ee344a4ea780b5ddc3a2bad9"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "c76f39df7d907ec4cefba5a6dc107efd7a10bcc472b48d87d0cab3f298f10d58"
+  },
+  {
+    "path": "apps/api/app/modules/content/tag/service/command.py",
+    "line": 18,
+    "symbol": "resolve_tags",
+    "sha256": "bba1ee6df582479313e895edf465bd83047161eb197ca2509f33c8a5ebe6ea1f"
+  },
+  {
+    "path": "apps/api/app/modules/content/tag/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "1e5af3559f0e34096b1e0671013ae9d912756496d44a810eff8e0ee005613574"
+  },
+  {
+    "path": "apps/api/app/modules/governance/admin/character_router.py",
+    "line": 3,
+    "symbol": "router",
+    "sha256": "441209d783c32f238ca5738412a3f16f36b9719591a15bf7df7ef8a4c74c4c09"
+  },
+  {
+    "path": "apps/api/app/modules/governance/admin/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "dae55c9a725533eb53a49fef17ce34da90a69ad01deb9e87d2e46807cebc4fd6"
+  },
+  {
+    "path": "apps/api/app/modules/governance/moderation/service/command/actions.py",
+    "line": 44,
+    "symbol": "request_action",
+    "sha256": "b902044ede75b61254d8d4bd98f9e948349b23f57d4ef94a9b9193da7b084134"
+  },
+  {
+    "path": "apps/api/app/modules/governance/moderation/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "2da4361ea026e141376c23b4046fc634daf04059d9d6891e3916f0d98e0d47ad"
+  },
+  {
+    "path": "apps/api/app/modules/identity/service/authentication.py",
+    "line": 279,
+    "symbol": "refresh_session",
+    "sha256": "99621516dac89a45d3e50a735b2ec13632d90c85a579d4cd87b3f7563617b14d"
+  },
+  {
+    "path": "apps/api/app/modules/identity/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "28a42c2c4c650514dd417259ad83c2d150d68fd812150dcfa1633bd71968627f"
+  },
+  {
+    "path": "apps/api/app/modules/llm/service/text_generation.py",
+    "line": 18,
+    "symbol": "TextGenerationService",
+    "sha256": "4bb202dfcc7f033857ced7bc26a58cad5ad9d03da5da51187a6dbb42f9bc2614"
+  },
+  {
+    "path": "apps/api/app/modules/llm/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "073c3abd618762795f22e485e2f556c024f118a637cc62d3e08c7dfd3956cbce"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/account_reporting/service/views.py",
+    "line": 21,
+    "symbol": "get_account_report",
+    "sha256": "4fb7725cc80d2654f31f191a74d777046493135226942be8e3aad0576b41b335"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/account_reporting/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "4c7851422a5e815e775aeedae52964f8a9b41a1552ffe1fa0e521cf5b15e3a27"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/creator_reporting/service/views.py",
+    "line": 19,
+    "symbol": "get_product_report",
+    "sha256": "23f8860225a35c2e8b89c1f9db67ba2e4cbe36623c5cc9aad06f1bc1ae155f11"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/creator_reporting/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "05f70175f806d938ae08ea1cb56ca0f11bce527a3cb2c4614a2d0bffa1b8a672"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/operations_reporting/service/prompts.py",
+    "line": 39,
+    "symbol": "get_generation_prompt",
+    "sha256": "24ff38039db55ec6b4a28c05c15a3142ac96311a6f6adc0baa950ee8b26d16d8"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/operations_reporting/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "2f1f8df87079206a3043c8e1123e29ae69bdbe54a68c78d640cb08e206436e5a"
+  },
+  {
+    "path": "apps/api/app/http/routes.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "ae600b9281b11b00f4d21e5ad3276aa9720aeb47d6b7b79235b1811288c4de73"
+  },
+  {
+    "path": "apps/api/app/use_cases/studio_publication.py",
+    "line": 103,
+    "symbol": "publish_studio",
+    "sha256": "e53e222ba18fb9c1d73407dc023ae4aa3f24b57c760954908685f374222b0c33"
+  },
+  {
+    "path": "apps/api/app/use_cases/studio_components.py",
+    "line": 18,
+    "symbol": "component_mapping",
+    "sha256": "cf2584848b7d63995b6c167a45a431bc24988250c8af5e1f84e624f0dd9b5d27"
+  },
+  {
+    "path": "apps/api/app/use_cases/product_statistics.py",
+    "line": 20,
+    "symbol": "rebuild_day",
+    "sha256": "161f558e029cf7dac53e07eded26434fa028a82c3a83606a34532ce318c2d666"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/mapper/schema.py",
+    "line": 120,
+    "symbol": "published_view_to_response",
+    "sha256": "bb212b8d73fd8f91bcbe9c66dcfa5c2469e73ae60fb3ea8f628aff688ef22b56"
+  },
+  {
+    "path": "apps/api/app/http/dependencies.py",
+    "line": 31,
+    "symbol": "errors",
+    "sha256": "376034f18dffe13b4bd53a6ab64ca9efafafecf7e5a7ecb613e76a71c25be6d7"
+  },
+  {
+    "path": "apps/api/app/modules/identity/http_security.py",
+    "line": 134,
+    "symbol": "AuthRoute",
+    "sha256": "cee2156f41521afae1f32509218db6ddcbe2735dd1aba80cfd7a8a6031f42653"
+  },
+  {
+    "path": "apps/api/app/http/contracts/tags.py",
+    "line": 10,
+    "symbol": "model_config = ConfigDict(extra=\"forbid\")",
+    "sha256": "df782fb1ac49dadc1b6e7782e0c4b85393eb6fdcd9db316b420ed95f08679d70"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/command.py",
+    "line": 47,
+    "symbol": "async with use_case_transaction(session):",
+    "sha256": "c046d0738530225806178264785ac22493bb794951a7adc45a566777dcea01c8"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/command.py",
+    "line": 50,
+    "symbol": "row = await Repository.create_character_command(session, command)",
+    "sha256": "c046d0738530225806178264785ac22493bb794951a7adc45a566777dcea01c8"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/mapper/schema.py",
+    "line": 123,
+    "symbol": "return Schemas.PublishedProductInfoResponseDto.model_validate(result)",
+    "sha256": "bb212b8d73fd8f91bcbe9c66dcfa5c2469e73ae60fb3ea8f628aff688ef22b56"
+  },
+  {
+    "path": "apps/api/app/http/dependencies.py",
+    "line": 27,
+    "symbol": "Owner = Annotated[UUID, Depends(get_current_owner_id)]",
+    "sha256": "376034f18dffe13b4bd53a6ab64ca9efafafecf7e5a7ecb613e76a71c25be6d7"
+  },
+  {
+    "path": "apps/api/app/http/dependencies.py",
+    "line": 37,
+    "symbol": "raise HTTPException(422, str(exc)) from exc",
+    "sha256": "376034f18dffe13b4bd53a6ab64ca9efafafecf7e5a7ecb613e76a71c25be6d7"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/workflow/media.py",
+    "line": 19,
+    "symbol": "await asyncio.shield(task)",
+    "sha256": "ed8fa0cda7dffbe080252ce25cc9eddab4e74f1965dc11c8e128e11e41f28c4b"
+  },
+  {
+    "path": "apps/api/app/main.py",
+    "line": 72,
+    "symbol": "os.environ[\"DATABASE_URL\"], pool_pre_ping=True, hide_parameters=True",
+    "sha256": "d6217b6198c92db275d647f75cfa2dcd70fccd46868dfc792e82aae3b03c33b3"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+    "line": 530,
+    "symbol": "_finalize",
+    "sha256": "3667aa2f58fabcbbfc41370d45e9383c20d76d4beb0ffb4396c476daf3b0d7d1"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/command/prompts.py",
+    "line": 15,
+    "symbol": "save_generation_prompt",
+    "sha256": "42ac9daf066be170a9846fc3df6ccb27252652c5ea5ecaa6a6bbd18f3366609a"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/service/command/studio.py",
+    "line": 13,
+    "symbol": "save_studio_draft",
+    "sha256": "f5c33620ceeade4d0e58f4c4a7fe610d75b0dcb15f8eec7608f2370b7609b4a4"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/service/command/releases.py",
+    "line": 36,
+    "symbol": "publish_product",
+    "sha256": "83de76bcaae97f0b78ba387950522e96c70eb652ba308a90a91f50207fe250b5"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/workflow/media.py",
+    "line": 12,
+    "symbol": "_settle_storage",
+    "sha256": "ed8fa0cda7dffbe080252ce25cc9eddab4e74f1965dc11c8e128e11e41f28c4b"
+  },
+  {
+    "path": "apps/api/app/http/media.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "d83ffa1ae2903382327b86918b12c5426bad8f9d36833c77f3998cfec13cade1"
+  },
+  {
+    "path": "apps/api/app/media_cleanup.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "1a9c8231629a614549b2585fdce29f22e1f05f44c76a7b0ebf8fcd58c8b43200"
+  },
+  {
+    "path": "apps/api/app/modules/identity/service/workflow/mail.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "7a5911b12d3d9efb92aa4944bfdc07bd805b0a6cc5e100ce79be90c93e970482"
+  },
+  {
+    "path": "apps/api/app/modules/identity/service/workflow/google.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "b06389abe261215036c4fa3402142ac434a88e7e37f734b9881295786b16f681"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/workflow/memory.py",
+    "line": 172,
+    "symbol": "_persist_summary",
+    "sha256": "8da84a15e5a1d8e8aadc5f4f92edc0cd4d9162c1954fb9c8bc8573d8c912a424"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/memory/repository.py",
+    "line": 355,
+    "symbol": "claim_memory_work",
+    "sha256": "c8fda4028f8a75acb3cefdcad567da8299d1c72bb090d3b380037e7c1705fcb9"
+  },
+  {
+    "path": "apps/api/alembic/env.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "616bb3c1a79c8df42aa067e0ba52fc0cc192f7709caab96470478300fb293bda"
+  },
+  {
+    "path": "apps/api/alembic/versions/0030_generation_prompts.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "1ac2c7fd0467f848c8767ee3f294f23ef68a985b26eb1779ff15e097f1ad6f5b"
+  },
+  {
+    "path": "apps/api/tests/test_product_migrations.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "bffa08f08381965945169265953378e56f19e5bc755cafac2ef16f10237d2702"
+  },
+  {
+    "path": "apps/api/tests/conftest.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "be16905a3292394273429cecdcfed22bcab69697e3962e50e526fd86b0933e14"
+  },
+  {
+    "path": "apps/api/app/modules/identity/http_security.py",
+    "line": 91,
+    "symbol": "verify_csrf",
+    "sha256": "cee2156f41521afae1f32509218db6ddcbe2735dd1aba80cfd7a8a6031f42653"
+  },
+  {
+    "path": "apps/api/app/modules/identity/http_security.py",
+    "line": 111,
+    "symbol": "error_response",
+    "sha256": "cee2156f41521afae1f32509218db6ddcbe2735dd1aba80cfd7a8a6031f42653"
+  },
+  {
+    "path": "apps/api/app/modules/identity/settings.py",
+    "line": 12,
+    "symbol": "AuthSettings",
+    "sha256": "76e82cb4360bd457c239186b3474399764c7256e9cf8b0dfc8ef435125700579"
+  },
+  {
+    "path": "apps/api/app/modules/reporting/operations_reporting/router.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "59072dbdd801092d7f9bef4e52423f0d2a01b26c0b106a2ce62a1d4d29c5382a"
+  },
+  {
+    "path": "apps/api/app/db/idempotency.py",
+    "line": 8,
+    "symbol": "lock_key",
+    "sha256": "ef4648111e9bc5c6b279d6f60fd9d8ff4d17ce982451df32df86117b667e2ac5"
+  },
+  {
+    "path": "apps/api/app/modules/commerce/credit/service/command.py",
+    "line": 24,
+    "symbol": "_require_credit_transaction",
+    "sha256": "0fdc0d53aa4840652aa0c34a6ad2e0d8ecc93482186e828f1a54e379d368d156"
+  },
+  {
+    "path": "apps/api/tests/test_architecture_contracts.py",
+    "line": 46,
+    "symbol": "test_openapi_contract_is_unchanged",
+    "sha256": "90c487a6a49fd9d777fa1f3f161fe70322dc51f98536ffdee305cd6478f70e00"
+  },
+  {
+    "path": "apps/api/app/main.py",
+    "line": 185,
+    "symbol": "recover",
+    "sha256": "d6217b6198c92db275d647f75cfa2dcd70fccd46868dfc792e82aae3b03c33b3"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/statistics_job.py",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "fa42e7f9027a2b36563ea03914ef49e822dfcbaeca72a066bdaf9068510d138e"
+  },
+  {
+    "path": "apps/api/app/modules/content/lorebook/service/command.py",
+    "line": 40,
+    "symbol": "_validate_lorebook_entry",
+    "sha256": "fe5aded4a63ea711fd96f8ebd4d09a64f1cf212178ed84006c94402b1b1f04e3"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/service/command/settings.py",
+    "line": 79,
+    "symbol": "_validate_publication",
+    "sha256": "12e3b7b1644cd952efee1e58a565387819b72921abe128068ade5a2c6566a8d8"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/repository/publication.py",
+    "line": 111,
+    "symbol": "add_snapshot_start",
+    "sha256": "d720e512c89d2a21ede0239abe3fce312ae9436ccf2e3d4afcf2a584c56f2287"
+  },
+  {
+    "path": "apps/api/app/modules/content/product/schemas.py",
+    "line": 121,
+    "symbol": "StartOptionInfoResponseDto",
+    "sha256": "36047d47e908967f1d43fccd4b2a13232ce0dd555befaf61df89bc7079d1dba6"
+  },
+  {
+    "path": "apps/api/app/http/character_dependencies.py",
+    "line": 37,
+    "symbol": "require_character_admin",
+    "sha256": "c1857bb18eff41d64b17a8167984b08bda0e9955edc4295c2d96272bdbf296e1"
+  },
+  {
+    "path": "apps/api/app/http/lorebook_dependencies.py",
+    "line": 35,
+    "symbol": "require_lorebook_moderator",
+    "sha256": "f36131c19c136d9670a1f1a935099e24ec0fbde6e0b21eee7785c8df19d39c2a"
+  },
+  {
+    "path": "apps/api/app/modules/governance/moderation/mapper/character.py",
+    "line": 9,
+    "symbol": "change_character_status_request_to_command",
+    "sha256": "6fa422af6adb5d3622b6d231f557295d805cb9031df461b7f8650c271b768453"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/command.py",
+    "line": 70,
+    "symbol": "change_character_status",
+    "sha256": "c046d0738530225806178264785ac22493bb794951a7adc45a566777dcea01c8"
+  },
+  {
+    "path": "apps/api/app/modules/content/lorebook/service/command.py",
+    "line": 148,
+    "symbol": "change_lorebook_status",
+    "sha256": "fe5aded4a63ea711fd96f8ebd4d09a64f1cf212178ed84006c94402b1b1f04e3"
+  },
+  {
+    "path": "apps/api/app/db/models/character.py",
+    "line": 78,
+    "symbol": "CharacterImage",
+    "sha256": "ae9fe8196c84954abc2ceb075d1a2aa9991c3cd0f211e40e9c7cf1985c908692"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/service/media.py",
+    "line": 260,
+    "symbol": "_attach_character_media",
+    "sha256": "80f040ba80478f5532bf034786038bb56e6f783cbbdc16ef50fd2b87ba9c7e92"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/repository.py",
+    "line": 691,
+    "symbol": "create_media_attachment",
+    "sha256": "2cad0c0414f17336ba32bb9c7f43973dd71c05d47dd92eb391ca7d8bdfd266f1"
+  },
+  {
+    "path": "apps/api/app/modules/content/character/router.py",
+    "line": 33,
+    "symbol": "_service_errors",
+    "sha256": "59ec282d8d06602aad18189933f94bcbd94872ad816bf8bb5362fac4963f570b"
+  },
+  {
+    "path": "apps/api/tests/test_product_catalog_page.py",
+    "line": 16,
+    "symbol": "test_catalog_title_and_description_come_from_published_snapshot",
+    "sha256": "42404e9c828deeac4b089e9011fece6388640949ff1cbdbd2384d871ae7632e5"
+  },
+  {
+    "path": "apps/api/tests/test_studio_draft_guard.py",
+    "line": 15,
+    "symbol": "test_edit_after_first_publication_does_not_change_product_visibility",
+    "sha256": "e39f9d7af5c1e509cd8dd4967c6ce020a06d994c62da9c34916ae1f98f444ec7"
+  },
+  {
+    "path": "apps/api/tests/test_studio_publication.py",
+    "line": 79,
+    "symbol": "test_initial_publication_uses_one_composed_transaction",
+    "sha256": "768ec2a527da7ce54500e6b83f07e55c58ee0f38d856b2b074ea052bf461d3b9"
+  },
+  {
+    "path": "apps/api/app/use_cases/ARCHITECTURE.md",
+    "line": 1,
+    "symbol": "file",
+    "sha256": "78b147a69ea8cf5afacf905bb80e9eb8fa9161ded7136cd8f9e0ee3e0ca308e0"
+  },
+  {
+    "path": "apps/api/app/modules/chatting/chat/service/workflow/memory.py",
+    "line": 79,
+    "symbol": "_process_memory_work",
+    "sha256": "8da84a15e5a1d8e8aadc5f4f92edc0cd4d9162c1954fb9c8bc8573d8c912a424"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation.py",
+    "line": 61,
+    "symbol": "AuditLog",
+    "sha256": "5ee9d615cb77cf6b6f50ba0a026c9b18acc78b093945a5608099859f9ca03b0b"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation_review.py",
+    "line": 188,
+    "symbol": "ModerationAction",
+    "sha256": "2fb521bc6b1ed03db3f48dab54fcb83e8196fb243c1a8698be7117e1d7678829"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation_review.py",
+    "line": 170,
+    "symbol": "ModerationAssessmentReport",
+    "sha256": "2fb521bc6b1ed03db3f48dab54fcb83e8196fb243c1a8698be7117e1d7678829"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation_review.py",
+    "line": 98,
+    "symbol": "ModerationAssessment",
+    "sha256": "2fb521bc6b1ed03db3f48dab54fcb83e8196fb243c1a8698be7117e1d7678829"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation.py",
+    "line": 26,
+    "symbol": "ModerationFlag",
+    "sha256": "5ee9d615cb77cf6b6f50ba0a026c9b18acc78b093945a5608099859f9ca03b0b"
+  },
+  {
+    "path": "apps/api/app/db/models/moderation_review.py",
+    "line": 26,
+    "symbol": "ModerationReport",
+    "sha256": "2fb521bc6b1ed03db3f48dab54fcb83e8196fb243c1a8698be7117e1d7678829"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 97,
+    "symbol": "AuthActionToken",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 115,
+    "symbol": "AuthOAuthAttempt",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 124,
+    "symbol": "AuthRateLimit",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 82,
+    "symbol": "AuthSession",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 65,
+    "symbol": "UserOAuthAccount",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/identity.py",
+    "line": 35,
+    "symbol": "User",
+    "sha256": "097a2d322d6869fc037a9cc32e964cae0f542999c40265b6150c117a1b71cfcc"
+  },
+  {
+    "path": "apps/api/app/db/models/billing_credit.py",
+    "line": 14,
+    "symbol": "BillingCreditBinding",
+    "sha256": "520304796611c55dd3756d2ee0079a936200b53a03384dc3c4b9ea3c73edb273"
+  },
+  {
+    "path": "apps/api/app/db/models/billing_quote.py",
+    "line": 16,
+    "symbol": "BillingQuote",
+    "sha256": "2cb063135b7a4a6e90af327a8103d87ade37f90b6eb26e1b25708bb3df7317e1"
+  },
+  {
+    "path": "apps/api/app/db/models/billing.py",
+    "line": 153,
+    "symbol": "Payment",
+    "sha256": "752e32368cf3440cbc02479915f8aee72cd4d9525261ee8c770a678051ceb7ab"
+  },
+  {
+    "path": "apps/api/app/db/models/product_usage.py",
+    "line": 85,
+    "symbol": "ProductPaymentEvent",
+    "sha256": "f3469ecf2fdb4ccd37456f067f1d3a6a008a53584e67928757ffa0647ce3a711"
+  },
+  {
+    "path": "apps/api/app/db/models/billing.py",
+    "line": 106,
+    "symbol": "SubscriptionPlan",
+    "sha256": "752e32368cf3440cbc02479915f8aee72cd4d9525261ee8c770a678051ceb7ab"
+  },
+  {
+    "path": "apps/api/app/db/models/billing.py",
+    "line": 55,
+    "symbol": "UsageLog",
+    "sha256": "752e32368cf3440cbc02479915f8aee72cd4d9525261ee8c770a678051ceb7ab"
+  },
+  {
+    "path": "apps/api/app/db/models/billing.py",
+    "line": 124,
+    "symbol": "UserSubscription",
+    "sha256": "752e32368cf3440cbc02479915f8aee72cd4d9525261ee8c770a678051ceb7ab"
+  },
+  {
+    "path": "apps/api/app/db/models/character.py",
+    "line": 109,
+    "symbol": "CharacterAsset",
+    "sha256": "ae9fe8196c84954abc2ceb075d1a2aa9991c3cd0f211e40e9c7cf1985c908692"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 111,
+    "symbol": "CharacterInternalTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/character_media.py",
+    "line": 16,
+    "symbol": "CharacterMedia",
+    "sha256": "257e5989bc4edd1017de2eee86b25caea15535342bd96cdcccb26b984d179411"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/character.py",
+    "line": 73,
+    "symbol": "CharacterSnapshotAsset",
+    "sha256": "ba1a1e265c222c6b85ce810c5ac13d24793818e660235de8d0c2cb8d08276ced"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/character.py",
+    "line": 44,
+    "symbol": "CharacterSnapshotImage",
+    "sha256": "ba1a1e265c222c6b85ce810c5ac13d24793818e660235de8d0c2cb8d08276ced"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/character.py",
+    "line": 22,
+    "symbol": "CharacterSnapshot",
+    "sha256": "ba1a1e265c222c6b85ce810c5ac13d24793818e660235de8d0c2cb8d08276ced"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 99,
+    "symbol": "CharacterTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/character.py",
+    "line": 40,
+    "symbol": "Character",
+    "sha256": "ae9fe8196c84954abc2ceb075d1a2aa9991c3cd0f211e40e9c7cf1985c908692"
+  },
+  {
+    "path": "apps/api/app/db/models/chat.py",
+    "line": 219,
+    "symbol": "MessageRequest",
+    "sha256": "7d2097d830e6a95338ae3a70248b709e3b113db7b87a90699035b098d0e16412"
+  },
+  {
+    "path": "apps/api/app/db/models/generation_prompt.py",
+    "line": 13,
+    "symbol": "GenerationPrompt",
+    "sha256": "9746bc1fbcb8ff0090181f8f5268d21865c79614611bfe9d44efaee84fbcd21a"
+  },
+  {
+    "path": "apps/api/app/db/models/chat.py",
+    "line": 127,
+    "symbol": "Message",
+    "sha256": "7d2097d830e6a95338ae3a70248b709e3b113db7b87a90699035b098d0e16412"
+  },
+  {
+    "path": "apps/api/app/db/models/product_usage.py",
+    "line": 30,
+    "symbol": "ProductGeneration",
+    "sha256": "f3469ecf2fdb4ccd37456f067f1d3a6a008a53584e67928757ffa0647ce3a711"
+  },
+  {
+    "path": "apps/api/app/db/models/chat.py",
+    "line": 89,
+    "symbol": "ConversationCharacter",
+    "sha256": "7d2097d830e6a95338ae3a70248b709e3b113db7b87a90699035b098d0e16412"
+  },
+  {
+    "path": "apps/api/app/db/models/chat.py",
+    "line": 192,
+    "symbol": "ConversationVersionChange",
+    "sha256": "7d2097d830e6a95338ae3a70248b709e3b113db7b87a90699035b098d0e16412"
+  },
+  {
+    "path": "apps/api/app/db/models/chat.py",
+    "line": 36,
+    "symbol": "Conversation",
+    "sha256": "7d2097d830e6a95338ae3a70248b709e3b113db7b87a90699035b098d0e16412"
+  },
+  {
+    "path": "apps/api/app/db/models/memory.py",
+    "line": 36,
+    "symbol": "ConversationMemory",
+    "sha256": "a6312eaac07d437c36b708bac2e0dc00d244b79b8d4a68f140ac67699994efcc"
+  },
+  {
+    "path": "apps/api/app/db/models/memory.py",
+    "line": 121,
+    "symbol": "MemoryJob",
+    "sha256": "a6312eaac07d437c36b708bac2e0dc00d244b79b8d4a68f140ac67699994efcc"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 35,
+    "symbol": "CreditAccount",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 273,
+    "symbol": "CreditBalance",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 149,
+    "symbol": "CreditReservation",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 298,
+    "symbol": "CreditTransactionEntry",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 66,
+    "symbol": "CreditTransaction",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/credit.py",
+    "line": 257,
+    "symbol": "CreditWallet",
+    "sha256": "a9bda51f887c2f839d6221cc620a19b130de0941a79b08a10b21823f8a02848a"
+  },
+  {
+    "path": "apps/api/app/db/models/lorebook.py",
+    "line": 105,
+    "symbol": "LorebookEntry",
+    "sha256": "a104c60f4428b7621ba5d0418618bc8a84fa6cef3a644ac116760a747edfee91"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 136,
+    "symbol": "LorebookInternalTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/lorebook.py",
+    "line": 13,
+    "symbol": "LorebookSnapshot",
+    "sha256": "43ab36a8ca1dbb9d7660d705562bb1afb4d13d6bdf9ce41cbb4272ac71894409"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 126,
+    "symbol": "LorebookTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/lorebook.py",
+    "line": 72,
+    "symbol": "Lorebook",
+    "sha256": "a104c60f4428b7621ba5d0418618bc8a84fa6cef3a644ac116760a747edfee91"
+  },
+  {
+    "path": "apps/api/app/db/models/model_routing.py",
+    "line": 66,
+    "symbol": "ModelReplacement",
+    "sha256": "4c274edcb598229fee172463b22f4daa3da94a0789eda7cd05ba21b70d50239c"
+  },
+  {
+    "path": "apps/api/app/db/models/model_routing.py",
+    "line": 34,
+    "symbol": "Model",
+    "sha256": "4c274edcb598229fee172463b22f4daa3da94a0789eda7cd05ba21b70d50239c"
+  },
+  {
+    "path": "apps/api/app/db/models/model_routing.py",
+    "line": 25,
+    "symbol": "Provider",
+    "sha256": "4c274edcb598229fee172463b22f4daa3da94a0789eda7cd05ba21b70d50239c"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 108,
+    "symbol": "ProductCharacter",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/product_statistics.py",
+    "line": 61,
+    "symbol": "ProductDailyStats",
+    "sha256": "bdf202fd8740d1171bd6e13ead6687d13db034f6d4e3b882d88c40a2292c0b28"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 84,
+    "symbol": "ProductInternalTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 186,
+    "symbol": "ProductLorebookCharacter",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 145,
+    "symbol": "ProductLorebook",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/product_release.py",
+    "line": 40,
+    "symbol": "ProductReleaseNoteRevision",
+    "sha256": "e247a947c9984b150296256ec911948a63c60c77bae6dd19bec387a182fb43b8"
+  },
+  {
+    "path": "apps/api/app/db/models/product_release.py",
+    "line": 14,
+    "symbol": "ProductReleaseNote",
+    "sha256": "e247a947c9984b150296256ec911948a63c60c77bae6dd19bec387a182fb43b8"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 66,
+    "symbol": "ProductSnapshotCharacter",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 146,
+    "symbol": "ProductSnapshotLorebookCharacter",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 105,
+    "symbol": "ProductSnapshotLorebook",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 50,
+    "symbol": "ProductSnapshotPolicyChange",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 177,
+    "symbol": "ProductSnapshotStartSet",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/snapshot/product.py",
+    "line": 27,
+    "symbol": "ProductSnapshot",
+    "sha256": "6de43039fee1f91ae5a3277df7af4605610180d18fd86ac4ae96267073932494"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 209,
+    "symbol": "ProductStartSet",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/product_statistics.py",
+    "line": 117,
+    "symbol": "ProductStatsDirtyDay",
+    "sha256": "bdf202fd8740d1171bd6e13ead6687d13db034f6d4e3b882d88c40a2292c0b28"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 94,
+    "symbol": "ProductStudioDraft",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 74,
+    "symbol": "ProductTag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  },
+  {
+    "path": "apps/api/app/db/models/product_statistics.py",
+    "line": 86,
+    "symbol": "ProductUserDailyActivity",
+    "sha256": "bdf202fd8740d1171bd6e13ead6687d13db034f6d4e3b882d88c40a2292c0b28"
+  },
+  {
+    "path": "apps/api/app/db/models/product_statistics.py",
+    "line": 69,
+    "symbol": "ProductVersionDailyStats",
+    "sha256": "bdf202fd8740d1171bd6e13ead6687d13db034f6d4e3b882d88c40a2292c0b28"
+  },
+  {
+    "path": "apps/api/app/db/models/product_statistics.py",
+    "line": 97,
+    "symbol": "ProductVersionUserDailyActivity",
+    "sha256": "bdf202fd8740d1171bd6e13ead6687d13db034f6d4e3b882d88c40a2292c0b28"
+  },
+  {
+    "path": "apps/api/app/db/models/product.py",
+    "line": 45,
+    "symbol": "Product",
+    "sha256": "410e352771eefde01262f2b915be6a4057d7d039460a0b1d875f395560dec2b6"
+  },
+  {
+    "path": "apps/api/app/db/models/tag.py",
+    "line": 31,
+    "symbol": "Tag",
+    "sha256": "7aa798a1935ca2798f7aa6effed1d53d6ae9e5d889ce7d4f57e08a6ae53c1820"
+  }
+]

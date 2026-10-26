@@ -1,0 +1,38 @@
+[
+  {
+    "id": "F01",
+    "result": "nullable start entry accepted; response rejects null title",
+    "errors": [
+      "string_type"
+    ]
+  },
+  {
+    "id": "F02",
+    "guard": "require_character_admin",
+    "overridden": false,
+    "status": 503
+  },
+  {
+    "id": "F02",
+    "guard": "require_character_moderator",
+    "overridden": false,
+    "status": 503
+  },
+  {
+    "id": "F02",
+    "guard": "require_lorebook_admin",
+    "overridden": false,
+    "status": 503
+  },
+  {
+    "id": "F02",
+    "guard": "require_lorebook_moderator",
+    "overridden": false,
+    "status": 503
+  },
+  {
+    "id": "F03",
+    "result": "moderator actor ID is used as target owner filter",
+    "actor_is_owner_filter": true
+  }
+]

@@ -25,6 +25,71 @@ class MessagePermissionError(Exception):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class SaveGenerationPromptCommand:
+    generation_id: UUID
+    user_id: UUID
+    execution_token: str
+    request_json: str
+    provider: str
+    max_output_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationPromptInfo:
+    request_json: str
+    digest: str
+    format_version: int
+    created_at: datetime
+    provider: str
+    max_output_tokens: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListGenerationPromptsCommand:
+    actor_id: UUID
+    start: datetime
+    end: datetime
+    conversation_id: UUID | None = None
+    status: str | None = None
+    limit: int = 50
+    offset: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class GetGenerationPromptCommand:
+    actor_id: UUID
+    generation_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationPromptSummaryInfo:
+    generation_id: UUID
+    conversation_id: UUID
+    model_id: UUID
+    model_name: str
+    reasoning_effort: str
+    status: str
+    created_at: datetime
+    finished_at: datetime | None
+    history_invalidated_at: datetime | None
+    prompt_recorded: bool
+    prompt_created_at: datetime | None
+    provider: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationPromptPageInfo:
+    items: tuple[GenerationPromptSummaryInfo, ...]
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationPromptDetailInfo:
+    generation: GenerationPromptSummaryInfo
+    prompt: GenerationPromptInfo | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CreateMessageCommand:
     conversation_id: UUID
     user_id: UUID
@@ -103,6 +168,12 @@ class MessagePageInfo:
 class ListConversationPreviewsCommand:
     user_id: UUID
     conversation_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationActivityInfo:
+    content: str
+    created_at: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -255,6 +326,7 @@ class GenerateAnswerCommand:
     input_message_id: UUID
     expected_revision: int
     product_character_id: UUID
+    manual_entry_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

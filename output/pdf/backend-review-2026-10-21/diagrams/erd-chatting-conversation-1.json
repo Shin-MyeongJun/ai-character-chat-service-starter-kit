@@ -1,0 +1,106 @@
+{
+  "id": "erd-chatting-conversation-1",
+  "title": "chatting/conversation 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "conversation_characters",
+      "parent": "characters",
+      "columns": "character_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversation_characters",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversation_characters",
+      "parent": "product_snapshot_characters",
+      "columns": "product_character_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversation_version_changes",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversation_version_changes",
+      "parent": "product_snapshots",
+      "columns": "to_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversation_version_changes",
+      "parent": "product_snapshots",
+      "columns": "from_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversations",
+      "parent": "product_snapshot_start_sets",
+      "columns": "initial_snapshot_id,start_set_id",
+      "target": "product_snapshot_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversations",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    },
+    {
+      "child": "conversations",
+      "parent": "models",
+      "columns": "active_model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "chatting/conversation"
+    }
+  ]
+}

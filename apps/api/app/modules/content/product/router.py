@@ -13,8 +13,6 @@ from app.modules.content.product.mapper.schema import (
 )
 from app.modules.content.product.service import command as CommandService
 from app.modules.content.product.service import query as QueryService
-from app.modules.content.product.service.command.studio import save_studio_draft
-from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.command import (
     composition as CompositionCommandService,
 )
@@ -24,6 +22,7 @@ from app.modules.content.product.service.command import (
 from app.modules.content.product.service.command import (
     settings as SettingsCommandService,
 )
+from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.views import notices as NoticesViewsService
 from app.modules.content.product.tag_router import router as TagsRouter
 
@@ -38,37 +37,32 @@ async def read_studio_draft(product_id: UUID, session: Session, owner: Owner):
         )
 
 
-@router.put("/{product_id}/studio-draft", response_model=Schemas.StudioDraftResponseDto)
-async def write_studio_draft(
-    product_id: UUID, body: Schemas.SaveStudioDraftRequestDto, session: Session, owner: Owner
-):
-    with errors():
-        try:
-            info = await save_studio_draft(
-                session,
-                Types.SaveStudioDraftCommand(product_id, owner, body.expected_revision, body.document),
-            )
-        except Types.StudioDraftConflictError as exc:
-            raise HTTPException(409, str(exc)) from exc
-        return SchemaMapper.studio_draft_info_to_response(info)
-
-
 @router.get("/catalog", response_model=Schemas.CatalogPageResponseDto)
 async def catalog(
     session: Session,
     limit: int = Query(default=30, ge=1, le=100),
     cursor_created_at: str | None = None,
     cursor_id: UUID | None = None,
+    search: str = Query(default="", max_length=200),
+    tag_id: UUID | None = None,
 ):
+    """Expose server-side catalog filters while preserving the cursor response."""
     from datetime import datetime
 
     with errors():
         created_at = datetime.fromisoformat(cursor_created_at) if cursor_created_at else None
         return SchemaMapper.catalog_page_info_to_response(
             await QueryService.list_catalog(
-                session, Types.ListCatalogCommand(limit, created_at, cursor_id)
+                session, Types.ListCatalogCommand(limit, created_at, cursor_id, search, tag_id)
             )
         )
+
+
+@router.get("/catalog-tags")
+async def catalog_tags(session: Session):
+    """Expose existing public tag names, without mapping sample genres or internal tags."""
+    with errors():
+        return [{"id": tag.id, "name": tag.name} for tag in await QueryService.list_catalog_tags(session)]
 
 
 @router.get("/mine", response_model=list[Schemas.ProductInfoResponseDto])
@@ -77,16 +71,24 @@ async def list_mine(
     owner: Owner,
     request: Annotated[Schemas.ListProductsRequestDto, Query()],
 ):
+    """Keep the owner array endpoint compatible and search the entire owner scope."""
     value = SchemaMapper.product_list_request_to_command(request)
     return [
         SchemaMapper.product_info_to_response(result)
         for result in await QueryService.list_products(
             session,
             Types.ListProductsCommand(
-                owner_id=owner, offset=value.offset, limit=value.limit
+                owner_id=owner, offset=value.offset, limit=value.limit, search=request.search
             ),
         )
     ]
+
+
+@router.get("/mine/count")
+async def count_mine(session: Session, owner: Owner, search: str = Query(default="", max_length=200)):
+    """Return an exact owner count without interpreting the length of a partial page."""
+    with errors():
+        return {"total": await QueryService.count_products(session, Types.ListProductsCommand(owner_id=owner, search=search))}
 
 
 @router.post("", response_model=Schemas.ProductInfoResponseDto, status_code=201)

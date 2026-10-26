@@ -1,0 +1,31 @@
+{
+  "id": "module-asset_storage",
+  "title": "asset_storage 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "adapters",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "__init__": 1,
+    "adapters": 5,
+    "example": 1,
+    "service": 4,
+    "types": 1
+  },
+  "edges": [
+    [
+      "adapters",
+      "types"
+    ],
+    [
+      "service",
+      "adapters"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

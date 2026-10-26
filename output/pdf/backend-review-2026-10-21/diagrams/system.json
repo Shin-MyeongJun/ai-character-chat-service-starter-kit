@@ -1,0 +1,75 @@
+{
+  "id": "system",
+  "title": "시스템 구성과 실행 호출",
+  "kind": "boxes",
+  "nodes": [
+    [
+      "web",
+      "웹 / 로컬 클라이언트",
+      0,
+      0
+    ],
+    [
+      "api",
+      "FastAPI · main",
+      1,
+      0
+    ],
+    [
+      "domains",
+      "업무 모듈 / use_cases",
+      1,
+      1
+    ],
+    [
+      "db",
+      "PostgreSQL + pgvector",
+      1,
+      2
+    ],
+    [
+      "workers",
+      "memory / statistics / cleanup",
+      0,
+      2
+    ],
+    [
+      "providers",
+      "LLM / embedding / S3 / SMTP / OIDC",
+      2,
+      1
+    ]
+  ],
+  "edges": [
+    [
+      "web",
+      "api",
+      "HTTP"
+    ],
+    [
+      "api",
+      "domains",
+      "실행"
+    ],
+    [
+      "domains",
+      "db",
+      "SQL"
+    ],
+    [
+      "workers",
+      "db",
+      "claim / 저장"
+    ],
+    [
+      "workers",
+      "providers",
+      "외부 호출"
+    ],
+    [
+      "domains",
+      "providers",
+      "어댑터"
+    ]
+  ]
+}

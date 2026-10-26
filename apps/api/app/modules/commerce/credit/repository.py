@@ -315,7 +315,9 @@ def _history_statement(
     cursor,
     limit,
     status=None,
+    direction=None,
 ):
+    """Build owner/currency/time and signed movement predicates before LIMIT."""
     statement = select(model).where(
         model.user_id == user_id, model.currency_code == currency_code
     )
@@ -330,12 +332,17 @@ def _history_statement(
         statement = statement.where(tuple_(model.created_at, model.id) < cursor)
     if status is not None:
         statement = statement.where(model.status == status)
+    # Operations describe causes; the signed wallet delta defines usage/acquisition.
+    # Zero movements remain visible in the unfiltered ledger only.
+    if direction is not None:
+        statement = statement.where(model.amount < 0 if direction == "usage" else model.amount > 0)
     return statement.order_by(model.created_at.desc(), model.id.desc()).limit(limit + 1)
 
 
 async def list_credit_transactions(
     session: AsyncSession, **filters
 ) -> list[CreditTransactionRow]:
+    """Load a filtered ledger page and its free/paid allocations without extra metadata."""
     entities = list(
         await session.scalars(_history_statement(CreditTransaction, **filters))
     )

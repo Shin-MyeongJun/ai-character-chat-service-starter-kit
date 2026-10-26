@@ -1,0 +1,1567 @@
+/* [project]/apps/web/components/studio/studio.module.css [app-client] (css) */
+.studio-module__Aruvya__studio {
+  --canvas: #fff;
+  --sidebar: #f7f7f8;
+  --surface: #fff;
+  --hover: #f1f1f3;
+  --border: #e5e5e8;
+  --text: #202024;
+  --secondary: #65656f;
+  --action: #252529;
+  --on-action: #fff;
+  --selection: #eeeef1;
+  --positive: #3b6550;
+  --danger: #9d493e;
+  background: var(--canvas);
+  min-height: 100dvh;
+  color: var(--text);
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+  color-scheme: light;
+  font-family: Noto Sans KR, Malgun Gothic, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.studio-module__Aruvya__studio[data-theme="dark"] {
+  --canvas: #1c1c1e;
+  --sidebar: #222225;
+  --surface: #27272a;
+  --hover: #303034;
+  --border: #3d3d42;
+  --text: #f4f4f5;
+  --secondary: #b2b2bb;
+  --action: #f0f0f2;
+  --on-action: #202024;
+  --selection: #35353b;
+  --positive: #bcd9c8;
+  --danger: #e6b6ac;
+  --lightningcss-light: ;
+  --lightningcss-dark: initial;
+  color-scheme: dark;
+}
+
+.studio-module__Aruvya__studio ::selection {
+  background: var(--selection);
+  color: var(--text);
+}
+
+.studio-module__Aruvya__studio :where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+.studio-module__Aruvya__studio button {
+  transition: background .12s;
+}
+
+.studio-module__Aruvya__studio button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.studio-module__Aruvya__studio :is(button, a, input, textarea, select, summary):focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+}
+
+.studio-module__Aruvya__studio h1, .studio-module__Aruvya__studio h2, .studio-module__Aruvya__studio p {
+  margin: 0;
+}
+
+.studio-module__Aruvya__skipLink {
+  z-index: 99;
+  background: var(--action);
+  color: var(--on-action);
+  padding: 10px 16px;
+  position: fixed;
+  top: -80px;
+  left: 16px;
+}
+
+.studio-module__Aruvya__skipLink:focus {
+  top: 8px;
+}
+
+.studio-module__Aruvya__topbar {
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas);
+  z-index: 20;
+  align-items: center;
+  gap: 16px;
+  height: 72px;
+  padding: 0 16px;
+  display: flex;
+  position: sticky;
+  top: 0;
+}
+
+.studio-module__Aruvya__brand {
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__brand > span {
+  background: var(--action);
+  width: 36px;
+  height: 36px;
+  color: var(--on-action);
+  border-radius: 8px;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  display: grid;
+}
+
+.studio-module__Aruvya__brand > strong {
+  font-size: 14px;
+}
+
+.studio-module__Aruvya__breadcrumb {
+  color: var(--secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.studio-module__Aruvya__topActions {
+  flex-shrink: 0;
+}
+
+.studio-module__Aruvya__breadcrumb > span {
+  padding: 0 8px;
+}
+
+.studio-module__Aruvya__topActions {
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  display: flex;
+}
+
+.studio-module__Aruvya__saveStatus {
+  color: var(--secondary);
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  white-space: nowrap;
+  border-radius: 8px;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 24px;
+  font-weight: 600;
+  line-height: 22px;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.studio-module__Aruvya__primary, .studio-module__Aruvya__selected {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action) !important;
+}
+
+.studio-module__Aruvya__primary:hover:not(:disabled), .studio-module__Aruvya__selected:hover {
+  background: var(--action);
+  filter: brightness(.94);
+}
+
+.studio-module__Aruvya__workspace {
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  align-items: start;
+  min-height: calc(100dvh - 72px);
+  display: grid;
+}
+
+.studio-module__Aruvya__explorer, .studio-module__Aruvya__preview {
+  background: var(--sidebar);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  height: calc(100dvh - 72px);
+  min-height: calc(100dvh - 72px);
+  position: sticky;
+  top: 72px;
+  overflow-y: auto;
+}
+
+.studio-module__Aruvya__explorer {
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__explorer > .studio-module__Aruvya__button {
+  width: 100%;
+}
+
+.studio-module__Aruvya__explorer h2 {
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.studio-module__Aruvya__help {
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  display: block;
+}
+
+.studio-module__Aruvya__search {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-height: 48px;
+  color: var(--secondary);
+  border-radius: 8px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__search > input {
+  background: none;
+  border: 0;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+}
+
+.studio-module__Aruvya__search:focus-within {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
+.studio-module__Aruvya__search > button {
+  background: none;
+  border: 0;
+  font-size: 20px;
+}
+
+.studio-module__Aruvya__tree {
+  flex-direction: column;
+  gap: 6px;
+  display: flex;
+}
+
+.studio-module__Aruvya__tree details > summary {
+  cursor: pointer;
+  color: var(--secondary);
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  font-weight: 600;
+  list-style: none;
+  display: flex;
+}
+
+.studio-module__Aruvya__tree summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-module__Aruvya__tree details:not([open]) > summary svg {
+  transform: rotate(-90deg);
+}
+
+.studio-module__Aruvya__treeRow {
+  text-align: left;
+  overflow-wrap: anywhere;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 12px;
+  font-weight: 500;
+  display: flex;
+  color: var(--secondary) !important;
+}
+
+.studio-module__Aruvya__treeRow:hover {
+  background: var(--hover);
+}
+
+.studio-module__Aruvya__treeRow.studio-module__Aruvya__activeRow, .studio-module__Aruvya__treeRow[aria-current="page"] {
+  background: var(--selection);
+  font-weight: 700;
+  color: var(--text) !important;
+}
+
+.studio-module__Aruvya__treeFolder > summary {
+  padding-left: 24px !important;
+}
+
+.studio-module__Aruvya__loreRow {
+  padding-left: 36px;
+}
+
+.studio-module__Aruvya__indent {
+  padding-left: 24px;
+}
+
+.studio-module__Aruvya__disabledDot {
+  background: var(--secondary);
+  border-radius: 50%;
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin-left: auto;
+}
+
+.studio-module__Aruvya__explorerFooter {
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__siteLink {
+  color: var(--secondary);
+  text-underline-offset: 3px;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.studio-module__Aruvya__editor {
+  outline: 0;
+  min-width: 0;
+  padding: 32px;
+}
+
+.studio-module__Aruvya__editorFieldset {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-module__Aruvya__editorTitle {
+  margin-bottom: 16px;
+}
+
+.studio-module__Aruvya__editorTitle h1 {
+  overflow-wrap: anywhere;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 34px;
+}
+
+.studio-module__Aruvya__editorTitle p {
+  color: var(--secondary);
+  margin-top: 12px;
+  line-height: 22px;
+}
+
+.studio-module__Aruvya__tabs {
+  gap: 8px;
+  margin-bottom: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__choice {
+  background: var(--hover);
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  line-height: 20px;
+  display: inline-flex;
+  color: var(--secondary) !important;
+  font-size: 12px !important;
+}
+
+.studio-module__Aruvya__choice:hover {
+  background: var(--selection);
+}
+
+.studio-module__Aruvya__choice.studio-module__Aruvya__selected {
+  background: var(--action);
+  color: var(--on-action) !important;
+}
+
+.studio-module__Aruvya__editorFields {
+  flex-direction: column;
+  gap: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__contentFields {
+  gap: 12px;
+}
+
+.studio-module__Aruvya__field {
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+  display: flex;
+}
+
+.studio-module__Aruvya__field input:not([type="checkbox"]), .studio-module__Aruvya__field select, .studio-module__Aruvya__field textarea {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.studio-module__Aruvya__field textarea {
+  resize: vertical;
+  min-height: 184px;
+  padding: 16px;
+}
+
+.studio-module__Aruvya__field select {
+  cursor: pointer;
+  padding-right: 28px;
+}
+
+.studio-module__Aruvya__field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.studio-module__Aruvya__fieldRow {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  display: grid;
+}
+
+.studio-module__Aruvya__titleRow {
+  grid-template-columns: minmax(0, 1.88fr) minmax(0, 1fr);
+}
+
+.studio-module__Aruvya__callout {
+  background: var(--sidebar);
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__inline {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__chips {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  display: flex;
+}
+
+.studio-module__Aruvya__chip {
+  background: var(--hover);
+  min-height: 36px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+  border-radius: 999px;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__chip button {
+  color: var(--secondary);
+  background: none;
+  border: 0;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: center;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__draggableChip {
+  cursor: grab;
+  transition: opacity .12s, box-shadow .12s;
+  position: relative;
+}
+
+.studio-module__Aruvya__draggableChip:active {
+  cursor: grabbing;
+}
+
+.studio-module__Aruvya__draggingChip {
+  opacity: 0;
+}
+
+.studio-module__Aruvya__draggableChip:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 3px;
+}
+
+.studio-module__Aruvya__chipInput {
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  max-width: 100%;
+  display: flex;
+}
+
+.studio-module__Aruvya__chipInput input {
+  max-width: 100%;
+  background: var(--hover) !important;
+  border-color: #0000 !important;
+  border-radius: 999px !important;
+  width: 135px !important;
+  min-height: 36px !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+}
+
+.studio-module__Aruvya__chipInput button {
+  background: var(--action);
+  color: var(--on-action);
+  white-space: nowrap;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.studio-module__Aruvya__fold {
+  text-align: left;
+  background: var(--hover);
+  border: 0;
+  border-radius: 8px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__fold > span {
+  flex-direction: column;
+  gap: 3px;
+  display: flex;
+}
+
+.studio-module__Aruvya__fold small {
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.studio-module__Aruvya__statusToggle {
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__positive {
+  color: var(--positive);
+  align-items: center;
+  gap: 5px;
+  display: inline-flex;
+}
+
+.studio-module__Aruvya__error {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.studio-module__Aruvya__checkbox {
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  display: flex;
+}
+
+.studio-module__Aruvya__checkbox input {
+  accent-color: var(--action);
+  width: 18px;
+  height: 18px;
+}
+
+.studio-module__Aruvya__preview {
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  display: flex;
+}
+
+.studio-module__Aruvya__previewHead {
+  align-items: center;
+  gap: 8px;
+  display: flex;
+}
+
+.studio-module__Aruvya__previewHead h2 {
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.studio-module__Aruvya__previewHead svg {
+  color: var(--secondary);
+}
+
+.studio-module__Aruvya__bubble {
+  background: var(--surface);
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.studio-module__Aruvya__bubble p {
+  color: var(--secondary);
+  margin-top: 8px;
+}
+
+.studio-module__Aruvya__userBubble {
+  background: var(--selection);
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.studio-module__Aruvya__previewFooter {
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__testForm {
+  flex-direction: column;
+  gap: 10px;
+  display: flex;
+}
+
+.studio-module__Aruvya__testForm textarea {
+  min-height: 90px;
+}
+
+.studio-module__Aruvya__diagnostics {
+  flex-direction: column;
+  gap: 8px;
+  display: flex;
+}
+
+.studio-module__Aruvya__diagnostic {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__diagnostic:hover {
+  background: var(--hover);
+}
+
+.studio-module__Aruvya__diagnostic > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.studio-module__Aruvya__diagnostic > span {
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  display: flex;
+}
+
+.studio-module__Aruvya__diagnostic small {
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.studio-module__Aruvya__notice {
+  border: 1px solid var(--border);
+  background: var(--hover);
+  border-radius: 8px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  font-size: 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__notice button {
+  background: none;
+  border: 0;
+  font-size: 20px;
+}
+
+.studio-module__Aruvya__emptySmall {
+  color: var(--secondary);
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__emptySmall > button {
+  color: var(--text);
+  background: var(--hover);
+  border: 0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.studio-module__Aruvya__libraryTabs {
+  gap: 8px;
+  margin: 24px 0;
+  display: flex;
+}
+
+.studio-module__Aruvya__libraryList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  display: grid;
+}
+
+.studio-module__Aruvya__studio[data-library="works"] .studio-module__Aruvya__libraryList {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .studio-module__Aruvya__studio[data-library="works"] .studio-module__Aruvya__libraryList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-module__Aruvya__studio[data-library="works"] .studio-module__Aruvya__libraryList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.studio-module__Aruvya__libraryCard {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 20px;
+  display: flex;
+}
+
+.studio-module__Aruvya__libraryCard:hover {
+  background: var(--sidebar);
+}
+
+.studio-module__Aruvya__libraryItem {
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  display: flex;
+}
+
+.studio-module__Aruvya__libraryItem .studio-module__Aruvya__libraryCard {
+  flex: 1;
+  width: 100%;
+}
+
+.studio-module__Aruvya__dangerButton {
+  color: var(--danger) !important;
+}
+
+.studio-module__Aruvya__editActions {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__studio[data-context="library"] .studio-module__Aruvya__workspace {
+  min-height: calc(100dvh - 72px);
+  padding-bottom: 24px;
+  display: block;
+}
+
+.studio-module__Aruvya__studio[data-context="library"] .studio-module__Aruvya__editor {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.studio-module__Aruvya__libraryTabs {
+  flex-wrap: wrap;
+}
+
+.studio-module__Aruvya__libraryCard > strong {
+  font-size: 18px;
+}
+
+.studio-module__Aruvya__libraryCard p {
+  color: var(--secondary);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  display: -webkit-box;
+  overflow: hidden;
+}
+
+.studio-module__Aruvya__libraryActions {
+  gap: 12px;
+  margin-bottom: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__libraryActions > .studio-module__Aruvya__search {
+  flex: 1;
+  min-width: 0;
+}
+
+.studio-module__Aruvya__summaryGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+  display: grid;
+}
+
+.studio-module__Aruvya__summaryGrid > div {
+  background: var(--sidebar);
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  display: flex;
+}
+
+.studio-module__Aruvya__summaryGrid span {
+  color: var(--secondary);
+}
+
+.studio-module__Aruvya__sectionHeading {
+  font-size: 18px;
+  margin-top: 32px !important;
+}
+
+.studio-module__Aruvya__dialog {
+  background: var(--canvas);
+  width: min(560px, 100% - 32px);
+  max-height: calc(100dvh - 48px);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 20px 80px #0003;
+}
+
+.studio-module__Aruvya__dialog::backdrop {
+  background: #0006;
+}
+
+.studio-module__Aruvya__dialogHead {
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 20px;
+  padding: 20px 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__dialogHead h2 {
+  flex: 1;
+  font-size: 18px;
+}
+
+.studio-module__Aruvya__iconButton {
+  background: var(--hover);
+  border: 0;
+  border-radius: 8px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  display: grid;
+}
+
+.studio-module__Aruvya__dialogBody {
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__sampleText {
+  white-space: pre-wrap;
+}
+
+.studio-module__Aruvya__mobileToolbar, .studio-module__Aruvya__mobileNav {
+  display: none;
+}
+
+@media (min-width: 1700px) {
+  .studio-module__Aruvya__editor {
+    justify-self: center;
+    width: 100%;
+    max-width: 1040px;
+  }
+}
+
+@media (max-width: 1150px) and (min-width: 761px) {
+  .studio-module__Aruvya__workspace {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .studio-module__Aruvya__preview {
+    display: none;
+  }
+
+  .studio-module__Aruvya__studio[data-pane="preview"] .studio-module__Aruvya__preview {
+    z-index: 15;
+    border-left: 1px solid var(--border);
+    width: 340px;
+    height: calc(100dvh - 112px);
+    min-height: 0;
+    display: flex;
+    position: fixed;
+    top: 112px;
+    right: 0;
+    box-shadow: -12px 0 40px #0001;
+  }
+
+  .studio-module__Aruvya__mobileToolbar {
+    background: var(--canvas);
+    border-bottom: 1px solid var(--border);
+    z-index: 20;
+    justify-content: flex-end;
+    gap: 16px;
+    height: 40px;
+    padding: 0 20px;
+    display: flex;
+    position: sticky;
+    top: 72px;
+  }
+
+  .studio-module__Aruvya__mobileToolbar > button {
+    background: none;
+    border: 0;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    display: flex;
+  }
+
+  .studio-module__Aruvya__mobileToolbar > button:first-child, .studio-module__Aruvya__mobileToolbar > span {
+    display: none;
+  }
+
+  .studio-module__Aruvya__explorer {
+    height: calc(100dvh - 112px);
+    min-height: calc(100dvh - 112px);
+    top: 112px;
+  }
+
+  .studio-module__Aruvya__saveStatus {
+    display: none;
+  }
+
+  .studio-module__Aruvya__editor {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-module__Aruvya__studio[data-context="library"] .studio-module__Aruvya__workspace {
+    min-height: calc(100dvh - 60px);
+  }
+
+  .studio-module__Aruvya__libraryActions > .studio-module__Aruvya__button {
+    flex: 1;
+    padding: 10px;
+  }
+
+  .studio-module__Aruvya__libraryTabs .studio-module__Aruvya__button {
+    flex-basis: calc(50% - 8px);
+  }
+
+  .studio-module__Aruvya__topbar {
+    gap: 12px;
+    height: 60px;
+    padding: 0 16px;
+  }
+
+  .studio-module__Aruvya__brand {
+    gap: 8px;
+  }
+
+  .studio-module__Aruvya__brand > span {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  .studio-module__Aruvya__brand > strong {
+    font-size: 12px;
+  }
+
+  .studio-module__Aruvya__breadcrumb, .studio-module__Aruvya__saveStatus {
+    display: none;
+  }
+
+  .studio-module__Aruvya__topActions {
+    gap: 8px;
+  }
+
+  .studio-module__Aruvya__topActions > .studio-module__Aruvya__siteLink {
+    display: none;
+  }
+
+  .studio-module__Aruvya__studio[data-context="library"] .studio-module__Aruvya__topActions > .studio-module__Aruvya__siteLink {
+    display: inline;
+  }
+
+  .studio-module__Aruvya__topActions .studio-module__Aruvya__button {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .studio-module__Aruvya__topActions .studio-module__Aruvya__button:first-of-type {
+    width: 40px;
+    padding: 8px;
+  }
+
+  .studio-module__Aruvya__topActions .studio-module__Aruvya__button:first-of-type > span {
+    display: none;
+  }
+
+  .studio-module__Aruvya__mobileToolbar {
+    border-bottom: 1px solid var(--border);
+    background: var(--canvas);
+    z-index: 19;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    padding: 0 16px;
+    display: flex;
+    position: sticky;
+    top: 60px;
+  }
+
+  .studio-module__Aruvya__mobileToolbar > button {
+    background: none;
+    border: 0;
+    align-items: center;
+    gap: 5px;
+    min-height: 40px;
+    padding: 0;
+    font-size: 12px;
+    display: flex;
+  }
+
+  .studio-module__Aruvya__mobileToolbar > span {
+    color: var(--secondary);
+    text-align: center;
+    font-size: 10px;
+  }
+
+  .studio-module__Aruvya__workspace {
+    min-height: calc(100dvh - 108px);
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    display: block;
+  }
+
+  .studio-module__Aruvya__editor {
+    padding: 24px 20px;
+  }
+
+  .studio-module__Aruvya__explorer, .studio-module__Aruvya__preview {
+    height: auto;
+    min-height: calc(100dvh - 188px);
+    display: none;
+    position: static;
+  }
+
+  .studio-module__Aruvya__studio[data-pane="resources"] .studio-module__Aruvya__explorer {
+    padding: 20px;
+    display: flex;
+  }
+
+  .studio-module__Aruvya__studio[data-pane="resources"] .studio-module__Aruvya__editor, .studio-module__Aruvya__studio[data-pane="preview"] .studio-module__Aruvya__editor {
+    display: none;
+  }
+
+  .studio-module__Aruvya__studio[data-pane="preview"] .studio-module__Aruvya__preview {
+    padding: 24px 20px;
+    display: flex;
+  }
+
+  .studio-module__Aruvya__treeRow, .studio-module__Aruvya__tree details > summary {
+    min-height: 48px;
+  }
+
+  .studio-module__Aruvya__explorerFooter {
+    padding-top: 32px;
+  }
+
+  .studio-module__Aruvya__editorTitle h1 {
+    font-size: 24px;
+  }
+
+  .studio-module__Aruvya__editorTitle p {
+    font-size: 13px;
+  }
+
+  .studio-module__Aruvya__editorFields {
+    gap: 20px;
+  }
+
+  .studio-module__Aruvya__fieldRow, .studio-module__Aruvya__titleRow {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-module__Aruvya__choice {
+    min-height: 44px;
+  }
+
+  .studio-module__Aruvya__button {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+
+  .studio-module__Aruvya__field :is(input, select, textarea) {
+    font-size: 16px;
+  }
+
+  .studio-module__Aruvya__chip {
+    min-height: 44px;
+    padding: 4px 8px 4px 12px;
+  }
+
+  .studio-module__Aruvya__chip button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .studio-module__Aruvya__chipInput input {
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+
+  .studio-module__Aruvya__chipInput button {
+    min-height: 44px;
+  }
+
+  .studio-module__Aruvya__inline {
+    gap: 12px;
+  }
+
+  .studio-module__Aruvya__callout {
+    padding: 16px;
+  }
+
+  .studio-module__Aruvya__libraryList {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-module__Aruvya__libraryActions {
+    flex-wrap: wrap;
+  }
+
+  .studio-module__Aruvya__libraryActions .studio-module__Aruvya__search {
+    flex-basis: 100%;
+  }
+
+  .studio-module__Aruvya__libraryTabs .studio-module__Aruvya__button {
+    flex: 1;
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .studio-module__Aruvya__summaryGrid {
+    gap: 8px;
+  }
+
+  .studio-module__Aruvya__summaryGrid > div {
+    padding: 12px;
+    font-size: 12px;
+  }
+
+  .studio-module__Aruvya__mobileNav {
+    z-index: 25;
+    background: var(--canvas);
+    border-top: 1px solid var(--border);
+    padding: 4px 12px calc(4px + env(safe-area-inset-bottom));
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  .studio-module__Aruvya__mobileNav > button {
+    min-height: 56px;
+    color: var(--secondary);
+    background: none;
+    border: 0;
+    border-radius: 8px;
+    flex-direction: column;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    display: flex;
+  }
+
+  .studio-module__Aruvya__mobileNav > .studio-module__Aruvya__mobileActive {
+    background: var(--selection);
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .studio-module__Aruvya__dialog {
+    max-height: calc(100dvh - 32px);
+  }
+
+  .studio-module__Aruvya__dialogHead, .studio-module__Aruvya__dialogBody {
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-module__Aruvya__studio button {
+    transition: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .studio-module__Aruvya__topbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  .studio-module__Aruvya__brand > strong {
+    display: none;
+  }
+
+  .studio-module__Aruvya__topActions {
+    gap: 6px;
+  }
+
+  .studio-module__Aruvya__topActions .studio-module__Aruvya__button {
+    padding-inline: 8px;
+  }
+
+  .studio-module__Aruvya__topActions .studio-module__Aruvya__button:first-of-type {
+    width: 36px;
+  }
+}
+
+.studio-module__Aruvya__projectFields {
+  gap: 24px;
+}
+
+.studio-module__Aruvya__projectHeading p {
+  margin-top: 16px;
+}
+
+.studio-module__Aruvya__workHeading {
+  margin-bottom: 24px;
+}
+
+.studio-module__Aruvya__workHeading p {
+  margin-top: 24px;
+}
+
+.studio-module__Aruvya__workHeading + .studio-module__Aruvya__tabs {
+  margin-bottom: 24px;
+}
+
+.studio-module__Aruvya__sceneFields {
+  gap: 16px;
+}
+
+.studio-module__Aruvya__characterFields {
+  gap: 20px;
+}
+
+.studio-module__Aruvya__field .studio-module__Aruvya__mediumText {
+  min-height: 130px;
+}
+
+.studio-module__Aruvya__field .studio-module__Aruvya__openingText {
+  min-height: 148px;
+}
+
+.studio-module__Aruvya__field .studio-module__Aruvya__characterIntro {
+  min-height: 112px;
+}
+
+.studio-module__Aruvya__field .studio-module__Aruvya__characterPersona {
+  min-height: 150px;
+}
+
+.studio-module__Aruvya__field .studio-module__Aruvya__shortText {
+  min-height: 88px;
+}
+
+.studio-module__Aruvya__inlineCallout {
+  flex-flow: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.studio-module__Aruvya__linkList {
+  flex-direction: column;
+  gap: 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__scopeCallout {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.studio-module__Aruvya__scopeCallout p {
+  margin-top: 2px;
+}
+
+.studio-module__Aruvya__characterGrid {
+  grid-template-columns: minmax(0, 1.82fr) minmax(260px, 1fr);
+  align-items: start;
+  gap: 24px;
+  display: grid;
+}
+
+.studio-module__Aruvya__characterMedia {
+  background: var(--sidebar);
+  border-radius: 16px;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 24px;
+  display: flex;
+}
+
+.studio-module__Aruvya__characterMedia h2 {
+  font-size: 18px;
+}
+
+.studio-module__Aruvya__portrait {
+  background: var(--selection);
+  text-align: left;
+  overflow-wrap: anywhere;
+  border: 0;
+  border-radius: 12px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 176px;
+  padding: 24px;
+  display: flex;
+  overflow: hidden;
+}
+
+.studio-module__Aruvya__portraitLetter {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 42px;
+}
+
+.studio-module__Aruvya__assetGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  display: grid;
+}
+
+.studio-module__Aruvya__assetPlaceholder {
+  background: var(--surface);
+  border-radius: 8px;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+  padding: 12px;
+  display: flex;
+}
+
+.studio-module__Aruvya__assetPlaceholder > span {
+  color: var(--secondary);
+  font-size: 32px;
+  line-height: 42px;
+}
+
+.studio-module__Aruvya__assetImage {
+  object-fit: contain;
+  border-radius: 8px;
+  width: 100%;
+  height: 150px;
+}
+
+.studio-module__Aruvya__portrait .studio-module__Aruvya__assetImage {
+  height: 176px;
+}
+
+.studio-module__Aruvya__assetCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  display: flex;
+}
+
+.studio-module__Aruvya__assetCard .studio-module__Aruvya__field {
+  font-size: 12px;
+}
+
+.studio-module__Aruvya__assetCard .studio-module__Aruvya__field > span {
+  overflow-wrap: anywhere;
+}
+
+.studio-module__Aruvya__assetCard .studio-module__Aruvya__field select {
+  padding: 8px;
+  font-size: 12px;
+}
+
+.studio-module__Aruvya__assetName {
+  overflow-wrap: anywhere;
+  color: var(--secondary);
+}
+
+.studio-module__Aruvya__assetRemove {
+  border: 1px solid var(--border);
+  background: var(--hover);
+  border-radius: 8px;
+  min-height: 40px;
+}
+
+.studio-module__Aruvya__preserveLines {
+  white-space: pre-wrap;
+}
+
+.studio-module__Aruvya__previewClose {
+  margin-left: auto;
+}
+
+@media (min-width: 1151px) {
+  .studio-module__Aruvya__workspace[data-wide="true"] {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .studio-module__Aruvya__workspace[data-wide="true"] > .studio-module__Aruvya__preview {
+    display: none;
+  }
+
+  .studio-module__Aruvya__studio[data-pane="preview"] .studio-module__Aruvya__workspace[data-wide="true"] > .studio-module__Aruvya__preview {
+    z-index: 18;
+    border-left: 1px solid var(--border);
+    width: 340px;
+    display: flex;
+    position: fixed;
+    top: 72px;
+    right: 0;
+    box-shadow: -12px 0 40px #0002;
+  }
+}
+
+@media (min-width: 1700px) {
+  .studio-module__Aruvya__workspace[data-wide="true"] .studio-module__Aruvya__editor {
+    max-width: 1350px;
+  }
+}
+
+@media (max-width: 1250px) {
+  .studio-module__Aruvya__characterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-module__Aruvya__characterMedia {
+    width: 100%;
+    max-width: 600px;
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-module__Aruvya__projectFields, .studio-module__Aruvya__characterFields, .studio-module__Aruvya__sceneFields {
+    gap: 20px;
+  }
+
+  .studio-module__Aruvya__tabs .studio-module__Aruvya__chips {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .studio-module__Aruvya__tabs .studio-module__Aruvya__choice {
+    padding: 8px 10px;
+    font-size: 11px !important;
+  }
+
+  .studio-module__Aruvya__scopeCallout {
+    flex-wrap: wrap;
+  }
+
+  .studio-module__Aruvya__characterMedia {
+    padding: 20px;
+  }
+
+  .studio-module__Aruvya__characterGrid {
+    gap: 24px;
+  }
+
+  .studio-module__Aruvya__inline > .studio-module__Aruvya__button {
+    white-space: normal;
+    flex: 1;
+  }
+
+  .studio-module__Aruvya__assetCard .studio-module__Aruvya__field select {
+    font-size: 16px;
+  }
+}
+
+/*# sourceMappingURL=apps_web_components_studio_studio_module_css_1igg3k2._.single.css.map*/

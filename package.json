@@ -9,7 +9,11 @@
     "infra:down": "docker compose down",
     "web:dev": "pnpm --dir apps/web dev",
     "web:build": "pnpm --dir apps/web build",
-    "web:typecheck": "pnpm --dir apps/web typecheck"
+    "web:typecheck": "pnpm --dir apps/web typecheck",
+    "admin:dev": "pnpm --dir apps/admin_web dev",
+    "admin:build": "pnpm --dir apps/admin_web build",
+    "admin:typecheck": "pnpm --dir apps/admin_web typecheck",
+    "admin:test": "pnpm --dir apps/admin_web test"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

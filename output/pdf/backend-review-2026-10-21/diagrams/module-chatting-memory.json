@@ -1,0 +1,39 @@
+{
+  "id": "module-chatting-memory",
+  "title": "chatting/memory 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "repository",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 1,
+    "repository": 1,
+    "service": 9,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "repository",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

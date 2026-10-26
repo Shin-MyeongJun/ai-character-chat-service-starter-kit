@@ -81,7 +81,7 @@ def conversation_snapshot_infos_to_runtime_view(
         execution=execution,
         product_snapshot_id=str(snapshot.id),
         settings={
-            k: v for k, v in snapshot.snapshot_data.items() if k != "opening_message"
+            k: v for k, v in snapshot.snapshot_data.items() if k not in {"opening_message", "studio_start_options"}
         },
         start=start_context.start,
         opening_message=start_context.opening_message,
@@ -122,7 +122,7 @@ def conversation_start_infos_to_view(
     return Types.ConversationStartView(
         initial_snapshot_id=conversation.initial_snapshot_id,
         opening_mode=conversation.opening_mode,
-        opening_message=initial.snapshot_data["opening_message"]
+        opening_message=(initial.snapshot_data.get("studio_start_options", {}).get(str(start.source_entry_id), {}).get("opening", initial.snapshot_data["opening_message"]))
         if initial is not None and conversation.opening_mode == "snapshot"
         else None,
         start=Types.RuntimeStart(start.title, start.content)

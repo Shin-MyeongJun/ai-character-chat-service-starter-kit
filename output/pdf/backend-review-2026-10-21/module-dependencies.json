@@ -1,0 +1,516 @@
+{
+  "edges": [
+    {
+      "source": "chatting/chat",
+      "target": "chatting/conversation",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/service/command/answers.py:12",
+        "apps/api/app/modules/chatting/chat/service/command/answers.py:13",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:21",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:22",
+        "apps/api/app/modules/chatting/chat/service/command/messages.py:10",
+        "apps/api/app/modules/chatting/chat/service/command/messages.py:11",
+        "apps/api/app/modules/chatting/chat/service/command/prompts.py:11",
+        "apps/api/app/modules/chatting/chat/service/command/prompts.py:12",
+        "apps/api/app/modules/chatting/chat/service/query/messages.py:5",
+        "apps/api/app/modules/chatting/chat/service/query/messages.py:6",
+        "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py:13",
+        "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py:14",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:30",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:31",
+        "apps/api/app/modules/chatting/chat/service/workflow/memory.py:12",
+        "apps/api/app/modules/chatting/chat/service/workflow/memory.py:13",
+        "apps/api/app/modules/chatting/chat/types.py:13"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "chatting/memory",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/service/command/messages.py:15",
+        "apps/api/app/modules/chatting/chat/service/command/messages.py:16",
+        "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py:15",
+        "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py:16",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:32",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:33",
+        "apps/api/app/modules/chatting/chat/service/workflow/memory.py:14",
+        "apps/api/app/modules/chatting/chat/service/workflow/memory.py:15",
+        "apps/api/app/modules/chatting/chat/types.py:14"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "chatting/prompt",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/mapper/prompt.py:4",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:34",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:35"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "commerce/billing",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/router/answers.py:15",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:26",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:27",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:36",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:37",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:38",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:39"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:28",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:29",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:32"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/service/query/generation.py:33",
+        "apps/api/app/modules/chatting/chat/service/query/generation.py:34",
+        "apps/api/app/modules/chatting/chat/service/query/prompts.py:7",
+        "apps/api/app/modules/chatting/chat/service/query/prompts.py:8"
+      ]
+    },
+    {
+      "source": "chatting/chat",
+      "target": "llm",
+      "evidence": [
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:33",
+        "apps/api/app/modules/chatting/chat/service/command/generation.py:34",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:40",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:41",
+        "apps/api/app/modules/chatting/chat/service/workflow/answers.py:42",
+        "apps/api/app/modules/chatting/chat/service/workflow/memory.py:16",
+        "apps/api/app/modules/chatting/chat/types.py:15",
+        "apps/api/app/modules/chatting/chat/types.py:16"
+      ]
+    },
+    {
+      "source": "chatting/conversation",
+      "target": "content/lorebook",
+      "evidence": [
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:8",
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:9"
+      ]
+    },
+    {
+      "source": "chatting/conversation",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/chatting/conversation/mapper/schema.py:6",
+        "apps/api/app/modules/chatting/conversation/router.py:14",
+        "apps/api/app/modules/chatting/conversation/router.py:39",
+        "apps/api/app/modules/chatting/conversation/service/command/__init__.py:7",
+        "apps/api/app/modules/chatting/conversation/service/command/__init__.py:8",
+        "apps/api/app/modules/chatting/conversation/service/command/__init__.py:9",
+        "apps/api/app/modules/chatting/conversation/service/command/__init__.py:10",
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:10",
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:11",
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:12",
+        "apps/api/app/modules/chatting/conversation/service/command/versions.py:10",
+        "apps/api/app/modules/chatting/conversation/service/command/versions.py:11",
+        "apps/api/app/modules/chatting/conversation/service/command/versions.py:12",
+        "apps/api/app/modules/chatting/conversation/service/command/versions.py:13",
+        "apps/api/app/modules/chatting/conversation/service/views.py:6",
+        "apps/api/app/modules/chatting/conversation/service/views.py:7",
+        "apps/api/app/modules/chatting/conversation/service/views.py:8"
+      ]
+    },
+    {
+      "source": "chatting/conversation",
+      "target": "llm",
+      "evidence": [
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:13",
+        "apps/api/app/modules/chatting/conversation/service/command/context.py:14",
+        "apps/api/app/modules/chatting/conversation/types.py:9"
+      ]
+    },
+    {
+      "source": "chatting/memory",
+      "target": "chatting/conversation",
+      "evidence": [
+        "apps/api/app/modules/chatting/memory/service/command/invalidation.py:5",
+        "apps/api/app/modules/chatting/memory/service/command/invalidation.py:6"
+      ]
+    },
+    {
+      "source": "chatting/memory",
+      "target": "llm",
+      "evidence": [
+        "apps/api/app/modules/chatting/memory/service/command/indexing.py:11",
+        "apps/api/app/modules/chatting/memory/service/command/indexing.py:12",
+        "apps/api/app/modules/chatting/memory/service/command/summarization.py:12",
+        "apps/api/app/modules/chatting/memory/service/command/summarization.py:13",
+        "apps/api/app/modules/chatting/memory/service/query/retrieval.py:18",
+        "apps/api/app/modules/chatting/memory/service/query/retrieval.py:19",
+        "apps/api/app/modules/chatting/memory/types.py:12"
+      ]
+    },
+    {
+      "source": "chatting/prompt",
+      "target": "chatting/conversation",
+      "evidence": [
+        "apps/api/app/modules/chatting/prompt/types.py:7"
+      ]
+    },
+    {
+      "source": "chatting/prompt",
+      "target": "chatting/memory",
+      "evidence": [
+        "apps/api/app/modules/chatting/prompt/types.py:8"
+      ]
+    },
+    {
+      "source": "commerce/billing",
+      "target": "commerce/credit",
+      "evidence": [
+        "apps/api/app/modules/commerce/billing/mapper/credits.py:5",
+        "apps/api/app/modules/commerce/billing/service/credits.py:16",
+        "apps/api/app/modules/commerce/billing/service/credits.py:17",
+        "apps/api/app/modules/commerce/billing/service/credits.py:18"
+      ]
+    },
+    {
+      "source": "commerce/billing",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/commerce/billing/service/command/attribution.py:19",
+        "apps/api/app/modules/commerce/billing/service/command/attribution.py:20",
+        "apps/api/app/modules/commerce/billing/service/command/attribution.py:21"
+      ]
+    },
+    {
+      "source": "commerce/billing",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/commerce/billing/service/query.py:22",
+        "apps/api/app/modules/commerce/billing/service/query.py:23"
+      ]
+    },
+    {
+      "source": "content/character",
+      "target": "asset_storage",
+      "evidence": [
+        "apps/api/app/modules/content/character/service/media.py:11",
+        "apps/api/app/modules/content/character/service/media.py:12",
+        "apps/api/app/modules/content/character/service/workflow/media.py:6",
+        "apps/api/app/modules/content/character/types.py:11"
+      ]
+    },
+    {
+      "source": "content/character",
+      "target": "content/tag",
+      "evidence": [
+        "apps/api/app/modules/content/character/mapper/tags.py:1",
+        "apps/api/app/modules/content/character/service/tags.py:8",
+        "apps/api/app/modules/content/character/service/tags.py:9",
+        "apps/api/app/modules/content/character/service/tags.py:10"
+      ]
+    },
+    {
+      "source": "content/character",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/content/character/service/tags.py:11",
+        "apps/api/app/modules/content/character/service/tags.py:12"
+      ]
+    },
+    {
+      "source": "content/lorebook",
+      "target": "content/tag",
+      "evidence": [
+        "apps/api/app/modules/content/lorebook/mapper/tags.py:1",
+        "apps/api/app/modules/content/lorebook/service/tags.py:8",
+        "apps/api/app/modules/content/lorebook/service/tags.py:9",
+        "apps/api/app/modules/content/lorebook/service/tags.py:10"
+      ]
+    },
+    {
+      "source": "content/lorebook",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/content/lorebook/service/tags.py:11",
+        "apps/api/app/modules/content/lorebook/service/tags.py:12"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "asset_storage",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/views/media.py:3"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "chatting/conversation",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/views/notices.py:3",
+        "apps/api/app/modules/content/product/service/views/notices.py:4"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "content/character",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/command/composition.py:4",
+        "apps/api/app/modules/content/product/service/command/composition.py:5",
+        "apps/api/app/modules/content/product/service/command/publication.py:8",
+        "apps/api/app/modules/content/product/service/command/publication.py:9",
+        "apps/api/app/modules/content/product/service/command/publication.py:10",
+        "apps/api/app/modules/content/product/service/command/releases.py:7",
+        "apps/api/app/modules/content/product/service/command/releases.py:8",
+        "apps/api/app/modules/content/product/service/views/__init__.py:2",
+        "apps/api/app/modules/content/product/service/views/__init__.py:3",
+        "apps/api/app/modules/content/product/service/views/media.py:4",
+        "apps/api/app/modules/content/product/service/views/media.py:5",
+        "apps/api/app/modules/content/product/service/views/snapshots.py:2",
+        "apps/api/app/modules/content/product/service/views/snapshots.py:3",
+        "apps/api/app/modules/content/product/types.py:11"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "content/lorebook",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/command/composition.py:6",
+        "apps/api/app/modules/content/product/service/command/composition.py:7",
+        "apps/api/app/modules/content/product/service/command/publication.py:11",
+        "apps/api/app/modules/content/product/service/command/publication.py:12",
+        "apps/api/app/modules/content/product/service/command/publication.py:13",
+        "apps/api/app/modules/content/product/service/command/settings.py:4",
+        "apps/api/app/modules/content/product/service/command/settings.py:5",
+        "apps/api/app/modules/content/product/service/views/__init__.py:4",
+        "apps/api/app/modules/content/product/service/views/__init__.py:5",
+        "apps/api/app/modules/content/product/types.py:12"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "content/tag",
+      "evidence": [
+        "apps/api/app/modules/content/product/mapper/tags.py:1",
+        "apps/api/app/modules/content/product/service/query/__init__.py:9",
+        "apps/api/app/modules/content/product/service/query/__init__.py:88",
+        "apps/api/app/modules/content/product/service/tags.py:8",
+        "apps/api/app/modules/content/product/service/tags.py:9",
+        "apps/api/app/modules/content/product/service/tags.py:10"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/command/__init__.py:13",
+        "apps/api/app/modules/content/product/service/command/__init__.py:14",
+        "apps/api/app/modules/content/product/service/query/reporting.py:8",
+        "apps/api/app/modules/content/product/service/query/reporting.py:9",
+        "apps/api/app/modules/content/product/service/tags.py:11",
+        "apps/api/app/modules/content/product/service/tags.py:12"
+      ]
+    },
+    {
+      "source": "content/product",
+      "target": "llm",
+      "evidence": [
+        "apps/api/app/modules/content/product/service/command/publication.py:21",
+        "apps/api/app/modules/content/product/service/command/publication.py:22",
+        "apps/api/app/modules/content/product/service/command/settings.py:14",
+        "apps/api/app/modules/content/product/service/command/settings.py:15",
+        "apps/api/app/modules/content/product/service/views/notices.py:8",
+        "apps/api/app/modules/content/product/service/views/notices.py:9",
+        "apps/api/app/modules/content/product/types.py:13"
+      ]
+    },
+    {
+      "source": "content/tag",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/content/tag/service/command.py:5",
+        "apps/api/app/modules/content/tag/service/command.py:6",
+        "apps/api/app/modules/content/tag/service/query.py:4",
+        "apps/api/app/modules/content/tag/service/query.py:5"
+      ]
+    },
+    {
+      "source": "governance/admin",
+      "target": "content/character",
+      "evidence": [
+        "apps/api/app/modules/governance/admin/character_router.py:18",
+        "apps/api/app/modules/governance/admin/character_router.py:19",
+        "apps/api/app/modules/governance/admin/mapper/character.py:1",
+        "apps/api/app/modules/governance/admin/tag_router.py:9",
+        "apps/api/app/modules/governance/admin/tag_router.py:10"
+      ]
+    },
+    {
+      "source": "governance/admin",
+      "target": "content/lorebook",
+      "evidence": [
+        "apps/api/app/modules/governance/admin/lorebook_router.py:18",
+        "apps/api/app/modules/governance/admin/lorebook_router.py:19",
+        "apps/api/app/modules/governance/admin/mapper/lorebook.py:1",
+        "apps/api/app/modules/governance/admin/tag_router.py:11",
+        "apps/api/app/modules/governance/admin/tag_router.py:12"
+      ]
+    },
+    {
+      "source": "governance/admin",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/governance/admin/service/command.py:2",
+        "apps/api/app/modules/governance/admin/service/command.py:3",
+        "apps/api/app/modules/governance/admin/tag_router.py:13",
+        "apps/api/app/modules/governance/admin/tag_router.py:14"
+      ]
+    },
+    {
+      "source": "governance/admin",
+      "target": "content/tag",
+      "evidence": [
+        "apps/api/app/modules/governance/admin/tag_router.py:15",
+        "apps/api/app/modules/governance/admin/tag_router.py:16",
+        "apps/api/app/modules/governance/admin/tag_router.py:17"
+      ]
+    },
+    {
+      "source": "governance/admin",
+      "target": "llm",
+      "evidence": [
+        "apps/api/app/modules/governance/admin/model_router.py:9",
+        "apps/api/app/modules/governance/admin/model_router.py:10"
+      ]
+    },
+    {
+      "source": "governance/moderation",
+      "target": "content/character",
+      "evidence": [
+        "apps/api/app/modules/governance/moderation/character_router.py:18",
+        "apps/api/app/modules/governance/moderation/mapper/character.py:3"
+      ]
+    },
+    {
+      "source": "governance/moderation",
+      "target": "content/lorebook",
+      "evidence": [
+        "apps/api/app/modules/governance/moderation/lorebook_router.py:18",
+        "apps/api/app/modules/governance/moderation/mapper/lorebook.py:3"
+      ]
+    },
+    {
+      "source": "governance/moderation",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/governance/moderation/service/command/actions.py:8",
+        "apps/api/app/modules/governance/moderation/service/command/actions.py:9",
+        "apps/api/app/modules/governance/moderation/service/command/reports.py:8",
+        "apps/api/app/modules/governance/moderation/service/command/reports.py:9"
+      ]
+    },
+    {
+      "source": "governance/moderation",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/governance/moderation/service/command/reports.py:16",
+        "apps/api/app/modules/governance/moderation/service/command/reports.py:17",
+        "apps/api/app/modules/governance/moderation/service/util/validation.py:11",
+        "apps/api/app/modules/governance/moderation/service/util/validation.py:12"
+      ]
+    },
+    {
+      "source": "llm",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/llm/service/command/replacement.py:8",
+        "apps/api/app/modules/llm/service/command/replacement.py:9",
+        "apps/api/app/modules/llm/types.py:231"
+      ]
+    },
+    {
+      "source": "llm",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/llm/service/command/replacement.py:10",
+        "apps/api/app/modules/llm/service/command/replacement.py:11"
+      ]
+    },
+    {
+      "source": "reporting/account_reporting",
+      "target": "chatting/chat",
+      "evidence": [
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:7",
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:8"
+      ]
+    },
+    {
+      "source": "reporting/account_reporting",
+      "target": "commerce/billing",
+      "evidence": [
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:11",
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:12"
+      ]
+    },
+    {
+      "source": "reporting/account_reporting",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:13",
+        "apps/api/app/modules/reporting/account_reporting/service/views.py:14"
+      ]
+    },
+    {
+      "source": "reporting/creator_reporting",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/reporting/creator_reporting/service/views.py:7",
+        "apps/api/app/modules/reporting/creator_reporting/service/views.py:8"
+      ]
+    },
+    {
+      "source": "reporting/creator_reporting",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/reporting/creator_reporting/service/views.py:11",
+        "apps/api/app/modules/reporting/creator_reporting/service/views.py:12"
+      ]
+    },
+    {
+      "source": "reporting/operations_reporting",
+      "target": "chatting/chat",
+      "evidence": [
+        "apps/api/app/modules/reporting/operations_reporting/service/prompts.py:4",
+        "apps/api/app/modules/reporting/operations_reporting/service/prompts.py:5"
+      ]
+    },
+    {
+      "source": "reporting/operations_reporting",
+      "target": "content/product",
+      "evidence": [
+        "apps/api/app/modules/reporting/operations_reporting/service/views.py:7",
+        "apps/api/app/modules/reporting/operations_reporting/service/views.py:8"
+      ]
+    },
+    {
+      "source": "reporting/operations_reporting",
+      "target": "identity",
+      "evidence": [
+        "apps/api/app/modules/reporting/operations_reporting/service/views.py:11",
+        "apps/api/app/modules/reporting/operations_reporting/service/views.py:12"
+      ]
+    }
+  ],
+  "strongly_connected_groups": [
+    [
+      "chatting/conversation",
+      "content/product",
+      "llm"
+    ]
+  ]
+}

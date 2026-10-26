@@ -16,6 +16,13 @@ from app.modules.content.product import types as ProductTypes
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
+@router.get("/{conversation_id}/manual-lore")
+async def manual_lore(conversation_id: UUID, session: Session, owner: Owner):
+    """Expose authorized manual choices; selection applies to a single answer request."""
+    with errors():
+        return {"items": await ViewsService.list_manual_lore(session, Types.OwnedConversationCommand(conversation_id=conversation_id, user_id=owner))}
+
+
 @router.post("", status_code=201, response_model=Schemas.ConversationStartedResponseDto)
 async def start(body: Schemas.StartRequest, session: Session, owner: Owner):
     command = SchemaMapper.conversation_start_request_to_command(body, owner)

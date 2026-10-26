@@ -12,6 +12,7 @@ class GenerateAnswerRequestDto(BaseModel):
     input_message_id: UUID
     expected_revision: int = Field(ge=1)
     product_character_id: UUID
+    manual_entry_ids: tuple[UUID, ...] = Field(default=(), max_length=100)
 
 
 class GenerateAnswerResponseDto(BaseModel):

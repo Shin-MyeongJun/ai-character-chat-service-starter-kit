@@ -1,0 +1,84 @@
+{
+  "id": "erd-commerce-billing-2",
+  "title": "commerce/billing 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "usage_logs",
+      "parent": "product_generations",
+      "columns": "generation_id,product_snapshot_id",
+      "target": "id,product_snapshot_id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "usage_logs",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "usage_logs",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "usage_logs",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "usage_logs",
+      "parent": "models",
+      "columns": "model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "user_subscriptions",
+      "parent": "subscription_plans",
+      "columns": "plan_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "user_subscriptions",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    }
+  ]
+}

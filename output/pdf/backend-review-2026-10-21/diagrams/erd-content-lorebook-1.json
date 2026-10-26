@@ -1,0 +1,106 @@
+{
+  "id": "erd-content-lorebook-1",
+  "title": "content/lorebook 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "lorebook_entries",
+      "parent": "lorebooks",
+      "columns": "lorebook_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_internal_tags",
+      "parent": "tags",
+      "columns": "tag_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_internal_tags",
+      "parent": "users",
+      "columns": "assigned_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_internal_tags",
+      "parent": "lorebooks",
+      "columns": "lorebook_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_snapshots",
+      "parent": "lorebooks",
+      "columns": "lorebook_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_tags",
+      "parent": "tags",
+      "columns": "tag_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_tags",
+      "parent": "users",
+      "columns": "assigned_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebook_tags",
+      "parent": "lorebooks",
+      "columns": "lorebook_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    },
+    {
+      "child": "lorebooks",
+      "parent": "users",
+      "columns": "owner_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/lorebook"
+    }
+  ]
+}

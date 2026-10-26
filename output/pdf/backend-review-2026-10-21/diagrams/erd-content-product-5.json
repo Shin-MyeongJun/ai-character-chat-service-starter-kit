@@ -1,0 +1,29 @@
+{
+  "id": "erd-content-product-5",
+  "title": "content/product 상세 FK 5",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "products",
+      "parent": "models",
+      "columns": "default_model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "products",
+      "parent": "product_snapshots",
+      "columns": "id,latest_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    }
+  ]
+}

@@ -68,7 +68,9 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
     async def lifespan(app):
         template = PromptService.load_template()
         async with AsyncExitStack() as stack:
-            engine = create_async_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
+            engine = create_async_engine(
+                os.environ["DATABASE_URL"], pool_pre_ping=True, hide_parameters=True
+            )
             stack.push_async_callback(engine.dispose)
             sessions = async_sessionmaker(engine, expire_on_commit=False)
             app.state.session_factory = sessions

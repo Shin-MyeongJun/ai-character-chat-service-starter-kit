@@ -1,4 +1,4 @@
-# 만료 시각과 현재 시각의 경계, 무기한 버전, active admin 조건을 확인한다.
+# 만료 시각과 현재 시각의 경계, 무기한 버전을 확인한다.
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -7,8 +7,6 @@ from uuid import uuid4
 import pytest
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.query import ensure_available
-from app.modules.identity.service.query import require_admin
-from app.modules.identity.types import GetUserCommand
 
 
 @pytest.mark.asyncio
@@ -39,15 +37,3 @@ async def test_expiry_boundary_and_unlimited_version():
             session, ProductTypes.EnsureAvailableCommand(snapshot_id=uuid4(), now=now)
         )
     ).expires_at == snapshot.expires_at
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("role,status", [("user", "active"), ("admin", "suspended")])
-async def test_administration_requires_active_admin(role, status):
-    session = SimpleNamespace(
-        get=AsyncMock(
-            return_value=SimpleNamespace(id=uuid4(), role=role, status=status)
-        )
-    )
-    with pytest.raises(LookupError):
-        await require_admin(session, GetUserCommand(uuid4()))

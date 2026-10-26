@@ -187,6 +187,7 @@ class ListCreditTransactionsCommand:
     end: datetime | None = None
     cursor: CreditCursor | None = None
     limit: int = 50
+    direction: str | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

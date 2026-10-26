@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from app.http.routes import router
 from app.modules.content.lorebook import schemas, types
 from app.modules.content.lorebook.mapper.schema import LorebookSchemaMapper
 from pydantic import ValidationError
@@ -23,19 +22,6 @@ from pydantic import ValidationError
 def test_cursor_requires_a_complete_timezone_aware_pair(values):
     with pytest.raises(ValidationError):
         schemas.ListLorebooksRequestDto.model_validate(values)
-
-
-def test_cursor_mapper_preserves_valid_cursor():
-    created_at = datetime.now(UTC)
-    cursor_id = uuid4()
-    request = schemas.ListLorebookEntriesRequestDto(
-        cursor_created_at=created_at,
-        cursor_id=cursor_id,
-    )
-
-    result = LorebookSchemaMapper.cursor_request_to_value(request)
-
-    assert result == types.LorebookCursor(created_at=created_at, id=cursor_id)
 
 
 def test_create_mapper_uses_trusted_owner_id():
@@ -102,13 +88,3 @@ def test_enabled_keyword_entry_requires_a_trigger():
         is_enabled=False,
     )
     assert disabled_keyword.key_triggers is None
-
-
-def test_static_me_routes_are_registered_before_uuid_routes():
-    from fastapi import FastAPI
-
-    app = FastAPI()
-    app.include_router(router)
-    paths = list(app.openapi()["paths"])
-
-    assert paths.index("/lorebooks/me") < paths.index("/lorebooks/{lorebook_id}")

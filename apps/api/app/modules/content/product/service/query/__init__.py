@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
+from app.modules.content.tag import types as TagTypes
 
 
 async def get_owned_product(
@@ -43,16 +44,22 @@ async def get_product(session, command: Types.GetProductCommand) -> Types.Produc
 async def list_products(
     session, command: Types.ListProductsCommand
 ) -> list[Types.ProductInfo]:
+    """Return one server-searched owner page without changing the legacy array contract."""
     owner_id = command.owner_id
     offset = command.offset
     limit = command.limit
     if offset < 0 or not 1 <= limit <= 100:
         raise ValueError("Invalid pagination.")
-    rows = await Repository.list_owned(session, owner_id, offset=offset, limit=limit)
+    if len(command.search) > 200:
+        raise ValueError("Search is too long.")
+    rows = await Repository.list_owned(session, owner_id, offset=offset, limit=limit, search=command.search.strip())
     return PersistenceMapper.products_entities_to_info(rows)
 
 
 async def list_catalog(session, command: Types.ListCatalogCommand) -> Types.CatalogPageInfo:
+    """Apply the same published-text/tag conditions on every catalog page."""
+    if len(command.search) > 200:
+        raise ValueError("Search is too long.")
     if not 1 <= command.limit <= 100 or (
         (command.cursor_created_at is None) != (command.cursor_id is None)
     ) or (
@@ -64,8 +71,23 @@ async def list_catalog(session, command: Types.ListCatalogCommand) -> Types.Cata
         session, limit=command.limit,
         cursor_created_at=command.cursor_created_at,
         cursor_id=command.cursor_id,
+        search=command.search.strip(), tag_id=command.tag_id,
     )
     return PersistenceMapper.catalog_entities_to_page_info(rows, command.limit)
+
+
+async def count_products(session, command: Types.ListProductsCommand) -> int:
+    """Count the same owner/search scope as list_products, independent of its page."""
+    if len(command.search) > 200:
+        raise ValueError("Search is too long.")
+    return await Repository.count_owned(session, command.owner_id, search=command.search.strip())
+
+
+async def list_catalog_tags(session) -> tuple[TagTypes.TagInfo, ...]:
+    """Resolve only tag IDs that occur on listable products through the tag public API."""
+    from app.modules.content.tag.service import query as TagQueryService
+    ids = await Repository.list_catalog_tag_ids(session)
+    return tuple(sorted(await TagQueryService.get_tags(session, TagTypes.GetTagsCommand(ids)), key=lambda tag: (tag.name, tag.id)))
 
 
 async def ensure_snapshot_available(

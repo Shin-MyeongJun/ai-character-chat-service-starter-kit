@@ -1,0 +1,92 @@
+{
+  "id": "layers",
+  "title": "대표 모듈의 호출과 값 변환",
+  "kind": "boxes",
+  "nodes": [
+    [
+      "http",
+      "router / HTTP DTO",
+      0,
+      0
+    ],
+    [
+      "sm",
+      "mapper/schema",
+      1,
+      0
+    ],
+    [
+      "svc",
+      "command / query / views",
+      0,
+      1
+    ],
+    [
+      "wf",
+      "선택적 workflow",
+      2,
+      0
+    ],
+    [
+      "repo",
+      "repository",
+      0,
+      2
+    ],
+    [
+      "pm",
+      "mapper/persistence",
+      1,
+      2
+    ],
+    [
+      "db",
+      "자기 소유 테이블",
+      0,
+      3
+    ],
+    [
+      "values",
+      "types: Command / Info / View",
+      2,
+      2
+    ]
+  ],
+  "edges": [
+    [
+      "http",
+      "sm",
+      "변환"
+    ],
+    [
+      "http",
+      "svc",
+      "직접 호출"
+    ],
+    [
+      "http",
+      "wf",
+      "다단계"
+    ],
+    [
+      "wf",
+      "svc",
+      "조합"
+    ],
+    [
+      "svc",
+      "repo",
+      "조회 / 쓰기"
+    ],
+    [
+      "repo",
+      "db",
+      "SQL"
+    ],
+    [
+      "svc",
+      "pm",
+      "Row 변환"
+    ]
+  ]
+}

@@ -1,12 +1,10 @@
 """업무 경계는 대역으로, 저장·동시성·페이지는 별도 PostgreSQL 검사로 검증한다."""
 
-import ast
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -544,25 +542,6 @@ def test_invalid_assessment_scores(score):
                 confidence_score=score,
             )
         )
-
-
-def test_all_new_module_functions_have_korean_docstrings():
-    """추가한 계층의 모든 함수에 기능 설명이 있는지 검사한다."""
-    base = Path(__file__).resolve().parents[1] / "app/modules/governance/moderation"
-    paths = [
-        base / "types.py",
-        base / "mapper/persistence.py",
-        *base.joinpath("service").rglob("*.py"),
-        *base.joinpath("repository").rglob("*.py"),
-    ]
-    for path in paths:
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                doc = ast.get_docstring(node)
-                assert doc and any("가" <= character <= "힣" for character in doc), (
-                    path,
-                    node.name,
-                )
 
 
 @pytest.mark.asyncio

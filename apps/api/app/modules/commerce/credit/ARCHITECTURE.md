@@ -17,6 +17,12 @@ credit은 재화별 무료/유료 보유·예약·사용 가능량, 지갑 준�
 쓰기와 조회는 변경 이유가 달라 분리했다. 각각의 밀접한 기능은 한 파일에 유지한다.
 빈 기존 service.py는 service 디렉터리로 대체했다. 모듈 내부 HTTP 계층은 만들지 않는다. 최상위 `app/http/account_credits.py`가 billing의 공개 잔액 조회 서비스를 인증된 사용자에게 읽기 전용으로 연결한다.
 
+2026-10-20: 같은 애플리케이션 HTTP 경계에 `GET /account/credits/transactions`를 추가했다.
+기존 `query.list_credit_transactions`만 호출하며 인증 owner와 `CREDIT` 재화로 고정한다.
+HTTP contracts/mapper가 기간·내림차순 커서를 검증·변환하고 signed amount와 무료/유료 배분만
+노출한다. 타 사용자 ID·재화·내부 namespace/request_key/reason/reference_id는 입력·출력에서
+제외한다. 원장은 결제 주문·승인·영수증 증빙이 아니며 지갑 준비·지급·commit을 실행하지 않는다.
+
 ## 소유 테이블
 
 | 테이블 | 계약 |

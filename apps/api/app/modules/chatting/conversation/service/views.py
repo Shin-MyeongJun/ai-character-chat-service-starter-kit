@@ -5,6 +5,17 @@ from app.modules.chatting.conversation.mapper import persistence as PersistenceM
 from app.modules.chatting.conversation.service import query as QueryService
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import query as ProductQueryService
+from app.modules.content.product.service import views as ProductViewsService
+
+
+async def list_manual_lore(session, command: Types.OwnedConversationCommand) -> tuple[Types.ManualLoreInfo, ...]:
+    """List selectable manual entries only from this owner's available pinned snapshot."""
+    conversation = await QueryService.get_owned_conversation(session, command)
+    if conversation.product_snapshot_id is None:
+        return ()
+    await ProductQueryService.ensure_snapshot_available(session, ProductTypes.ProductSnapshotCommand(conversation.product_snapshot_id))
+    runtime = await ProductViewsService.get_snapshot_runtime(session, ProductTypes.ProductSnapshotCommand(conversation.product_snapshot_id))
+    return tuple(Types.ManualLoreInfo(str(entry["id"]), entry.get("title") or "이름 없는 로어") for book in runtime.lorebooks.values() for entry in book.snapshot_data["entries"] if entry["is_enabled"] and entry["entry_type"] != "start_set" and entry["activation_type"] == "manual")
 
 
 async def get_conversation_start(

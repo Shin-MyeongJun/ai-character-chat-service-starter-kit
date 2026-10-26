@@ -1,0 +1,46 @@
+{
+  "id": "module-llm",
+  "title": "llm 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "adapters",
+    "mapper",
+    "repository",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "__init__": 1,
+    "adapters": 8,
+    "mapper": 1,
+    "repository": 1,
+    "service": 8,
+    "types": 1
+  },
+  "edges": [
+    [
+      "adapters",
+      "types"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "service",
+      "adapters"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

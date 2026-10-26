@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="503" height="264" preserveAspectRatio="xMinYMin meet" viewBox="0 0 503 264" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="503" height="264"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-264)" style="clip-path: url(#clip)">
+		<g transform="">
+			<path d="M 148,228 L 181.5,228 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="181.5 228, 177.9897 229.9177, 177.9897 226.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="156.1258056640625" y="258" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,516) scale(1,-1)">HTTP</text>
+			<path d="M 251.5,204 L 251.5,160 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="251.5 160, 253.4177 163.5103, 249.5823 163.5103" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="259.5" y="182.0" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,364) scale(1,-1)">실행</text>
+			<path d="M 251.5,112 L 251.5,68 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="251.5 68, 253.4177 71.51033, 249.5823 71.51033" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="259.5" y="90.0" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,180) scale(1,-1)">SQL</text>
+			<path d="M 148,44 L 181.5,44 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="181.5 44, 177.9897 45.9177, 177.9897 42.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="144.806884765625" y="74" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,148) scale(1,-1)">claim / 저장</text>
+			<path d="M 8,44 L 2,44 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<path d="M 2,44 L 2,3 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<path d="M 2,3 L 425,3 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<path d="M 425,3 L 425,112 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="425 112, 423.0823 108.4897, 426.9177 108.4897" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="350.116796875" y="9" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,18) scale(1,-1)">외부 호출</text>
+			<path d="M 321.5,136 L 355,136 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="355 136, 351.4897 137.9177, 351.4897 134.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="327.3" y="166" style="font-family: Malgun Gothic; font-size: 7.3px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,332) scale(1,-1)">어댑터</text>
+			<rect x="8.0" y="204" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="35.27856445312499" y="237" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,474) scale(1,-1)">웹 / 로컬 클라이언트</text>
+			<rect x="181.5" y="204" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="220.648193359375" y="237" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,474) scale(1,-1)">FastAPI · main</text>
+			<rect x="181.5" y="112" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="206.304443359375" y="145" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,290) scale(1,-1)">업무 모듈 / use_cases</text>
+			<rect x="181.5" y="20" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="201.3232421875" y="53" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,106) scale(1,-1)">PostgreSQL + pgvector</text>
+			<rect x="8.0" y="20" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="14.797851562499993" y="53" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,106) scale(1,-1)">memory / statistics / cleanup</text>
+			<rect x="355.0" y="112" width="140.0" height="48" rx="5" ry="5" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.7; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="372.7138671875" y="145" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,290) scale(1,-1)">LLM / embedding / S3 /</text>
+			<text x="396.468505859375" y="132.85" style="font-family: Malgun Gothic Bold; font-size: 9px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,265) scale(1,-1)">SMTP / OIDC</text>
+		</g>
+	</g>
+</svg>

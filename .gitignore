@@ -27,6 +27,7 @@ build/
 # next
 .next/
 **/.next/
+apps/web/.next-workflow-check/
 out/
 *.tsbuildinfo
 

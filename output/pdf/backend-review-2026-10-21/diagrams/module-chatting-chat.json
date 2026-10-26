@@ -1,0 +1,69 @@
+{
+  "id": "module-chatting-chat",
+  "title": "chatting/chat 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "dependencies",
+    "mapper",
+    "repository",
+    "router",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "dependencies": 1,
+    "mapper": 5,
+    "repository": 1,
+    "router": 3,
+    "schemas": 2,
+    "service": 14,
+    "types": 1
+  },
+  "edges": [
+    [
+      "dependencies",
+      "service"
+    ],
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "dependencies"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="503" height="558" preserveAspectRatio="xMinYMin meet" viewBox="0 0 503 558" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="503" height="558"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-558)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="0" y="546" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1092) scale(1,-1)">자식 FK → 부모 참조 · 아래 수량/삭제 정책은 ORM 선언 기준</text>
+			<rect x="0" y="485" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="12.275390625" y="516" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1032) scale(1,-1)">character_snapshot_images</text>
+			<rect x="375" y="485" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="400.64453125" y="516" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1032) scale(1,-1)">character_snapshots</text>
+			<path d="M 131,503 L 372,503 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 503, 368.4897 504.9177, 368.4897 501.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="205.4740234375" y="523" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1046) scale(1,-1)">character_snapshot_id → id</text>
+			<text x="198.926025390625" y="490" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,980) scale(1,-1)">자식당 부모 1 / 부모당 자식 0..N</text>
+			<text x="185.84060058593752" y="474" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,948) scale(1,-1)">DELETE CASCADE · UPDATE NO ACTION</text>
+			<rect x="0" y="419" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="12.275390625" y="450" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,900) scale(1,-1)">character_snapshot_images</text>
+			<rect x="375" y="419" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="408.076171875" y="450" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,900) scale(1,-1)">character_media</text>
+			<path d="M 131,437 L 372,437 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 437, 368.4897 438.9177, 368.4897 435.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="227.233203125" y="457" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,914) scale(1,-1)">media_id → id</text>
+			<text x="195.417626953125" y="424" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,848) scale(1,-1)">자식당 부모 0..1 / 부모당 자식 0..N</text>
+			<text x="186.2358154296875" y="408" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,816) scale(1,-1)">DELETE RESTRICT · UPDATE NO ACTION</text>
+			<rect x="0" y="353" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="25.64453125" y="384" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,768) scale(1,-1)">character_snapshots</text>
+			<rect x="375" y="353" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="419.59765625" y="384" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,768) scale(1,-1)">characters</text>
+			<path d="M 131,371 L 372,371 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 371, 368.4897 372.9177, 368.4897 369.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="222.172802734375" y="391" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,782) scale(1,-1)">character_id → id</text>
+			<text x="195.417626953125" y="358" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,716) scale(1,-1)">자식당 부모 0..1 / 부모당 자식 0..N</text>
+			<text x="185.80593261718752" y="342" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,684) scale(1,-1)">DELETE SET NULL · UPDATE NO ACTION</text>
+			<rect x="0" y="287" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="36.681640625" y="318" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,636) scale(1,-1)">character_tags</text>
+			<rect x="375" y="287" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="430.939453125" y="318" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,636) scale(1,-1)">tags</text>
+			<path d="M 131,305 L 372,305 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 305, 368.4897 306.9177, 368.4897 303.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="232.10390625" y="325" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,650) scale(1,-1)">tag_id → id</text>
+			<text x="198.926025390625" y="292" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,584) scale(1,-1)">자식당 부모 1 / 부모당 자식 0..N</text>
+			<text x="186.2358154296875" y="276" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,552) scale(1,-1)">DELETE RESTRICT · UPDATE NO ACTION</text>
+			<rect x="0" y="221" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="36.681640625" y="252" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,504) scale(1,-1)">character_tags</text>
+			<rect x="375" y="221" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="429.09765625" y="252" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,504) scale(1,-1)">users</text>
+			<path d="M 131,239 L 372,239 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 239, 368.4897 240.9177, 368.4897 237.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="222.010205078125" y="259" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,518) scale(1,-1)">assigned_by → id</text>
+			<text x="195.417626953125" y="226" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,452) scale(1,-1)">자식당 부모 0..1 / 부모당 자식 0..N</text>
+			<text x="185.80593261718752" y="210" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,420) scale(1,-1)">DELETE SET NULL · UPDATE NO ACTION</text>
+			<rect x="0" y="155" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="36.681640625" y="186" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,372) scale(1,-1)">character_tags</text>
+			<rect x="375" y="155" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="419.59765625" y="186" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,372) scale(1,-1)">characters</text>
+			<path d="M 131,173 L 372,173 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 173, 368.4897 174.9177, 368.4897 171.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="222.172802734375" y="193" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,386) scale(1,-1)">character_id → id</text>
+			<text x="198.926025390625" y="160" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,320) scale(1,-1)">자식당 부모 1 / 부모당 자식 0..N</text>
+			<text x="185.84060058593752" y="144" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,288) scale(1,-1)">DELETE CASCADE · UPDATE NO ACTION</text>
+			<rect x="0" y="89" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="44.59765625" y="120" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,240) scale(1,-1)">characters</text>
+			<rect x="375" y="89" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="425.1796875" y="120" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,240) scale(1,-1)">models</text>
+			<path d="M 131,107 L 372,107 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 107, 368.4897 108.9177, 368.4897 105.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="213.73759765625" y="127" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,254) scale(1,-1)">default_model_id → id</text>
+			<text x="195.417626953125" y="94" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,188) scale(1,-1)">자식당 부모 0..1 / 부모당 자식 0..N</text>
+			<text x="185.80593261718752" y="78" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,156) scale(1,-1)">DELETE SET NULL · UPDATE NO ACTION</text>
+			<rect x="0" y="23" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="44.59765625" y="54" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,108) scale(1,-1)">characters</text>
+			<rect x="375" y="23" width="128" height="43" rx="4" ry="4" style="stroke: rgb(71%,80%,83%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="429.09765625" y="54" style="font-family: Malgun Gothic Bold; font-size: 8.0px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,108) scale(1,-1)">users</text>
+			<path d="M 131,41 L 372,41 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="372 41, 368.4897 42.9177, 368.4897 39.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="227.162744140625" y="61" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,122) scale(1,-1)">owner_id → id</text>
+			<text x="198.926025390625" y="28" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,56) scale(1,-1)">자식당 부모 1 / 부모당 자식 0..N</text>
+			<text x="185.84060058593752" y="12" style="font-family: Malgun Gothic; font-size: 7.1px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,24) scale(1,-1)">DELETE CASCADE · UPDATE NO ACTION</text>
+		</g>
+	</g>
+</svg>

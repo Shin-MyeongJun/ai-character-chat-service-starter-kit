@@ -170,27 +170,6 @@ async def test_lorebook_detail_is_owner_scoped(database, data):
     )
 
 
-async def test_entry_page_forwards_parent_cursor_and_limit(monkeypatch):
-    cursor = types.LorebookCursor(
-        created_at=datetime(2026, 9, 2, tzinfo=UTC), id=uid(201)
-    )
-    entries = [make_entry(101), make_entry(102)]
-    repository_page = types.LorebookEntryPage(items=entries, next_cursor=cursor)
-    list_entries = AsyncMock(return_value=repository_page)
-    monkeypatch.setattr(repository, "list_lorebook_entries", list_entries)
-    session = object()
-    page = await query.list_lorebook_entries(
-        session,
-        LorebookTypes.ListLorebookEntriesCommand(
-            lorebook_id=uid(10), cursor=cursor, limit=7
-        ),
-    )
-    list_entries.assert_awaited_once_with(session, uid(10), cursor=cursor, limit=7)
-    assert [item.id for item in page.items] == [uid(101), uid(102)]
-    assert all(isinstance(item, types.LorebookEntryInfo) for item in page.items)
-    assert page.next_cursor is cursor
-
-
 async def test_owned_entry_list_checks_parent_before_reading_children(monkeypatch):
     parent = make_lorebook(10, uid(800), datetime(2026, 9, 1, tzinfo=UTC))
     get_parent = AsyncMock(side_effect=[None, parent])

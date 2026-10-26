@@ -21,6 +21,7 @@ from app.modules.chatting.chat.service.command import answers as AnswersCommandS
 from app.modules.chatting.chat.service.command import (
     generation as GenerationCommandService,
 )
+from app.modules.chatting.chat.service.command import prompts as PromptsCommandService
 from app.modules.chatting.chat.service.query import generation as GenerationQueryService
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 from app.modules.chatting.chat.service.workflow.answer_preparation import (
@@ -87,6 +88,7 @@ class AnswerOrchestrator:
         return existing
 
     async def _read_preparation(self, session, command):
+        """Collect owner history before runtime so diagnostic and answer lore rules agree."""
         current = await AnswersCommandService.get_answer_input(
             session,
             Types.GetAnswerInputCommand(
@@ -107,12 +109,22 @@ class AnswerOrchestrator:
             c.product_character_id for c in participants
         }:
             raise ValueError("Select exactly one participating answer character.")
+        source = await MessagesQueryService.list_memory_source(
+            session,
+            Types.ListMemorySourceCommand(
+                conversation_id=command.conversation_id, user_id=command.user_id
+            ),
+        )
+        if source.truncated:
+            raise ValueError("Conversation exceeds safe lore inspection limit.")
         runtime = await ConversationService.prepare_runtime_context(
             session,
             ConversationTypes.PrepareRuntimeContextCommand(
                 conversation_id=command.conversation_id,
                 user_id=command.user_id,
                 activation_text=current.content,
+                activation_messages=tuple((item.sender_type, item.content) for item in source.messages),
+                manual_entry_ids=tuple(map(str, command.manual_entry_ids)),
             ),
         )
         model = await LLMQueryService.get_model(
@@ -120,12 +132,6 @@ class AnswerOrchestrator:
         )
         if model is None:
             raise LLMTypes.UnsupportedModelError("Execution model is unavailable.")
-        source = await MessagesQueryService.list_memory_source(
-            session,
-            Types.ListMemorySourceCommand(
-                conversation_id=command.conversation_id, user_id=command.user_id
-            ),
-        )
         snapshot = _digest(
             {
                 "conversation": asdict(conversation),
@@ -167,6 +173,7 @@ class AnswerOrchestrator:
             "input_message_id": str(command.input_message_id),
             "expected_revision": command.expected_revision,
             "product_character_id": str(command.product_character_id),
+            **({"manual_entry_ids": sorted(map(str, command.manual_entry_ids))} if command.manual_entry_ids else {}),
         }
         # Existing requests precede configuration, preparation, prices and expiry.
         async with self.sessions() as session, use_case_transaction(session):
@@ -361,6 +368,18 @@ class AnswerOrchestrator:
                             lease_until=lease,
                         ),
                     )
+                    if prompt is not None:
+                        await PromptsCommandService.save_generation_prompt(
+                            session,
+                            Types.SaveGenerationPromptCommand(
+                                generation_id=run.id,
+                                user_id=command.user_id,
+                                execution_token=metadata["execution_token"],
+                                request_json=prompt.request_json,
+                                provider=runtime.execution.provider,
+                                max_output_tokens=config.response_tokens,
+                            ),
+                        )
         except (ValueError, LookupError, Types.MessageConflictError):
             raise
         except Exception as exc:

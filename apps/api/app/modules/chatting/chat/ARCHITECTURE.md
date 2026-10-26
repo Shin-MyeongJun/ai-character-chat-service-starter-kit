@@ -2,7 +2,7 @@
 
 ## 소유 데이터와 호출 경계
 
-`messages`, `product_generations`, `chat_message_requests`를 소유한다. 기존 테이블명은 유지한다. ORM 읽기·쓰기는 `repository.py`에만 있고, Entity 해석은 `mapper/persistence.py`를 거친다. 타 모듈 테이블 JOIN 예외는 없다.
+`messages`, `product_generations`, `chat_message_requests`, `generation_prompts`를 소유한다. 기존 테이블명은 유지한다. ORM 읽기·쓰기는 `repository.py`에만 있고, Entity 해석은 `mapper/persistence.py` 및 `mapper/prompts.py`를 거친다.
 
 conversation의 공개 `get_owned_conversation(OwnedConversationCommand)`으로 소유권·현재 상품 버전을 확인하고, `list_conversation_characters`의 Info로 실제 참여 캐릭터를 확인한다. 별도 대화방 상태 컬럼은 없으며, 생성 시에는 기존 상품 버전 사용 가능 정책도 적용한다. Legacy 대화는 사용자 메시지 CRUD는 가능하고, 검증된 버전이 필요한 생성은 기존대로 거절한다.
 
@@ -95,6 +95,48 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 - command/query는 workflow를 호출하지 않는다. workflow는 구체적인 chat command/query 파일을 호출하며 repository를 직접 사용하지 않는다. `main`/`memory_worker`는 의존성과 반복 실행만 조립한다.
 
 답변의 요청 키·실행권·lease·staging·stale/cancelled·가격·사용량·기억 예약 계약은 기존 과금 구현 그대로다. 답변 HTTP 경로와 상태 코드를 유지하고, 응답 DTO에 선택적 `price_credit`를 추가해 기록된 예약 견적 금액을 보여준다. 별도 answer 모듈이나 기존 use_cases 재노출은 없다.
+
+## 최종 답변 프롬프트 기록 (2026-10-21)
+
+- `service/command/prompts.py`의 `save_generation_prompt(SaveGenerationPromptCommand)`는
+  conversation → generation 잠금, 실행 token·digest·provider·출력 예산·예약/lease 검증 후
+  UTF-8 원문의 SHA-256과 원문을 저장한다. 같은 원문의 재호출은 기존 시각을 유지하고,
+  다른 원문/실행 설정은 거절하며 UPDATE 경로를 제공하지 않는다.
+- `service/workflow/answers.py`는 최종 prompt 확정 및 준비 재검증 후 생성·견적·크레딧
+  예약·answer metadata·프롬프트 저장을 **같은 트랜잭션**에 조립한다. commit 성공 반환 후에만
+  calling staging과 LLM 호출로 간다. 저장 실패는 예약 전체 rollback이며 외부 호출은 없다.
+  commit 응답 유실 시 기존 요청을 조회/복구하며 불확실한 외부 호출을 새로 실행하지 않는다.
+- 현재 하나의 생성 ID는 하나의 실행권/외부 호출이다. SDK 내부 재시도나 lease 복구용
+  추가 프롬프트/시도 행은 만들지 않는다. 복구는 원문을 재구성하거나 덮어쓰지 않는다.
+- 원문은 공급자 어댑터 변환 **전** `prompt.request_json`의 전체 문자열이며 TEXT로 보존한다.
+  JSONB 재직렬화나 원본별 사후 재조립을 하지 않는다. system/reference_data, 캐릭터·로어·기억,
+  역할별 이력·현재 입력을 포함한 최종 구조를 유지한다. SDK 전송 HTTP 본문 기록이 아니다.
+- `generation_prompts.generation_id` PK/FK가 생성당 한 행을 보장한다. FK는 CASCADE로
+  의도적인 부모 생성 삭제 시 고아를 남기지 않는다. 메시지 편집/되돌리기는 기존대로
+  generation을 삭제하지 않으므로 기록이 남는다. 기존 generation→conversation/user/product
+  및 usage/payment FK는 바꾸지 않는다. 기존 대화방 전체 삭제 제약도 그대로다.
+- 저장 시각·형식 버전(1)·digest·provider·max_output_tokens를 저장한다.
+  model_id/model_name/reasoning_effort는 생성의 기존 불변 필드를 사용한다. 따라서 현재
+  models/providers 카탈로그를 JOIN하여 과거 실행 설정을 추정하지 않는다. reasoning_effort=none은
+  LLM Command에서 None으로 전달되는 기존 계약이다. 공급자 키/헤더/SDK 설정은 읽거나 저장하지 않는다.
+- `service/query/prompts.py`의 공개 `list_generation_prompts(ListGenerationPromptsCommand)`와
+  `get_generation_prompt(GetGenerationPromptCommand)`는 identity로 활성 admin을 재검증한다.
+  Row를 공개하지 않고 `GenerationPromptPageInfo`/`GenerationPromptDetailInfo`를 반환한다.
+  operations_reporting은 이 service/types만 이용한다. 일반 사용자·작가용 조회 API는 없다.
+- 목록 SQL은 원문/answer_metadata를 SELECT하지 않는다. 상세에서만 원문을 반환하며,
+  과거 미기록은 prompt=None, 생성 미존재는 LookupError다. 미기록 이유나 전송 성공은 추정하지 않는다.
+  저장 사실은 전송/응답 성공의 증거가 아니며 실패·호출 전 중단 기록도 보존한다.
+- Alembic 0030 / 초기 SQL 020 / GenerationPrompt ORM을 함께 관리한다. backfill은 없으며
+  행이 있는 상태의 downgrade는 손실 방지를 위해 거절한다. DBA 직접 UPDATE를 막는
+  트리거는 없고 애플리케이션 쓰기 경계가 불변성을 보장한다.
+- 애플리케이션 로그/오류에 원문을 출력하지 않는다. 기본 API 엔진은 hide_parameters=True로
+  SQL 오류의 바인드 값도 숨긴다. answer_metadata와 일반 답변 DTO에는 원문을 추가하지 않는다.
+
+파일은 기존 메시지/생성 저장소를 유지하고, 민감 원문 저장·조회 Command/Query와 순수 mapper만
+기능별 파일로 분리했다. prompt 모듈은 순수 구성 책임을 유지하며 기억 요약·임베딩 기록은 제외한다.
+작가용 부분 조회는 공개 범위/지침 비노출 정책을 별도 설계할 후속 과제이며 이번 구현에 포함하지 않는다.
+
+API/검증 범위는 [프롬프트 조회 계약](../../../../../../docs/generation-prompts.md)을 따른다.
 
 새 대화의 고정 첫 대사는 conversation 시작 조회에서 받고 prompt의 고정 assistant 문맥으로 전달한다. 메시지 목록이나 요약 원문에는 들어가지 않는다. legacy_messages 대화의 기존 첫 메시지는 이력으로 보존하며 snapshot 첫 대사를 추가하지 않는다. 기존 이력 요약 의미를 소급 변경하거나 기존 기억을 일괄 재작성하지 않는다.
 `list_conversation_previews`는 소유 대화 목록 페이지에 대해 마지막 메시지 문구만 조회한다. chat repository의 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 상위 `use_cases/conversation_directory.py`가 두 모듈의 공개 결과를 조합한다.

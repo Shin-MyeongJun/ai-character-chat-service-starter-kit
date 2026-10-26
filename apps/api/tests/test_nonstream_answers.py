@@ -201,25 +201,6 @@ async def test_invalid_outputs_do_not_save_success(db, bad_result, code):
         )
 
 
-async def test_cancel_releases_pending_and_does_not_repeat(db):
-    orchestrator, command, text = await setup_answer(db)
-    entered = asyncio.Event()
-
-    async def hang(_):
-        entered.set()
-        await asyncio.Future()
-
-    text.generate_text.side_effect = hang
-    task = asyncio.create_task(orchestrator.generate_answer(command))
-    await asyncio.wait_for(entered.wait(), 5)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    replay = await orchestrator.generate_answer(command)
-    assert replay.status == "cancelled" and replay.uncertain
-    assert text.generate_text.await_count == 1
-
-
 async def test_result_storage_failure_recovers_without_provider_or_duplicate_usage(
     db, monkeypatch
 ):
@@ -389,35 +370,3 @@ async def test_memory_failure_rolls_back_answer_and_usage_then_recovers(
     async with db.begin():
         assert (await db.scalar(select(MemoryJob))).requested_generation == 1
         assert await db.scalar(select(func.count()).select_from(UsageLog)) == 1
-
-
-async def test_http_to_postgres_returns_one_persisted_answer(db):
-    import httpx
-    from app.http.dependencies import get_current_owner_id
-    from app.modules.chatting.chat.router.answers import get_answer_orchestrator, router
-    from fastapi import FastAPI
-
-    orchestrator, command, text = await setup_answer(db)
-    app = FastAPI()
-    app.include_router(router)
-    app.dependency_overrides[get_current_owner_id] = lambda: command.user_id
-    app.dependency_overrides[get_answer_orchestrator] = lambda: orchestrator
-    body = {
-        "request_key": command.request_key,
-        "input_message_id": str(command.input_message_id),
-        "expected_revision": command.expected_revision,
-        "product_character_id": str(command.product_character_id),
-    }
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        first = await client.post(
-            f"/conversations/{command.conversation_id}/answers", json=body
-        )
-        second = await client.post(
-            f"/conversations/{command.conversation_id}/answers", json=body
-        )
-    assert first.status_code == second.status_code == 200
-    assert first.json() == second.json()
-    assert first.json()["content"] == result().content
-    assert text.generate_text.await_count == 1

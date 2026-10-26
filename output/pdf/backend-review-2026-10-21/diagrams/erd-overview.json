@@ -1,0 +1,160 @@
+{
+  "id": "erd-overview",
+  "title": "전체 ERD: 소유 도메인과 물리 FK",
+  "kind": "module",
+  "nodes": [
+    "governance/moderation",
+    "identity",
+    "commerce/billing",
+    "content/character",
+    "chatting/chat",
+    "chatting/conversation",
+    "chatting/memory",
+    "commerce/credit",
+    "content/lorebook",
+    "llm",
+    "content/product",
+    "content/tag"
+  ],
+  "counts": {
+    "governance/moderation": 6,
+    "identity": 6,
+    "commerce/billing": 7,
+    "content/character": 9,
+    "chatting/chat": 4,
+    "chatting/conversation": 3,
+    "chatting/memory": 2,
+    "commerce/credit": 6,
+    "content/lorebook": 5,
+    "llm": 3,
+    "content/product": 21,
+    "content/tag": 1
+  },
+  "edges": [
+    [
+      "chatting/chat",
+      "chatting/conversation"
+    ],
+    [
+      "chatting/chat",
+      "content/character"
+    ],
+    [
+      "chatting/chat",
+      "content/product"
+    ],
+    [
+      "chatting/chat",
+      "identity"
+    ],
+    [
+      "chatting/chat",
+      "llm"
+    ],
+    [
+      "chatting/conversation",
+      "content/character"
+    ],
+    [
+      "chatting/conversation",
+      "content/product"
+    ],
+    [
+      "chatting/conversation",
+      "identity"
+    ],
+    [
+      "chatting/conversation",
+      "llm"
+    ],
+    [
+      "chatting/memory",
+      "chatting/chat"
+    ],
+    [
+      "chatting/memory",
+      "chatting/conversation"
+    ],
+    [
+      "chatting/memory",
+      "identity"
+    ],
+    [
+      "commerce/billing",
+      "chatting/chat"
+    ],
+    [
+      "commerce/billing",
+      "chatting/conversation"
+    ],
+    [
+      "commerce/billing",
+      "commerce/credit"
+    ],
+    [
+      "commerce/billing",
+      "content/product"
+    ],
+    [
+      "commerce/billing",
+      "identity"
+    ],
+    [
+      "commerce/billing",
+      "llm"
+    ],
+    [
+      "commerce/credit",
+      "identity"
+    ],
+    [
+      "content/character",
+      "content/tag"
+    ],
+    [
+      "content/character",
+      "identity"
+    ],
+    [
+      "content/character",
+      "llm"
+    ],
+    [
+      "content/lorebook",
+      "content/tag"
+    ],
+    [
+      "content/lorebook",
+      "identity"
+    ],
+    [
+      "content/product",
+      "content/character"
+    ],
+    [
+      "content/product",
+      "content/lorebook"
+    ],
+    [
+      "content/product",
+      "content/tag"
+    ],
+    [
+      "content/product",
+      "identity"
+    ],
+    [
+      "content/product",
+      "llm"
+    ],
+    [
+      "governance/moderation",
+      "identity"
+    ],
+    [
+      "llm",
+      "content/product"
+    ]
+  ],
+  "count_label": "tables"
+}

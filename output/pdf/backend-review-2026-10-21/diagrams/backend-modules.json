@@ -1,0 +1,243 @@
+{
+  "id": "backend-modules",
+  "title": "백엔드 전체 모듈 의존 지도",
+  "kind": "module",
+  "nodes": [
+    "asset_storage",
+    "chatting/chat",
+    "chatting/conversation",
+    "chatting/memory",
+    "chatting/prompt",
+    "commerce/billing",
+    "commerce/credit",
+    "content/character",
+    "content/lorebook",
+    "content/product",
+    "content/tag",
+    "governance/admin",
+    "governance/moderation",
+    "identity",
+    "llm",
+    "reporting/account_reporting",
+    "reporting/creator_reporting",
+    "reporting/operations_reporting"
+  ],
+  "counts": {
+    "asset_storage": 12,
+    "chatting/chat": 31,
+    "chatting/conversation": 15,
+    "chatting/memory": 14,
+    "chatting/prompt": 4,
+    "commerce/billing": 18,
+    "commerce/credit": 8,
+    "content/character": 18,
+    "content/lorebook": 20,
+    "content/product": 43,
+    "content/tag": 5,
+    "governance/admin": 16,
+    "governance/moderation": 22,
+    "identity": 20,
+    "llm": 24,
+    "reporting/account_reporting": 6,
+    "reporting/creator_reporting": 6,
+    "reporting/operations_reporting": 11
+  },
+  "edges": [
+    [
+      "chatting/chat",
+      "chatting/prompt"
+    ],
+    [
+      "chatting/chat",
+      "commerce/billing"
+    ],
+    [
+      "chatting/chat",
+      "chatting/conversation"
+    ],
+    [
+      "chatting/chat",
+      "content/product"
+    ],
+    [
+      "chatting/chat",
+      "llm"
+    ],
+    [
+      "chatting/chat",
+      "chatting/memory"
+    ],
+    [
+      "chatting/chat",
+      "identity"
+    ],
+    [
+      "chatting/conversation",
+      "content/product"
+    ],
+    [
+      "chatting/conversation",
+      "content/lorebook"
+    ],
+    [
+      "chatting/conversation",
+      "llm"
+    ],
+    [
+      "chatting/memory",
+      "llm"
+    ],
+    [
+      "chatting/memory",
+      "chatting/conversation"
+    ],
+    [
+      "chatting/prompt",
+      "chatting/conversation"
+    ],
+    [
+      "chatting/prompt",
+      "chatting/memory"
+    ],
+    [
+      "commerce/billing",
+      "commerce/credit"
+    ],
+    [
+      "commerce/billing",
+      "content/product"
+    ],
+    [
+      "commerce/billing",
+      "identity"
+    ],
+    [
+      "content/character",
+      "content/tag"
+    ],
+    [
+      "content/character",
+      "asset_storage"
+    ],
+    [
+      "content/character",
+      "identity"
+    ],
+    [
+      "content/lorebook",
+      "content/tag"
+    ],
+    [
+      "content/lorebook",
+      "identity"
+    ],
+    [
+      "content/product",
+      "content/tag"
+    ],
+    [
+      "content/product",
+      "identity"
+    ],
+    [
+      "content/product",
+      "content/character"
+    ],
+    [
+      "content/product",
+      "content/lorebook"
+    ],
+    [
+      "content/product",
+      "llm"
+    ],
+    [
+      "content/product",
+      "asset_storage"
+    ],
+    [
+      "content/product",
+      "chatting/conversation"
+    ],
+    [
+      "content/tag",
+      "identity"
+    ],
+    [
+      "governance/admin",
+      "content/character"
+    ],
+    [
+      "governance/admin",
+      "content/lorebook"
+    ],
+    [
+      "governance/admin",
+      "llm"
+    ],
+    [
+      "governance/admin",
+      "content/product"
+    ],
+    [
+      "governance/admin",
+      "content/tag"
+    ],
+    [
+      "governance/moderation",
+      "content/character"
+    ],
+    [
+      "governance/moderation",
+      "content/lorebook"
+    ],
+    [
+      "governance/moderation",
+      "content/product"
+    ],
+    [
+      "governance/moderation",
+      "identity"
+    ],
+    [
+      "llm",
+      "content/product"
+    ],
+    [
+      "llm",
+      "identity"
+    ],
+    [
+      "reporting/account_reporting",
+      "chatting/chat"
+    ],
+    [
+      "reporting/account_reporting",
+      "commerce/billing"
+    ],
+    [
+      "reporting/account_reporting",
+      "identity"
+    ],
+    [
+      "reporting/creator_reporting",
+      "content/product"
+    ],
+    [
+      "reporting/creator_reporting",
+      "identity"
+    ],
+    [
+      "reporting/operations_reporting",
+      "chatting/chat"
+    ],
+    [
+      "reporting/operations_reporting",
+      "content/product"
+    ],
+    [
+      "reporting/operations_reporting",
+      "identity"
+    ]
+  ]
+}

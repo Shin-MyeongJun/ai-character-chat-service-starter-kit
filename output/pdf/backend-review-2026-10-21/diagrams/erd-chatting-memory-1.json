@@ -1,0 +1,51 @@
+{
+  "id": "erd-chatting-memory-1",
+  "title": "chatting/memory 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "conversation_memories",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/memory"
+    },
+    {
+      "child": "conversation_memories",
+      "parent": "messages",
+      "columns": "source_message_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "chatting/memory"
+    },
+    {
+      "child": "memory_jobs",
+      "parent": "conversations",
+      "columns": "conversation_id",
+      "target": "id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/memory"
+    },
+    {
+      "child": "memory_jobs",
+      "parent": "users",
+      "columns": "owner_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "chatting/memory"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "a": "apps/api/alembic/sql/0030_generation_prompts.sql",
+    "b": "infra/postgres/init/020_generation_prompts.sql",
+    "bytes_equal": true,
+    "text_equal": true
+  },
+  {
+    "a": "apps/api/alembic/sql/0027_moderation_review.sql",
+    "b": "infra/postgres/init/018_moderation_review.sql",
+    "bytes_equal": true,
+    "text_equal": true
+  }
+]

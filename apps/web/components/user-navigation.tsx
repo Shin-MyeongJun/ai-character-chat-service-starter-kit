@@ -7,7 +7,7 @@ import { ArrowRight, Compass, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen
 import { RecentConversations } from "@/components/recent-conversations";
 import { StoryLink, StorySearch } from "@/components/discovery-controls";
 import { useUserTheme } from "@/components/user-theme";
-import { getMe, logout } from "@/lib/api";
+import { getMe } from "@/lib/api";
 import { AUTH_CHANGED_KEY } from "@/lib/recent-chats";
 import styles from "./discovery.module.css";
 
@@ -19,8 +19,6 @@ export function UserNavigation() {
   const { theme, toggleTheme } = useUserTheme();
   const [open, setOpen] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
-  const [authError, setAuthError] = useState("");
   const isActive = (href: string) => href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
   const showSidebar = path !== "/login";
   useEffect(() => {
@@ -44,17 +42,7 @@ export function UserNavigation() {
     setOpen(next);
     try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch { /* Keep the in-memory preference. */ }
   }
-  async function signOut() {
-    if (signingOut) return;
-    setSigningOut(true); setAuthError("");
-    try { await logout(); setSignedIn(false); }
-    catch { setAuthError("로그아웃에 실패했어요. 다시 시도해 주세요."); }
-    finally { setSigningOut(false); }
-  }
-  const accountLabel = signingOut ? "로그아웃 중" : signedIn ? "로그아웃" : "로그인";
-  const account = signedIn
-    ? <button type="button" className={styles.account} disabled={signingOut} onClick={() => void signOut()} aria-label={accountLabel}><UserRound size={20} /><span>{accountLabel}</span><ArrowRight size={16} /></button>
-    : <Link href="/login" className={styles.account} aria-label="로그인"><UserRound size={20} /><span>로그인</span><ArrowRight size={16} /></Link>;
+  const account = <Link href="/account" className={styles.account} aria-label="마이페이지"><UserRound size={20} /><span>{signedIn ? "내 계정" : "마이페이지"}</span><ArrowRight size={16} /></Link>;
   return <>
     <a href="#user-content" className={styles.skipLink}>본문으로 이동</a>
     <header className={`user-navigation ${styles.navigation}`} data-sidebar={showSidebar ? open ? "open" : "closed" : "none"}>
@@ -76,7 +64,6 @@ export function UserNavigation() {
         <nav className={styles.mobileTabs} aria-label="탐색 메뉴"><Link href="/" aria-current={path === "/" ? "page" : undefined}>발견</Link><Link href="/explore" aria-current={path === "/explore" ? "page" : undefined}>둘러보기</Link></nav>
       </div>
     </header>
-    {authError && <p className={styles.notice} role="alert">{authError}</p>}
-    <nav className={styles.bottomNav} aria-label="모바일 메뉴">{[...links, { href: "/studio", label: "스튜디오", icon: PencilLine }].map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}><Icon size={20} /><span>{label}</span></Link>)}</nav>
+    <nav className={styles.bottomNav} aria-label="모바일 메뉴">{[...links, { href: "/studio", label: "스튜디오", icon: PencilLine }, { href: "/account", label: "내 계정", icon: UserRound }].map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}><Icon size={20} /><span>{label}</span></Link>)}</nav>
   </>;
 }

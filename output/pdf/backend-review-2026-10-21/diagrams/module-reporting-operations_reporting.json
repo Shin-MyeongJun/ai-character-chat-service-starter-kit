@@ -1,0 +1,53 @@
+{
+  "id": "module-reporting-operations_reporting",
+  "title": "reporting/operations_reporting 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "router",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 3,
+    "router": 1,
+    "schemas": 1,
+    "service": 2,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

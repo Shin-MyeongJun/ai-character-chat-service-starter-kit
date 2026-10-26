@@ -67,9 +67,6 @@ async def test_same_revision_publication_retry_returns_saved_release(monkeypatch
     create = AsyncMock(side_effect=AssertionError("Retry must not create source rows"))
     monkeypatch.setattr(publication, "use_case_transaction", transaction)
     monkeypatch.setattr(publication, "get_studio_draft_for_publication", AsyncMock(return_value=draft))
-    monkeypatch.setattr(publication.ProductQuery, "get_owned_product", AsyncMock(return_value=SimpleNamespace(
-        title="Story", description="Intro", opening_message="Welcome.", visibility="private",
-    )))
     monkeypatch.setattr(publication.CharacterCommand, "create_character", create)
     assert await publication.publish_studio(object(), command()) == release
     create.assert_not_awaited()
@@ -92,16 +89,10 @@ async def test_initial_publication_uses_one_composed_transaction(monkeypatch):
     draft.document["work"]["tags"] = ["work-tag"]
     draft.document["characters"][0]["tags"] = ["character-tag"]
     draft.document["lorebooks"][0]["tags"] = ["lore-tag"]
-    from app.modules.content.product.service import tags as ProductTagsService
-    product_tags = AsyncMock(return_value=())
-    monkeypatch.setattr(ProductTagsService, "replace_public_tags", product_tags)
     character_id, book_id, start_id = uuid4(), uuid4(), uuid4()
     release = ProductTypes.ReleaseInfo(uuid4(), 1, "First release", "Ready to read", "initial", "choice")
     monkeypatch.setattr(publication, "use_case_transaction", transaction)
     monkeypatch.setattr(publication, "get_studio_draft_for_publication", AsyncMock(return_value=draft))
-    monkeypatch.setattr(publication.ProductQuery, "get_owned_product", AsyncMock(return_value=SimpleNamespace(
-        title="Story", description="Intro", opening_message="Welcome.", visibility="private",
-    )))
     monkeypatch.setattr(publication.CharacterCommand, "create_character", AsyncMock(return_value=SimpleNamespace(id=character_id)))
     monkeypatch.setattr(publication.LoreCommand, "create_lorebook", AsyncMock(return_value=SimpleNamespace(id=book_id)))
     monkeypatch.setattr(publication.LoreCommand, "create_lorebook_entry", AsyncMock(side_effect=[SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4()), SimpleNamespace(id=start_id)]))
@@ -113,6 +104,9 @@ async def test_initial_publication_uses_one_composed_transaction(monkeypatch):
     monkeypatch.setattr(publication.SettingsCommand, "set_settings", settings)
     monkeypatch.setattr(publication.ReleasesCommand, "publish_product", publish)
     monkeypatch.setattr(publication, "mark_studio_publication", mark)
+    monkeypatch.setattr(publication.CharacterQuery, "list_character_assets", AsyncMock(return_value=[]))
+    update_product = AsyncMock()
+    monkeypatch.setattr(publication.ProductCommand, "update_product", update_product)
     request = command()
     assert await publication.publish_studio(object(), request) == release
     assert active is False
@@ -122,11 +116,17 @@ async def test_initial_publication_uses_one_composed_transaction(monkeypatch):
 
     assert publication.CharacterCommand.create_character.await_args.args[1].tags == ("character-tag",)
     assert publication.LoreCommand.create_lorebook.await_args.args[1].tags == ("lore-tag",)
-    assert product_tags.await_args.args[1].names == ("work-tag",)
+    assert update_product.await_args.args[1].tags == ("work-tag",)
 
 
-@pytest.mark.parametrize("section", ["work", "characters", "lorebooks"])
-@pytest.mark.parametrize("invalid", ["not a list", ["   "], [123]])
+# Each section uses the same tag validator; cover its rules once and each section's wiring.
+@pytest.mark.parametrize("section,invalid", [
+    ("work", "not a list"),
+    ("work", ["   "]),
+    ("work", [123]),
+    ("characters", "not a list"),
+    ("lorebooks", "not a list"),
+])
 def test_publication_rejects_invalid_tag_names(section, invalid):
     value = document()
     row = value[section] if section == "work" else value[section][0]

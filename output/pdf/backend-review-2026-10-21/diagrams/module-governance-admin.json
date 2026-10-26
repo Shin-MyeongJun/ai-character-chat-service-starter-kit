@@ -1,0 +1,49 @@
+{
+  "id": "module-governance-admin",
+  "title": "governance/admin 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "router",
+    "mapper",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "router": 5,
+    "mapper": 4,
+    "schemas": 1,
+    "service": 1,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

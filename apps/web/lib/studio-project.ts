@@ -2,7 +2,7 @@ import { SAMPLE_LORE, readLoreDraft, type LoreEntry } from "./studio-data";
 
 export const PROJECT_STORAGE_KEY = "chat-kit-studio-draft-v2";
 export type StudioCharacter = { id: string; sourceId?: string; name: string; role: string; introduction: string; persona: string; dialogue: string; tags: string[]; relationships: string; assets: CharacterAsset[] };
-export type CharacterAsset = { id: string; name: string; usage: "portrait" | "expression" | "scene" };
+export type CharacterAsset = { id: string; name: string; usage: "portrait" | "expression" | "scene"; mediaId?: string };
 export type StudioScene = {
   id: string; title: string; background: string; opening: string; characterId: string; placeId: string;
   initialNotes: string; language: "한국어" | "English" | "日本語"; storyTime: string;

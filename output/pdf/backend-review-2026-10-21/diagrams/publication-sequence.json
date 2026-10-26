@@ -1,0 +1,63 @@
+{
+  "id": "publication-sequence",
+  "title": "스튜디오 발행과 재전송",
+  "kind": "sequence",
+  "actors": [
+    "HTTP",
+    "studio use case",
+    "공개 content services",
+    "DB"
+  ],
+  "steps": [
+    [
+      0,
+      1,
+      "인증 owner + expected_revision + 모델 / 노트"
+    ],
+    [
+      1,
+      2,
+      "상품 / 초안 잠금 · 소유권"
+    ],
+    [
+      2,
+      3,
+      "저장 draft 및 receipt 읽기"
+    ],
+    [
+      1,
+      1,
+      "기존 revision receipt의 fingerprint 비교"
+    ],
+    [
+      1,
+      2,
+      "캐릭터 / 로어 원본 및 미디어 연결 갱신"
+    ],
+    [
+      1,
+      2,
+      "composition / settings / publish_product"
+    ],
+    [
+      2,
+      3,
+      "원본별 snapshot + 상품 snapshot + release"
+    ],
+    [
+      1,
+      2,
+      "revision receipt와 컴포넌트 mapping 저장"
+    ],
+    [
+      1,
+      3,
+      "단일 transaction COMMIT; 실패 시 전체 ROLLBACK"
+    ],
+    [
+      1,
+      0,
+      "release; 응답 유실 재호출은 저장 receipt"
+    ]
+  ]
+}

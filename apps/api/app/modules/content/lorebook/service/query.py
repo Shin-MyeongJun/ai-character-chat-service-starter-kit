@@ -15,7 +15,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.content.lorebook import repository as Repository
 from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.mapper import persistence as PersistenceMapper
+from app.modules.content.lorebook.service.activation import diagnose_entries
 from app.modules.content.lorebook.service.util import matching as MatchingServiceUtil
+
+
+def diagnose_draft_entries(command: Types.DiagnoseDraftEntriesCommand) -> tuple[list[dict], list[dict]]:
+    """Validate transient entries using write rules, then use the snapshot selector.
+
+    IDs here identify a transient draft only; this API cannot activate any live
+    conversation or authorize arbitrary server lore. No database or AI is called.
+    """
+    from app.modules.content.lorebook.service.command import _validate_lorebook_entry
+    if len(command.entries) > 100 or len({str(entry["id"]) for entry in command.entries}) != len(command.entries):
+        raise ValueError("Draft lore IDs must be distinct and at most 100.")
+    for entry in command.entries:
+        value = {key: field for key, field in entry.items() if key != "id"}
+        _validate_lorebook_entry(Types.CreateLorebookEntryCommand(lorebook_id=command.owner_id, owner_id=command.owner_id, **value))
+    return diagnose_entries(list(command.entries), messages=command.messages, manual_entry_ids=command.manual_entry_ids)
 
 
 async def list_lorebooks(
@@ -146,21 +162,7 @@ def activate_snapshot_entries(
     Preserve snapshot order. Empty text activates only always entries; semantic
     and manual activation are not supported here. Never mutate the snapshot.
     """
-    active = []
-    for entry in command.snapshot.snapshot_data["entries"]:
-        if entry["entry_type"] == "start_set" or not entry["is_enabled"]:
-            continue
-        activation_type = entry["activation_type"]
-        if activation_type == "always":
-            active.append(entry)
-        elif activation_type == "keyword":
-            if command.text and any(
-                _keyword_matches(command.text, trigger, entry["match_mode"])
-                for trigger in entry["key_triggers"] or []
-            ):
-                active.append(entry)
-        elif activation_type not in ("semantic", "manual"):
-            raise ValueError("Stored lorebook entry has an invalid activation type.")
+    active, _ = diagnose_entries(command.snapshot.snapshot_data["entries"], text=command.text, messages=command.messages, manual_entry_ids=command.manual_entry_ids)
     return PersistenceMapper.lorebook_snapshot_entries_to_active_info(active)
 
 

@@ -40,6 +40,9 @@ def _validate_lorebook_status(status: Types.LorebookStatusValue) -> None:
 def _validate_lorebook_entry(
     command: Types.CreateLorebookEntryCommand | Types.UpdateLorebookEntryCommand,
 ) -> None:
+    """Validate authored entry values and opt-in options before persisting or freezing."""
+    from app.modules.content.lorebook.service.activation import validate_options
+    validate_options(command.metadata)
     if not command.content.strip():
         raise ValueError("Lorebook entry content must not be blank.")
     if len(command.content) > constraints.ENTRY_CONTENT_MAX_LENGTH:

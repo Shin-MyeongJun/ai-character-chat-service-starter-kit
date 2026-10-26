@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="503" height="252" preserveAspectRatio="xMinYMin meet" viewBox="0 0 503 252" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="503" height="252"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-252)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="0" y="240" style="font-family: Malgun Gothic; font-size: 8.5px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,480) scale(1,-1)">정적 import: 행의 모듈/계층 → 열의 번호</text>
+			<text x="218.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">01</text>
+			<text x="243.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">02</text>
+			<text x="268.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">03</text>
+			<text x="293.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">04</text>
+			<text x="318.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">05</text>
+			<text x="343.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">06</text>
+			<text x="368.09375" y="214" style="font-family: Malgun Gothic; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,428) scale(1,-1)">07</text>
+			<text x="0" y="190" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,380) scale(1,-1)">01 dependencies (1)</text>
+			<rect x="210" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="235" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="260" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="285" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="335" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="360" y="177" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<text x="0" y="164" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,328) scale(1,-1)">02 mapper (5)</text>
+			<rect x="210" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="235" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="260" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="272.5" cy="162" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="285" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="322.5" cy="162" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="335" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="360" y="151" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="372.5" cy="162" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="0" y="138" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,276) scale(1,-1)">03 repository (1)</text>
+			<rect x="210" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="235" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="260" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="285" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="335" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="360" y="125" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="372.5" cy="136" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="0" y="112" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,224) scale(1,-1)">04 router (2)</text>
+			<rect x="210" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="222.5" cy="110" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="235" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="247.5" cy="110" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="260" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="285" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="310" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="322.5" cy="110" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="335" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="347.5" cy="110" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="360" y="99" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="372.5" cy="110" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="0" y="86" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,172) scale(1,-1)">05 schemas (1)</text>
+			<rect x="210" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="235" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="260" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="285" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="335" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="360" y="73" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<text x="0" y="60" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,120) scale(1,-1)">06 service (6)</text>
+			<rect x="210" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="235" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="247.5" cy="58" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="260" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="272.5" cy="58" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<rect x="285" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="335" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<rect x="360" y="47" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<circle cx="372.5" cy="58" r="3" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="0" y="34" style="font-family: Malgun Gothic; font-size: 8.2px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,68) scale(1,-1)">07 types (1)</text>
+			<rect x="210" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="235" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="260" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="285" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="310" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="335" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="360" y="21" width="25" height="22" style="stroke: rgb(84%,89%,90%); stroke-linecap: butt; stroke-width: 0.4; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="0" y="13" style="font-family: Malgun Gothic; font-size: 7.7px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,26) scale(1,-1)">● 관계 있음 · 대각 음영은 자기 자신 · 괄호는 파일 수</text>
+		</g>
+	</g>
+</svg>

@@ -71,7 +71,7 @@ export function useConversationDirectory() {
   const demos = local.filter(item => item.id.startsWith("demo-"));
   const recent = [...server.map(row => {
     const prior = saved.get(row.id);
-    return { ...prior, id: row.id, title: row.title || "대화", lastMessage: row.last_message ?? prior?.lastMessage ?? "", updatedAt: Date.parse(row.created_at) };
+    return { ...prior, id: row.id, title: row.title || "대화", lastMessage: row.last_message ?? prior?.lastMessage ?? "", updatedAt: Date.parse(row.last_activity_at ?? row.created_at) };
   }), ...demos];
   return { recent, loadMore, hasMore: !!cursor, loading, error };
 }
@@ -88,6 +88,6 @@ export function RecentConversations({ activeId }: { activeId?: string }) {
         <span className="conversation-link-text"><strong>{chat.title}</strong><small>{chat.lastMessage || "대화를 시작해 보세요"}</small></span>
       </Link>) : <p className="sidebar-conversations-empty" role="status">{loading ? "대화를 확인하는 중…" : error || <>아직 시작한 대화가 없어요.<br />마음에 드는 작품을 골라보세요.</>}</p>}
     </div>
-    <span className="sidebar-conversations-note">이 브라우저에서 시작한 대화</span>
+    <span className="sidebar-conversations-note">서버 대화 · 브라우저 시연 대화</span>
   </section>;
 }

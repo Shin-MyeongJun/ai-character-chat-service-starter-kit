@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="503" height="566" preserveAspectRatio="xMinYMin meet" viewBox="0 0 503 566" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="503" height="566"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-566)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="528" width="112" height="34" rx="4" ry="4" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="45.802734375" y="550" style="font-family: Malgun Gothic Bold; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1100) scale(1,-1)">HTTP</text>
+			<path d="M 56,526 L 56,20 Z" style="stroke: rgb(70%,78%,81%); stroke-linecap: butt; stroke-width: 0.6; stroke-dasharray: 3, 3;"/>
+			<rect x="130.33333333333334" y="528" width="112.0" height="34" rx="4" ry="4" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="155.39388020833334" y="550" style="font-family: Malgun Gothic Bold; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1100) scale(1,-1)">Media workflow</text>
+			<path d="M 186.333333,526 L 186.333333,20 Z" style="stroke: rgb(70%,78%,81%); stroke-linecap: butt; stroke-width: 0.6; stroke-dasharray: 3, 3;"/>
+			<rect x="260.6666666666667" y="528" width="112.0" height="34" rx="4" ry="4" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="311.1354166666667" y="550" style="font-family: Malgun Gothic Bold; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1100) scale(1,-1)">DB</text>
+			<path d="M 316.666667,526 L 316.666667,20 Z" style="stroke: rgb(70%,78%,81%); stroke-linecap: butt; stroke-width: 0.6; stroke-dasharray: 3, 3;"/>
+			<rect x="391.0" y="528" width="112.0" height="34" rx="4" ry="4" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 0.6; fill: rgb(92%,96%,96%); fill-rule: evenodd;"/>
+			<text x="432.271484375" y="550" style="font-family: Malgun Gothic Bold; font-size: 8px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1100) scale(1,-1)">Storage</text>
+			<path d="M 447,526 L 447,20 Z" style="stroke: rgb(70%,78%,81%); stroke-linecap: butt; stroke-width: 0.6; stroke-dasharray: 3, 3;"/>
+			<path d="M 56,489 L 186.333333,489 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="186.3333 489, 182.823 490.9177, 182.823 487.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="50.631803385416674" y="513" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,1026) scale(1,-1)">1. 소유자 / request UUID / 본문 metadata</text>
+			<path d="M 186.333333,441 L 316.666667,441 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="316.6667 441, 313.1563 442.9177, 313.1563 439.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="208.53447265625" y="465" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,930) scale(1,-1)">2. pending 예약 COMMIT</text>
+			<path d="M 186.333333,393 L 316.666667,393 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="316.6667 393, 313.1563 394.9177, 313.1563 391.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="204.83447265625" y="417" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,834) scale(1,-1)">3. 캐릭터 / 미디어 row 잠금</text>
+			<path d="M 186.333333,345 L 447,345 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="447 345, 443.4897 346.9177, 443.4897 343.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="246.16251627604163" y="369" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,738) scale(1,-1)">4. store_asset; 취소 시에도 작업 종료 대기</text>
+			<path d="M 447,297 L 186.333333,297 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="186.3333 297, 189.8437 295.0823, 189.8437 298.9177" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="296.41783854166664" y="321" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,642) scale(1,-1)">5. 저장 결과</text>
+			<path d="M 186.333333,249 L 316.666667,249 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="316.6667 249, 313.1563 250.9177, 313.1563 247.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="172.360107421875" y="273" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,546) scale(1,-1)">6. ready COMMIT; 모호한 실패는 pending 재개</text>
+			<path d="M 186.333333,201 L 56,201 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="56 201, 59.51033 199.0823, 59.51033 202.9177" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="82.60934244791667" y="225" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,450) scale(1,-1)">7. 앱 내부 content URL</text>
+			<path d="M 186.333333,153 L 316.666667,153 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="316.6667 153, 313.1563 154.9177, 313.1563 151.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="163.550927734375" y="177" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,354) scale(1,-1)">8. 정리 CLI: 24h 보존·참조 없음 → deleting COMMIT</text>
+			<path d="M 186.333333,105 L 447,105 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="447 105, 443.4897 106.9177, 443.4897 103.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="254.55436197916663" y="129" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,258) scale(1,-1)">9. 객체 삭제; 실패 시 deleting 재시도</text>
+			<path d="M 186.333333,57 L 316.666667,57 Z" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="316.6667 57, 313.1563 58.9177, 313.1563 55.0823" style="stroke: rgb(3%,49%,54%); stroke-linecap: butt; stroke-width: 1; fill: rgb(3%,49%,54%); fill-rule: evenodd;"/>
+			<text x="216.46201171875" y="81" style="font-family: Malgun Gothic; font-size: 7.4px;fill: rgb(9%,20%,29%); stroke:none;" transform="translate(0,162) scale(1,-1)">10. deleted COMMIT</text>
+			<text x="0" y="5" style="font-family: Malgun Gothic; font-size: 7.2px;fill: rgb(31%,39%,45%); stroke:none;" transform="translate(0,10) scale(1,-1)">실선 → 호출·요청 또는 반환 · 세로 점선: 참여자 · 위에서 아래로 실행 순서</text>
+		</g>
+	</g>
+</svg>

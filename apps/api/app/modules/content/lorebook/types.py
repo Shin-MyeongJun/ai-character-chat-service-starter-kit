@@ -279,11 +279,21 @@ class GetLorebookSnapshotsCommand:
 class ActivateSnapshotEntriesCommand:
     snapshot: LorebookSnapshotInfo
     text: str = ""
+    messages: tuple[tuple[str, str], ...] = ()
+    manual_entry_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class ActivatedSnapshotEntriesInfo:
     entries: list[dict]
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnoseDraftEntriesCommand:
+    owner_id: UUID
+    entries: tuple[dict, ...]
+    messages: tuple[tuple[str, str], ...]
+    manual_entry_ids: tuple[str, ...] = ()
 
 
 LOREBOOK_TITLE_MAX_LENGTH = 200

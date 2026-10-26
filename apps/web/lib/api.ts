@@ -12,8 +12,8 @@ export type PublishedWork = {
   model_notice: unknown;
 };
 export type CatalogItem = { id: string; title: string; description: string | null; snapshot_id: string; created_at: string };
-export type CursorPage<T> = { items: T[]; next_cursor_created_at: string | null; next_cursor_id: string | null };
-export type OwnedConversation = { id: string; product_id: string; title: string | null; created_at: string; last_message: string | null };
+export type CursorPage<T> = { items: T[]; next_cursor_created_at: string | null; next_cursor_id: string | null; total?: number };
+export type OwnedConversation = { id: string; product_id: string; title: string | null; created_at: string; last_activity_at?: string; last_message: string | null };
 export type CreditBalance = { balance_credit: number; reserved_credit: number; available_credit: number };
 export type ConversationStart = {
   opening_mode: string;
@@ -67,7 +67,7 @@ export async function getCsrf(): Promise<string> {
 async function send<T>(path: string, options: RequestInit = {}, recoverCsrf = true): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase();
   const headers = new Headers(options.headers);
-  if (options.body) headers.set("Content-Type", "application/json");
+  if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (!["GET", "HEAD"].includes(method)) headers.set("X-CSRF-Token", await getCsrf());
   const response = await fetch(`/backend${path}`, { ...options, headers, credentials: "include", cache: "no-store" });
   if (!response.ok) {
@@ -154,8 +154,10 @@ function pageQuery(cursor?: { createdAt: string; id: string }): string {
   if (cursor) { query.set("cursor_created_at", cursor.createdAt); query.set("cursor_id", cursor.id); }
   return query.toString();
 }
-export const listCatalog = (cursor?: { createdAt: string; id: string }) =>
-  request<CursorPage<CatalogItem>>(`/products/catalog?${pageQuery(cursor)}`);
+/** Keep search and public tag scope identical across every catalog cursor. */
+export const listCatalog = (cursor?: { createdAt: string; id: string }, search = "", tagId = "") =>
+  request<CursorPage<CatalogItem>>(`/products/catalog?${pageQuery(cursor)}&search=${encodeURIComponent(search)}${tagId ? `&tag_id=${encodeURIComponent(tagId)}` : ""}`);
+export const listCatalogTags = () => request<{ id: string; name: string }[]>("/products/catalog-tags");
 export const listOwnedConversations = (cursor?: { createdAt: string; id: string }) =>
   request<CursorPage<OwnedConversation>>(`/conversations/mine?${pageQuery(cursor)}`);
 export const getCreditBalance = () => request<CreditBalance>("/account/credits");
@@ -179,8 +181,8 @@ export async function listConversationMessages(id: string): Promise<ChatMessage[
 }
 export const createMessage = (id: string, content: string, requestKey: string) =>
   request<ChatMessage>(`/conversations/${encodeURIComponent(id)}/messages`, { method: "POST", body: JSON.stringify({ request_key: requestKey, content }) });
-export const generateAnswer = (id: string, message: ChatMessage, productCharacterId: string, requestKey: string, signal?: AbortSignal) =>
-  request<Answer>(`/conversations/${encodeURIComponent(id)}/answers`, { method: "POST", signal, body: JSON.stringify({ request_key: requestKey, input_message_id: message.id, expected_revision: message.revision, product_character_id: productCharacterId }) });
+export const generateAnswer = (id: string, message: ChatMessage, productCharacterId: string, requestKey: string, signal?: AbortSignal, manualEntryIds: string[] = []) =>
+  request<Answer>(`/conversations/${encodeURIComponent(id)}/answers`, { method: "POST", signal, body: JSON.stringify({ request_key: requestKey, input_message_id: message.id, expected_revision: message.revision, product_character_id: productCharacterId, manual_entry_ids: manualEntryIds }) });
 export async function login(email: string, password: string): Promise<AuthUser> {
   const user = await request<AuthUser>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
   localStorage.removeItem(REFRESH_UNCERTAIN_KEY);

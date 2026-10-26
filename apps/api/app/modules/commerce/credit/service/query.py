@@ -37,6 +37,7 @@ async def get_credit_reservation(
 
 
 def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> dict:
+    """Validate shared history bounds; direction is meaningful only for signed transactions."""
     CommandService._validate_identifiers(command.user_id)
     if command.currency_code is not None:
         CommandService._validate_currency(command.currency_code)
@@ -85,8 +86,11 @@ def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> d
 async def list_credit_transactions(
     session: AsyncSession, command: Types.ListCreditTransactionsCommand
 ) -> Types.CreditTransactionPageInfo:
+    """Filter signed wallet movements before paging, including refunds and adjustments."""
+    if command.direction not in (None, "usage", "acquisition"):
+        raise Types.InvalidCreditCommandError("Invalid credit direction.")
     rows = await Repository.list_credit_transactions(
-        session, **_validate_history_command(command)
+        session, **_validate_history_command(command), direction=command.direction
     )
     infos = tuple(PersistenceMapper.credit_transaction_row_to_info(row) for row in rows)
     items = tuple(info for info in infos[: command.limit] if info is not None)

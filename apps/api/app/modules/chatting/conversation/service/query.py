@@ -37,6 +37,11 @@ async def list_owned_conversations(
     return PersistenceMapper.conversations_entities_to_page_info(rows, command.limit)
 
 
+async def count_owned_conversations(session, command: Types.ListOwnedConversationsCommand) -> int:
+    """Count owner-visible conversations independently of any cursor or limit."""
+    return await Repository.count_owned_conversations(session, command.user_id)
+
+
 async def get_statistics_facts(
     session, command: Types.GetStatisticsFactsCommand
 ) -> Types.ConversationStatisticsInfo:

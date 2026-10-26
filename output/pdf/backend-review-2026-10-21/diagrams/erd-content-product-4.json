@@ -1,0 +1,106 @@
+{
+  "id": "erd-content-product-4",
+  "title": "content/product 상세 FK 4",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "product_tags",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_tags",
+      "parent": "tags",
+      "columns": "tag_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_tags",
+      "parent": "users",
+      "columns": "assigned_by",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_user_daily_activity",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_user_daily_activity",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_version_daily_stats",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_version_user_daily_activity",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_version_user_daily_activity",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "products",
+      "parent": "users",
+      "columns": "owner_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "erd-governance-moderation-2",
+  "title": "governance/moderation 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "moderation_reports",
+      "parent": "users",
+      "columns": "reporter_user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    },
+    {
+      "child": "moderation_reports",
+      "parent": "moderation_reports",
+      "columns": "duplicate_of_report_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "governance/moderation"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "erd-commerce-credit-2",
+  "title": "commerce/credit 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "credit_transactions",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    },
+    {
+      "child": "credit_wallets",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/credit"
+    }
+  ]
+}

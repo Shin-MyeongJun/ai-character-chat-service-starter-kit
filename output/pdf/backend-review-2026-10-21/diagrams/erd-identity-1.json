@@ -1,0 +1,40 @@
+{
+  "id": "erd-identity-1",
+  "title": "identity 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "auth_action_tokens",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "identity"
+    },
+    {
+      "child": "auth_sessions",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "identity"
+    },
+    {
+      "child": "user_oauth_accounts",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "identity"
+    }
+  ]
+}

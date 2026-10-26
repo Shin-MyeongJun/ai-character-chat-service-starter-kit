@@ -1,0 +1,106 @@
+{
+  "id": "erd-content-product-3",
+  "title": "content/product 상세 FK 3",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "product_snapshot_lorebooks",
+      "parent": "lorebook_snapshots",
+      "columns": "lorebook_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_policy_changes",
+      "parent": "users",
+      "columns": "actor_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_policy_changes",
+      "parent": "product_snapshots",
+      "columns": "product_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_start_sets",
+      "parent": "product_snapshot_lorebooks",
+      "columns": "product_snapshot_id,product_lorebook_id",
+      "target": "product_snapshot_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshots",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_start_sets",
+      "parent": "lorebook_entries",
+      "columns": "lorebook_id,entry_id",
+      "target": "lorebook_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_start_sets",
+      "parent": "product_lorebooks",
+      "columns": "product_id,lorebook_id",
+      "target": "product_id,lorebook_id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_stats_dirty_days",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_studio_drafts",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    }
+  ]
+}

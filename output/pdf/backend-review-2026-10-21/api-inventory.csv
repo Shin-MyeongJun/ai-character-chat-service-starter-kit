@@ -1,0 +1,115 @@
+﻿method,path,function,source,dependencies
+POST,/characters/{character_id}/media/uploads,upload_character_media,apps/api/app/http/media.py:91,app.http.character_dependencies.get_current_owner_id; app.http.media.get_character_media_service
+GET,/characters/media/{media_id}/content,read_character_media,apps/api/app/http/media.py:143,app.http.character_dependencies.get_current_owner_id; app.http.media.get_character_media_service
+GET,/products/{product_id}/versions/{snapshot_id}/media/{media_id}/content,read_product_media,apps/api/app/http/media.py:156,app.http.dependencies.get_current_owner_id; app.http.media.get_product_media_service
+GET,/conversations/mine,list_mine,apps/api/app/http/conversation_directory.py:17,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/catalog/{product_id},get_catalog_product,apps/api/app/http/public_catalog.py:16,app.http.dependencies.get_product_session
+GET,/models/available,available_models,apps/api/app/http/model_catalog.py:21,app.http.dependencies.get_product_session
+PUT,/products/{product_id}/studio-draft,write_studio_draft,apps/api/app/http/studio_publication.py:22,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/products/studio/lore-diagnostics,diagnose_lore,apps/api/app/http/studio_publication.py:44,app.http.dependencies.get_current_owner_id
+POST,/products/{product_id}/studio-components,prepare_studio_components,apps/api/app/http/studio_publication.py:63,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/products/{product_id}/studio-publication,publish_studio_draft,apps/api/app/http/studio_publication.py:73,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/account/overview-counts,read_counts,apps/api/app/http/account_credits.py:18,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/account/credits/transactions,list_credit_transactions,apps/api/app/http/account_credits.py:35,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/account/credits,read_credits,apps/api/app/http/account_credits.py:48,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/conversations/{conversation_id}/manual-lore,manual_lore,apps/api/app/modules/chatting/conversation/router.py:19,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/conversations,start,apps/api/app/modules/chatting/conversation/router.py:26,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/conversations/{conversation_id}/updates,updates,apps/api/app/modules/chatting/conversation/router.py:35,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/conversations/{conversation_id}/version,switch,apps/api/app/modules/chatting/conversation/router.py:52,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/conversations/{conversation_id}/start,get_start,apps/api/app/modules/chatting/conversation/router.py:71,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/characters/me,list_my_characters,apps/api/app/modules/content/character/router.py:53,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+GET,/characters/me/{character_id},get_my_character,apps/api/app/modules/content/character/router.py:68,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+POST,/characters,create_character,apps/api/app/modules/content/character/router.py:84,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+PUT,/characters,update_character,apps/api/app/modules/content/character/router.py:100,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+DELETE,/characters,delete_character,apps/api/app/modules/content/character/router.py:112,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+POST,/characters/images,add_character_image,apps/api/app/modules/content/character/router.py:124,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+PATCH,/characters/images/default,set_default_character_image,apps/api/app/modules/content/character/router.py:140,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+DELETE,/characters/images,delete_character_image,apps/api/app/modules/content/character/router.py:156,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+POST,/characters/assets,add_character_asset,apps/api/app/modules/content/character/router.py:168,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+DELETE,/characters/assets,delete_character_asset,apps/api/app/modules/content/character/router.py:184,app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+GET,/characters/me/{target_id}/tags,list_public_tags,apps/api/app/modules/content/character/tag_router.py:24,app.http.character_dependencies.get_character_session; app.http.character_dependencies.get_current_owner_id
+POST,/characters/me/{target_id}/tags,add_public_tags,apps/api/app/modules/content/character/tag_router.py:34,app.http.character_dependencies.get_character_session; app.http.character_dependencies.get_current_owner_id
+PUT,/characters/me/{target_id}/tags,replace_public_tags,apps/api/app/modules/content/character/tag_router.py:47,app.http.character_dependencies.get_character_session; app.http.character_dependencies.get_current_owner_id
+DELETE,/characters/me/{target_id}/tags/{tag_id},remove_public_tag,apps/api/app/modules/content/character/tag_router.py:60,app.http.character_dependencies.get_character_session; app.http.character_dependencies.get_current_owner_id
+GET,/lorebooks/me,list_my_lorebooks,apps/api/app/modules/content/lorebook/router.py:47,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/me/{lorebook_id},get_my_lorebook,apps/api/app/modules/content/lorebook/router.py:62,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/me/{lorebook_id}/entries,list_my_lorebook_entries,apps/api/app/modules/content/lorebook/router.py:78,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/me/{lorebook_id}/entries/{entry_id},get_my_lorebook_entry,apps/api/app/modules/content/lorebook/router.py:103,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+POST,/lorebooks,create_lorebook,apps/api/app/modules/content/lorebook/router.py:125,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+PUT,/lorebooks,update_lorebook,apps/api/app/modules/content/lorebook/router.py:141,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+DELETE,/lorebooks,delete_lorebook,apps/api/app/modules/content/lorebook/router.py:153,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+POST,/lorebooks/entries,create_lorebook_entry,apps/api/app/modules/content/lorebook/router.py:165,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+PUT,/lorebooks/entries,update_lorebook_entry,apps/api/app/modules/content/lorebook/router.py:181,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+DELETE,/lorebooks/entries,delete_lorebook_entry,apps/api/app/modules/content/lorebook/router.py:193,app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/me/{target_id}/tags,list_public_tags,apps/api/app/modules/content/lorebook/tag_router.py:24,app.http.lorebook_dependencies.get_lorebook_session; app.http.lorebook_dependencies.get_current_owner_id
+POST,/lorebooks/me/{target_id}/tags,add_public_tags,apps/api/app/modules/content/lorebook/tag_router.py:34,app.http.lorebook_dependencies.get_lorebook_session; app.http.lorebook_dependencies.get_current_owner_id
+PUT,/lorebooks/me/{target_id}/tags,replace_public_tags,apps/api/app/modules/content/lorebook/tag_router.py:47,app.http.lorebook_dependencies.get_lorebook_session; app.http.lorebook_dependencies.get_current_owner_id
+DELETE,/lorebooks/me/{target_id}/tags/{tag_id},remove_public_tag,apps/api/app/modules/content/lorebook/tag_router.py:60,app.http.lorebook_dependencies.get_lorebook_session; app.http.lorebook_dependencies.get_current_owner_id
+GET,/products/{product_id}/studio-draft,read_studio_draft,apps/api/app/modules/content/product/router.py:32,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/catalog,catalog,apps/api/app/modules/content/product/router.py:40,app.http.dependencies.get_product_session
+GET,/products/catalog-tags,catalog_tags,apps/api/app/modules/content/product/router.py:61,app.http.dependencies.get_product_session
+GET,/products/mine,list_mine,apps/api/app/modules/content/product/router.py:68,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/mine/count,count_mine,apps/api/app/modules/content/product/router.py:87,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/products,create,apps/api/app/modules/content/product/router.py:94,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{product_id}/draft,get_draft,apps/api/app/modules/content/product/router.py:108,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/products/{product_id}/draft,update,apps/api/app/modules/content/product/router.py:119,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/products/{product_id}/draft,delete,apps/api/app/modules/content/product/router.py:140,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/products/{product_id}/composition,put_composition,apps/api/app/modules/content/product/router.py:149,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{product_id}/composition,read_composition,apps/api/app/modules/content/product/router.py:169,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/products/{product_id}/settings,put_settings,apps/api/app/modules/content/product/router.py:180,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/products/{product_id}/releases,publish,apps/api/app/modules/content/product/router.py:197,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PATCH,/products/{product_id}/releases/{snapshot_id}/note,correct_note,apps/api/app/modules/content/product/router.py:218,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{product_id},published,apps/api/app/modules/content/product/router.py:247,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{product_id}/statistics,statistics,apps/api/app/modules/content/product/router.py:258,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{product_id}/releases/{snapshot_id}/availability,version_availability,apps/api/app/modules/content/product/router.py:285,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/products/{target_id}/tags,list_public_tags,apps/api/app/modules/content/product/tag_router.py:20,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/products/{target_id}/tags,add_public_tags,apps/api/app/modules/content/product/tag_router.py:30,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/products/{target_id}/tags,replace_public_tags,apps/api/app/modules/content/product/tag_router.py:43,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/products/{target_id}/tags/{tag_id},remove_public_tag,apps/api/app/modules/content/product/tag_router.py:56,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/characters,list_characters,apps/api/app/modules/governance/admin/character_router.py:52,app.http.character_dependencies.require_character_admin; app.http.character_dependencies.get_character_session
+GET,/characters/{character_id},get_character,apps/api/app/modules/governance/admin/character_router.py:69,app.http.character_dependencies.require_character_admin; app.http.character_dependencies.get_character_session
+GET,/lorebooks,list_lorebooks,apps/api/app/modules/governance/admin/lorebook_router.py:47,app.http.lorebook_dependencies.require_lorebook_admin; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/{lorebook_id},get_lorebook,apps/api/app/modules/governance/admin/lorebook_router.py:64,app.http.lorebook_dependencies.require_lorebook_admin; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/{lorebook_id}/entries,list_entries,apps/api/app/modules/governance/admin/lorebook_router.py:81,app.http.lorebook_dependencies.require_lorebook_admin; app.http.lorebook_dependencies.get_lorebook_session
+GET,/lorebooks/{lorebook_id}/entries/{entry_id},get_entry,apps/api/app/modules/governance/admin/lorebook_router.py:105,app.http.lorebook_dependencies.require_lorebook_admin; app.http.lorebook_dependencies.get_lorebook_session
+PUT,/admin/models/{model_id}/retirement,announce,apps/api/app/modules/governance/admin/model_router.py:15,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/products/versions/{snapshot_id}/expiry,expiry,apps/api/app/modules/governance/admin/product_router.py:15,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/products/{product_id}/status,status,apps/api/app/modules/governance/admin/product_router.py:36,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PATCH,/characters/status,change_character_status,apps/api/app/modules/governance/moderation/character_router.py:51,app.http.character_dependencies.require_character_moderator; app.http.character_dependencies.get_current_owner_id; app.http.character_dependencies.get_character_session
+PATCH,/lorebooks/status,change_lorebook_status,apps/api/app/modules/governance/moderation/lorebook_router.py:46,app.http.lorebook_dependencies.require_lorebook_moderator; app.http.lorebook_dependencies.get_current_owner_id; app.http.lorebook_dependencies.get_lorebook_session
+POST,/conversations/{conversation_id}/messages,create_message,apps/api/app/modules/chatting/chat/router/messages.py:30,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/conversations/{conversation_id}/messages,list_messages,apps/api/app/modules/chatting/chat/router/messages.py:46,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/conversations/{conversation_id}/messages/{message_id},replace_message,apps/api/app/modules/chatting/chat/router/messages.py:63,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/conversations/{conversation_id}/messages/{message_id},rewind_messages,apps/api/app/modules/chatting/chat/router/messages.py:80,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/conversations/{conversation_id}/answers,generate_answer,apps/api/app/modules/chatting/chat/router/answers.py:20,app.http.dependencies.get_current_owner_id; app.modules.chatting.chat.dependencies.get_answer_orchestrator
+GET,/admin/products/{target_id}/internal-tags,list_product_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:23,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/admin/products/{target_id}/internal-tags,add_product_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:36,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/products/{target_id}/internal-tags,replace_product_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:52,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/admin/products/{target_id}/internal-tags/{tag_id},remove_product_internal_tag,apps/api/app/modules/governance/admin/tag_router.py:68,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/admin/characters/{target_id}/internal-tags,list_character_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:78,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/admin/characters/{target_id}/internal-tags,add_character_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:91,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/characters/{target_id}/internal-tags,replace_character_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:107,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/admin/characters/{target_id}/internal-tags/{tag_id},remove_character_internal_tag,apps/api/app/modules/governance/admin/tag_router.py:123,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/admin/lorebooks/{target_id}/internal-tags,list_lorebook_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:133,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/admin/lorebooks/{target_id}/internal-tags,add_lorebook_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:146,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/lorebooks/{target_id}/internal-tags,replace_lorebook_internal_tags,apps/api/app/modules/governance/admin/tag_router.py:162,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/admin/lorebooks/{target_id}/internal-tags/{tag_id},remove_lorebook_internal_tag,apps/api/app/modules/governance/admin/tag_router.py:178,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/admin/tags/{tag_id},get_tag,apps/api/app/modules/governance/admin/tag_router.py:188,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+POST,/admin/tags,create_tag,apps/api/app/modules/governance/admin/tag_router.py:198,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+PUT,/admin/tags/{tag_id},update_tag,apps/api/app/modules/governance/admin/tag_router.py:208,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+DELETE,/admin/tags/{tag_id},deactivate_tag,apps/api/app/modules/governance/admin/tag_router.py:221,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/admin/reporting/generation-prompts,list_generation_prompts,apps/api/app/modules/reporting/operations_reporting/router.py:33,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/admin/reporting/generation-prompts/{generation_id},get_generation_prompt,apps/api/app/modules/reporting/operations_reporting/router.py:51,app.http.dependencies.get_product_session; app.http.dependencies.get_current_owner_id
+GET,/auth/csrf,get_csrf,apps/api/app/modules/identity/router.py:30,
+POST,/auth/register,register_user,apps/api/app/modules/identity/router.py:38,
+POST,/auth/email/resend,resend_email,apps/api/app/modules/identity/router.py:48,
+POST,/auth/email/verify,verify_email,apps/api/app/modules/identity/router.py:58,
+POST,/auth/password/reset/request,request_password_reset,apps/api/app/modules/identity/router.py:67,
+POST,/auth/password/reset,reset_password,apps/api/app/modules/identity/router.py:79,
+POST,/auth/login,login_user,apps/api/app/modules/identity/router.py:88,
+POST,/auth/refresh,refresh_session,apps/api/app/modules/identity/router.py:98,
+POST,/auth/logout,logout_session,apps/api/app/modules/identity/router.py:110,
+POST,/auth/logout-all,logout_all_sessions,apps/api/app/modules/identity/router.py:124,
+GET,/auth/me,get_current_user,apps/api/app/modules/identity/router.py:137,
+POST,/auth/google/start,start_google_login,apps/api/app/modules/identity/router.py:148,
+GET,/auth/google/callback,complete_google_login,apps/api/app/modules/identity/router.py:159,

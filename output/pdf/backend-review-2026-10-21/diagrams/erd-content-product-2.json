@@ -1,0 +1,106 @@
+{
+  "id": "erd-content-product-2",
+  "title": "content/product 상세 FK 2",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "product_lorebooks",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_release_note_revisions",
+      "parent": "product_release_notes",
+      "columns": "product_snapshot_id",
+      "target": "product_snapshot_id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_release_note_revisions",
+      "parent": "users",
+      "columns": "editor_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_release_notes",
+      "parent": "product_snapshots",
+      "columns": "product_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_characters",
+      "parent": "character_snapshots",
+      "columns": "character_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_characters",
+      "parent": "product_snapshots",
+      "columns": "product_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_lorebook_characters",
+      "parent": "product_snapshot_lorebooks",
+      "columns": "product_snapshot_id,product_lorebook_id",
+      "target": "product_snapshot_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_lorebook_characters",
+      "parent": "product_snapshot_characters",
+      "columns": "product_snapshot_id,product_character_id",
+      "target": "product_snapshot_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    },
+    {
+      "child": "product_snapshot_lorebooks",
+      "parent": "product_snapshots",
+      "columns": "product_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "content/product"
+    }
+  ]
+}

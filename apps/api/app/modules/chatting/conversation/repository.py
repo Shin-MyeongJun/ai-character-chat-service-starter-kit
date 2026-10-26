@@ -32,6 +32,11 @@ async def list_owned_conversations(session, user_id, *, limit, cursor_created_at
     ))
 
 
+async def count_owned_conversations(session, user_id) -> int:
+    """Count the exact owner scope used by the directory, including empty rooms."""
+    return await session.scalar(select(func.count()).select_from(Conversation).where(Conversation.user_id == user_id))
+
+
 async def advance_history_revision(session, conversation_id):
     return await session.scalar(
         update(Conversation)

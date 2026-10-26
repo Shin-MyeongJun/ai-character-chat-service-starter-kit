@@ -3,7 +3,7 @@
 # 통계 date_from/date_to는 서울 날짜 양 끝 포함, active_users는 성공 생성 기준이며 cost_credit은 기록된 크레딧 양이다.
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
@@ -42,6 +42,8 @@ class ListCatalogCommand:
     limit: int = 30
     cursor_created_at: datetime | None = None
     cursor_id: UUID | None = None
+    search: str = ""
+    tag_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +95,15 @@ class MarkStudioPublicationCommand:
     owner_id: UUID
     content_digest: str
     release: ReleaseInfo
+    mapping: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SetStudioComponentsCommand:
+    product_id: UUID
+    owner_id: UUID
+    expected_revision: int
+    mapping: dict
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +123,7 @@ class ProductInfo:
     status: str
     created_at: datetime
     updated_at: datetime
+    has_publication: bool = field(default=False, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -478,6 +490,7 @@ class ListProductsCommand:
     owner_id: UUID
     offset: int = 0
     limit: int = 50
+    search: str = ""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

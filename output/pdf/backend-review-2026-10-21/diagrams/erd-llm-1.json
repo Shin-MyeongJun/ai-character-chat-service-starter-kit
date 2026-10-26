@@ -1,0 +1,51 @@
+{
+  "id": "erd-llm-1",
+  "title": "llm 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "model_replacements",
+      "parent": "models",
+      "columns": "from_model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "llm"
+    },
+    {
+      "child": "model_replacements",
+      "parent": "product_snapshots",
+      "columns": "product_snapshot_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "llm"
+    },
+    {
+      "child": "model_replacements",
+      "parent": "models",
+      "columns": "to_model_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "llm"
+    },
+    {
+      "child": "models",
+      "parent": "providers",
+      "columns": "provider_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "llm"
+    }
+  ]
+}

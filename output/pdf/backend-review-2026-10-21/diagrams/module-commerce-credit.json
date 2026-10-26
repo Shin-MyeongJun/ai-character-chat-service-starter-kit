@@ -1,0 +1,39 @@
+{
+  "id": "module-commerce-credit",
+  "title": "commerce/credit 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "repository",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 1,
+    "repository": 1,
+    "service": 2,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "repository"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

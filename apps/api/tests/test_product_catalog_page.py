@@ -20,7 +20,7 @@ def test_catalog_title_and_description_come_from_published_snapshot():
         id=product_id, title="Unpublished edit", description="Not published", created_at=created_at,
     )
     snapshot = SimpleNamespace(
-        id=snapshot_id, snapshot_data={"product": {"title": "Published", "description": "Visible"}},
+        id=snapshot_id, snapshot_data={"title": "Published", "description": "Visible"},
     )
     page = catalog_entities_to_page_info([(product, snapshot)], 1)
     assert page.items[0].title == "Published"

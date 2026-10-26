@@ -5,6 +5,7 @@ from uuid import uuid4
 from sqlalchemy import delete, func, select, update
 
 from app.db.models.chat import Conversation, Message, MessageRequest
+from app.db.models.generation_prompt import GenerationPrompt
 from app.db.models.product_usage import ProductGeneration
 
 
@@ -62,6 +63,17 @@ async def list_latest_message_previews(session, user_id, conversation_ids):
         .distinct(Message.conversation_id)
         .order_by(Message.conversation_id, Message.position.desc())
     ))
+
+
+async def list_conversation_activity(session, user_id, conversation_ids):
+    """Read latest surviving message activity; Conversation is only an ownership scope."""
+    return list(await session.execute(
+        select(Message.conversation_id, Message.content, Message.created_at)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Conversation.user_id == user_id, Message.conversation_id.in_(conversation_ids))
+        .distinct(Message.conversation_id)
+        .order_by(Message.conversation_id, Message.created_at.desc(), Message.position.desc())
+    )) if conversation_ids else []
 
 
 async def list_message_range(session, conversation_id, after, through, limit):
@@ -310,3 +322,51 @@ async def get_account_generation_statistics(session, user_id, start, end):
             )
         ).all()
     )
+
+
+async def get_generation_prompt(session, generation_id):
+    return await session.get(GenerationPrompt, generation_id, populate_existing=True)
+
+
+async def create_generation_prompt(session, generation_id, **values):
+    session.add(GenerationPrompt(generation_id=generation_id, **values))
+    await session.flush()
+
+
+def _select_generation_summaries():
+    # Deliberately excludes prompt text and answer_metadata even from the SQL projection.
+    return select(
+        ProductGeneration.id.label("generation_id"),
+        ProductGeneration.conversation_id,
+        ProductGeneration.model_id,
+        ProductGeneration.model_name,
+        ProductGeneration.reasoning_effort,
+        ProductGeneration.status,
+        ProductGeneration.created_at,
+        ProductGeneration.finished_at,
+        ProductGeneration.history_invalidated_at,
+        GenerationPrompt.generation_id.is_not(None).label("prompt_recorded"),
+        GenerationPrompt.created_at.label("prompt_created_at"),
+        GenerationPrompt.provider,
+    ).outerjoin(GenerationPrompt, GenerationPrompt.generation_id == ProductGeneration.id)
+
+
+async def list_generation_prompts(session, *, start, end, conversation_id, status, limit, offset):
+    predicates = [ProductGeneration.created_at >= start, ProductGeneration.created_at < end]
+    if conversation_id is not None:
+        predicates.append(ProductGeneration.conversation_id == conversation_id)
+    if status is not None:
+        predicates.append(ProductGeneration.status == status)
+    total = await session.scalar(select(func.count()).select_from(ProductGeneration).where(*predicates))
+    rows = (await session.execute(
+        _select_generation_summaries().where(*predicates)
+        .order_by(ProductGeneration.created_at.desc(), ProductGeneration.id.desc())
+        .offset(offset).limit(limit)
+    )).all()
+    return rows, total
+
+
+async def get_generation_prompt_summary(session, generation_id):
+    return (await session.execute(
+        _select_generation_summaries().where(ProductGeneration.id == generation_id)
+    )).one_or_none()

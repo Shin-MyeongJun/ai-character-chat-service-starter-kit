@@ -22,6 +22,7 @@ class RequestDto(BaseModel):
 class ListProductsRequestDto(RequestDto):
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=50, ge=1, le=100)
+    search: str = Field(default="", max_length=200)
 
 
 class CatalogItemResponseDto(ResponseDto):
@@ -74,6 +75,7 @@ class ProductInfoResponseDto(ResponseDto):
     status: str
     created_at: datetime
     updated_at: datetime
+    has_publication: bool = False
 
 
 class CharacterSelectionResponseDto(ResponseDto):

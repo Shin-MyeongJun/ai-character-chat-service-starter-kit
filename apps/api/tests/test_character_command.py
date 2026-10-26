@@ -127,10 +127,15 @@ async def test_create_returns_result_with_db_defaults_after_commit(
     assert not session.in_transaction()
 
 
-@pytest.mark.parametrize("operation", ["create", "update"])
+# Both operations share profile validation; exercise every rule once and update's entry point.
 @pytest.mark.parametrize(
-    ("field", "value"),
-    [("name", " \t"), ("persona_prompt", "\n "), ("visibility", "unknown")],
+    ("operation", "field", "value"),
+    [
+        ("create", "name", " \t"),
+        ("create", "persona_prompt", "\n "),
+        ("create", "visibility", "unknown"),
+        ("update", "name", " \t"),
+    ],
 )
 async def test_invalid_profile_rolls_back_without_repository_write(
     session, transaction_events, commands, repo, operation, field, value

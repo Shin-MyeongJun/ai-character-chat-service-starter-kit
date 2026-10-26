@@ -1,0 +1,21 @@
+{
+  "id": "module-chatting-prompt",
+  "title": "chatting/prompt 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "service",
+    "types"
+  ],
+  "counts": {
+    "__init__": 1,
+    "resources": 1,
+    "service": 1,
+    "types": 1
+  },
+  "edges": [
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

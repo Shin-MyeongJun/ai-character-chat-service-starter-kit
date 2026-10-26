@@ -1,0 +1,106 @@
+{
+  "id": "erd-commerce-billing-1",
+  "title": "commerce/billing 상세 FK 1",
+  "kind": "relations",
+  "rows": [
+    {
+      "child": "billing_credit_bindings",
+      "parent": "billing_quotes",
+      "columns": "quote_id,user_id,request_key",
+      "target": "id,user_id,request_key",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "billing_credit_bindings",
+      "parent": "credit_reservations",
+      "columns": "reservation_id,user_id,request_key",
+      "target": "id,user_id,request_key",
+      "child_per_parent": "0..1",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "billing_quotes",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "RESTRICT",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "payments",
+      "parent": "user_subscriptions",
+      "columns": "subscription_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "SET NULL",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "payments",
+      "parent": "users",
+      "columns": "user_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "CASCADE",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "product_payment_events",
+      "parent": "product_payment_events",
+      "columns": "sale_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "0..1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "product_payment_events",
+      "parent": "products",
+      "columns": "product_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "product_payment_events",
+      "parent": "product_snapshots",
+      "columns": "product_id,product_snapshot_id",
+      "target": "product_id,id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    },
+    {
+      "child": "product_payment_events",
+      "parent": "payments",
+      "columns": "payment_id",
+      "target": "id",
+      "child_per_parent": "0..N",
+      "parent_per_child": "1",
+      "delete": "NO ACTION",
+      "update": "NO ACTION",
+      "owner": "commerce/billing"
+    }
+  ]
+}

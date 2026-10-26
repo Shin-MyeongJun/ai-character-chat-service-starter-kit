@@ -38,6 +38,11 @@ def conversation_preview_rows_to_info(rows) -> dict:
     return {conversation_id: content for conversation_id, content in rows}
 
 
+def conversation_activity_rows_to_info(rows) -> dict:
+    """Detach message activity values so other modules never consume SQL rows."""
+    return {cid: Types.ConversationActivityInfo(content, created_at) for cid, content, created_at in rows}
+
+
 def messages_entities_to_memory_source_info(entities, limit) -> Types.MemorySourceInfo:
     return Types.MemorySourceInfo(
         messages=tuple(

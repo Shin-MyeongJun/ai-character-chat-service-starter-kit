@@ -20,6 +20,9 @@ from app.modules.governance.admin.product_router import router as Router9
 from app.modules.governance.admin.tag_router import router as AdminTagsRouter
 from app.modules.governance.moderation.character_router import router as Router11
 from app.modules.governance.moderation.lorebook_router import router as Router12
+from app.modules.reporting.operations_reporting.router import (
+    router as OperationsReportingRouter,
+)
 
 """Application router assembly: owner routes precede administrative UUID routes."""
 
@@ -54,3 +57,4 @@ router.include_router(MessagesRouter)
 
 
 router.include_router(AdminTagsRouter)
+router.include_router(OperationsReportingRouter)

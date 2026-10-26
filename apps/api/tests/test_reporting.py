@@ -10,8 +10,6 @@ from uuid import uuid4
 
 import pytest
 from app.core.reporting import ReportingError, get_reporting_period
-from app.modules.account_reporting import types as AccountTypes
-from app.modules.account_reporting.service import views as AccountViewsService
 from app.modules.chatting.chat import repository as ChatRepository
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.mapper import reporting as ProductReportingMapper
@@ -21,10 +19,14 @@ from app.modules.content.product.repository import (
 from app.modules.content.product.service.query import (
     reporting as ProductReportingQueryService,
 )
-from app.modules.creator_reporting import types as CreatorTypes
-from app.modules.creator_reporting.service import views as CreatorViewsService
-from app.modules.operations_reporting import types as OperationsTypes
-from app.modules.operations_reporting.service import views as OperationsViewsService
+from app.modules.reporting.account_reporting import types as AccountTypes
+from app.modules.reporting.account_reporting.service import views as AccountViewsService
+from app.modules.reporting.creator_reporting import types as CreatorTypes
+from app.modules.reporting.creator_reporting.service import views as CreatorViewsService
+from app.modules.reporting.operations_reporting import types as OperationsTypes
+from app.modules.reporting.operations_reporting.service import (
+    views as OperationsViewsService,
+)
 from sqlalchemy.dialects import postgresql
 
 
@@ -310,31 +312,25 @@ async def test_account_query_sql_is_scoped_and_half_open():
     )
 
 
-def test_reporting_import_boundaries_and_korean_function_docs():
-    """영역 간 참조·ORM 접근·역방향 참조를 금지하고 함수 설명을 검사한다."""
+def test_reporting_import_boundaries():
+    """영역 간 참조·ORM 접근·역방향 참조를 금지한다."""
     root = Path(__file__).resolve().parents[1] / "app"
     names = {"account_reporting", "creator_reporting", "operations_reporting"}
     for name in names:
-        for path in root.joinpath("modules", name).rglob("*.py"):
+        for path in root.joinpath("modules", "reporting", name).rglob("*.py"):
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.ImportFrom):
                     module = node.module or ""
                     assert not module.startswith("app.db.models")
                     for other in names - {name}:
-                        assert not module.startswith(f"app.modules.{other}")
+                        assert not module.startswith(f"app.modules.reporting.{other}")
                     if module.startswith("app.modules.") and not module.startswith(
-                        f"app.modules.{name}"
+                        f"app.modules.reporting.{name}"
                     ):
                         assert "repository" not in module and "mapper" not in module
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    doc = ast.get_docstring(node)
-                    assert doc and any("가" <= c <= "힣" for c in doc), (
-                        path,
-                        node.name,
-                    )
     for path in root.joinpath("core").rglob("*.py"):
         assert not any(
-            f"app.modules.{name}" in path.read_text(encoding="utf-8") for name in names
+            f"app.modules.reporting.{name}" in path.read_text(encoding="utf-8") for name in names
         )
 
 

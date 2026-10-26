@@ -15,6 +15,7 @@ from app.db.models.chat import (
     MessageRequest,
 )
 from app.db.models.credit import CreditAccount, CreditReservation, CreditTransaction
+from app.db.models.generation_prompt import GenerationPrompt
 from app.db.models.identity import User, UserOAuthAccount
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.memory import ConversationMemory, MemoryJob
@@ -70,6 +71,7 @@ __all__ = [
     "CreditAccount",
     "CreditReservation",
     "CreditTransaction",
+    "GenerationPrompt",
     "Lorebook",
     "LorebookEntry",
     "LorebookInternalTag",

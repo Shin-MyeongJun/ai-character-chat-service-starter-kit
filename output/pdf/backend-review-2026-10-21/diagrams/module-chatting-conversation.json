@@ -1,0 +1,59 @@
+{
+  "id": "module-chatting-conversation",
+  "title": "chatting/conversation 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "repository",
+    "router",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 2,
+    "repository": 1,
+    "router": 1,
+    "schemas": 1,
+    "service": 7,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

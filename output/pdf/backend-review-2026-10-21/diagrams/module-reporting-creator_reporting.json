@@ -1,0 +1,29 @@
+{
+  "id": "module-reporting-creator_reporting",
+  "title": "reporting/creator_reporting 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "mapper",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "mapper": 1,
+    "service": 1,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

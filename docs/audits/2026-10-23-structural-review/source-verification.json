@@ -1,0 +1,291 @@
+{
+  "review_completed_date": "2026-10-24",
+  "timezone": "Asia/Seoul",
+  "baseline_files": 587,
+  "changed_baseline_files": [],
+  "missing_baseline_files": [],
+  "source_citations_validated": 61,
+  "consolidated_items": [
+    "U01",
+    "U02",
+    "U03",
+    "U04",
+    "U05",
+    "U06",
+    "U07",
+    "U08",
+    "U09",
+    "U10",
+    "U11",
+    "U12",
+    "U13",
+    "U14",
+    "U15",
+    "U16",
+    "U17",
+    "U18",
+    "U19",
+    "U20",
+    "U21",
+    "U22",
+    "U23",
+    "U24",
+    "U25",
+    "U26",
+    "U27",
+    "U28",
+    "U29"
+  ],
+  "citations": [
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py",
+      "line": 109
+    },
+    {
+      "path": "apps/api/app/modules/chatting/memory/service/command/summarization.py",
+      "line": 16
+    },
+    {
+      "path": "apps/web/components/recent-conversations.tsx",
+      "line": 29
+    },
+    {
+      "path": "apps/api/app/modules/chatting/memory/repository.py",
+      "line": 355
+    },
+    {
+      "path": "apps/api/app/memory_worker.py",
+      "line": 109
+    },
+    {
+      "path": "apps/api/app/use_cases/studio_components.py",
+      "line": 64
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/command/studio.py",
+      "line": 38
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+      "line": 90
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/workflow/answer_preparation.py",
+      "line": 61
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/types.py",
+      "line": 180
+    },
+    {
+      "path": "apps/api/app/use_cases/ARCHITECTURE.md",
+      "line": 9
+    },
+    {
+      "path": "apps/api/app/modules/content/product/ARCHITECTURE.md",
+      "line": 20
+    },
+    {
+      "path": "apps/api/app/use_cases/studio_publication.py",
+      "line": 133
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/command/studio.py",
+      "line": 15
+    },
+    {
+      "path": "apps/api/app/use_cases/studio_publication.py",
+      "line": 78
+    },
+    {
+      "path": "apps/api/app/modules/content/character/service/workflow/media.py",
+      "line": 12
+    },
+    {
+      "path": "apps/api/app/modules/asset_storage/adapters/s3_storage/adapter.py",
+      "line": 245
+    },
+    {
+      "path": "apps/api/app/modules/llm/service/command/replacement.py",
+      "line": 59
+    },
+    {
+      "path": "apps/api/app/modules/content/product/repository/publication.py",
+      "line": 22
+    },
+    {
+      "path": "apps/api/app/modules/identity/service/authentication.py",
+      "line": 223
+    },
+    {
+      "path": "apps/api/app/modules/identity/repository.py",
+      "line": 30
+    },
+    {
+      "path": "apps/api/app/use_cases/conversation_directory.py",
+      "line": 34
+    },
+    {
+      "path": "apps/web/lib/api.ts",
+      "line": 169
+    },
+    {
+      "path": "apps/web/lib/account.ts",
+      "line": 31
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+      "line": 530
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/command/generation.py",
+      "line": 151
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/repository.py",
+      "line": 181
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/command/publication.py",
+      "line": 125
+    },
+    {
+      "path": "apps/api/app/modules/content/product/repository/publication.py",
+      "line": 100
+    },
+    {
+      "path": "apps/api/app/modules/content/lorebook/service/activation.py",
+      "line": 31
+    },
+    {
+      "path": "apps/api/app/modules/content/lorebook/service/util/matching.py",
+      "line": 12
+    },
+    {
+      "path": "apps/api/app/modules/content/character/service/tags.py",
+      "line": 54
+    },
+    {
+      "path": "apps/api/app/modules/content/lorebook/service/tags.py",
+      "line": 54
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/tags.py",
+      "line": 56
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/repository.py",
+      "line": 275
+    },
+    {
+      "path": "apps/api/alembic/versions/0018_nonstream_answers.py",
+      "line": 16
+    },
+    {
+      "path": "apps/api/app/modules/chatting/chat/service/workflow/answers.py",
+      "line": 265
+    },
+    {
+      "path": "apps/api/app/db/models/character.py",
+      "line": 82
+    },
+    {
+      "path": "apps/api/app/modules/content/character/service/media.py",
+      "line": 260
+    },
+    {
+      "path": "apps/api/app/modules/governance/moderation/service/command/reports.py",
+      "line": 149
+    },
+    {
+      "path": "apps/api/app/modules/governance/moderation/service/command/assessments.py",
+      "line": 96
+    },
+    {
+      "path": "apps/api/app/modules/commerce/billing/service/credits.py",
+      "line": 95
+    },
+    {
+      "path": "apps/api/app/modules/commerce/credit/service/command.py",
+      "line": 80
+    },
+    {
+      "path": "apps/api/app/modules/identity/service/workflow/mail.py",
+      "line": 12
+    },
+    {
+      "path": "apps/api/app/modules/identity/adapters.py",
+      "line": 32
+    },
+    {
+      "path": "apps/api/app/modules/identity/http_security.py",
+      "line": 30
+    },
+    {
+      "path": "apps/api/app/modules/asset_storage/adapters/test_local_storage/adapter.py",
+      "line": 70
+    },
+    {
+      "path": "apps/api/app/main.py",
+      "line": 224
+    },
+    {
+      "path": "apps/api/app/http/character_dependencies.py",
+      "line": 37
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/command/statistics.py",
+      "line": 36
+    },
+    {
+      "path": "apps/api/app/modules/content/product/service/command/statistics_queue.py",
+      "line": 13
+    },
+    {
+      "path": "apps/api/app/modules/content/tag/service/command.py",
+      "line": 18
+    },
+    {
+      "path": "apps/api/app/modules/governance/moderation/mapper/persistence.py",
+      "line": 71
+    },
+    {
+      "path": "apps/api/app/modules/content/product/mapper/persistence.py",
+      "line": 120
+    },
+    {
+      "path": "apps/api/app/modules/content/character/service/workflow/media.py",
+      "line": 48
+    },
+    {
+      "path": "apps/api/app/modules/content/character/service/media.py",
+      "line": 35
+    },
+    {
+      "path": "apps/api/app/modules/asset_storage/adapters/s3_storage/adapter.py",
+      "line": 79
+    },
+    {
+      "path": "apps/api/app/modules/llm/adapters/openai.py",
+      "line": 100
+    },
+    {
+      "path": "apps/api/app/modules/llm/adapters/base.py",
+      "line": 125
+    },
+    {
+      "path": "apps/api/app/modules/llm/adapters/openai.py",
+      "line": 46
+    },
+    {
+      "path": "apps/web/app/chats/[id]/page.tsx",
+      "line": 133
+    }
+  ],
+  "all_local_links_valid": true,
+  "status_counts": {
+    "재현 확인": 6,
+    "정적 확인": 17,
+    "부분 확인": 6
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "module-governance-moderation",
+  "title": "governance/moderation 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "router",
+    "mapper",
+    "repository",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "router": 2,
+    "mapper": 3,
+    "repository": 2,
+    "schemas": 1,
+    "service": 11,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "repository",
+      "types"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}

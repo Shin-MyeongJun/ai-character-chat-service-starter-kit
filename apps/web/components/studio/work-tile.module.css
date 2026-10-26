@@ -1,0 +1,12 @@
+.tile { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--surface); min-width: 0; display: flex; flex-direction: column; }
+.cover { display: flex; flex-direction: column; gap: 24px; min-height: 184px; padding: 24px; background: var(--selection); }
+.cover small { color: var(--secondary); font-size: 12px; line-height: 20px; }
+.cover h2 { margin: auto 0 0; color: var(--text); font-size: 24px; line-height: 34px; overflow-wrap: anywhere; }
+.body { padding: 20px; display: flex; flex: 1; flex-direction: column; gap: 12px; min-width: 0; }
+.body p { margin: 0; font-size: 14px; line-height: 22px; color: var(--secondary); overflow-wrap: anywhere; }
+.body > small { font-size: 12px; line-height: 20px; color: var(--secondary); }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tags span { background: var(--hover); color: var(--secondary); border-radius: 999px; padding: 8px; font-size: 12px; line-height: 20px; }
+.actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.actions > * { width: 100%; white-space: normal; }
+@media (max-width: 600px) { .cover { min-height: 140px; } }

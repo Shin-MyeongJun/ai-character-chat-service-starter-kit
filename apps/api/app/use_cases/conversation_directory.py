@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.modules.chatting.chat import types as ChatTypes
-from app.modules.chatting.chat.service.query import list_conversation_previews
+from app.modules.chatting.chat.service.query.messages import list_conversation_activity
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service import list_owned_conversations
 
@@ -17,6 +17,7 @@ class RecentConversationView:
     title: str | None
     created_at: datetime
     last_message: str | None
+    last_activity_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,26 +25,41 @@ class RecentConversationsPageView:
     items: tuple[RecentConversationView, ...]
     next_cursor_created_at: datetime | None
     next_cursor_id: UUID | None
+    total: int = 0
 
 
 async def list_recent_conversations(
     session, command: ConversationTypes.ListOwnedConversationsCommand
 ) -> RecentConversationsPageView:
-    page = await list_owned_conversations(session, command)
-    previews = await list_conversation_previews(
-        session,
-        ChatTypes.ListConversationPreviewsCommand(
-            command.user_id, tuple(item.id for item in page.items)
-        ),
-    )
+    """Merge public conversation/chat reads before activity pagination.
+
+    No cross-domain data JOIN is permitted. Walk owner metadata in bounded batches,
+    collect chat activity, then order the complete owner scope. Empty rooms use their
+    creation time. This is a live READ COMMITTED view, not a multi-request snapshot:
+    newly active rows can move before an old cursor; refresh restarts the traversal.
+    """
+    if not 1 <= command.limit <= 100 or ((command.cursor_created_at is None) != (command.cursor_id is None)) or (command.cursor_created_at is not None and command.cursor_created_at.utcoffset() is None):
+        raise ValueError("Invalid activity cursor or limit.")
+    rows = []
+    scan = ConversationTypes.ListOwnedConversationsCommand(command.user_id, 100)
+    while True:
+        page = await list_owned_conversations(session, scan)
+        activities = await list_conversation_activity(session, ChatTypes.ListConversationPreviewsCommand(command.user_id, tuple(item.id for item in page.items)))
+        for item in page.items:
+            activity = activities.get(item.id)
+            rows.append(RecentConversationView(item.id, item.product_id, item.title, item.created_at, activity.content if activity else None, activity.created_at if activity else item.created_at))
+        if page.next_cursor_id is None:
+            break
+        scan = ConversationTypes.ListOwnedConversationsCommand(command.user_id, 100, page.next_cursor_created_at, page.next_cursor_id)
+    total = len(rows)
+    rows.sort(key=lambda item: (item.last_activity_at, item.id), reverse=True)
+    if command.cursor_created_at is not None:
+        rows = [item for item in rows if (item.last_activity_at, item.id) < (command.cursor_created_at, command.cursor_id)]
+    selected = tuple(rows[:command.limit])
+    last = selected[-1] if len(rows) > command.limit else None
     return RecentConversationsPageView(
-        items=tuple(
-            RecentConversationView(
-                item.id, item.product_id, item.title, item.created_at,
-                previews.get(item.id),
-            )
-            for item in page.items
-        ),
-        next_cursor_created_at=page.next_cursor_created_at,
-        next_cursor_id=page.next_cursor_id,
+        items=selected,
+        next_cursor_created_at=last.last_activity_at if last else None,
+        next_cursor_id=last.id if last else None,
+        total=total,
     )

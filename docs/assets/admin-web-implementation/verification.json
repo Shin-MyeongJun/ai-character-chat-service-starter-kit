@@ -1,0 +1,24 @@
+{
+  "kind": "development-fixture",
+  "checks": 26,
+  "viewports": [
+    1440,
+    1280
+  ],
+  "errors": [],
+  "screenshots": [
+    "detail-1280.png",
+    "detail-1440.png",
+    "empty-1440.png",
+    "error-1440.png",
+    "forbidden-1440.png",
+    "list-1280.png",
+    "list-1440.png",
+    "loading-1440.png",
+    "login-1440.png",
+    "long-nowrap-1440.png",
+    "not-found-1440.png",
+    "raw-1440.png",
+    "unrecorded-1440.png"
+  ]
+}

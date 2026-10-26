@@ -1,0 +1,7 @@
+{
+  "/account/[[...section]]/page": "app/account/[[...section]]/page.js",
+  "/explore/page": "app/explore/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/studio/page": "app/studio/page.js"
+}

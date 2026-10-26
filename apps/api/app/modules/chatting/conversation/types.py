@@ -36,6 +36,12 @@ class RuntimeStart:
 
 
 @dataclass(frozen=True, slots=True)
+class ManualLoreInfo:
+    id: str
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeCharacter:
     id: str
     snapshot_id: str
@@ -153,6 +159,8 @@ class PrepareRuntimeContextCommand:
     conversation_id: UUID
     user_id: UUID
     activation_text: str = ""
+    activation_messages: tuple[tuple[str, str], ...] = ()
+    manual_entry_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

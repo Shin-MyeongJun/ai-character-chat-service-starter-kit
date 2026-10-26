@@ -14,18 +14,21 @@ from app.modules.content.product.types import (
 
 
 def product_entity_to_info(entity):
+    """Expose publication existence separately from moderation status."""
     return ProductInfo(
-        **{name: getattr(entity, name) for name in ProductInfo.__dataclass_fields__}
+        **{name: getattr(entity, name) for name in ProductInfo.__dataclass_fields__ if name != "has_publication"},
+        has_publication=entity.latest_snapshot_id is not None,
     )
 
 
 def catalog_entities_to_page_info(rows, limit) -> Types.CatalogPageInfo:
+    """Read the published profile shape shared by publication and public detail."""
     selected = rows[:limit]
     items = tuple(
         Types.CatalogProductInfo(
             id=product.id,
-            title=snapshot.snapshot_data["product"]["title"],
-            description=snapshot.snapshot_data["product"].get("description"),
+            title=snapshot.snapshot_data["title"],
+            description=snapshot.snapshot_data.get("description"),
             snapshot_id=snapshot.id, created_at=product.created_at,
         ) for product, snapshot in selected
     )
@@ -109,13 +112,15 @@ def product_entity_to_state_info(entity: None) -> None: ...
 def product_entity_to_state_info(
     entity: Product | None,
 ) -> Types.ProductStateInfo | None:
+    """Detach mutable product state and its independent publication indicator."""
     if entity is None:
         return None
     return Types.ProductStateInfo(
         **{
             name: deepcopy(getattr(entity, name))
-            for name in Types.ProductStateInfo.__dataclass_fields__
-        }
+            for name in Types.ProductStateInfo.__dataclass_fields__ if name != "has_publication"
+        },
+        has_publication=entity.latest_snapshot_id is not None,
     )
 
 

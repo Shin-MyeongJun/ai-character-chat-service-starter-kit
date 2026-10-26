@@ -1,0 +1,63 @@
+{
+  "id": "media-sequence",
+  "title": "미디어 업로드·취소·정리",
+  "kind": "sequence",
+  "actors": [
+    "HTTP",
+    "Media workflow",
+    "DB",
+    "Storage"
+  ],
+  "steps": [
+    [
+      0,
+      1,
+      "소유자 / request UUID / 본문 metadata"
+    ],
+    [
+      1,
+      2,
+      "pending 예약 COMMIT"
+    ],
+    [
+      1,
+      2,
+      "캐릭터 / 미디어 row 잠금"
+    ],
+    [
+      1,
+      3,
+      "store_asset; 취소 시에도 작업 종료 대기"
+    ],
+    [
+      3,
+      1,
+      "저장 결과"
+    ],
+    [
+      1,
+      2,
+      "ready COMMIT; 모호한 실패는 pending 재개"
+    ],
+    [
+      1,
+      0,
+      "앱 내부 content URL"
+    ],
+    [
+      1,
+      2,
+      "정리 CLI: 24h 보존·참조 없음 → deleting COMMIT"
+    ],
+    [
+      1,
+      3,
+      "객체 삭제; 실패 시 deleting 재시도"
+    ],
+    [
+      1,
+      2,
+      "deleted COMMIT"
+    ]
+  ]
+}

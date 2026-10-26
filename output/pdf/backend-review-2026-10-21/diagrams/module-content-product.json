@@ -1,0 +1,62 @@
+{
+  "id": "module-content-product",
+  "title": "content/product 내부 구조",
+  "kind": "module",
+  "nodes": [
+    "dependencies",
+    "mapper",
+    "repository",
+    "router",
+    "schemas",
+    "service",
+    "types"
+  ],
+  "counts": {
+    "dependencies": 1,
+    "mapper": 6,
+    "repository": 9,
+    "router": 2,
+    "schemas": 1,
+    "service": 19,
+    "statistics_job": 1,
+    "types": 1
+  },
+  "edges": [
+    [
+      "mapper",
+      "schemas"
+    ],
+    [
+      "mapper",
+      "types"
+    ],
+    [
+      "router",
+      "mapper"
+    ],
+    [
+      "router",
+      "schemas"
+    ],
+    [
+      "router",
+      "service"
+    ],
+    [
+      "router",
+      "types"
+    ],
+    [
+      "service",
+      "mapper"
+    ],
+    [
+      "service",
+      "repository"
+    ],
+    [
+      "service",
+      "types"
+    ]
+  ]
+}
