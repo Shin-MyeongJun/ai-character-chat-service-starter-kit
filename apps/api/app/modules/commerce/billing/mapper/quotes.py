@@ -3,10 +3,11 @@
 import json
 from dataclasses import asdict
 from decimal import Decimal
-from typing import Any, overload
+from typing import overload
 from uuid import UUID
 
 from app.db.models.billing_quote import BillingQuote
+from app.modules.commerce.billing import repository as Repository
 from app.modules.commerce.billing import types as Types
 
 
@@ -18,7 +19,7 @@ def _scalar_to_json(value: object) -> str:
 
 def quote_info_to_snapshots(
     info: Types.BillingQuoteInfo,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[Repository.BillingQuoteSnapshot, Repository.BillingQuoteSnapshot]:
     return (
         {
             "schema_version": 1,

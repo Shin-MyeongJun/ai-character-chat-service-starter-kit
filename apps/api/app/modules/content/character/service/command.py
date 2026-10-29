@@ -5,11 +5,12 @@
 from typing import get_args
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.content.character import repository as Repository
 from app.modules.content.character import types as Types
 from app.modules.content.character.mapper import persistence as PersistenceMapper
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _validate_character_profile(
@@ -32,13 +33,13 @@ def _validate_character_status(status: Types.CharacterStatusValue) -> None:
 async def _get_owned_character(
     session: AsyncSession, character_id: UUID, owner_id: UUID
 ) -> Types.CharacterInfo:
-    row = await Repository.get_character_by_id_and_owner_id(
+    character_entity = await Repository.get_character_by_id_and_owner_id(
         session, character_id, owner_id, for_update=True
     )
-    info = PersistenceMapper.character_entity_to_info(row)
-    if info is None:
+    character_info = PersistenceMapper.character_entity_to_info(character_entity)
+    if character_info is None:
         raise LookupError("Character not found.")
-    return info
+    return character_info
 
 
 async def create_character(
@@ -47,14 +48,20 @@ async def create_character(
     async with use_case_transaction(session):
         _validate_character_profile(command)
         _validate_character_status(command.status)
-        row = await Repository.create_character_command(session, command)
-        info = PersistenceMapper.character_entity_to_info(row)
+        character_entity = await Repository.create_character_command(session, command)
+        character_info = PersistenceMapper.character_entity_to_info(character_entity)
         if command.tags:
             from app.modules.content.character.service import tags as TagsCommandService
+
             await TagsCommandService.replace_public_tags(
-                session, Types.PublicTagsCommand(info.id, command.owner_id, command.tags)
+                session,
+                Types.PublicTagsCommand(
+                    target_id=character_info.id,
+                    user_id=command.owner_id,
+                    names=command.tags,
+                ),
             )
-        return info
+        return character_info
 
 
 async def update_character(
@@ -63,8 +70,8 @@ async def update_character(
     async with use_case_transaction(session):
         await _get_owned_character(session, command.character_id, command.owner_id)
         _validate_character_profile(command)
-        row = await Repository.update_character_command(session, command)
-        return PersistenceMapper.character_entity_to_info(row)
+        character_entity = await Repository.update_character_command(session, command)
+        return PersistenceMapper.character_entity_to_info(character_entity)
 
 
 async def change_character_status(
@@ -73,8 +80,10 @@ async def change_character_status(
     async with use_case_transaction(session):
         await _get_owned_character(session, command.character_id, command.owner_id)
         _validate_character_status(command.status)
-        row = await Repository.change_character_status_command(session, command)
-        return PersistenceMapper.character_entity_to_info(row)
+        character_entity = await Repository.change_character_status_command(
+            session, command
+        )
+        return PersistenceMapper.character_entity_to_info(character_entity)
 
 
 async def delete_character(
@@ -101,11 +110,11 @@ async def delete_character_image(
 ) -> None:
     async with use_case_transaction(session):
         await _get_owned_character(session, command.character_id, command.owner_id)
-        row = await Repository.get_character_image_by_id_and_character_id(
+        image_entity = await Repository.get_character_image_by_id_and_character_id(
             session, command.image_id, command.character_id
         )
-        info = PersistenceMapper.character_image_entity_to_info(row)
-        if info is None:
+        image_info = PersistenceMapper.character_image_entity_to_info(image_entity)
+        if image_info is None:
             raise LookupError("Character image not found.")
         await Repository.delete_character_image_command(session, command)
 
@@ -129,11 +138,11 @@ async def delete_character_asset(
 ) -> None:
     async with use_case_transaction(session):
         await _get_owned_character(session, command.character_id, command.owner_id)
-        row = await Repository.get_character_asset_by_id_and_character_id(
+        asset_entity = await Repository.get_character_asset_by_id_and_character_id(
             session, command.asset_id, command.character_id
         )
-        info = PersistenceMapper.character_asset_entity_to_info(row)
-        if info is None:
+        asset_info = PersistenceMapper.character_asset_entity_to_info(asset_entity)
+        if asset_info is None:
             raise LookupError("Character asset not found.")
         await Repository.delete_character_asset_command(session, command)
 
@@ -143,21 +152,21 @@ async def set_default_character_image(
 ) -> Types.CharacterImageInfo:
     async with use_case_transaction(session):
         await _get_owned_character(session, command.character_id, command.owner_id)
-        row = await Repository.set_default_character_image(
+        image_entity = await Repository.set_default_character_image(
             session, command.image_id, command.character_id
         )
-        info = PersistenceMapper.character_image_entity_to_info(row)
-        if info is None:
+        image_info = PersistenceMapper.character_image_entity_to_info(image_entity)
+        if image_info is None:
             raise LookupError("Character image not found.")
-        return info
+        return image_info
 
 
 async def freeze_character(
     session: AsyncSession, command: Types.FreezeCharacterCommand
 ) -> Types.CharacterSnapshotInfo:
     async with use_case_transaction(session):
-        source = await _get_owned_character(
+        character_info = await _get_owned_character(
             session, command.character_id, command.owner_id
         )
-        row = await Repository.freeze_character(session, source)
-        return PersistenceMapper.character_snapshot_entity_to_info(row)
+        snapshot_entity = await Repository.freeze_character(session, character_info)
+        return PersistenceMapper.character_snapshot_entity_to_info(snapshot_entity)

@@ -1,5 +1,7 @@
 # 고정 상품 스냅샷·활성 로어·실행 모델을 조합한다. 모델 대체 이력을 저장할 수 있어 쓰기 트랜잭션을 사용한다.
 # activation_text만 로어 활성화에 사용하며 메시지 이력을 직접 조회하지 않는다.
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import types as Types
 from app.modules.chatting.conversation.mapper import persistence as PersistenceMapper
@@ -15,7 +17,7 @@ from app.modules.llm.service.replacement import resolve_execution
 
 
 async def prepare_runtime_context(
-    session, command: Types.PrepareRuntimeContextCommand
+    session: AsyncSession, command: Types.PrepareRuntimeContextCommand
 ) -> Types.ConversationRuntimeView:
     """Authorize the pinned snapshot before selecting lore from supplied message facts.
 
@@ -35,25 +37,42 @@ async def prepare_runtime_context(
             raise ValueError("Legacy conversation requires verified version mapping.")
         snapshot = await ProductQueryService.ensure_snapshot_available(
             session,
-            ProductTypes.ProductSnapshotCommand(conversation.product_snapshot_id),
+            ProductTypes.ProductSnapshotCommand(
+                snapshot_id=conversation.product_snapshot_id
+            ),
         )
         runtime = await ProductViewsService.get_snapshot_runtime(
-            session, ProductTypes.ProductSnapshotCommand(snapshot.id)
+            session, ProductTypes.ProductSnapshotCommand(snapshot_id=snapshot.id)
         )
         execution = await resolve_execution(
             session, LlmTypes.ResolveExecutionCommand(snapshot_id=snapshot.id)
         )
         active_entries = {
-            sid: LorebookQueryService.activate_snapshot_entries(
+            snapshot_id: LorebookQueryService.activate_snapshot_entries(
                 LorebookTypes.ActivateSnapshotEntriesCommand(
-                    snapshot=book, text=command.activation_text, messages=command.activation_messages,
-                    manual_entry_ids=tuple(value for value in command.manual_entry_ids if value in {str(entry["id"]) for entry in book.snapshot_data["entries"]}),
+                    snapshot=lorebook,
+                    text=command.activation_text,
+                    messages=command.activation_messages,
+                    manual_entry_ids=tuple(
+                        entry_id
+                        for entry_id in command.manual_entry_ids
+                        if entry_id
+                        in {
+                            str(entry["id"])
+                            for entry in lorebook.snapshot_data["entries"]
+                        }
+                    ),
                 )
             ).entries
-            for sid, book in runtime.lorebooks.items()
+            for snapshot_id, lorebook in runtime.lorebooks.items()
         }
-        known_ids = {str(entry["id"]) for book in runtime.lorebooks.values() for entry in book.snapshot_data["entries"] if entry["entry_type"] != "start_set"}
-        if set(command.manual_entry_ids) - known_ids:
+        known_entry_ids = {
+            str(entry["id"])
+            for lorebook in runtime.lorebooks.values()
+            for entry in lorebook.snapshot_data["entries"]
+            if entry["entry_type"] != "start_set"
+        }
+        if set(command.manual_entry_ids) - known_entry_ids:
             raise ValueError("Manual lore ID is outside the conversation snapshot.")
         start_context = await get_conversation_start(
             session,

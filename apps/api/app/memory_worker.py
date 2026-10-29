@@ -108,9 +108,9 @@ async def run_worker(*, once: bool, concurrency: int, poll_seconds: float) -> No
     indexer = MemoryService.MemoryIndexer(embedding_service)
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
     semaphore = asyncio.Semaphore(concurrency)
-    active: set[asyncio.Task] = set()
+    active: set[asyncio.Task[None]] = set()
 
-    async def process(work):
+    async def process(work: MemoryTypes.MemoryWorkInfo) -> None:
         async with semaphore:
             try:
                 await process_memory_work(

@@ -1,19 +1,33 @@
 # 릴리스 목록은 after_version 초과, through_version 이하를 버전순 반환한다.
 # 노트가 없는 버전도 outer join으로 남겨 서비스가 전환 가능 여부를 판단하게 한다.
-from sqlalchemy import select
+from datetime import datetime
+from typing import TypeAlias, cast
+from uuid import UUID
+
+from sqlalchemy import Row, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision
 from app.db.models.snapshot.product import (
     ProductSnapshot,
 )
 
+ReleaseRow: TypeAlias = Row[tuple[ProductSnapshot, ProductReleaseNote | None]]
 
-async def get_release_note(session, snapshot_id, *, lock=False):
+
+async def get_release_note(
+    session: AsyncSession, snapshot_id: UUID, *, lock: bool = False
+) -> ProductReleaseNote | None:
     return await session.get(ProductReleaseNote, snapshot_id, with_for_update=lock)
 
 
 async def create_release_note(
-    session, snapshot_id, summary, body, kind, policy
+    session: AsyncSession,
+    snapshot_id: UUID,
+    summary: str,
+    body: str,
+    kind: str,
+    policy: str,
 ) -> None:
     session.add(
         ProductReleaseNote(
@@ -28,9 +42,16 @@ async def create_release_note(
 
 
 async def correct_release_note(
-    session, snapshot_id, owner_id, summary, body, corrected_at
-):
+    session: AsyncSession,
+    snapshot_id: UUID,
+    owner_id: UUID,
+    summary: str,
+    body: str,
+    corrected_at: datetime,
+) -> ProductReleaseNote:
     note = await session.get(ProductReleaseNote, snapshot_id, with_for_update=True)
+    # The caller checked and locked this note in the same transaction.
+    assert note is not None, "Locked release note disappeared."
     session.add(
         ProductReleaseNoteRevision(
             product_snapshot_id=snapshot_id,
@@ -45,8 +66,11 @@ async def correct_release_note(
 
 
 async def list_product_release_rows(
-    session, product_id, after_version, through_version=None
-):
+    session: AsyncSession,
+    product_id: UUID,
+    after_version: int,
+    through_version: int | None = None,
+) -> list[ReleaseRow]:
     stmt = (
         select(ProductSnapshot, ProductReleaseNote)
         .outerjoin(
@@ -61,4 +85,6 @@ async def list_product_release_rows(
     )
     if through_version is not None:
         stmt = stmt.where(ProductSnapshot.version <= through_version)
-    return list(await session.execute(stmt))
+    # SQLAlchemy retains a non-null entity annotation across OUTER JOIN. SQL
+    # actually returns None when the release note is absent; preserve the Row.
+    return cast(list[ReleaseRow], list(await session.execute(stmt)))

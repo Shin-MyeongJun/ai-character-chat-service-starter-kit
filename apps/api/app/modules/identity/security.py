@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID
 
 import jwt
@@ -12,7 +13,8 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError
 from email_validator import EmailNotValidError, validate_email
 
-from app.modules.identity.types import AuthError
+from app.modules.identity.settings import AuthSettings
+from app.modules.identity.types import AuthError, AuthTokenClaims
 
 # Argon2id의 메모리 비용 64MiB를 명시한다. 불명 계정도 같은 검증 비용을 지불한다.
 PASSWORD_HASHER = PasswordHasher(
@@ -26,7 +28,9 @@ def normalize_email(email: str) -> str:
         value = validate_email(
             email.strip(), check_deliverability=False, allow_smtputf8=False
         )
-        return value.ascii_email.lower()
+        # The validator's ASCII field is optional in its general type. Preserve
+        # this path's successful string read and existing AttributeError mapping.
+        return cast(str, value.ascii_email).lower()
     except (EmailNotValidError, AttributeError) as exc:
         raise AuthError("invalid_input") from exc
 
@@ -77,7 +81,7 @@ def safe_redirect(value: str) -> str:
 
 
 class TokenCodec:
-    def __init__(self, settings):
+    def __init__(self, settings: AuthSettings) -> None:
         self.settings = settings
         self.key = base64.b64decode(settings.jwt_key)
 
@@ -102,7 +106,7 @@ class TokenCodec:
             headers={"typ": "JWT"},
         )
 
-    def decode_token(self, token: str, kind: str) -> dict:
+    def decode_token(self, token: str, kind: str) -> AuthTokenClaims:
         try:
             if len(token) > 4096:
                 raise ValueError
@@ -140,7 +144,9 @@ class TokenCodec:
                 raise ValueError
             UUID(claims["sub"])
             UUID(claims["sid"])
-            return claims
+            # PyJWT and the checks above validate these fields. Keep the original
+            # dictionary, extension claims and existing failure classification.
+            return cast(AuthTokenClaims, claims)
         except (jwt.PyJWTError, ValueError, TypeError, AttributeError) as exc:
             raise AuthError("invalid_token") from exc
 

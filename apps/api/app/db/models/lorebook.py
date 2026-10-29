@@ -189,7 +189,7 @@ class LorebookEntry(TimestampMixin, UuidPkMixin, Base):
     is_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
-    metadata_: Mapped[dict] = mapped_column(
+    metadata_: Mapped[dict[str, object]] = mapped_column(
         "metadata",
         JSONB,
         nullable=False,

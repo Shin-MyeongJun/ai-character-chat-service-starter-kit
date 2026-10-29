@@ -3,17 +3,22 @@
 import asyncio
 import hmac
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID, uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
+from app.db.types import SessionFactory
 from app.modules.identity import repository as Repository
 from app.modules.identity import security as Security
 from app.modules.identity import types as Types
 from app.modules.identity.mapper import persistence as PersistenceMapper
+from app.modules.identity.settings import AuthSettings
 
 
 class AuthenticationService:
-    def __init__(self, sessions, settings):
+    def __init__(self, sessions: SessionFactory, settings: AuthSettings) -> None:
         self.sessions = sessions
         self.settings = settings
         self.codec = Security.TokenCodec(settings)
@@ -34,12 +39,16 @@ class AuthenticationService:
         if not allowed:
             raise Types.AuthError("rate_limited")
 
-    async def _check_email_rate(self, scope, email, limit=5, seconds=900):
+    async def _check_email_rate(
+        self, scope: str, email: str, limit: int = 5, seconds: int = 900
+    ) -> None:
         await self.check_rate_limit(
             Types.RateLimitCommand(scope, email, limit, seconds)
         )
 
-    async def _create_mail_token(self, session, user_id, purpose, now):
+    async def _create_mail_token(
+        self, session: AsyncSession, user_id: UUID, purpose: str, now: datetime
+    ) -> str:
         token = Security.random_token()
         await Repository.invalidate_action_tokens(session, user_id, purpose, now)
         await Repository.create_action_token(
@@ -128,7 +137,9 @@ class AuthenticationService:
             return Types.ActionMailInfo(email, purpose, token)
         return None
 
-    async def _consume_action(self, session, token, purpose, now):
+    async def _consume_action(
+        self, session: AsyncSession, token: str, purpose: str, now: datetime
+    ) -> Types.CredentialInfo:
         info = PersistenceMapper.action_entity_to_info(
             await Repository.get_action_token(session, Security.token_hash(token))
         )
@@ -181,7 +192,7 @@ class AuthenticationService:
             await Repository.revoke_user_sessions(session, user.user.id, now)
 
     async def issue_session(
-        self, session, command: Types.IssueSessionCommand
+        self, session: AsyncSession, command: Types.IssueSessionCommand
     ) -> Types.LoginInfo:
         user, now = command.user, command.now
         if user.status != "active" or not user.user.email_verified:
@@ -199,7 +210,13 @@ class AuthenticationService:
         )
         return login
 
-    def _encode_login(self, user, session_id, now, expires_at):
+    def _encode_login(
+        self,
+        user: Types.UserInfo,
+        session_id: UUID,
+        now: datetime,
+        expires_at: datetime,
+    ) -> Types.LoginInfo:
         access = self.codec.encode_token(
             kind="access",
             subject=str(user.id),
@@ -236,7 +253,10 @@ class AuthenticationService:
                 or not user.user.email_verified
             ):
                 raise Types.AuthError("invalid_credentials")
-            if Security.PASSWORD_HASHER.check_needs_rehash(user.password_hash):
+            # verify_password returns True only for a non-null stored hash. Keep
+            # the original value and failure behavior if an injected verifier lies.
+            password_hash = cast(str, user.password_hash)
+            if Security.PASSWORD_HASHER.check_needs_rehash(password_hash):
                 await Repository.update_password(
                     session,
                     user.user.id,
@@ -248,7 +268,9 @@ class AuthenticationService:
                 session, Types.IssueSessionCommand(user, datetime.now(UTC))
             )
 
-    async def _require_session(self, session, claims, now):
+    async def _require_session(
+        self, session: AsyncSession, claims: Types.AuthTokenClaims, now: datetime
+    ) -> tuple[Types.CredentialInfo, Types.SessionInfo]:
         user = PersistenceMapper.user_entity_to_credential_info(
             await Repository.get_locked_user(session, UUID(claims["sub"]))
         )
@@ -294,6 +316,8 @@ class AuthenticationService:
         # 폐기 트랜잭션을 커밋한 뒤 실패를 내보내야 재사용 공격에서도 폐기가 유지된다.
         if reused:
             raise Types.AuthError("refresh_reused")
+        # The only non-reuse branch encoded LoginInfo before the transaction ended.
+        assert login is not None
         return login
 
     async def logout_session(self, command: Types.LogoutCommand) -> None:

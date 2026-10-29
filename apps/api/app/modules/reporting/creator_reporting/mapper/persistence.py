@@ -1,27 +1,37 @@
 """Creator 영역의 허용 필드만 구성하는 순수 mapper."""
 
-from dataclasses import fields
+from datetime import datetime
 
-from app.core.reporting import FreshnessInfo
+from app.core.reporting import FreshnessInfo, PeriodInfo
+from app.modules.content.product import types as ProductTypes
 from app.modules.reporting.creator_reporting import types as Types
 
 
-def _metrics_info_to_result(info) -> Types.CreatorMetricsInfo | None:
+def _metrics_info_to_result(
+    info: ProductTypes.ReportingMetricsInfo | None,
+) -> Types.CreatorMetricsInfo | None:
     """매출·사용자 식별자 없이 이 영역의 사용량 필드만 선택한다."""
-    return (
-        None
-        if info is None
-        else Types.CreatorMetricsInfo(
-            **{
-                field.name: getattr(info, field.name)
-                for field in fields(Types.CreatorMetricsInfo)
-            }
-        )
+    if info is None:
+        return None
+    return Types.CreatorMetricsInfo(
+        active_users=info.active_users,
+        succeeded=info.succeeded,
+        failed=info.failed,
+        cancelled=info.cancelled,
+        stale=info.stale,
+        messages=info.messages,
+        conversations=info.conversations,
+        transitions=info.transitions,
+        input_tokens=info.input_tokens,
+        output_tokens=info.output_tokens,
+        cost_credit=info.cost_credit,
     )
 
 
 def product_statistics_info_to_view(
-    info, period, queried_at
+    info: ProductTypes.ReportingStatisticsInfo,
+    period: PeriodInfo,
+    queried_at: datetime,
 ) -> Types.CreatorProductReportView:
     """집계된 날짜와 누락·dirty 날짜를 구분해 전체 기간 완료를 과장하지 않는다."""
     days = tuple(

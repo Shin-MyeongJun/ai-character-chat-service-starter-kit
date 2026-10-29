@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import TypeAlias
 from uuid import UUID
+
+# Token/credit counts are integral; monetary event amounts remain Decimal.
+UsageStatisticsFact: TypeAlias = tuple[UUID, int, int, int]
+PaymentStatisticsFact: TypeAlias = tuple[UUID, str, str, Decimal, int, list[UUID]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,8 +64,8 @@ class GetStatisticsFactsCommand:
 
 @dataclass(frozen=True, slots=True)
 class BillingStatisticsInfo:
-    usage: list[tuple]
-    payments: list[tuple]
+    usage: list[UsageStatisticsFact]
+    payments: list[PaymentStatisticsFact]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

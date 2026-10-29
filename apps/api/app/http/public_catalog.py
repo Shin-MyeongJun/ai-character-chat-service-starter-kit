@@ -14,10 +14,13 @@ router = APIRouter(prefix="/products/catalog", tags=["products"])
 
 
 @router.get("/{product_id}", response_model=Schemas.PublishedProductInfoResponseDto)
-async def get_catalog_product(product_id: UUID, session: Session):
+async def get_catalog_product(
+    product_id: UUID, session: Session
+) -> Schemas.PublishedProductInfoResponseDto:
     with errors():
         return ProductSchemaMapper.published_view_to_response(
             await get_published_product(
-                session, Types.PublishedProductCommand(product_id=product_id, user_id=None)
+                session,
+                Types.PublishedProductCommand(product_id=product_id, user_id=None),
             )
         )

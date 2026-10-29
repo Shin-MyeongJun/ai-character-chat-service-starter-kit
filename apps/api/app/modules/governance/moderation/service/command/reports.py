@@ -1,7 +1,10 @@
 """신고 접수와 관리자 접수 상태 변경."""
 
 from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
@@ -17,7 +20,9 @@ from app.modules.identity import types as IdentityTypes
 from app.modules.identity.service import query as IdentityQueryService
 
 
-async def _capture_report_target(session, command, actor_id):
+async def _capture_report_target(
+    session: AsyncSession, command: Types.SubmitReportCommand, actor_id: UUID
+) -> tuple[UUID | None, UUID | None, Types.JsonObject]:
     """공개 도메인 서비스로 신고 접근 권한과 버전을 검증하고 최소 증거를 확보한다."""
     try:
         if command.target_type == "user":
@@ -42,7 +47,12 @@ async def _capture_report_target(session, command, actor_id):
         if snapshot.product_id != product.id:
             raise Types.ModerationError("target_unavailable")
         # 전체 캐릭터 설정이나 비공개 내부 문맥은 복제하지 않는다.
-        data = snapshot.snapshot_data.get("product", snapshot.snapshot_data)
+        # 발행 서비스가 저장하는 JSON object와 기존 중첩 product/평면 형식을
+        # 읽는다. cast는 저장 계약의 표현이며 명시적 null/손상 값을 보정하지 않는다.
+        data = cast(
+            Types.JsonObject,
+            snapshot.snapshot_data.get("product", snapshot.snapshot_data),
+        )
         return (
             product.owner_id,
             snapshot.id,
@@ -61,7 +71,10 @@ async def _capture_report_target(session, command, actor_id):
 
 
 async def submit_report(
-    session, command: Types.SubmitReportCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.SubmitReportCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ReportSummaryInfo:
     """활성 신고자의 접수를 멱등 저장하고 신고자에게 허용된 요약만 반환한다."""
     actor_id = actor.user_id
@@ -90,8 +103,10 @@ async def submit_report(
         # 인증 상태를 먼저 확인하고, 기존 요청이 있으면 변한 원본을 재확보하지 않는다.
         await ValidationServiceUtil._require_actor(session, actor_id)
         await lock_key(session, "moderation.report", str(command.request_key))
-        row = await ReviewRepository.get_report_by_key(session, command.request_key)
-        existing = PersistenceMapper.report_entity_to_info(row)
+        existing_report_entity = await ReviewRepository.get_report_by_key(
+            session, command.request_key
+        )
+        existing = PersistenceMapper.report_entity_to_info(existing_report_entity)
         if existing is not None:
             ValidationServiceUtil.require_match(
                 existing.evidence_snapshot.get("request_fingerprint"), fingerprint
@@ -101,7 +116,7 @@ async def submit_report(
             session, command, actor_id
         )
         now = datetime.now(UTC)
-        row = await ReviewRepository.create_report(
+        created_report_entity = await ReviewRepository.create_report(
             session,
             {
                 "request_key": command.request_key,
@@ -128,12 +143,15 @@ async def submit_report(
             },
         )
         return PersistenceMapper.report_info_to_summary(
-            PersistenceMapper.report_entity_to_info(row)
+            PersistenceMapper.report_entity_to_info(created_report_entity)
         )
 
 
 async def change_report_intake(
-    session, command: Types.ChangeReportIntakeCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ChangeReportIntakeCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ReportInfo:
     """관리자가 미처리 신고를 중복·거절로 확정하며 연결 순환을 차단한다."""
     actor_id = actor.user_id
@@ -147,9 +165,11 @@ async def change_report_intake(
         await ValidationServiceUtil._require_actor(session, actor_id, admin=True)
         # 모든 중복 그래프 편집을 직렬화해 서로를 동시에 연결하는 경쟁을 막는다.
         await lock_key(session, "moderation.intake", "graph")
-        row = await ReviewRepository.get_report(session, command.report_id, lock=True)
+        report_entity = await ReviewRepository.get_report(
+            session, command.report_id, lock=True
+        )
         info = ValidationServiceUtil.require_info(
-            PersistenceMapper.report_entity_to_info(row)
+            PersistenceMapper.report_entity_to_info(report_entity)
         )
         if (info.intake_status, info.duplicate_of_report_id, info.intake_reason) == (
             command.intake_status,
@@ -163,8 +183,10 @@ async def change_report_intake(
             in {"reviewed", "dismissed"}
         ):
             raise Types.ModerationError("state_conflict")
-        row = await ReviewRepository.get_report_assessment_id(session, info.id)
-        if PersistenceMapper.scalar_row_to_value(row) is not None:
+        assessment_id_row = await ReviewRepository.get_report_assessment_id(
+            session, info.id
+        )
+        if PersistenceMapper.scalar_row_to_value(assessment_id_row) is not None:
             raise Types.ModerationError("state_conflict")
         visited = {info.id}
         next_id = command.duplicate_of_report_id
@@ -172,9 +194,9 @@ async def change_report_intake(
             if next_id in visited:
                 raise Types.ModerationError("invalid_link")
             visited.add(next_id)
-            row = await ReviewRepository.get_report(session, next_id)
+            parent_report_entity = await ReviewRepository.get_report(session, next_id)
             parent = ValidationServiceUtil.require_info(
-                PersistenceMapper.report_entity_to_info(row)
+                PersistenceMapper.report_entity_to_info(parent_report_entity)
             )
             if (parent.target_type, parent.target_id) != (
                 info.target_type,
@@ -182,14 +204,19 @@ async def change_report_intake(
             ) or parent.intake_status == "rejected":
                 raise Types.ModerationError("invalid_link")
             next_id = parent.duplicate_of_report_id
-        row = await ReviewRepository.update_report_intake(
+        updated_report_entity = await ReviewRepository.update_report_intake(
             session,
             info.id,
             status=command.intake_status,
             duplicate_id=command.duplicate_of_report_id,
             reason=command.reason,
         )
-        result = PersistenceMapper.report_entity_to_info(row)
+        # 위에서 존재를 확인하고 잠근 동일 ID를 같은 트랜잭션에서 UPDATE RETURNING한다.
+        # 삭제 경쟁이 없으므로 mapper 결과는 존재한다. 기존 오류/반환 동작은 유지한다.
+        result = cast(
+            Types.ReportInfo,
+            PersistenceMapper.report_entity_to_info(updated_report_entity),
+        )
         await ReviewRepository.create_admin_audit(
             session,
             actor_id,

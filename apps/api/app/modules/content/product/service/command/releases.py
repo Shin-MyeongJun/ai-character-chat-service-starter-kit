@@ -2,6 +2,9 @@
 # 콘텐츠 변경 또는 기존 미디어 제거는 content, 그 외 후속 발행은 media로 분류한다.
 # media이면서 auto_apply_media=True인 경우에만 automatic으로 기록한다.
 from datetime import UTC, datetime
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
 from app.modules.content.character import types as CharacterTypes
@@ -14,7 +17,7 @@ from app.modules.content.product.service.command.publication import _build_publi
 from app.modules.content.product.types import ReleaseInfo
 
 
-def validate_note(summary, body):
+def validate_note(summary: str, body: str) -> None:
     if (
         not summary.strip()
         or not body.strip()
@@ -24,7 +27,9 @@ def validate_note(summary, body):
         raise ValueError("Patch summary (1–300) and body (1–20000) are required.")
 
 
-async def _get_media_manifest(session, sid):
+async def _get_media_manifest(
+    session: AsyncSession, sid: UUID
+) -> frozenset[CharacterTypes.SnapshotMediaManifestItem]:
     ids = await Repository.list_snapshot_character_ids(session, sid)
     info = await CharacterQueryService.get_snapshot_media(
         session, CharacterTypes.GetSnapshotMediaCommand(ids)
@@ -33,14 +38,19 @@ async def _get_media_manifest(session, sid):
 
 
 # 고정 스냅샷·구성·릴리스 노트를 같은 트랜잭션에 만든다. 명시적 요청 키 재사용 계약은 없다.
-async def publish_product(session, command: Types.PublishCommand) -> ReleaseInfo:
+async def publish_product(
+    session: AsyncSession, command: Types.PublishCommand
+) -> ReleaseInfo:
     product_id = command.product_id
     owner_id = command.owner_id
     value = command.value
     validate_note(value.summary, value.body)
     async with use_case_transaction(session):
         product = await QueryService.get_owned_product(
-            session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+            session,
+            Types.OwnedProductCommand(
+                product_id=product_id, owner_id=owner_id, lock=True
+            ),
         )
         previous = (
             await QueryService.get_product_snapshot(
@@ -73,7 +83,9 @@ async def publish_product(session, command: Types.PublishCommand) -> ReleaseInfo
 
 
 # 발행 내용은 그대로 두고 안내 문구만 정정한다. 이전 summary/body와 편집자를 별도 이력에 남긴다.
-async def correct_note(session, command: Types.CorrectNoteCommand) -> ReleaseInfo:
+async def correct_note(
+    session: AsyncSession, command: Types.CorrectNoteCommand
+) -> ReleaseInfo:
     product_id = command.product_id
     snapshot_id = command.snapshot_id
     owner_id = command.owner_id
@@ -82,7 +94,10 @@ async def correct_note(session, command: Types.CorrectNoteCommand) -> ReleaseInf
     validate_note(summary, body)
     async with use_case_transaction(session):
         await QueryService.get_owned_product(
-            session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+            session,
+            Types.OwnedProductCommand(
+                product_id=product_id, owner_id=owner_id, lock=True
+            ),
         )
         snapshot = await QueryService.get_product_snapshot(
             session, Types.ProductSnapshotCommand(snapshot_id)

@@ -1,4 +1,8 @@
 # 소유 대화의 현재 선형 이력을 조회한다. 페이지 사이 편집까지 고정한 스냅샷 조회는 아니다.
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper
@@ -7,7 +11,7 @@ from app.modules.chatting.conversation.service import get_owned_conversation
 
 
 async def list_messages(
-    session, command: Types.ListMessagesCommand
+    session: AsyncSession, command: Types.ListMessagesCommand
 ) -> Types.MessagePageInfo:
     if type(command.limit) is not int or not 1 <= command.limit <= 100:
         raise ValueError("Page limit must be 1–100.")
@@ -35,8 +39,8 @@ async def list_messages(
 
 
 async def list_conversation_previews(
-    session, command: Types.ListConversationPreviewsCommand
-) -> dict:
+    session: AsyncSession, command: Types.ListConversationPreviewsCommand
+) -> dict[UUID, str]:
     if len(command.conversation_ids) > 100:
         raise ValueError("Too many conversation previews.")
     rows = await Repository.list_latest_message_previews(
@@ -45,17 +49,21 @@ async def list_conversation_previews(
     return PersistenceMapper.conversation_preview_rows_to_info(rows)
 
 
-async def list_conversation_activity(session, command: Types.ListConversationPreviewsCommand) -> dict:
+async def list_conversation_activity(
+    session: AsyncSession, command: Types.ListConversationPreviewsCommand
+) -> dict[UUID, Types.ConversationActivityInfo]:
     """Expose chat-owned activity for an owner-scoped batch of at most 100 rooms."""
     if len(command.conversation_ids) > 100:
         raise ValueError("Too many conversation activities.")
     return PersistenceMapper.conversation_activity_rows_to_info(
-        await Repository.list_conversation_activity(session, command.user_id, command.conversation_ids)
+        await Repository.list_conversation_activity(
+            session, command.user_id, command.conversation_ids
+        )
     )
 
 
 async def list_memory_source(
-    session, command: Types.ListMemorySourceCommand
+    session: AsyncSession, command: Types.ListMemorySourceCommand
 ) -> Types.MemorySourceInfo:
     if (
         type(command.after_position) is not int

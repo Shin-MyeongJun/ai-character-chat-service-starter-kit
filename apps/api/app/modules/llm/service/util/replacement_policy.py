@@ -1,9 +1,15 @@
 # 허용 범위 안에서 같은 계열, 같은 provider, effort 거리, UUID 문자열 순으로 대체 모델을 고른다.
 # 동일 거리의 effort는 낮은 단계를 우선한다. 비용·응답 품질 순위는 사용하지 않는다.
+from collections.abc import Container, Iterable, Mapping
+from datetime import datetime
+from typing import cast
+
+from app.modules.llm import types as Types
+
 EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
-def closest_effort(requested, supported):
+def closest_effort(requested: str, supported: Iterable[str]) -> str | None:
     allowed = [e for e in supported if e in EFFORTS]
     if requested not in EFFORTS or not allowed:
         return None
@@ -16,10 +22,17 @@ def closest_effort(requested, supported):
     )
 
 
-def choose_replacement(original, candidates, policy, effort, *, now):
+def choose_replacement(
+    original: Types.ModelInfo,
+    candidates: Iterable[Types.ModelInfo],
+    policy: Mapping[str, object],
+    effort: str,
+    *,
+    now: datetime,
+) -> tuple[Types.ModelInfo, str] | None:
     scope = policy.get("scope", "same_family")
     family = original.capabilities.get("model_family")
-    choices = []
+    choices: list[tuple[bool, bool, int, str, Types.ModelInfo, str]] = []
     for model in candidates:
         if (
             model.id == original.id
@@ -37,10 +50,17 @@ def choose_replacement(original, candidates, policy, effort, *, now):
             scope == "same_family"
             and same_family
             or (scope == "same_provider" and same_provider)
-            or (scope == "allowlist" and str(model.id) in policy.get("model_ids", []))
+            # Product policy writes a model-ID container. Keep original membership
+            # semantics and malformed-input errors instead of normalizing it.
+            or (
+                scope == "allowlist"
+                and str(model.id) in cast(Container[str], policy.get("model_ids", []))
+            )
         )
+        # The catalog owns this effort sequence; preserve unknown entries and order.
+        capabilities = cast(Types.ModelCapabilities, model.capabilities)
         replacement_effort = closest_effort(
-            effort, model.capabilities.get("reasoning_efforts", [])
+            effort, capabilities.get("reasoning_efforts", [])
         )
         if not allowed or replacement_effort is None:
             continue

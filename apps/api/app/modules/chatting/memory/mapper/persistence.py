@@ -1,7 +1,9 @@
 # 기억·작업 Entity를 공개 값으로 변환한다. 유사도는 DB 거리에서 변환된 값이며 음수도 유지한다.
+from collections.abc import Iterable
 from typing import cast, overload
 
 from app.db.models.memory import ConversationMemory, MemoryJob
+from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 
 
@@ -61,14 +63,18 @@ def memory_entity_to_retrieved(
     )
 
 
-def memory_page_row_to_info(page) -> Types.MemoryPage[Types.MemoryInfo]:
+def memory_page_row_to_info(
+    page: Repository.MemoryPageRow,
+) -> Types.MemoryPage[Types.MemoryInfo]:
     return Types.MemoryPage(
         items=[memory_entity_to_info(item) for item in page.items],
         next_cursor=page.next_cursor,
     )
 
 
-def memory_search_rows_to_info(rows) -> list[Types.RetrievedMemoryInfo]:
+def memory_search_rows_to_info(
+    rows: Iterable[tuple[ConversationMemory, float]],
+) -> list[Types.RetrievedMemoryInfo]:
     return [
         memory_entity_to_retrieved(entity, similarity_score=score)
         for entity, score in rows

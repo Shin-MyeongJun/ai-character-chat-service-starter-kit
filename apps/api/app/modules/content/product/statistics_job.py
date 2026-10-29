@@ -15,16 +15,16 @@ from app.use_cases.product_statistics import (
 )
 
 
-async def run(limit, repair):
+async def run(limit: int, repair: bool) -> None:
     engine = create_async_engine(os.environ["DATABASE_URL"])
     try:
         async with AsyncSession(engine, expire_on_commit=False) as session:
             if repair:
                 await enqueue_recent(session, Types.EnqueueRecentCommand())
-            count = await process_pending(
+            processed_info = await process_pending(
                 session, Types.ProcessPendingCommand(limit=limit)
             )
-            print(f"Processed {count.processed} product statistic days.")
+            print(f"Processed {processed_info.processed} product statistic days.")
     finally:
         await engine.dispose()
 

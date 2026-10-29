@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.reporting import get_reporting_period
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.query import (
@@ -17,7 +19,7 @@ from app.modules.reporting.operations_reporting.mapper import (
 
 
 async def get_product_report(
-    session,
+    session: AsyncSession,
     command: Types.GetOperationsProductReportCommand,
     *,
     actor: Types.ActorCommand,
@@ -55,20 +57,20 @@ async def get_product_report(
         )
 
 
-async def _require_actor(session, actor) -> None:
+async def _require_actor(session: AsyncSession, actor: Types.ActorCommand) -> None:
     """인증 경계의 ID로 최신 활성 관리자 역할를 확인한다."""
     if not isinstance(actor.user_id, UUID):
         raise Types.ReportError("invalid_input")
     try:
         await IdentityQueryService.require_admin(
-            session, IdentityTypes.GetUserCommand(actor.user_id)
+            session, IdentityTypes.GetUserCommand(user_id=actor.user_id)
         )
     except LookupError as exc:
         raise Types.ReportError("forbidden") from exc
 
 
 async def get_recorded_service_report(
-    session,
+    session: AsyncSession,
     command: Types.GetRecordedServiceReportCommand,
     *,
     actor: Types.ActorCommand,
@@ -80,7 +82,9 @@ async def get_recorded_service_report(
         info = await ProductReportingQueryService.get_recorded_service_statistics(
             session,
             ProductTypes.GetServiceReportingStatisticsCommand(
-                actor.user_id, command.date_from, command.date_to
+                actor_id=actor.user_id,
+                date_from=command.date_from,
+                date_to=command.date_to,
             ),
         )
         return PersistenceMapper.service_statistics_info_to_view(
@@ -89,7 +93,7 @@ async def get_recorded_service_report(
 
 
 async def get_statistics_queue_report(
-    session, *, actor: Types.ActorCommand
+    session: AsyncSession, *, actor: Types.ActorCommand
 ) -> Types.StatisticsQueueReportView:
     """관리자가 전체 dirty 작업 현황을 읽으며 재집계를 요청하거나 작업을 claim하지 않는다."""
     with session.no_autoflush:

@@ -14,6 +14,12 @@ credit은 재화별 무료/유료 보유·예약·사용 가능량, 지갑 준�
 - `mapper/persistence.py`: Entity/Row를 불변 Info로 변환. I/O와 외부 조회 없음.
 - `types.py`: 불변 Command/Info, bucket/status enum, 업무 오류. ORM 노출 없음.
 
+repository의 차감 원장 생성·이력 조회 인자는 명시적 키워드 타입으로 연결한다. 공통 이력 SQL은
+거래/예약 Entity에 한정된 제네릭으로 선택한 Entity 타입을 보존하고, signed amount와
+status 조건은 각 소유 조회에서 추가한다. SQL의 필터·내림차순 정렬·limit + 1 계약은 같다.
+persistence mapper는 단건 조회의 `None`을 그대로 보존하며, Entity/Row가 주어진 경우에는
+해당 Info를 반환한다는 overload를 제공한다. 공개 service/types 및 저장 표현은 유지한다.
+
 쓰기와 조회는 변경 이유가 달라 분리했다. 각각의 밀접한 기능은 한 파일에 유지한다.
 빈 기존 service.py는 service 디렉터리로 대체했다. 모듈 내부 HTTP 계층은 만들지 않는다. 최상위 `app/http/account_credits.py`가 billing의 공개 잔액 조회 서비스를 인증된 사용자에게 읽기 전용으로 연결한다.
 
@@ -131,3 +137,11 @@ CreditAccountNotFoundError(LookupError)의 하위 타입이며 billing의 기존
 예상하지 못한 DB 오류는 숨기지 않는다. 손실이 생기는 downgrade는 사전 가드로 거절한다.
 
 검증은 [완료 보고](../../../../../../docs/credit-billing-separation-handoff.md)를 참조한다.
+
+## 병렬 타입 정리 통합 (2026-10-28)
+
+주 대화에서 병렬 결과의 Ruff/mypy를 재확인하고 credit 디렉터리 전체를 필수 엄격 검사에
+추가했다. credit 직접 mypy는 8 source files, 시그니처 기준선은 0개다. 해결된 16항목은
+앞선 주 대화의 공용 prune에서 이미 제거했으며 중복 계산하지 않는다. credit 조회 계약과
+account credit history는 15 passed로 재검증했다. PostgreSQL 잠금·SAVEPOINT·경합은
+실제 DB 미연결로 검증하지 않았으며 다른 모듈의 타입 완료를 의미하지 않는다.

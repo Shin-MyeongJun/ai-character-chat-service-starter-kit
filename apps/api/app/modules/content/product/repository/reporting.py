@@ -1,8 +1,13 @@
 """Product가 소유한 기존 통계의 읽기 전용 조회. 집계·큐 상태를 변경하지 않는다."""
 
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from typing import TypeAlias
+from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product_statistics import (
     ProductDailyStats,
@@ -25,25 +30,49 @@ COUNTERS = (
     "cost_credit",
 )
 
+# COUNT/COUNT DISTINCT, MIN/MAX timestamp, then the ten COUNTERS sums.
+# PostgreSQL SUM(bigint) may return Decimal; the mapper keeps the existing int conversion.
+ServiceReportingMetricsRow: TypeAlias = tuple[
+    int,
+    int,
+    datetime | None,
+    datetime | None,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+    int | Decimal,
+]
+StatisticsQueueRow: TypeAlias = tuple[int, datetime | None]
+
 
 @dataclass
 class ProductReportingRow:
-    rows: list
-    root_rows: list
+    rows: list[ProductDailyStats] | list[ProductVersionDailyStats]
+    root_rows: list[ProductDailyStats]
     active_users: int
-    pending_days: list
+    pending_days: list[date]
 
 
 @dataclass
 class ServiceReportingRow:
-    metrics: object
+    metrics: ServiceReportingMetricsRow
     active_users: int
-    pending: object
+    pending: StatisticsQueueRow
 
 
 async def get_product_reporting_statistics(
-    session, product_id, date_from, date_to, snapshot_id
-):
+    session: AsyncSession,
+    product_id: UUID,
+    date_from: date,
+    date_to: date,
+    snapshot_id: UUID | None,
+) -> ProductReportingRow:
     """작품/버전 집계와 부모 일별 집계·중복 제거 사용자·dirty 날짜를 조회한다."""
     root = ProductDailyStats
     roots = list(
@@ -59,7 +88,10 @@ async def get_product_reporting_statistics(
             )
         ).all()
     )
+    rows: list[ProductDailyStats] | list[ProductVersionDailyStats]
+    activity: type[ProductUserDailyActivity] | type[ProductVersionUserDailyActivity]
     if snapshot_id is None:
+        # This branch keeps the same rows/root_rows list object, as before.
         rows = roots
         activity = ProductUserDailyActivity
         filters = [
@@ -86,13 +118,15 @@ async def get_product_reporting_statistics(
         activity = ProductVersionUserDailyActivity
         filters = [
             activity.product_id == product_id,
-            activity.product_snapshot_id == snapshot_id,
+            ProductVersionUserDailyActivity.product_snapshot_id == snapshot_id,
             activity.day >= date_from,
             activity.day <= date_to,
         ]
     active_users = await session.scalar(
         select(func.count(func.distinct(activity.user_id))).where(*filters)
     )
+    # Ungrouped COUNT DISTINCT returns a non-null row even for empty activity.
+    assert active_users is not None
     queue = ProductStatsDirtyDay
     pending = list(
         (
@@ -110,43 +144,58 @@ async def get_product_reporting_statistics(
     return ProductReportingRow(rows, roots, active_users, pending)
 
 
-async def get_service_reporting_statistics(session, date_from, date_to):
+async def get_service_reporting_statistics(
+    session: AsyncSession, date_from: date, date_to: date
+) -> ServiceReportingRow:
     """기록된 작품 집계만 합산하고 기간·작품 간 활성 사용자를 DISTINCT로 센다."""
     model = ProductDailyStats
-    metrics = (
-        await session.execute(
-            select(
-                func.count(),
-                func.count(func.distinct(model.product_id)),
-                func.min(model.updated_at),
-                func.max(model.updated_at),
-                *(
-                    func.coalesce(func.sum(getattr(model, field)), 0)
-                    for field in COUNTERS
-                ),
-            ).where(model.day >= date_from, model.day <= date_to)
+    # Result.tuples() preserves runtime Rows and types positions on SQLAlchemy >= 2.0.
+    metrics: ServiceReportingMetricsRow = (
+        (
+            await session.execute(
+                select(
+                    func.count(),
+                    func.count(func.distinct(model.product_id)),
+                    func.min(model.updated_at),
+                    func.max(model.updated_at),
+                    *(
+                        func.coalesce(func.sum(getattr(model, field)), 0)
+                        for field in COUNTERS
+                    ),
+                ).where(model.day >= date_from, model.day <= date_to)
+            )
         )
-    ).one()
+        .tuples()
+        .one()
+    )
     activity = ProductUserDailyActivity
     users = await session.scalar(
         select(func.count(func.distinct(activity.user_id))).where(
             activity.day >= date_from, activity.day <= date_to
         )
     )
+    assert users is not None
     queue = ProductStatsDirtyDay
-    pending = (
-        await session.execute(
-            select(func.count(), func.min(queue.requested_at)).where(
-                queue.day >= date_from, queue.day <= date_to
+    pending: StatisticsQueueRow = (
+        (
+            await session.execute(
+                select(func.count(), func.min(queue.requested_at)).where(
+                    queue.day >= date_from, queue.day <= date_to
+                )
             )
         )
-    ).one()
+        .tuples()
+        .one()
+    )
     return ServiceReportingRow(metrics, users, pending)
 
 
-async def get_statistics_queue(session):
+async def get_statistics_queue(session: AsyncSession) -> StatisticsQueueRow:
     """전체 재집계 대기 작품-날짜 개수와 가장 오래된 최신 요청 시각을 조회한다."""
     queue = ProductStatsDirtyDay
-    return (
-        await session.execute(select(func.count(), func.min(queue.requested_at)))
-    ).one()
+    row: StatisticsQueueRow = (
+        (await session.execute(select(func.count(), func.min(queue.requested_at))))
+        .tuples()
+        .one()
+    )
+    return row

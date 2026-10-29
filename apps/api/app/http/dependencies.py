@@ -3,6 +3,7 @@
 # errors는 LookupError→404, ValueError→422만 변환하며 다른 오류는 전달한다.
 """Override with shared identity/DB dependencies at application composition time."""
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
 from uuid import UUID
@@ -28,7 +29,7 @@ Owner = Annotated[UUID, Depends(get_current_owner_id)]
 
 
 @contextmanager
-def errors():
+def errors() -> Iterator[None]:
     try:
         yield
     except LookupError as exc:

@@ -2,6 +2,17 @@
 
 ## 소유 데이터와 공개 경계
 
+`MemoryRetriever`의 세션 팩토리는 `app.db.types.SessionFactory`를 사용한다. 실제 세션
+수명은 기존대로 읽기 범위별 컨텍스트가 소유하고, provider 호출 전에 닫는 순서를 유지한다.
+
+세션을 직접 받는 저장·예약 서비스와 repository는 `AsyncSession`으로 입력을 명시한다.
+페이지 mapper는 repository의 `MemoryPageRow`, 검색 mapper는 `(ConversationMemory, float)`의
+반복 가능한 묶음을 받아 공개 Info로 변환한다. ORM 타입은 repository/mapper에만 둔다.
+`EmbeddedSummaryInfo.settings`는 `EmbeddingSettings` TypedDict로 document 목적·truncation·
+출력 차원·출력 형식을 표현한다. 기존 부분 dict 입력을 표현할 수 있도록 키는 선택적이며,
+현재 생성기는 네 키를 모두 기록한다. 타입 표기는 실행 시 검증이나 저장 JSON 변환을 추가하지 않는다.
+memory 폴더 전체를 엄격 품질 검사 범위에 포함하므로 새 Python 파일도 같은 검사를 받는다.
+
 `conversation_memories`와 `memory_jobs`를 소유한다. 원본 메시지는 chat이 계속
 소유하며 memory에는 요약 본문, 전체 근거 위치 범위, 근거 digest, 대화
 `history_revision`, 요약/임베딩 공급자·모델·프롬프트 버전과 정규화된 토큰
@@ -97,3 +108,12 @@ lease는 만료 후 다시 claim할 수 있고 현재 worker에는 주기 갱신
 
 
 2026-09-27: 기억 실행 조율은 chat workflow로 이전했다. memory는 chat을 호출하지 않으며 정책·검색·SummaryGenerator/MemoryIndexer·기억 저장·작업 상태를 계속 소유한다. MemoryModelConfig는 memory/types에 둔다. 신규 고정 첫 대사는 메시지가 아니므로 요약 원문에 포함되지 않는다. 시작 문맥은 conversation → chat → prompt가 별도로 전달한다. legacy 메시지/기억의 기존 의미는 보존한다.
+
+## worker 실행 타입 (2026-10-28)
+
+app.memory_worker의 process는 MemoryWorkInfo→None이며 active는 Task[None] 집합이다.
+기존 concurrency 제한·건별 오류 기록 후 계속 처리·once의 drain·취소 대기 후 text/
+embedding/engine 순서 종료를 유지한다. 새 lease 갱신·재시도·초기화 복구는 없다.
+test_runtime_entrypoint_contracts는 작업/DB/공급자 대역으로 once의 여러 작업 처리,
+건별 실패 후 다음 작업 처리와 실행 루프 종료 시 자원 정리를 확인한다. 실제 lease/
+DB 경쟁 조건·공급자 초기화 중 실패·실제 외부 호출은 이 검증에 포함하지 않는다.

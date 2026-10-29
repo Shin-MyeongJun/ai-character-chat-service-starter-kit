@@ -1,7 +1,7 @@
 """Owner credit history HTTP values; payment and internal idempotency data stay private."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
@@ -17,7 +17,7 @@ class CreditHistoryRequestDto(BaseModel):
     direction: Literal["usage", "acquisition"] | None = None
 
     @model_validator(mode="after")
-    def validate_history_filters(self):
+    def validate_history_filters(self) -> Self:
         if (self.cursor_id is None) != (self.cursor_created_at is None):
             raise ValueError("Both cursor values are required.")
         if self.start is not None and self.end is not None and self.start >= self.end:

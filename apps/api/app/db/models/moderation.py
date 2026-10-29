@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.json_types import JsonObject
 from app.db.models._mixins import UuidPkMixin
 
 
@@ -72,7 +73,7 @@ class AuditLog(UuidPkMixin, Base):
     )
     action: Mapped[str] = mapped_column(Text, nullable=False)
     target_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    metadata_: Mapped[dict] = mapped_column(
+    metadata_: Mapped[JsonObject] = mapped_column(
         "metadata",
         JSONB,
         nullable=False,

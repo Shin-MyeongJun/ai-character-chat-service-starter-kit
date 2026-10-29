@@ -1,6 +1,7 @@
 # 서울 날짜별 재계산 결과와 사용자 중복 제거용 행, 재계산할 날짜 큐다.
 # revenue는 통화별 금액 묶음이고 cost_credit은 정수 크레딧이다. 날짜별 active_users 합은 기간 순사용자 수와 다르다.
 from datetime import date, datetime
+from typing import TypedDict
 from uuid import UUID
 
 from sqlalchemy import (
@@ -17,6 +18,16 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+
+
+class RevenueBucket(TypedDict):
+    """Persisted currency bucket: exact decimal text and integer event counts."""
+
+    sales: str
+    refunds: str
+    net: str
+    sale_count: int
+    refund_count: int
 
 
 class DailyMetrics:
@@ -50,7 +61,7 @@ class DailyMetrics:
         BigInteger, nullable=False, server_default="0"
     )
     # Currency-keyed exact decimal strings: monetary amounts never sum across currencies.
-    revenue: Mapped[dict] = mapped_column(
+    revenue: Mapped[dict[str, RevenueBucket]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     updated_at: Mapped[datetime] = mapped_column(

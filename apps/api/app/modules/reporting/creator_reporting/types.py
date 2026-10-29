@@ -43,6 +43,8 @@ class CreatorMetricsInfo:
 
 @dataclass(frozen=True, slots=True)
 class CreatorDayInfo:
+    """metrics=None은 미집계이며, pending 날짜의 저장 값은 stale일 수 있다."""
+
     day: date
     metrics: CreatorMetricsInfo | None
     updated_at: datetime | None
@@ -51,6 +53,8 @@ class CreatorDayInfo:
 
 @dataclass(frozen=True, slots=True)
 class CreatorProductReportView:
+    """기간 DISTINCT를 보존한 작가 전용 값. 부분 합계와 확정 totals를 구분한다."""
+
     product_id: UUID
     snapshot_id: UUID | None
     period: PeriodInfo

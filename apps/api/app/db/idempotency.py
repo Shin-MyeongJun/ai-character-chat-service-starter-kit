@@ -3,9 +3,10 @@
 import hashlib
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def lock_key(session, namespace: str, key: str):
+async def lock_key(session: AsyncSession, namespace: str, key: str) -> None:
     """Stable transaction advisory lock, including when the row does not exist yet."""
     digest = hashlib.sha256(f"{namespace}:{key}".encode()).digest()
     lock_id = int.from_bytes(digest[:8], byteorder="big", signed=True)

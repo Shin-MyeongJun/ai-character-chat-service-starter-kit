@@ -1,5 +1,7 @@
 """Administrator HTTP reporting uses chat public services/types exclusively."""
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.reporting import get_reporting_period
 from app.modules.chatting.chat import types as ChatTypes
 from app.modules.chatting.chat.service.query import prompts as ChatPromptsQueryService
@@ -11,7 +13,10 @@ from app.modules.reporting.operations_reporting.service.views import _require_ac
 
 
 async def list_generation_prompts(
-    session, command: Types.ListGenerationPromptsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListGenerationPromptsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.GenerationPromptPageView:
     """활성 관리자에게 서울 날짜 범위·대화·상태 필터로 원문 없는 페이지를 제공한다."""
     with session.no_autoflush:
@@ -37,7 +42,10 @@ async def list_generation_prompts(
 
 
 async def get_generation_prompt(
-    session, command: Types.GetGenerationPromptCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetGenerationPromptCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.GenerationPromptDetailView:
     """실패 생성도 조회하며 원문 미기록과 생성 미존재를 구분한다."""
     with session.no_autoflush:
@@ -46,7 +54,7 @@ async def get_generation_prompt(
             info = await ChatPromptsQueryService.get_generation_prompt(
                 session,
                 ChatTypes.GetGenerationPromptCommand(
-                    actor.user_id, command.generation_id
+                    actor_id=actor.user_id, generation_id=command.generation_id
                 ),
             )
         except LookupError as exc:

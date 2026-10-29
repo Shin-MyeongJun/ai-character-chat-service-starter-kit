@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.chatting.chat import types as ChatTypes
 from app.modules.chatting.chat.service.query.messages import list_conversation_activity
@@ -29,7 +32,7 @@ class RecentConversationsPageView:
 
 
 async def list_recent_conversations(
-    session, command: ConversationTypes.ListOwnedConversationsCommand
+    session: AsyncSession, command: ConversationTypes.ListOwnedConversationsCommand
 ) -> RecentConversationsPageView:
     """Merge public conversation/chat reads before activity pagination.
 
@@ -38,24 +41,53 @@ async def list_recent_conversations(
     creation time. This is a live READ COMMITTED view, not a multi-request snapshot:
     newly active rows can move before an old cursor; refresh restarts the traversal.
     """
-    if not 1 <= command.limit <= 100 or ((command.cursor_created_at is None) != (command.cursor_id is None)) or (command.cursor_created_at is not None and command.cursor_created_at.utcoffset() is None):
+    if (
+        not 1 <= command.limit <= 100
+        or ((command.cursor_created_at is None) != (command.cursor_id is None))
+        or (
+            command.cursor_created_at is not None
+            and command.cursor_created_at.utcoffset() is None
+        )
+    ):
         raise ValueError("Invalid activity cursor or limit.")
-    rows = []
+    rows: list[RecentConversationView] = []
     scan = ConversationTypes.ListOwnedConversationsCommand(command.user_id, 100)
     while True:
         page = await list_owned_conversations(session, scan)
-        activities = await list_conversation_activity(session, ChatTypes.ListConversationPreviewsCommand(command.user_id, tuple(item.id for item in page.items)))
+        activities = await list_conversation_activity(
+            session,
+            ChatTypes.ListConversationPreviewsCommand(
+                command.user_id, tuple(item.id for item in page.items)
+            ),
+        )
         for item in page.items:
             activity = activities.get(item.id)
-            rows.append(RecentConversationView(item.id, item.product_id, item.title, item.created_at, activity.content if activity else None, activity.created_at if activity else item.created_at))
+            rows.append(
+                RecentConversationView(
+                    item.id,
+                    item.product_id,
+                    item.title,
+                    item.created_at,
+                    activity.content if activity else None,
+                    activity.created_at if activity else item.created_at,
+                )
+            )
         if page.next_cursor_id is None:
             break
-        scan = ConversationTypes.ListOwnedConversationsCommand(command.user_id, 100, page.next_cursor_created_at, page.next_cursor_id)
+        scan = ConversationTypes.ListOwnedConversationsCommand(
+            command.user_id, 100, page.next_cursor_created_at, page.next_cursor_id
+        )
     total = len(rows)
-    rows.sort(key=lambda item: (item.last_activity_at, item.id), reverse=True)
+    rows.sort(key=_activity_key, reverse=True)
     if command.cursor_created_at is not None:
-        rows = [item for item in rows if (item.last_activity_at, item.id) < (command.cursor_created_at, command.cursor_id)]
-    selected = tuple(rows[:command.limit])
+        # The paired cursor was checked above; preserve its existing raw value.
+        cursor_id = cast(UUID, command.cursor_id)
+        rows = [
+            item
+            for item in rows
+            if _activity_key(item) < (command.cursor_created_at, cursor_id)
+        ]
+    selected = tuple(rows[: command.limit])
     last = selected[-1] if len(rows) > command.limit else None
     return RecentConversationsPageView(
         items=selected,
@@ -63,3 +95,9 @@ async def list_recent_conversations(
         next_cursor_id=last.id if last else None,
         total=total,
     )
+
+
+def _activity_key(item: RecentConversationView) -> tuple[datetime, UUID]:
+    # Every row above supplies activity.created_at or conversation.created_at.
+    # The public dataclass's optional default remains compatible with old callers.
+    return cast(datetime, item.last_activity_at), item.id

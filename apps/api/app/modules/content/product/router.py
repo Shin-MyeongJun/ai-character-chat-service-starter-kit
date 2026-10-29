@@ -30,10 +30,15 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 @router.get("/{product_id}/studio-draft", response_model=Schemas.StudioDraftResponseDto)
-async def read_studio_draft(product_id: UUID, session: Session, owner: Owner):
+async def read_studio_draft(
+    product_id: UUID, session: Session, owner: Owner
+) -> Schemas.StudioDraftResponseDto:
     with errors():
         return SchemaMapper.studio_draft_info_to_response(
-            await get_studio_draft(session, Types.GetStudioDraftCommand(product_id, owner))
+            await get_studio_draft(
+                session,
+                Types.GetStudioDraftCommand(product_id=product_id, owner_id=owner),
+            )
         )
 
 
@@ -45,24 +50,36 @@ async def catalog(
     cursor_id: UUID | None = None,
     search: str = Query(default="", max_length=200),
     tag_id: UUID | None = None,
-):
+) -> Schemas.CatalogPageResponseDto:
     """Expose server-side catalog filters while preserving the cursor response."""
     from datetime import datetime
 
     with errors():
-        created_at = datetime.fromisoformat(cursor_created_at) if cursor_created_at else None
+        created_at = (
+            datetime.fromisoformat(cursor_created_at) if cursor_created_at else None
+        )
         return SchemaMapper.catalog_page_info_to_response(
             await QueryService.list_catalog(
-                session, Types.ListCatalogCommand(limit, created_at, cursor_id, search, tag_id)
+                session,
+                Types.ListCatalogCommand(
+                    limit=limit,
+                    cursor_created_at=created_at,
+                    cursor_id=cursor_id,
+                    search=search,
+                    tag_id=tag_id,
+                ),
             )
         )
 
 
-@router.get("/catalog-tags")
-async def catalog_tags(session: Session):
+@router.get("/catalog-tags", response_model=None)
+async def catalog_tags(session: Session) -> list[dict[str, UUID | str]]:
     """Expose existing public tag names, without mapping sample genres or internal tags."""
     with errors():
-        return [{"id": tag.id, "name": tag.name} for tag in await QueryService.list_catalog_tags(session)]
+        return [
+            {"id": tag.id, "name": tag.name}
+            for tag in await QueryService.list_catalog_tags(session)
+        ]
 
 
 @router.get("/mine", response_model=list[Schemas.ProductInfoResponseDto])
@@ -70,35 +87,47 @@ async def list_mine(
     session: Session,
     owner: Owner,
     request: Annotated[Schemas.ListProductsRequestDto, Query()],
-):
+) -> list[Schemas.ProductInfoResponseDto]:
     """Keep the owner array endpoint compatible and search the entire owner scope."""
-    value = SchemaMapper.product_list_request_to_command(request)
+    command = SchemaMapper.product_list_request_to_command(request)
     return [
         SchemaMapper.product_info_to_response(result)
         for result in await QueryService.list_products(
             session,
             Types.ListProductsCommand(
-                owner_id=owner, offset=value.offset, limit=value.limit, search=request.search
+                owner_id=owner,
+                offset=command.offset,
+                limit=command.limit,
+                search=request.search,
             ),
         )
     ]
 
 
-@router.get("/mine/count")
-async def count_mine(session: Session, owner: Owner, search: str = Query(default="", max_length=200)):
+@router.get("/mine/count", response_model=None)
+async def count_mine(
+    session: Session, owner: Owner, search: str = Query(default="", max_length=200)
+) -> dict[str, int]:
     """Return an exact owner count without interpreting the length of a partial page."""
     with errors():
-        return {"total": await QueryService.count_products(session, Types.ListProductsCommand(owner_id=owner, search=search))}
+        return {
+            "total": await QueryService.count_products(
+                session, Types.ListProductsCommand(owner_id=owner, search=search)
+            )
+        }
 
 
 @router.post("", response_model=Schemas.ProductInfoResponseDto, status_code=201)
-async def create(body: Schemas.ProductWriteRequestDto, session: Session, owner: Owner):
+async def create(
+    body: Schemas.ProductWriteRequestDto, session: Session, owner: Owner
+) -> Schemas.ProductInfoResponseDto:
     with errors():
         return SchemaMapper.product_info_to_response(
             await CommandService.create_product(
                 session,
                 Types.CreateProductCommand(
-                    owner_id=owner, value=SchemaMapper.product_request_to_command(body),
+                    owner_id=owner,
+                    value=SchemaMapper.product_request_to_command(body),
                     tags=tuple(body.tags or ()),
                 ),
             )
@@ -106,7 +135,9 @@ async def create(body: Schemas.ProductWriteRequestDto, session: Session, owner: 
 
 
 @router.get("/{product_id}/draft", response_model=Schemas.ProductInfoResponseDto)
-async def get_draft(product_id: UUID, session: Session, owner: Owner):
+async def get_draft(
+    product_id: UUID, session: Session, owner: Owner
+) -> Schemas.ProductInfoResponseDto:
     with errors():
         return SchemaMapper.product_info_to_response(
             await QueryService.get_product(
@@ -122,7 +153,7 @@ async def update(
     body: Schemas.ProductWriteRequestDto,
     session: Session,
     owner: Owner,
-):
+) -> Schemas.ProductInfoResponseDto:
     with errors():
         return SchemaMapper.product_info_to_response(
             await CommandService.update_product(
@@ -138,7 +169,7 @@ async def update(
 
 
 @router.delete("/{product_id}/draft", status_code=204)
-async def delete(product_id: UUID, session: Session, owner: Owner):
+async def delete(product_id: UUID, session: Session, owner: Owner) -> None:
     with errors():
         await CommandService.delete_product(
             session,
@@ -152,7 +183,7 @@ async def put_composition(
     body: Schemas.CompositionRequestDto,
     session: Session,
     owner: Owner,
-):
+) -> Schemas.CompositionResponseDto:
     with errors():
         return SchemaMapper.composition_info_to_response(
             await CompositionCommandService.replace_composition(
@@ -167,7 +198,9 @@ async def put_composition(
 
 
 @router.get("/{product_id}/composition", response_model=Schemas.CompositionResponseDto)
-async def read_composition(product_id: UUID, session: Session, owner: Owner):
+async def read_composition(
+    product_id: UUID, session: Session, owner: Owner
+) -> Schemas.CompositionResponseDto:
     with errors():
         return SchemaMapper.composition_info_to_response(
             await CompositionCommandService.get_composition(
@@ -180,7 +213,7 @@ async def read_composition(product_id: UUID, session: Session, owner: Owner):
 @router.put("/{product_id}/settings", response_model=Schemas.SettingsResponseDto)
 async def put_settings(
     product_id: UUID, body: Schemas.SettingsRequestDto, session: Session, owner: Owner
-):
+) -> Schemas.SettingsResponseDto:
     with errors():
         return SchemaMapper.settings_info_to_response(
             await SettingsCommandService.set_settings(
@@ -201,7 +234,7 @@ async def put_settings(
 )
 async def publish(
     product_id: UUID, body: Schemas.ReleaseRequestDto, session: Session, owner: Owner
-):
+) -> Schemas.ReleaseInfoResponseDto:
     with errors():
         return SchemaMapper.release_info_to_response(
             await ReleasesCommandService.publish_product(
@@ -225,10 +258,10 @@ async def correct_note(
     body: Schemas.ReleaseRequestDto,
     session: Session,
     owner: Owner,
-):
-    value = SchemaMapper.release_request_to_command(body)
+) -> Schemas.ReleaseInfoResponseDto:
+    command = SchemaMapper.release_request_to_command(body)
     with errors():
-        if value.auto_apply_media:
+        if command.auto_apply_media:
             raise HTTPException(422, "Patch corrections cannot change update policy.")
         return SchemaMapper.release_info_to_response(
             await ReleasesCommandService.correct_note(
@@ -237,15 +270,17 @@ async def correct_note(
                     product_id=product_id,
                     snapshot_id=snapshot_id,
                     owner_id=owner,
-                    summary=value.summary,
-                    body=value.body,
+                    summary=command.summary,
+                    body=command.body,
                 ),
             )
         )
 
 
 @router.get("/{product_id}", response_model=Schemas.PublishedProductInfoResponseDto)
-async def published(product_id: UUID, session: Session, owner: Owner):
+async def published(
+    product_id: UUID, session: Session, owner: Owner
+) -> Schemas.PublishedProductInfoResponseDto:
     with errors():
         return SchemaMapper.published_view_to_response(
             await NoticesViewsService.get_published_product(
@@ -263,10 +298,10 @@ async def statistics(
     request: Annotated[Schemas.ProductStatisticsRequestDto, Query()],
     session: Session,
     owner: Owner,
-):
+) -> Schemas.StatisticsInfoResponseDto:
     from app.modules.content.product.service.statistics import get_statistics
 
-    value = SchemaMapper.statistics_request_to_command(request)
+    command = SchemaMapper.statistics_request_to_command(request)
     with errors():
         return SchemaMapper.statistics_info_to_response(
             await get_statistics(
@@ -274,9 +309,9 @@ async def statistics(
                 Types.GetStatisticsCommand(
                     product_id=product_id,
                     owner_id=owner,
-                    date_from=value.date_from,
-                    date_to=value.date_to,
-                    snapshot_id=value.snapshot_id,
+                    date_from=command.date_from,
+                    date_to=command.date_to,
+                    snapshot_id=command.snapshot_id,
                 ),
             )
         )
@@ -288,7 +323,7 @@ async def statistics(
 )
 async def version_availability(
     product_id: UUID, snapshot_id: UUID, session: Session, owner: Owner
-):
+) -> Schemas.VersionAvailabilityInfoResponseDto:
     with errors():
         return SchemaMapper.availability_view_to_response(
             await NoticesViewsService.get_version_availability(

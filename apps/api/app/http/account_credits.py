@@ -15,13 +15,14 @@ from app.modules.commerce.credit.service import query as CreditQueryService
 router = APIRouter(prefix="/account", tags=["account"])
 
 
-@router.get("/overview-counts")
-async def read_counts(session: Session, owner: Owner):
+@router.get("/overview-counts", response_model=None)
+async def read_counts(session: Session, owner: Owner) -> dict[str, int]:
     """Bind overview totals to authenticated ownership rather than client array lengths."""
     from app.use_cases.account_overview import (
         GetAccountCountsCommand,
         get_account_counts,
     )
+
     with errors():
         return await get_account_counts(session, GetAccountCountsCommand(owner))
 
@@ -37,7 +38,7 @@ async def list_credit_transactions(
     session: Session,
     owner: Owner,
     request: Annotated[Schemas.CreditHistoryRequestDto, Query()],
-):
+) -> Schemas.CreditHistoryResponseDto:
     with errors():
         info = await CreditQueryService.list_credit_transactions(
             session, SchemaMapper.credit_history_request_to_command(request, owner)
@@ -46,7 +47,7 @@ async def list_credit_transactions(
 
 
 @router.get("/credits", response_model=CreditBalanceDto)
-async def read_credits(session: Session, owner: Owner):
+async def read_credits(session: Session, owner: Owner) -> CreditBalanceDto:
     with errors():
         info = await BillingCredits.get_credit_balance(
             session, BillingTypes.GetCreditBalanceCommand(user_id=owner)

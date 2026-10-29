@@ -10,7 +10,9 @@ class ConversationSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
-    def conversation_list_page_to_response(result: Types.ConversationListPageInfo) -> Schemas.ConversationListPageResponseDto:
+    def conversation_list_page_to_response(
+        result: Types.ConversationListPageInfo,
+    ) -> Schemas.ConversationListPageResponseDto:
         return Schemas.ConversationListPageResponseDto.model_validate(result)
 
     @staticmethod

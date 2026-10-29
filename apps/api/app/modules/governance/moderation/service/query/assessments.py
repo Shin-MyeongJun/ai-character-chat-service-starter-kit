@@ -1,5 +1,7 @@
 """관리자 평가 단건과 대상별 이력 조회."""
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.governance.moderation import types as Types
 from app.modules.governance.moderation.mapper import persistence as PersistenceMapper
 from app.modules.governance.moderation.repository import review as ReviewRepository
@@ -9,7 +11,10 @@ from app.modules.governance.moderation.service.util import (
 
 
 async def get_assessment(
-    session, command: Types.GetAssessmentCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetAssessmentCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.AssessmentInfo:
     """활성 관리자에게 평가 결과와 근거 신고 연결을 반환한다."""
     actor_id = actor.user_id
@@ -21,7 +26,10 @@ async def get_assessment(
 
 
 async def list_assessments(
-    session, command: Types.ListAssessmentsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListAssessmentsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.PageInfo[Types.AssessmentInfo]:
     """관리자가 대상별 평가를 시각·ID 커서로 조회한다."""
     actor_id = actor.user_id

@@ -81,14 +81,16 @@ async def reserve_credit(
         balance = await _get_credit_balance(
             session, command.user_id, command.currency_code, for_update=True
         )
-        row = await Repository.get_credit_reservation_by_key(
+        reservation_entity = await Repository.get_credit_reservation_by_key(
             session,
             command.user_id,
             command.namespace,
             command.request_key,
             command.currency_code,
         )
-        existing = PersistenceMapper.credit_reservation_entity_to_info(row)
+        existing = PersistenceMapper.credit_reservation_entity_to_info(
+            reservation_entity
+        )
         if existing is not None:
             if (
                 existing.reserved_credit,
@@ -128,7 +130,7 @@ async def reserve_credit(
                 balance_delta=0,
                 reserved_delta=amount,
             )
-        row = await Repository.create_credit_reservation(
+        reservation_entity = await Repository.create_credit_reservation(
             session,
             reservation_id=uuid4(),
             currency_code=command.currency_code,
@@ -143,7 +145,7 @@ async def reserve_credit(
             reserved_credit=command.amount,
             created_at=command.created_at,
         )
-        info = PersistenceMapper.credit_reservation_entity_to_info(row)
+        info = PersistenceMapper.credit_reservation_entity_to_info(reservation_entity)
         assert info is not None
         return info
 
@@ -157,10 +159,10 @@ async def _get_owned_reservation(
     currency_code: str,
 ) -> Types.CreditReservationInfo:
     await _get_credit_balance(session, user_id, currency_code, for_update=True)
-    row = await Repository.get_credit_reservation_by_key(
+    reservation_entity = await Repository.get_credit_reservation_by_key(
         session, user_id, namespace, request_key, currency_code
     )
-    info = PersistenceMapper.credit_reservation_entity_to_info(row)
+    info = PersistenceMapper.credit_reservation_entity_to_info(reservation_entity)
     if info is None:
         raise Types.CreditReservationNotFoundError("Credit reservation not found.")
     if info.id != reservation_id:
@@ -221,7 +223,7 @@ async def commit_credit_reservation(
             free_amount=-info.free_amount,
             paid_amount=-info.paid_amount,
         )
-        row = await Repository.finalize_credit_reservation(
+        reservation_entity = await Repository.finalize_credit_reservation(
             session,
             reservation_id=info.id,
             status=Types.CreditReservationStatus.COMMITTED,
@@ -229,7 +231,7 @@ async def commit_credit_reservation(
             transaction_id=transaction_id,
             finalized_at=_get_utc_now(),
         )
-        result = PersistenceMapper.credit_reservation_entity_to_info(row)
+        result = PersistenceMapper.credit_reservation_entity_to_info(reservation_entity)
         assert result is not None
         return result
 
@@ -265,7 +267,7 @@ async def release_credit_reservation(
                 balance_delta=0,
                 reserved_delta=-amount,
             )
-        row = await Repository.finalize_credit_reservation(
+        reservation_entity = await Repository.finalize_credit_reservation(
             session,
             reservation_id=info.id,
             status=Types.CreditReservationStatus.RELEASED,
@@ -273,7 +275,7 @@ async def release_credit_reservation(
             transaction_id=None,
             finalized_at=_get_utc_now(),
         )
-        result = PersistenceMapper.credit_reservation_entity_to_info(row)
+        result = PersistenceMapper.credit_reservation_entity_to_info(reservation_entity)
         assert result is not None
         return result
 

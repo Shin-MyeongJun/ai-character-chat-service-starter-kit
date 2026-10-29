@@ -5,12 +5,17 @@ import hmac
 import smtplib
 import ssl
 from email.message import EmailMessage
-from typing import Protocol
+from typing import Protocol, TypedDict, cast
 
 import httpx
 import jwt
 
 from app.modules.identity import types as Types
+from app.modules.identity.settings import AuthSettings
+
+
+class _GoogleTokenResponse(TypedDict):
+    id_token: str
 
 
 class MailSender(Protocol):
@@ -24,11 +29,11 @@ class GoogleVerifier(Protocol):
 
 
 class SMTPMailSender:
-    def __init__(self, settings):
+    def __init__(self, settings: AuthSettings) -> None:
         self.settings = settings
 
     async def send_mail(self, recipient: str, purpose: str, link: str) -> None:
-        def deliver():
+        def deliver() -> None:
             settings = self.settings
             message = EmailMessage()
             message["From"] = settings.smtp_from
@@ -39,15 +44,17 @@ class SMTPMailSender:
             message.set_content(
                 f"요청한 작업을 계속하려면 아래 링크를 여세요. 요청하지 않았다면 무시하세요.\n\n{link}\n"
             )
-            smtp_type = smtplib.SMTP_SSL if settings.smtp_tls == "ssl" else smtplib.SMTP
-            kwargs = (
-                {"context": ssl.create_default_context()}
-                if settings.smtp_tls == "ssl"
-                else {}
-            )
-            with smtp_type(
-                settings.smtp_host, settings.smtp_port, timeout=10, **kwargs
-            ) as smtp:
+            smtp: smtplib.SMTP
+            if settings.smtp_tls == "ssl":
+                smtp = smtplib.SMTP_SSL(
+                    settings.smtp_host,
+                    settings.smtp_port,
+                    timeout=10,
+                    context=ssl.create_default_context(),
+                )
+            else:
+                smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
+            with smtp:
                 if settings.smtp_tls == "starttls":
                     smtp.starttls(context=ssl.create_default_context())
                 if settings.smtp_user:
@@ -62,7 +69,7 @@ class SMTPMailSender:
 
 
 class GoogleOIDCVerifier:
-    def __init__(self, settings):
+    def __init__(self, settings: AuthSettings) -> None:
         self.settings = settings
         # 키 주소와 알고리즘은 고정한다. 토큰의 jku/x5u를 신뢰하지 않는다.
         self.keys = jwt.PyJWKClient(
@@ -135,7 +142,10 @@ class GoogleOIDCVerifier:
                     },
                 )
                 response.raise_for_status()
-                token = response.json()["id_token"]
+                # Google's token response contains an ID token. Preserve the raw
+                # field and existing error handling; this cast does not validate it.
+                provider_response = cast(_GoogleTokenResponse, response.json())
+                token = provider_response["id_token"]
             return await asyncio.to_thread(self.verify_id_token, token, nonce)
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             raise Types.AuthError("invalid_google_login") from exc

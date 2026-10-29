@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from app.modules.content.character import types as CharacterTypes
+from app.modules.content.lorebook import types as LorebookTypes
+from app.modules.content.product import types as ProductTypes
 from app.modules.llm.types import ExecutionView
 
 
@@ -31,7 +34,7 @@ class VersionSwitchedInfo:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeStart:
-    title: str
+    title: str | None
     content: str
 
 
@@ -46,7 +49,7 @@ class RuntimeCharacter:
     id: str
     snapshot_id: str
     primary: bool
-    data: dict
+    data: dict[str, CharacterTypes.CharacterSnapshotJsonValue]
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,15 +57,15 @@ class RuntimeLorebook:
     id: str
     scope: str
     targets: list[str]
-    entries: list[dict]
+    entries: list[LorebookTypes.LorebookSnapshotEntryData]
 
 
 @dataclass(frozen=True, slots=True)
 class ConversationRuntimeView:
     execution: ExecutionView
     product_snapshot_id: str
-    settings: dict
-    start: RuntimeStart
+    settings: ProductTypes.ProductJsonObject
+    start: RuntimeStart | None
     characters: list[RuntimeCharacter]
     lorebooks: list[RuntimeLorebook]
     opening_message: str | None = None
@@ -130,8 +133,8 @@ class GetStatisticsFactsCommand:
 
 @dataclass(frozen=True, slots=True)
 class ConversationStatisticsInfo:
-    conversations: list[tuple]
-    transitions: list[tuple]
+    conversations: list[tuple[UUID, int]]
+    transitions: list[tuple[UUID, int]]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

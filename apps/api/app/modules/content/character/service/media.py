@@ -5,9 +5,13 @@
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Literal, overload
 from uuid import UUID, uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
+from app.db.types import SessionFactory
 from app.modules.asset_storage import types as AssetStorageTypes
 from app.modules.asset_storage.service import AssetStorageService
 from app.modules.content.character import repository as MediaRepository
@@ -32,7 +36,7 @@ MEDIA_CONTENT_TYPES = frozenset(
 )
 
 
-def _fingerprint_upload(command):
+def _fingerprint_upload(command: Types.UploadCharacterMediaCommand) -> tuple[int, str]:
     if command.content_type not in MEDIA_CONTENT_TYPES:
         raise ValueError("Unsupported media content type.")
     filename = command.original_filename
@@ -62,13 +66,13 @@ def _fingerprint_upload(command):
 class CharacterMediaService:
     def __init__(
         self,
-        sessions,
+        sessions: SessionFactory,
         storage: AssetStorageService,
         *,
         storage_kind: str,
         storage_id: str,
-        read_storages=None,
-    ):
+        read_storages: dict[tuple[str, str], AssetStorageService] | None = None,
+    ) -> None:
         self.sessions = sessions
         self.storage = storage
         self.storage_kind = storage_kind
@@ -76,7 +80,7 @@ class CharacterMediaService:
         self.storages = dict(read_storages or {})
         self.storages[(storage_kind, storage_id)] = storage
 
-    def _storage_for_media(self, info):
+    def _storage_for_media(self, info: Types.CharacterMediaInfo) -> AssetStorageService:
         try:
             return self.storages[(info.storage_kind, info.storage_id)]
         except KeyError as exc:
@@ -85,14 +89,14 @@ class CharacterMediaService:
             ) from exc
 
     async def reserve_upload(
-        self, session, command: Types.UploadCharacterMediaCommand
+        self, session: AsyncSession, command: Types.UploadCharacterMediaCommand
     ) -> Types.CharacterMediaInfo:
         size, digest = _fingerprint_upload(command)
         await _get_owned_character(session, command.character_id, command.owner_id)
         row = await MediaRepository.get_media_request(session, command)
         info = MediaPersistenceMapper.media_entity_to_info(row)
         new_upload = info is None
-        if new_upload:
+        if info is None:
             media_id = uuid4()
             info = Types.CharacterMediaInfo(
                 media_id,
@@ -133,7 +137,7 @@ class CharacterMediaService:
         return info
 
     async def lock_upload(
-        self, session, command: Types.LockMediaUploadCommand
+        self, session: AsyncSession, command: Types.LockMediaUploadCommand
     ) -> Types.CharacterMediaInfo:
         await _get_owned_character(session, command.character_id, command.owner_id)
         row = await MediaRepository.get_media(session, command.media_id, lock=True)
@@ -151,7 +155,7 @@ class CharacterMediaService:
         return info
 
     async def complete_upload(
-        self, session, command: Types.CompleteMediaUploadCommand
+        self, session: AsyncSession, command: Types.CompleteMediaUploadCommand
     ) -> Types.CharacterMediaInfo:
         info = await self.lock_upload(
             session,
@@ -179,6 +183,8 @@ class CharacterMediaService:
         result = MediaPersistenceMapper.media_entity_to_info(row)
         # A commit failure propagates. The committed reservation remains;
         # no unsafe compensation deletion on an ambiguous commit outcome.
+        # The reservation remains locked; state update does not delete its row.
+        assert result is not None, "Locked media reservation disappeared."
         return result
 
     # 현재 캐릭터 소유권과 ready 상태·설정된 저장소를 확인한 뒤 열린 reader를 반환한다.
@@ -218,7 +224,7 @@ class CharacterMediaService:
         )
 
     async def prepare_cleanup(
-        self, session, command: Types.CleanupCharacterMediaCommand
+        self, session: AsyncSession, command: Types.CleanupCharacterMediaCommand
     ) -> Types.CharacterMediaInfo | Types.CleanupCharacterMediaInfo:
         if command.older_than.tzinfo is None or command.older_than > datetime.now(
             UTC
@@ -238,7 +244,7 @@ class CharacterMediaService:
         return info
 
     async def lock_cleanup(
-        self, session, command: Types.CleanupCharacterMediaCommand
+        self, session: AsyncSession, command: Types.CleanupCharacterMediaCommand
     ) -> Types.CharacterMediaInfo | None:
         info = MediaPersistenceMapper.media_entity_to_info(
             await MediaRepository.get_media(session, command.media_id, lock=True)
@@ -250,16 +256,43 @@ class CharacterMediaService:
         return info
 
     async def complete_cleanup(
-        self, session, command: Types.CleanupCharacterMediaCommand
+        self, session: AsyncSession, command: Types.CleanupCharacterMediaCommand
     ) -> None:
         info = await self.lock_cleanup(session, command)
         if info is not None:
             await MediaRepository.set_media_state(session, info.id, "deleted")
 
 
-async def _attach_character_media(session, command, kind):
+@overload
+async def _attach_character_media(
+    session: AsyncSession,
+    command: Types.CreateCharacterImageCommand,
+    kind: Literal["image"],
+) -> Types.CharacterImageInfo: ...
+
+
+@overload
+async def _attach_character_media(
+    session: AsyncSession,
+    command: Types.CreateCharacterAssetCommand,
+    kind: Literal["asset"],
+) -> Types.CharacterAssetInfo: ...
+
+
+async def _attach_character_media(
+    session: AsyncSession,
+    command: Types.CreateCharacterImageCommand | Types.CreateCharacterAssetCommand,
+    kind: Literal["image", "asset"],
+) -> Types.CharacterImageInfo | Types.CharacterAssetInfo:
     await _get_owned_character(session, command.character_id, command.owner_id)
-    url = command.image_url if kind == "image" else command.file_url
+    # Public image/asset commands supply the matching literal kind; overloads encode it.
+    if kind == "image":
+        assert isinstance(command, Types.CreateCharacterImageCommand)
+        url = command.image_url
+    else:
+        assert isinstance(command, Types.CreateCharacterAssetCommand)
+        url = command.file_url
+    media_id: UUID | None = None
     if not url.startswith("/characters/media/"):
         # Legacy references keep their URL meaning; never fetch arbitrary URLs
         # or read caller-supplied local paths in an online request.
@@ -270,16 +303,13 @@ async def _attach_character_media(session, command, kind):
             or url.startswith("/")
         ):
             raise ValueError("Invalid legacy media URL.")
-        row = await MediaRepository.create_media_attachment(
-            session, command, None, kind
-        )
     else:
         try:
             media_id = UUID(url.split("/")[3])
         except (ValueError, IndexError) as exc:
             raise ValueError("Invalid managed media URL.") from exc
-        row = await MediaRepository.get_media(session, media_id, lock=True)
-        info = MediaPersistenceMapper.media_entity_to_info(row)
+        media_row = await MediaRepository.get_media(session, media_id, lock=True)
+        info = MediaPersistenceMapper.media_entity_to_info(media_row)
         if (
             info is None
             or info.owner_id != command.owner_id
@@ -288,36 +318,45 @@ async def _attach_character_media(session, command, kind):
             raise LookupError("Media not found.")
         if info.state != "ready" or url != info.content_url:
             raise ValueError("Media is not ready.")
-        media_type = "image" if kind == "image" else command.asset_type
+        if kind == "image":
+            assert isinstance(command, Types.CreateCharacterImageCommand)
+            media_type = "image"
+            binding_values = [kind, command.emotion_tag, command.is_default]
+        else:
+            assert isinstance(command, Types.CreateCharacterAssetCommand)
+            media_type = command.asset_type
+            binding_values = [kind, command.asset_type, command.purpose]
         if not info.content_type.startswith(media_type + "/"):
             raise ValueError("Media type does not match attachment.")
-        binding = json.dumps(
-            [kind, command.emotion_tag, command.is_default]
-            if kind == "image"
-            else [kind, command.asset_type, command.purpose]
-        )
+        binding = json.dumps(binding_values)
         if info.binding is not None and info.binding != binding:
             raise ValueError(
                 "Media already attached with different metadata; upload a new object."
             )
-        row = await MediaRepository.get_media_attachment(session, media_id, kind)
-        mapper = (
-            PersistenceMapper.character_image_entity_to_info
-            if kind == "image"
-            else PersistenceMapper.character_asset_entity_to_info
-        )
-        existing = mapper(row)
+        existing: Types.CharacterImageInfo | Types.CharacterAssetInfo | None
+        if kind == "image":
+            existing = PersistenceMapper.character_image_entity_to_info(
+                await MediaRepository.get_media_attachment(session, media_id, "image")
+            )
+        else:
+            existing = PersistenceMapper.character_asset_entity_to_info(
+                await MediaRepository.get_media_attachment(session, media_id, "asset")
+            )
         if existing is not None:
             return existing
         if info.binding is not None:
             raise ValueError("Attachment was deleted; upload a new object.")
         await MediaRepository.bind_media(session, media_id, binding)
-        row = await MediaRepository.create_media_attachment(
-            session, command, media_id, kind
+    if kind == "image":
+        assert isinstance(command, Types.CreateCharacterImageCommand)
+        return PersistenceMapper.character_image_entity_to_info(
+            await MediaRepository.create_media_attachment(
+                session, command, media_id, "image"
+            )
         )
-    mapper = (
-        PersistenceMapper.character_image_entity_to_info
-        if kind == "image"
-        else PersistenceMapper.character_asset_entity_to_info
+    assert isinstance(command, Types.CreateCharacterAssetCommand)
+    return PersistenceMapper.character_asset_entity_to_info(
+        await MediaRepository.create_media_attachment(
+            session, command, media_id, "asset"
+        )
     )
-    return mapper(row)

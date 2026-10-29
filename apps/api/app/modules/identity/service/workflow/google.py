@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 from datetime import UTC, datetime
+from typing import TypedDict, cast
 from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -12,11 +13,22 @@ from cryptography.fernet import Fernet, InvalidToken
 from app.db.transaction import use_case_transaction
 from app.modules.identity import security as Security
 from app.modules.identity import types as Types
+from app.modules.identity.adapters import GoogleVerifier
 from app.modules.identity.service import google as GoogleCommandService
+from app.modules.identity.service.authentication import AuthenticationService
+
+
+class _GoogleFlow(TypedDict):
+    state: str
+    nonce: str
+    verifier: str
+    redirect: str
 
 
 class GoogleLoginService:
-    def __init__(self, authentication, verifier):
+    def __init__(
+        self, authentication: AuthenticationService, verifier: GoogleVerifier
+    ) -> None:
         self.auth = authentication
         self.settings = authentication.settings
         self.verifier = verifier
@@ -67,7 +79,12 @@ class GoogleLoginService:
         self, command: Types.GoogleCallbackCommand
     ) -> Types.GoogleLoginInfo:
         try:
-            flow = json.loads(self.fernet.decrypt(command.cookie.encode(), ttl=600))
+            # This authenticated cookie is written by start_google_login. The cast
+            # describes that format; existing lookup/type failures are unchanged.
+            flow = cast(
+                _GoogleFlow,
+                json.loads(self.fernet.decrypt(command.cookie.encode(), ttl=600)),
+            )
             if not hmac.compare_digest(flow["state"], command.state):
                 raise ValueError
             redirect = Security.safe_redirect(flow["redirect"])

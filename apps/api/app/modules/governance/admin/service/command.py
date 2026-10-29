@@ -1,11 +1,15 @@
 # 상품 만료·검수 상태 변경을 product 공개 Command로 위임한다. 관리자 검사는 해당 product 서비스에서 수행한다.
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import command as ProductCommandService
 from app.modules.governance.admin import types as Types
 from app.modules.governance.admin.types import ExpiryChangedInfo
 
 
-async def set_expiry(session, command: Types.SetExpiryCommand) -> ExpiryChangedInfo:
+async def set_expiry(
+    session: AsyncSession, command: Types.SetExpiryCommand
+) -> ExpiryChangedInfo:
     snapshot_id = command.snapshot_id
     actor_id = command.actor_id
     expires_at = command.expires_at
@@ -13,19 +17,25 @@ async def set_expiry(session, command: Types.SetExpiryCommand) -> ExpiryChangedI
     info = await ProductCommandService.change_snapshot_expiry(
         session,
         ProductTypes.ChangeSnapshotExpiryCommand(
-            snapshot_id, actor_id, expires_at, reason
+            snapshot_id=snapshot_id,
+            actor_id=actor_id,
+            expires_at=expires_at,
+            reason=reason,
         ),
     )
     return ExpiryChangedInfo(info.id, info.expires_at, command.reason)
 
 
 async def moderate_product(
-    session, command: Types.ModerateProductCommand
+    session: AsyncSession, command: Types.ModerateProductCommand
 ) -> Types.ModeratedProductInfo:
     product_id = command.product_id
     actor_id = command.actor_id
     status = command.status
     info = await ProductCommandService.change_product_status(
-        session, ProductTypes.ChangeProductStatusCommand(product_id, actor_id, status)
+        session,
+        ProductTypes.ChangeProductStatusCommand(
+            product_id=product_id, actor_id=actor_id, status=status
+        ),
     )
     return Types.ModeratedProductInfo(info.id, info.status)

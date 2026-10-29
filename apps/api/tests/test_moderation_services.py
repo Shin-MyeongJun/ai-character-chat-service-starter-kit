@@ -3,13 +3,14 @@
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from app.modules.governance.moderation import types as Types
+from app.modules.governance.moderation.mapper import persistence as PersistenceMapper
 from app.modules.governance.moderation.repository import review as ReviewRepository
 from app.modules.governance.moderation.service.command import (
     actions as ActionsCommandService,
@@ -671,8 +672,328 @@ async def test_repository_cursor_uses_actual_timestamp_column(kind):
         id_column=model.id,
         cursor=Types.Cursor(now, uuid4()),
         limit=1,
-        max_limit=100,
-        cursor_factory=Types.Cursor,
-        page_factory=ReviewRepository.PageRow,
+        cursor_from_entity=lambda item: Types.Cursor(getattr(item, field), item.id),
     )
     assert page.next_cursor == Types.Cursor(now, rows[0].id)
+
+
+@pytest.mark.asyncio
+async def test_persistence_preserves_json_and_isolates_nested_values(memory_backend):
+    """알 수 없는 legacy JSON·첨부·권고도 손실 없이 복사하고 ORM 대역과 격리한다."""
+    b = memory_backend
+    report = await ReportsCommandService.submit_report(
+        b.session, report_command(), actor=b.user
+    )
+    entity = b.store["reports"][report.id]
+    legacy = {"status": "dismissed", "reviewed_by": None, "future": [True, 1, None]}
+    entity.evidence_snapshot["legacy_moderation_flag"] = legacy
+    entity.attachment_refs = [{"unknown": [False, 0, "", None, {}]}]
+    info = PersistenceMapper.report_entity_to_info(entity)
+    assert info.evidence_snapshot == entity.evidence_snapshot
+    assert info.attachment_refs == entity.attachment_refs
+    assert (
+        PersistenceMapper.report_info_to_summary(info).legacy_review_status
+        == "dismissed"
+    )
+    assert ValidationServiceUtil.legacy_review_status(info) == "dismissed"
+    info.evidence_snapshot["legacy_moderation_flag"]["future"].append("changed")
+    info.attachment_refs[0]["unknown"].clear()
+    assert legacy["future"] == [True, 1, None]
+    assert entity.attachment_refs[0]["unknown"] == [False, 0, "", None, {}]
+
+    assessment = await AssessmentsCommandService.record_manual_assessment(
+        b.session,
+        replace(assessment_command(report), acknowledge_legacy_review=True),
+        actor=b.admin,
+    )
+    row = b.store["assessments"][assessment.id]
+    row.entity.signals["future"] = {"nested": [True, 1, None]}
+    row.entity.recommended_actions = [{"unknown": ["keep", None]}]
+    info = PersistenceMapper.assessment_row_to_info(row)
+    assert info.signals == row.entity.signals
+    assert info.recommended_actions == row.entity.recommended_actions
+    info.signals["future"]["nested"].clear()
+    info.recommended_actions[0]["unknown"].clear()
+    assert row.entity.signals["future"]["nested"] == [True, 1, None]
+    assert row.entity.recommended_actions[0]["unknown"] == ["keep", None]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("legacy", [{}, {"status": None}, {"status": ""}])
+async def test_legacy_status_keeps_missing_null_and_empty(memory_backend, legacy):
+    """legacy status의 누락·null·빈 문자열을 기본 상태로 합치지 않는다."""
+    b = memory_backend
+    report = await ReportsCommandService.submit_report(
+        b.session, report_command(), actor=b.user
+    )
+    entity = b.store["reports"][report.id]
+    entity.evidence_snapshot["legacy_moderation_flag"] = legacy
+    info = PersistenceMapper.report_entity_to_info(entity)
+    assert PersistenceMapper.report_info_to_summary(
+        info
+    ).legacy_review_status == legacy.get("status")
+    assert ValidationServiceUtil.legacy_review_status(info) == legacy.get("status")
+    del entity.evidence_snapshot["legacy_moderation_flag"]
+    assert (
+        PersistenceMapper.report_info_to_summary(
+            PersistenceMapper.report_entity_to_info(entity)
+        ).legacy_review_status
+        is None
+    )
+
+
+def test_empty_pages_and_missing_entities_keep_distinct_results():
+    """단건 미존재는 None이며 빈 페이지는 항목 없이 커서를 유지한다."""
+    assert PersistenceMapper.report_entity_to_info(None) is None
+    assert PersistenceMapper.assessment_row_to_info(None) is None
+    assert PersistenceMapper.action_entity_to_info(None) is None
+    cursor = Types.Cursor(datetime.now(UTC), uuid4())
+    row = ReviewRepository.PageRow([], cursor)
+    for page in (
+        PersistenceMapper.reports_row_to_page(row),
+        PersistenceMapper.reports_row_to_page(row, summary=True),
+        PersistenceMapper.assessments_row_to_page(row),
+        PersistenceMapper.actions_row_to_page(row),
+    ):
+        assert page.items == () and page.next_cursor == cursor
+    with pytest.raises(Types.ModerationError, match="not_found"):
+        ValidationServiceUtil.require_info(None)
+
+
+@pytest.mark.asyncio
+async def test_explicit_null_legacy_object_is_not_treated_as_missing(memory_backend):
+    """이관 object의 명시적 null을 누락 기본값으로 바꾸거나 숨기지 않는다."""
+    b = memory_backend
+    report = await ReportsCommandService.submit_report(
+        b.session, report_command(), actor=b.user
+    )
+    entity = b.store["reports"][report.id]
+    entity.evidence_snapshot["legacy_moderation_flag"] = None
+    info = PersistenceMapper.report_entity_to_info(entity)
+    with pytest.raises(AttributeError):
+        PersistenceMapper.report_info_to_summary(info)
+    with pytest.raises(AttributeError):
+        ValidationServiceUtil.legacy_review_status(info)
+
+
+def test_request_fingerprints_match_original_storage_contract():
+    """변경 전 구현에서 추출한 세 요청의 SHA256과 UTC·Decimal 정규화를 보존한다."""
+    report = Types.SubmitReportCommand(
+        request_key=UUID(int=1),
+        target_type="user",
+        target_id=UUID(int=2),
+        reason_code="abuse",
+        occurred_at=datetime(2026, 10, 28, tzinfo=UTC),
+        form_elapsed_ms=0,
+        attachment_claims=("proof",),
+    )
+    expected = "b3ac2f0c33397f72a24cdbb1cb6e14d13148b11f113fc1790a32ba6229eb30fe"
+    assert (
+        ValidationServiceUtil.request_fingerprint(report, actor_id=UUID(int=3))
+        == expected
+    )
+    assert (
+        ValidationServiceUtil.request_fingerprint(
+            replace(
+                report,
+                occurred_at=datetime(
+                    2026, 10, 28, 9, tzinfo=timezone(timedelta(hours=9))
+                ),
+            ),
+            actor_id=UUID(int=3),
+        )
+        == expected
+    )
+    for change in (
+        {"reason_detail": ""},
+        {"form_elapsed_ms": False},
+        {"form_elapsed_ms": None},
+    ):
+        assert (
+            ValidationServiceUtil.request_fingerprint(
+                replace(report, **change), actor_id=UUID(int=3)
+            )
+            != expected
+        )
+
+    assessment = Types.RecordAssessmentCommand(
+        evaluation_key="manual-key",
+        target_type="user",
+        target_id=UUID(int=2),
+        policy_version="v1",
+        outcome="violation",
+        rationale="review",
+        reports=(Types.ReportDisposition(UUID(int=4), "supported"),),
+        confidence_score=Decimal("0.5000"),
+        violation_code="abuse",
+        severity=0,
+    )
+    expected = "3dfc99d8de38c579f660e25324b85d565af470706c98618f988d68de1d8d56d5"
+    assert (
+        ValidationServiceUtil.request_fingerprint(assessment, actor_id=UUID(int=3))
+        == expected
+    )
+    assert (
+        ValidationServiceUtil.request_fingerprint(
+            replace(assessment, confidence_score=Decimal("0.5")), actor_id=UUID(int=3)
+        )
+        == expected
+    )
+    action = Types.RequestActionCommand(
+        assessment_id=UUID(int=5),
+        target_type="user",
+        target_id=UUID(int=2),
+        action_type="warn",
+        scope="login",
+        starts_at=datetime(2026, 10, 28, tzinfo=UTC),
+        idempotency_key=UUID(int=6),
+    )
+    assert ValidationServiceUtil.request_fingerprint(action) == (
+        "ac2e1bc70e8624e372b7e5a3b44b48343acf0fe1a16c6659231fb3898cf29843"
+    )
+
+
+@pytest.mark.parametrize("value", [None, "", "   ", False, 0, [], {}])
+def test_text_validator_checks_runtime_values(value):
+    """타입 주석과 무관하게 잘못된 런타임 텍스트를 거절한다."""
+    with pytest.raises(Types.ModerationError, match="invalid_input"):
+        ValidationServiceUtil.validate_text(value)
+
+
+def test_time_validator_optional_none_and_original_return_contract():
+    """선택적 None만 허용하고 검증 함수는 값을 변환하거나 새 값을 반환하지 않는다."""
+    assert ValidationServiceUtil.validate_time(None) is None
+    assert (
+        ValidationServiceUtil.validate_time(datetime.now(UTC), optional=False) is None
+    )
+    assert ValidationServiceUtil.validate_text("  keep  ") is None
+    with pytest.raises(Types.ModerationError, match="invalid_input"):
+        ValidationServiceUtil.validate_time(None, optional=False)
+
+
+@pytest.mark.parametrize(
+    ("start_offset", "end_offset", "valid"),
+    [
+        (None, None, True),
+        (None, 1, False),
+        (0, None, False),
+        (1, 0, False),
+        (0, 0, False),
+        (0, 1, True),
+    ],
+)
+def test_assessment_window_pair_contract(start_offset, end_offset, valid):
+    """기간을 모두 생략하거나 순서가 맞는 쌍으로만 허용한다."""
+    now = datetime(2026, 10, 28, tzinfo=UTC)
+    command = assessment_command(
+        SimpleNamespace(id=uuid4(), target_type="user", target_id=uuid4()),
+        window_start=None
+        if start_offset is None
+        else now + timedelta(hours=start_offset),
+        window_end=None if end_offset is None else now + timedelta(hours=end_offset),
+    )
+    if valid:
+        assert AssessmentsCommandService._normalize_assessment(command) == command
+    else:
+        with pytest.raises(Types.ModerationError, match="invalid_input"):
+            AssessmentsCommandService._normalize_assessment(command)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("received_offset", "valid"), [(-1, False), (0, True), (1, True), (2, False)]
+)
+async def test_assessment_report_window_is_half_open(
+    memory_backend, received_offset, valid
+):
+    """신고 접수 시각에 [start, end)를 적용하며 기간 밖이면 평가를 쓰지 않는다."""
+    b = memory_backend
+    report = await ReportsCommandService.submit_report(
+        b.session, report_command(), actor=b.user
+    )
+    start = datetime(2026, 10, 28, tzinfo=UTC)
+    b.store["reports"][report.id].received_at = start + timedelta(hours=received_offset)
+    command = assessment_command(
+        report, window_start=start, window_end=start + timedelta(hours=2)
+    )
+    if valid:
+        assessment = await AssessmentsCommandService.record_manual_assessment(
+            b.session, command, actor=b.admin
+        )
+        assert assessment.reports == command.reports
+        assert assessment.window_start == start
+        assert assessment.window_end == start + timedelta(hours=2)
+    else:
+        with pytest.raises(Types.ModerationError, match="invalid_link"):
+            await AssessmentsCommandService.record_manual_assessment(
+                b.session, command, actor=b.admin
+            )
+        assert not b.store["assessments"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("snapshot_data", "expected"),
+    [
+        (
+            {"title": "published", "description": None, "opening_message": ""},
+            {"title": "published", "description": None, "opening_message": ""},
+        ),
+        (
+            {"title": "outer", "product": {"title": "", "description": "detail"}},
+            {"title": "", "description": "detail", "opening_message": None},
+        ),
+        (
+            {"title": "outer", "product": {}},
+            {"title": None, "description": None, "opening_message": None},
+        ),
+        ({"title": "outer", "product": None}, None),
+        ({"title": "outer", "product": []}, None),
+    ],
+)
+async def test_report_snapshot_json_forms_preserve_existing_behavior(
+    memory_backend, monkeypatch, snapshot_data, expected
+):
+    """평면/중첩 증거의 누락·빈 값을 유지하고 손상 구조를 정상 값으로 대체하지 않는다."""
+    b = memory_backend
+    product_id, snapshot_id = uuid4(), uuid4()
+
+    async def accessible(session, command):
+        """신고 대상 접근 서비스의 최소 공개 결과를 반환한다."""
+        assert command.lock is True and command.user_id == b.user.user_id
+        return SimpleNamespace(
+            id=product_id, owner_id=b.user.user_id, latest_snapshot_id=snapshot_id
+        )
+
+    async def snapshot(session, command):
+        """소속과 버전이 확인된 JSON snapshot을 반환한다."""
+        return SimpleNamespace(
+            id=snapshot_id,
+            product_id=product_id,
+            version=1,
+            snapshot_data=snapshot_data,
+        )
+
+    monkeypatch.setattr(
+        ReportsCommandService.ProductQueryService, "get_accessible_product", accessible
+    )
+    monkeypatch.setattr(
+        ReportsCommandService.ProductQueryService, "ensure_snapshot_available", snapshot
+    )
+    command = replace(report_command(product_id), target_type="product")
+    if expected is None:
+        with pytest.raises(AttributeError):
+            await ReportsCommandService.submit_report(b.session, command, actor=b.user)
+        assert not b.store["reports"]
+    else:
+        report = await ReportsCommandService.submit_report(
+            b.session, command, actor=b.user
+        )
+        info = await ReportsQueryService.get_admin_report(
+            b.session, Types.GetReportCommand(report.id), actor=b.admin
+        )
+        assert info.evidence_snapshot["server"] == {
+            "snapshot_id": str(snapshot_id),
+            "version": 1,
+            **expected,
+        }

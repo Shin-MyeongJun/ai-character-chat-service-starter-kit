@@ -1,5 +1,6 @@
 # 상품 접근·버전 만료·상품 소속을 확인한 뒤 그 버전 캐릭터 스냅샷에 연결된 미디어만 읽는다.
 from app.db.transaction import use_case_transaction
+from app.db.types import SessionFactory
 from app.modules.asset_storage import types as AssetStorageTypes
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service.media import CharacterMediaService
@@ -8,7 +9,7 @@ from app.modules.content.product.service import query as QueryService
 
 
 class ProductMediaService:
-    def __init__(self, sessions, media: CharacterMediaService):
+    def __init__(self, sessions: SessionFactory, media: CharacterMediaService) -> None:
         self.sessions = sessions
         self.media = media
 

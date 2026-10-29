@@ -15,6 +15,7 @@ tzdata>=2024.2
 uvicorn[standard]>=0.32,<1.0
 
 mypy>=1.13,<2.0
+boto3-stubs[s3]>=1.35,<2.0
 pytest>=8.3,<9.0
 pytest-asyncio>=0.24,<1.0
 ruff>=0.8,<1.0

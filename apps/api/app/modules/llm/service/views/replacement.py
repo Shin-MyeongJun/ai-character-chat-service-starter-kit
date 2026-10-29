@@ -1,7 +1,10 @@
 # 상품 조회에서 현재 모델 가용성·대체 예정 상태를 계산한다.
 # DB를 변경하거나 알림을 발송하지 않으며, 실행 시 resolve_execution에서 다시 판단한다.
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.llm import types as Types
 from app.modules.llm.service import query as QueryService
@@ -10,13 +13,15 @@ from app.modules.llm.types import ModelNoticeView
 
 
 async def execution_notice(
-    session, command: Types.ExecutionNoticeCommand
+    session: AsyncSession, command: Types.ExecutionNoticeCommand
 ) -> ModelNoticeView | None:
     """Read-only availability for customers and creators; never expose prompts."""
     snapshot = command.snapshot
     now = command.now
     now = now or datetime.now(UTC)
-    configuration = snapshot.snapshot_data["model"]
+    # Same product snapshot writer contract as resolve_execution, with no new
+    # runtime checks or fallback for malformed legacy settings.
+    configuration = cast(Types.SnapshotModelSettings, snapshot.snapshot_data["model"])
     model = await QueryService.get_model(
         session, Types.GetModelCommand(UUID(configuration["id"]))
     )
@@ -68,5 +73,6 @@ async def execution_notice(
         replacement_model_id=choice[0].id if choice else None,
         replacement_model_name=choice[0].model_name if choice else None,
         replacement_reasoning_effort=choice[1] if choice else None,
-        unavailable_policy=policy.get("unavailable", "pause"),
+        # Product replacement policy stores its existing string/None behavior.
+        unavailable_policy=cast(str | None, policy.get("unavailable", "pause")),
     )

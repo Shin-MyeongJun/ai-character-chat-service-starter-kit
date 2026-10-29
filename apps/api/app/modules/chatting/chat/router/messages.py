@@ -1,4 +1,5 @@
 # 사용자 메시지 CRUD HTTP 경계. sender·모델 선택은 입력으로 받지 않으며 충돌은 409, 발신자 위반은 403이다.
+from collections.abc import Iterator
 from contextlib import contextmanager
 from uuid import UUID
 
@@ -17,7 +18,7 @@ router = APIRouter(
 
 
 @contextmanager
-def _message_errors():
+def _message_errors() -> Iterator[None]:
     with errors():
         try:
             yield
@@ -33,7 +34,7 @@ async def create_message(
     body: Schemas.CreateMessageRequestDto,
     session: Session,
     owner: Owner,
-):
+) -> Schemas.MessageResponseDto:
     with _message_errors():
         command = SchemaMapper.create_message_request_to_command(
             body, conversation_id, owner
@@ -50,7 +51,7 @@ async def list_messages(
     owner: Owner,
     cursor: str | None = Query(default=None, max_length=100),
     limit: int = Query(default=50, ge=1, le=100),
-):
+) -> Schemas.MessagePageResponseDto:
     with _message_errors():
         command = SchemaMapper.list_messages_request_to_command(
             conversation_id, owner, cursor, limit
@@ -67,7 +68,7 @@ async def replace_message(
     body: Schemas.ReplaceMessageRequestDto,
     session: Session,
     owner: Owner,
-):
+) -> Schemas.MessageResponseDto:
     with _message_errors():
         command = SchemaMapper.replace_message_request_to_command(
             body, conversation_id, message_id, owner
@@ -80,7 +81,7 @@ async def replace_message(
 @router.delete("/{message_id}", response_model=Schemas.RewindMessagesResponseDto)
 async def rewind_messages(
     conversation_id: UUID, message_id: UUID, session: Session, owner: Owner
-):
+) -> Schemas.RewindMessagesResponseDto:
     with _message_errors():
         command = SchemaMapper.rewind_messages_request_to_command(
             conversation_id, message_id, owner

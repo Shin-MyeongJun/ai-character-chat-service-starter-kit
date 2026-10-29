@@ -4,6 +4,8 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as Repository
@@ -14,7 +16,7 @@ from app.modules.chatting.conversation import types as ConversationTypes
 
 
 async def get_answer_request(
-    session, command: Types.GetAnswerRequestCommand
+    session: AsyncSession, command: Types.GetAnswerRequestCommand
 ) -> Types.GenerationStateInfo | None:
     # Caller composes this lock with runtime preparation and reservation.
     async with use_case_transaction(session):
@@ -37,7 +39,7 @@ async def get_answer_request(
 
 
 async def get_answer_input(
-    session, command: Types.GetAnswerInputCommand
+    session: AsyncSession, command: Types.GetAnswerInputCommand
 ) -> Types.MessageInfo:
     await ConversationService.get_owned_conversation(
         session,
@@ -60,7 +62,9 @@ async def get_answer_input(
     return info
 
 
-async def update_answer(session, command: Types.UpdateAnswerCommand) -> None:
+async def update_answer(
+    session: AsyncSession, command: Types.UpdateAnswerCommand
+) -> None:
     async with use_case_transaction(session):
         info = PersistenceMapper.generation_entity_to_state_info(
             await Repository.get_owned_generation(
@@ -122,13 +126,13 @@ async def update_answer(session, command: Types.UpdateAnswerCommand) -> None:
 
 
 async def list_expired_answers(
-    session, command: Types.ListExpiredAnswersCommand
+    session: AsyncSession, command: Types.ListExpiredAnswersCommand
 ) -> tuple[Types.GenerationStateInfo, ...]:
     if not 1 <= command.limit <= 100:
         raise ValueError("Invalid recovery batch size.")
     return tuple(
-        PersistenceMapper.generation_entity_to_state_info(row)
-        for row in await Repository.list_expired_answers(
+        PersistenceMapper.generation_entity_to_state_info(generation_entity)
+        for generation_entity in await Repository.list_expired_answers(
             session, command.now, command.limit
         )
     )

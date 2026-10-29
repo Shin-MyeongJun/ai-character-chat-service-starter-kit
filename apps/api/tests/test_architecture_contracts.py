@@ -195,11 +195,11 @@ def test_public_service_business_inputs_use_commands_and_declare_results():
             "chatting/chat/service/workflow/answer_preparation.py",
             "prepare_answer_context",
         ): {
-            "session_factory": "Callable",
+            "session_factory": "SessionFactory",
             "memory_retriever": "MemoryService.MemoryRetriever",
         },
         ("chatting/chat/service/workflow/memory.py", "process_memory_work"): {
-            "session_factory": "Callable",
+            "session_factory": "SessionFactory",
             "summary_generator": "MemoryService.SummaryGenerator",
             "indexer": "MemoryService.MemoryIndexer",
         },

@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from dataclasses import asdict
 
+from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 from app.modules.chatting.conversation import service as ConversationService
@@ -19,7 +19,7 @@ from app.modules.chatting.memory import types as MemoryTypes
 # 고정 runtime·현재 입력·미요약 원문·기억을 예산 안에 조립한다.
 # 미요약 원문을 조용히 잘라내지 않고 초과하면 summary_required를 포함한 업무 오류를 전달한다.
 async def prepare_answer_context(
-    session_factory: Callable,
+    session_factory: SessionFactory,
     command: Types.PrepareAnswerContextCommand,
     *,
     memory_retriever: MemoryService.MemoryRetriever,

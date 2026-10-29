@@ -7,18 +7,28 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator, Callable, Iterable
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
+from typing import cast
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.db.types import SessionFactory
 from app.http import character_dependencies, dependencies, lorebook_dependencies
 from app.http.routes import router
 from app.modules.asset_storage.service import (
     create_asset_storage_service,
     load_asset_storage_settings,
+)
+from app.modules.asset_storage.service.storage import AssetStorageService
+from app.modules.asset_storage.types import (
+    AssetStorageSettings,
+    S3StorageSettings,
+    TestLocalStorageSettings,
 )
 from app.modules.chatting.chat.service.workflow.answers import AnswerOrchestrator
 from app.modules.chatting.chat.types import AnswerConfig
@@ -51,31 +61,38 @@ from app.modules.llm.adapters import (
     OpenAIAdapter,
     VoyageEmbeddingAdapter,
 )
+from app.modules.llm.adapters.protocols import EmbeddingAdapter, TextGenerationAdapter
 from app.modules.llm.service import EmbeddingService, TextGenerationService
 
 logger = structlog.get_logger(__name__)
 
 
-async def get_database_session(request: Request):
-    async with request.app.state.session_factory() as session:
+async def get_database_session(request: Request) -> AsyncIterator[AsyncSession]:
+    # lifespan installs a sessionmaker; keep direct state lookup semantics.
+    session_factory = cast(SessionFactory, request.app.state.session_factory)
+    async with session_factory() as session:
         yield session
 
 
-def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
+def create_app(
+    *,
+    authenticate: Callable[..., object] | None = None,
+    asset_read_settings: Iterable[AssetStorageSettings] = (),
+) -> FastAPI:
     """authenticate is a trusted FastAPI identity dependency, never an owner ID."""
 
     @asynccontextmanager
-    async def lifespan(app):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         template = PromptService.load_template()
         async with AsyncExitStack() as stack:
             engine = create_async_engine(
                 os.environ["DATABASE_URL"], pool_pre_ping=True, hide_parameters=True
             )
             stack.push_async_callback(engine.dispose)
-            sessions = async_sessionmaker(engine, expire_on_commit=False)
-            app.state.session_factory = sessions
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            app.state.session_factory = session_factory
             auth_settings = load_auth_settings()
-            authentication = AuthenticationService(sessions, auth_settings)
+            authentication = AuthenticationService(session_factory, auth_settings)
             app.state.authentication = authentication
             app.state.authentication_mail = AuthenticationMailWorkflow(
                 authentication, SMTPMailSender(auth_settings)
@@ -86,17 +103,26 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
             asset_settings = load_asset_storage_settings()
             asset_storage = create_asset_storage_service(asset_settings)
             stack.push_async_callback(asset_storage.aclose)
-            storage_settings = (
-                asset_settings.test_local
-                if asset_settings.storage_kind == "test_local"
-                else asset_settings.s3
+            # AssetStorageSettings.__post_init__ requires the selected config.
+            # Preserve the same object and lookup failures for invalid overrides.
+            storage_settings = cast(
+                TestLocalStorageSettings | S3StorageSettings,
+                (
+                    asset_settings.test_local
+                    if asset_settings.storage_kind == "test_local"
+                    else asset_settings.s3
+                ),
             )
-            read_storages = {}
+            read_storages: dict[tuple[str, str], AssetStorageService] = {}
             for old_settings in asset_read_settings:
-                old_config = (
-                    old_settings.test_local
-                    if old_settings.storage_kind == "test_local"
-                    else old_settings.s3
+                # The same constructor invariant applies to historical settings.
+                old_config = cast(
+                    TestLocalStorageSettings | S3StorageSettings,
+                    (
+                        old_settings.test_local
+                        if old_settings.storage_kind == "test_local"
+                        else old_settings.s3
+                    ),
                 )
                 identity = (str(old_settings.storage_kind), old_config.storage_id)
                 if identity in read_storages or identity == (
@@ -108,15 +134,18 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
                 stack.push_async_callback(old_storage.aclose)
                 read_storages[identity] = old_storage
             media = CharacterMediaWorkflow(
-                sessions,
+                session_factory,
                 asset_storage,
                 storage_kind=str(asset_settings.storage_kind),
                 storage_id=storage_settings.storage_id,
                 read_storages=read_storages,
             )
             app.state.character_media_service = media
-            app.state.product_media_service = ProductMediaService(sessions, media)
-            adapters = []
+            app.state.product_media_service = ProductMediaService(
+                session_factory, media
+            )
+            adapters: list[TextGenerationAdapter] = []
+            adapter: TextGenerationAdapter
             if os.getenv("OPENAI_API_KEY"):
                 adapter = OpenAIAdapter(
                     api_key=os.environ["OPENAI_API_KEY"], max_retries=0
@@ -137,7 +166,7 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
                 )
             text = TextGenerationService(adapters)
             embedding_model = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-large-2")
-            embedding_adapters = []
+            embedding_adapters: list[EmbeddingAdapter] = []
             if os.getenv("VOYAGE_API_KEY"):
                 embedding = VoyageEmbeddingAdapter(
                     api_key=os.environ["VOYAGE_API_KEY"],
@@ -173,16 +202,16 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
                 ),
             )
             orchestrator = AnswerOrchestrator(
-                sessions,
+                session_factory,
                 text,
-                MemoryService.MemoryRetriever(sessions, embeddings),
+                MemoryService.MemoryRetriever(session_factory, embeddings),
                 config=config,
                 template=template,
                 pricing=load_billing_pricing_configuration(),
             )
             app.state.answer_orchestrator = orchestrator
 
-            async def recover():
+            async def recover() -> None:
                 while True:
                     try:
                         await orchestrator.recover_answers()
@@ -204,8 +233,9 @@ def create_app(*, authenticate=None, asset_read_settings=()) -> FastAPI:
     app.include_router(router)
     app.include_router(identity_router)
 
-    async def handle_auth_error(request: Request, error: AuthError):
-        return error_response(error, request)
+    async def handle_auth_error(request: Request, error: Exception) -> JSONResponse:
+        # Starlette dispatches this handler only for the registered AuthError.
+        return error_response(cast(AuthError, error), request)
 
     app.add_exception_handler(AuthError, handle_auth_error)
     app.add_middleware(CookieCSRFMiddleware)

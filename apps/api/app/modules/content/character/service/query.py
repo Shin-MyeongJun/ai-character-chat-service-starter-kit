@@ -2,7 +2,7 @@
 # get_owned_characters는 요청 개수와 조회 개수를 비교하며 발행 시 ID 순 잠금을 요청할 수 있다.
 """Read use cases shared by HTTP routers and other application modules.
 
-Return Result dataclasses, never ORM entities or HTTP schemas. Singular reads
+Return Info dataclasses, never ORM entities or HTTP schemas. Singular reads
 return None when absent; collection reads return empty items. The caller owns
 authorization and session/transaction lifetime; these functions do not explicitly
 begin, commit, or roll back transactions. SELECT may autobegin a transaction
@@ -11,10 +11,11 @@ and honors the caller's session autoflush setting for pending changes.
 
 from typing import get_args
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.content.character import repository as Repository
 from app.modules.content.character import types as Types
 from app.modules.content.character.mapper import persistence as PersistenceMapper
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def list_characters(
@@ -145,13 +146,13 @@ async def get_character_promotion(
 async def get_owned_characters(
     session: AsyncSession, command: Types.GetOwnedCharactersCommand
 ) -> list[Types.CharacterInfo]:
-    rows = await Repository.list_owned_characters(
+    character_entities = await Repository.list_owned_characters(
         session, command.ids, command.owner_id, lock=command.lock
     )
-    infos = PersistenceMapper.characters_entities_to_info(rows)
-    if len(infos) != len(command.ids):
+    character_infos = PersistenceMapper.characters_entities_to_info(character_entities)
+    if len(character_infos) != len(command.ids):
         raise LookupError("Owned component not found.")
-    return infos
+    return character_infos
 
 
 async def get_snapshot_media(
@@ -172,5 +173,7 @@ async def check_media_reference(
 async def get_character_snapshots(
     session: AsyncSession, command: Types.GetCharacterSnapshotsCommand
 ) -> list[Types.CharacterSnapshotInfo]:
-    rows = await Repository.list_character_snapshots(session, command.snapshot_ids)
-    return PersistenceMapper.character_snapshots_entities_to_info(rows)
+    snapshot_entities = await Repository.list_character_snapshots(
+        session, command.snapshot_ids
+    )
+    return PersistenceMapper.character_snapshots_entities_to_info(snapshot_entities)

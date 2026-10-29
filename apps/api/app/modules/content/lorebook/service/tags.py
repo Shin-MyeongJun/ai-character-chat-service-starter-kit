@@ -1,5 +1,10 @@
 """Current content tags; parent locks serialize all connection mutations."""
 
+from typing import Literal, overload
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.content.lorebook import repository as Repository
 from app.modules.content.lorebook import types as Types
@@ -12,7 +17,9 @@ from app.modules.identity import types as IdentityTypes
 from app.modules.identity.service import query as IdentityQueryService
 
 
-async def _get_tag_target(session, target_id, *, lock=False):
+async def _get_tag_target(
+    session: AsyncSession, target_id: UUID, *, lock: bool = False
+) -> Types.LorebookInfo:
     row = await Repository.get_target_for_tag_access(session, target_id, lock=lock)
     info = PersistenceMapper.lorebook_entity_to_info(row)
     if info is None:
@@ -20,30 +27,32 @@ async def _get_tag_target(session, target_id, *, lock=False):
     return info
 
 
-async def _get_public_tags(session, target_id) -> tuple[TagTypes.PublicTagInfo, ...]:
+async def _get_public_tags(
+    session: AsyncSession, target_id: UUID
+) -> tuple[TagTypes.PublicTagInfo, ...]:
     links = TagsPersistenceMapper.public_tag_links_entities_to_info(
         await Repository.list_public_tag_links(session, target_id)
     )
     tags = await TagQueryService.get_tags(
-        session, TagTypes.GetTagsCommand(tuple(link.tag_id for link in links))
+        session, TagTypes.GetTagsCommand(tag_ids=tuple(link.tag_id for link in links))
     )
     return TagsPersistenceMapper.public_tag_links_infos_to_tags(links, tags)
 
 
 async def _get_internal_tags(
-    session, target_id
+    session: AsyncSession, target_id: UUID
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     links = TagsPersistenceMapper.internal_tag_links_entities_to_info(
         await Repository.list_internal_tag_links(session, target_id)
     )
     tags = await TagQueryService.get_tags(
-        session, TagTypes.GetTagsCommand(tuple(link.tag_id for link in links))
+        session, TagTypes.GetTagsCommand(tag_ids=tuple(link.tag_id for link in links))
     )
     return TagsPersistenceMapper.internal_tag_links_infos_to_tags(links, tags)
 
 
 async def list_public_tags(
-    session, command: Types.PublicTagsCommand
+    session: AsyncSession, command: Types.PublicTagsCommand
 ) -> tuple[TagTypes.PublicTagInfo, ...]:
     info = await _get_tag_target(session, command.target_id)
     if info.owner_id != command.user_id:
@@ -51,7 +60,9 @@ async def list_public_tags(
     return await _get_public_tags(session, command.target_id)
 
 
-async def _write_public_tags(session, command, *, append):
+async def _write_public_tags(
+    session: AsyncSession, command: Types.PublicTagsCommand, *, append: bool
+) -> tuple[TagTypes.PublicTagInfo, ...]:
     async with use_case_transaction(session):
         info = await _get_tag_target(session, command.target_id, lock=True)
         if info.owner_id != command.user_id:
@@ -59,31 +70,40 @@ async def _write_public_tags(session, command, *, append):
         links = TagsPersistenceMapper.public_tag_links_entities_to_info(
             await Repository.list_public_tag_links(session, command.target_id)
         )
-        retained = tuple(link.tag_id for link in links)
+        retained_tag_ids = tuple(link.tag_id for link in links)
         tags = await TagCommandService.resolve_tags(
-            session, TagTypes.ResolveTagsCommand(command.names, retained)
+            session,
+            TagTypes.ResolveTagsCommand(
+                names=command.names, retained_ids=retained_tag_ids
+            ),
         )
-        requested = tuple(tag.id for tag in tags)
-        ids = tuple(dict.fromkeys((*retained, *requested))) if append else requested
+        requested_tag_ids = tuple(tag.id for tag in tags)
+        tag_ids = (
+            tuple(dict.fromkeys((*retained_tag_ids, *requested_tag_ids)))
+            if append
+            else requested_tag_ids
+        )
         await Repository.replace_public_tag_links(
-            session, command.target_id, ids, command.user_id
+            session, command.target_id, tag_ids, command.user_id
         )
         return await _get_public_tags(session, command.target_id)
 
 
 async def add_public_tags(
-    session, command: Types.PublicTagsCommand
+    session: AsyncSession, command: Types.PublicTagsCommand
 ) -> tuple[TagTypes.PublicTagInfo, ...]:
     return await _write_public_tags(session, command, append=True)
 
 
 async def replace_public_tags(
-    session, command: Types.PublicTagsCommand
+    session: AsyncSession, command: Types.PublicTagsCommand
 ) -> tuple[TagTypes.PublicTagInfo, ...]:
     return await _write_public_tags(session, command, append=False)
 
 
-async def remove_public_tag(session, command: Types.PublicTagsCommand) -> None:
+async def remove_public_tag(
+    session: AsyncSession, command: Types.PublicTagsCommand
+) -> None:
     if command.tag_id is None:
         raise ValueError("Tag ID is required.")
     async with use_case_transaction(session):
@@ -96,21 +116,50 @@ async def remove_public_tag(session, command: Types.PublicTagsCommand) -> None:
 
 
 async def list_internal_tags(
-    session, command: Types.InternalTagsCommand
+    session: AsyncSession, command: Types.InternalTagsCommand
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     await IdentityQueryService.require_admin(
-        session, IdentityTypes.GetUserCommand(command.actor_id)
+        session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
     )
     await _get_tag_target(session, command.target_id)
     return await _get_internal_tags(session, command.target_id)
 
 
-async def _write_internal_tags(session, command, *, source, replace=False):
+@overload
+async def _write_internal_tags(
+    session: AsyncSession,
+    command: Types.InternalTagsCommand,
+    *,
+    source: Literal["admin"],
+    replace: bool = False,
+) -> tuple[TagTypes.InternalTagInfo, ...]: ...
+
+
+@overload
+async def _write_internal_tags(
+    session: AsyncSession,
+    command: Types.SystemTagsCommand,
+    *,
+    source: Literal["system"],
+    replace: Literal[False] = False,
+) -> tuple[TagTypes.InternalTagInfo, ...]: ...
+
+
+async def _write_internal_tags(
+    session: AsyncSession,
+    command: Types.InternalTagsCommand | Types.SystemTagsCommand,
+    *,
+    source: Literal["admin", "system"],
+    replace: bool = False,
+) -> tuple[TagTypes.InternalTagInfo, ...]:
     async with use_case_transaction(session):
-        actor = command.actor_id if source == "admin" else None
+        actor_id: UUID | None = None
         if source == "admin":
+            # Public admin entry points pair this source with InternalTagsCommand.
+            assert isinstance(command, Types.InternalTagsCommand)
+            actor_id = command.actor_id
             await IdentityQueryService.require_admin(
-                session, IdentityTypes.GetUserCommand(actor)
+                session, IdentityTypes.GetUserCommand(user_id=actor_id)
             )
         await _get_tag_target(session, command.target_id, lock=True)
         links = TagsPersistenceMapper.internal_tag_links_entities_to_info(
@@ -119,52 +168,81 @@ async def _write_internal_tags(session, command, *, source, replace=False):
         tags = await TagCommandService.resolve_tags(
             session,
             TagTypes.ResolveTagsCommand(
-                command.names, tuple(link.tag_id for link in links)
+                names=command.names, retained_ids=tuple(link.tag_id for link in links)
             ),
         )
         if replace:
-            requested = {tag.id for tag in tags}
+            requested_tag_ids = {tag.id for tag in tags}
             await Repository.remove_internal_tag_links(
                 session,
                 command.target_id,
-                tuple(link.tag_id for link in links if link.tag_id not in requested),
+                tuple(
+                    link.tag_id
+                    for link in links
+                    if link.tag_id not in requested_tag_ids
+                ),
             )
-        protected = {link.tag_id for link in links if link.source == "admin"}
+        protected_tag_ids = {link.tag_id for link in links if link.source == "admin"}
         for tag in tags:
-            if source == "system" and tag.id in protected:
+            if source == "system" and tag.id in protected_tag_ids:
                 continue
             await Repository.set_internal_tag_link(
-                session, command.target_id, tag.id, source, actor
+                session, command.target_id, tag.id, source, actor_id
             )
         return await _get_internal_tags(session, command.target_id)
 
 
 async def add_internal_tags(
-    session, command: Types.InternalTagsCommand
+    session: AsyncSession, command: Types.InternalTagsCommand
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     return await _write_internal_tags(session, command, source="admin")
 
 
 async def replace_internal_tags(
-    session, command: Types.InternalTagsCommand
+    session: AsyncSession, command: Types.InternalTagsCommand
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     return await _write_internal_tags(session, command, source="admin", replace=True)
 
 
 async def set_system_tags(
-    session, command: Types.SystemTagsCommand
+    session: AsyncSession, command: Types.SystemTagsCommand
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     """Trusted application callers only; never exposed as an HTTP request."""
     return await _write_internal_tags(session, command, source="system")
 
 
-async def _remove_internal_tag(session, command, *, source):
+@overload
+async def _remove_internal_tag(
+    session: AsyncSession,
+    command: Types.InternalTagsCommand,
+    *,
+    source: Literal["admin"],
+) -> None: ...
+
+
+@overload
+async def _remove_internal_tag(
+    session: AsyncSession,
+    command: Types.SystemTagsCommand,
+    *,
+    source: Literal["system"],
+) -> None: ...
+
+
+async def _remove_internal_tag(
+    session: AsyncSession,
+    command: Types.InternalTagsCommand | Types.SystemTagsCommand,
+    *,
+    source: Literal["admin", "system"],
+) -> None:
     if command.tag_id is None:
         raise ValueError("Tag ID is required.")
     async with use_case_transaction(session):
         if source == "admin":
+            # System requests carry no actor; only admin commands enter this branch.
+            assert isinstance(command, Types.InternalTagsCommand)
             await IdentityQueryService.require_admin(
-                session, IdentityTypes.GetUserCommand(command.actor_id)
+                session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
             )
         await _get_tag_target(session, command.target_id, lock=True)
         links = TagsPersistenceMapper.internal_tag_links_entities_to_info(
@@ -179,16 +257,20 @@ async def _remove_internal_tag(session, command, *, source):
         )
 
 
-async def remove_internal_tag(session, command: Types.InternalTagsCommand) -> None:
+async def remove_internal_tag(
+    session: AsyncSession, command: Types.InternalTagsCommand
+) -> None:
     await _remove_internal_tag(session, command, source="admin")
 
 
-async def remove_system_tag(session, command: Types.SystemTagsCommand) -> None:
+async def remove_system_tag(
+    session: AsyncSession, command: Types.SystemTagsCommand
+) -> None:
     await _remove_internal_tag(session, command, source="system")
 
 
 async def list_system_tags(
-    session, command: Types.SystemTagsCommand
+    session: AsyncSession, command: Types.SystemTagsCommand
 ) -> tuple[TagTypes.InternalTagInfo, ...]:
     """Trusted application use only; no corresponding HTTP endpoint."""
     await _get_tag_target(session, command.target_id)

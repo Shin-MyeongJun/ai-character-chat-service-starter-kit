@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.reporting import get_reporting_period
 from app.modules.chatting.chat import types as ChatTypes
 from app.modules.chatting.chat.service.query import (
@@ -19,7 +21,10 @@ from app.modules.reporting.account_reporting.mapper import (
 
 
 async def get_account_report(
-    session, command: Types.GetAccountReportCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetAccountReportCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.AccountReportView:
     """활성 사용자의 저장된 생성/usage를 각각의 생성 시각 범위로 조회한다.
 
@@ -32,7 +37,7 @@ async def get_account_report(
             raise Types.ReportError("invalid_input")
         try:
             await IdentityQueryService.require_active_user(
-                session, IdentityTypes.GetUserCommand(actor.user_id)
+                session, IdentityTypes.GetUserCommand(user_id=actor.user_id)
             )
         except LookupError as exc:
             raise Types.ReportError("forbidden") from exc
@@ -41,14 +46,14 @@ async def get_account_report(
             await ChatGenerationQueryService.get_account_generation_statistics(
                 session,
                 ChatTypes.GetAccountGenerationStatisticsCommand(
-                    actor.user_id, period.start, period.end
+                    user_id=actor.user_id, start=period.start, end=period.end
                 ),
             )
         )
         usage = await BillingQueryService.get_account_usage_statistics(
             session,
             BillingTypes.GetAccountUsageStatisticsCommand(
-                actor.user_id, period.start, period.end
+                user_id=actor.user_id, start=period.start, end=period.end
             ),
         )
         return PersistenceMapper.generation_usage_infos_to_view(

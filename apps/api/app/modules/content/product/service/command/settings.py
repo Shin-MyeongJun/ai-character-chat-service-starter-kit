@@ -1,5 +1,9 @@
 # 실행 모델·reasoning effort·시작 원본 항목·대체 정책을 초안에 저장한다.
 # 시작 항목은 구성에 포함된 로어북의 enabled start_set이어야 한다. 발행 직전에도 별도 재검증한다.
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.content.lorebook import types as LorebookTypes
 from app.modules.content.lorebook.service import query as LorebookQueryService
@@ -15,15 +19,18 @@ from app.modules.llm import types as LlmTypes
 from app.modules.llm.service import query as LlmQueryService
 
 
-async def _validate_model(session, model_id, effort):
+async def _validate_model(
+    session: AsyncSession, model_id: UUID, effort: str
+) -> LlmTypes.ModelInfo:
     return await LlmQueryService.validate_model(
-        session, LlmTypes.ValidateModelCommand(model_id, effort)
+        session,
+        LlmTypes.ValidateModelCommand(model_id=model_id, reasoning_effort=effort),
     )
 
 
 # 선택 모델·effort와 연결 로어의 시작 항목, 대체 허용 정책을 확인해 초안 설정을 저장한다.
 async def set_settings(
-    session, command: Types.SetSettingsCommand
+    session: AsyncSession, command: Types.SetSettingsCommand
 ) -> ProductSettingsInfo:
     product_id = command.product_id
     owner_id = command.owner_id
@@ -46,7 +53,10 @@ async def set_settings(
         raise ValueError("Allowlist requires at least one model.")
     async with use_case_transaction(session):
         await QueryService.get_owned_product(
-            session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+            session,
+            Types.OwnedProductCommand(
+                product_id=product_id, owner_id=owner_id, lock=True
+            ),
         )
         await _validate_model(session, value.model_id, value.reasoning_effort)
         for model_id in value.replacement_model_ids:
@@ -64,8 +74,8 @@ async def set_settings(
         entries = await LorebookQueryService.get_start_entries(
             session,
             LorebookTypes.GetStartEntriesCommand(
-                value.start_entry_ids,
-                tuple(b.lorebook_id for b in composition.lorebooks),
+                ids=value.start_entry_ids,
+                lorebook_ids=tuple(book.lorebook_id for book in composition.lorebooks),
             ),
         )
         if len(entries) != len(value.start_entry_ids):
@@ -76,7 +86,10 @@ async def set_settings(
         return value
 
 
-async def _validate_publication(session, product):
+async def _validate_publication(
+    session: AsyncSession,
+    product: Types.ProductStateInfo,
+) -> tuple[tuple[Types.CharacterSelection, ...], list[Types.ProductStartSetInfo]]:
     if (
         not product.title.strip()
         or not product.opening_message
@@ -96,7 +109,10 @@ async def _validate_publication(session, product):
     if not starts:
         raise ValueError("At least one start option is required.")
     valid = await LorebookQueryService.get_start_entries(
-        session, LorebookTypes.GetStartEntriesCommand(tuple(s.entry_id for s in starts))
+        session,
+        LorebookTypes.GetStartEntriesCommand(
+            ids=tuple(start.entry_id for start in starts)
+        ),
     )
     if len(valid) != len(starts):
         raise ValueError("Start options changed; configure them again.")

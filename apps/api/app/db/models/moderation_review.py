@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.json_types import JsonObject, JsonValue
 from app.db.models._mixins import UuidPkMixin
 
 
@@ -79,10 +80,10 @@ class ModerationReport(UuidPkMixin, Base):
         DateTime(timezone=True), server_default=text("now()")
     )
     form_elapsed_ms: Mapped[int | None] = mapped_column(BigInteger)
-    evidence_snapshot: Mapped[dict] = mapped_column(
+    evidence_snapshot: Mapped[JsonObject] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )
-    attachment_refs: Mapped[list] = mapped_column(
+    attachment_refs: Mapped[list[JsonValue]] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb")
     )
     evidence_captured_at: Mapped[datetime | None] = mapped_column(
@@ -152,12 +153,14 @@ class ModerationAssessment(UuidPkMixin, Base):
     )
     window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    signals: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    signals: Mapped[JsonObject] = mapped_column(
+        JSONB, server_default=text("'{}'::jsonb")
+    )
     confidence_score: Mapped[Decimal | None] = mapped_column(Numeric)
     outcome: Mapped[str] = mapped_column(Text)
     violation_code: Mapped[str | None] = mapped_column(Text)
     severity: Mapped[int | None] = mapped_column(SmallInteger)
-    recommended_actions: Mapped[list] = mapped_column(
+    recommended_actions: Mapped[list[JsonValue]] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb")
     )
     rationale: Mapped[str] = mapped_column(Text)

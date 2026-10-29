@@ -13,6 +13,7 @@ from sqlalchemy import delete as tag_delete
 from sqlalchemy import select as tag_select
 from sqlalchemy.dialects.postgresql import insert as tag_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.db.models import lorebook as lorebook_models
 from app.db.models.lorebook import Lorebook, LorebookEntry
@@ -319,14 +320,14 @@ def _apply_lorebook_entry_update(
 
 async def create_lorebook_command(
     session: AsyncSession, command: Types.CreateLorebookCommand
-):
+) -> Lorebook:
     entity = _create_lorebook_entity(command)
     return await create_lorebook(session, entity)
 
 
 async def update_lorebook_command(
     session: AsyncSession, command: Types.UpdateLorebookCommand
-):
+) -> Lorebook:
     entity = await get_lorebook_by_id_and_owner_id(
         session, command.lorebook_id, command.owner_id, for_update=True
     )
@@ -337,7 +338,7 @@ async def update_lorebook_command(
 
 async def change_lorebook_status_command(
     session: AsyncSession, command: Types.ChangeLorebookStatusCommand
-):
+) -> Lorebook:
     entity = await get_lorebook_by_id_and_owner_id(
         session, command.lorebook_id, command.owner_id, for_update=True
     )
@@ -348,7 +349,7 @@ async def change_lorebook_status_command(
 
 async def delete_lorebook_command(
     session: AsyncSession, command: Types.DeleteLorebookCommand
-):
+) -> None:
     entity = await get_lorebook_by_id_and_owner_id(
         session, command.lorebook_id, command.owner_id, for_update=True
     )
@@ -358,14 +359,14 @@ async def delete_lorebook_command(
 
 async def create_lorebook_entry_command(
     session: AsyncSession, command: Types.CreateLorebookEntryCommand
-):
+) -> LorebookEntry:
     entity = _create_lorebook_entry_entity(command)
     return await create_lorebook_entry(session, entity)
 
 
 async def update_lorebook_entry_command(
     session: AsyncSession, command: Types.UpdateLorebookEntryCommand
-):
+) -> LorebookEntry:
     entity = await get_lorebook_entry(
         session, command.entry_id, command.lorebook_id, for_update=True
     )
@@ -376,7 +377,7 @@ async def update_lorebook_entry_command(
 
 async def delete_lorebook_entry_command(
     session: AsyncSession, command: Types.DeleteLorebookEntryCommand
-):
+) -> None:
     entity = await get_lorebook_entry(
         session, command.entry_id, command.lorebook_id, for_update=True
     )
@@ -385,8 +386,8 @@ async def delete_lorebook_entry_command(
 
 
 async def list_owned_lorebooks(
-    session: AsyncSession, ids: tuple[UUID, ...], owner_id: UUID, *, lock=False
-):
+    session: AsyncSession, ids: tuple[UUID, ...], owner_id: UUID, *, lock: bool = False
+) -> list[Lorebook]:
     stmt = (
         select(Lorebook)
         .where(Lorebook.id.in_(ids), Lorebook.owner_id == owner_id)
@@ -397,7 +398,11 @@ async def list_owned_lorebooks(
     return list(await session.scalars(stmt))
 
 
-async def list_start_entries(session, ids, lorebook_ids=None):
+async def list_start_entries(
+    session: AsyncSession,
+    ids: Sequence[UUID],
+    lorebook_ids: Sequence[UUID] | None = None,
+) -> list[LorebookEntry]:
     stmt = select(LorebookEntry).where(
         LorebookEntry.id.in_(ids),
         LorebookEntry.entry_type == "start_set",
@@ -408,14 +413,21 @@ async def list_start_entries(session, ids, lorebook_ids=None):
     return list(await session.scalars(stmt))
 
 
-async def next_version(session, cls, column, source_id):
+async def next_version(
+    session: AsyncSession,
+    cls: type[LorebookSnapshot],
+    column: InstrumentedAttribute[UUID | None],
+    source_id: UUID,
+) -> int:
     return (
         await session.scalar(select(func.max(cls.version)).where(column == source_id))
         or 0
     ) + 1
 
 
-async def freeze_lorebook(session, source):
+async def freeze_lorebook(
+    session: AsyncSession, source: Types.LorebookInfo
+) -> LorebookSnapshot:
     entries = []
     for entry in await session.scalars(
         select(LorebookEntry)
@@ -457,7 +469,9 @@ async def freeze_lorebook(session, source):
     return snapshot
 
 
-async def list_lorebook_snapshots(session, snapshot_ids):
+async def list_lorebook_snapshots(
+    session: AsyncSession, snapshot_ids: Sequence[UUID]
+) -> list[LorebookSnapshot]:
     return list(
         await session.scalars(
             select(LorebookSnapshot).where(LorebookSnapshot.id.in_(snapshot_ids))
@@ -465,17 +479,20 @@ async def list_lorebook_snapshots(session, snapshot_ids):
     )
 
 
-
-
-
-async def get_target_for_tag_access(session, target_id, *, lock=False):
+async def get_target_for_tag_access(
+    session: AsyncSession, target_id: UUID, *, lock: bool = False
+) -> Lorebook | None:
     stmt = tag_select(Lorebook).where(Lorebook.id == target_id)
     if lock:
         stmt = stmt.with_for_update()
-    return await session.scalar(stmt.execution_options(populate_existing=True))
+    return (
+        await session.scalars(stmt.execution_options(populate_existing=True))
+    ).first()
 
 
-async def list_public_tag_links(session, target_id):
+async def list_public_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[LorebookTag]:
     return list(
         await session.scalars(
             tag_select(LorebookTag)
@@ -488,7 +505,9 @@ async def list_public_tag_links(session, target_id):
     )
 
 
-async def list_internal_tag_links(session, target_id):
+async def list_internal_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[LorebookInternalTag]:
     return list(
         await session.scalars(
             tag_select(LorebookInternalTag)
@@ -499,25 +518,32 @@ async def list_internal_tag_links(session, target_id):
     )
 
 
-async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
+async def replace_public_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID], actor_id: UUID
+) -> None:
     await session.execute(
         tag_delete(LorebookTag).where(
             LorebookTag.lorebook_id == target_id, LorebookTag.tag_id.not_in(tag_ids)
         )
     )
-    for order, tag_id in enumerate(tag_ids):
+    for sort_order, tag_id in enumerate(tag_ids):
         stmt = tag_insert(LorebookTag).values(
-            lorebook_id=target_id, tag_id=tag_id, sort_order=order, assigned_by=actor_id
+            lorebook_id=target_id,
+            tag_id=tag_id,
+            sort_order=sort_order,
+            assigned_by=actor_id,
         )
         await session.execute(
             stmt.on_conflict_do_update(
                 index_elements=[LorebookTag.lorebook_id, LorebookTag.tag_id],
-                set_={"sort_order": order},
+                set_={"sort_order": sort_order},
             )
         )
 
 
-async def remove_public_tag_link(session, target_id, tag_id):
+async def remove_public_tag_link(
+    session: AsyncSession, target_id: UUID, tag_id: UUID
+) -> None:
     await session.execute(
         tag_delete(LorebookTag).where(
             LorebookTag.lorebook_id == target_id, LorebookTag.tag_id == tag_id
@@ -525,7 +551,9 @@ async def remove_public_tag_link(session, target_id, tag_id):
     )
 
 
-async def remove_internal_tag_links(session, target_id, tag_ids):
+async def remove_internal_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID]
+) -> None:
     await session.execute(
         tag_delete(LorebookInternalTag).where(
             LorebookInternalTag.lorebook_id == target_id,
@@ -534,7 +562,13 @@ async def remove_internal_tag_links(session, target_id, tag_ids):
     )
 
 
-async def set_internal_tag_link(session, target_id, tag_id, source, actor_id):
+async def set_internal_tag_link(
+    session: AsyncSession,
+    target_id: UUID,
+    tag_id: UUID,
+    source: str,
+    actor_id: UUID | None,
+) -> None:
     stmt = tag_insert(LorebookInternalTag).values(
         lorebook_id=target_id, tag_id=tag_id, source=source, assigned_by=actor_id
     )

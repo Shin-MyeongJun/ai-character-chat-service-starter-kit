@@ -101,3 +101,24 @@ API 키/인증 헤더를 수집하지 않으며, 일반 사용자·작가에게 
 
 공개 함수의 이름/인가/예제와 현재 검증 결과는
 [프롬프트 조회 계약](../../../../../../docs/generation-prompts.md)에 기록한다.
+
+## 타입·패턴 검증 경계 (2026-10-28)
+
+- service의 AsyncSession·이 영역 Command·ActorCommand와 product/chat 공개 Info를
+  mapper의 구체 입력·반환에 연결했다. 기간은 PeriodInfo, 조합 시각은 datetime이다.
+- 작품/서비스/큐 mapper는 nullable 합계·요청 시각과 일별 tuple 요소 타입을 보존한다.
+  지표를 명시적으로 선택하며 기간 DISTINCT 재합산이나 coverage 확대를 하지 않는다.
+- 프롬프트 mapper는 chat 공개 summary/page/detail Info에서 독립 운영 View로,
+  schema mapper는 구체 RequestDto → Command와 View → ResponseDto로 변환한다.
+  목록은 메타데이터만 선택하며 상세 prompt=None과 생성 미존재 오류를 구분한다.
+- HTTP 반환 주석은 기존 명시 response_model DTO와 동일하다. 경로·DTO·필드·오류 변환은
+  유지했으며 변경 전후 이 라우터의 전체 OpenAPI JSON SHA-256이 동일함을 확인했다.
+- 상태 문자열·생성자·영역 간 공개 경계는 유지한다. 새 공통 계층이나 파일 분리 없이
+  기존 책임을 유지하며 전체 모듈 디렉터리를 직접 Ruff format/check 및 mypy로 검사한다.
+
+이번 범위 검증: 세 모듈과 reporting 전용 회귀 및 프롬프트 HTTP/Command 검증은
+70 passed / 14 skipped였다. TEST_DATABASE_URL을 제거해 reporting DB 4건과
+프롬프트 DB 10건은 미검증이며 통과에 포함하지 않는다. DB migration/초기화/삭제 및
+외부 모델 호출은 수행하지 않았다. 필수 check_backend_quality.py는 샌드박스의
+임시 디렉터리 권한 문제를 피해 재실행해 통과했다. 공용 기준선/검사 범위 파일은
+이 작업에서 수정하지 않았고, 엄격 범위 편입은 주 대화의 통합 작업으로 남긴다.

@@ -1,0 +1,6 @@
+{
+  "description": "Entire apps/api/app application: formatting, lint and mypy are checked directly. Signature baseline is empty; domain/runtime contracts still require their regression and integration tests.",
+  "paths": [
+    "apps/api/app"
+  ]
+}

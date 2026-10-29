@@ -1,8 +1,9 @@
 # 인증 테이블 조회·쓰기와 PostgreSQL 잠금을 담당한다. 상태 판단과 commit은 서비스 소유다.
 from datetime import datetime
+from typing import TypeAlias, cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import CursorResult, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,31 +17,33 @@ from app.db.models.identity import (
     UserOAuthAccount,
 )
 
+CleanupRow: TypeAlias = tuple[int, int, int, int, int]
 
-async def get_user(session: AsyncSession, user_id: UUID, *, refresh=False) -> User | None:
+
+async def get_user(
+    session: AsyncSession, user_id: UUID, *, refresh: bool = False
+) -> User | None:
     """사용자를 조회하고 인가 재검증 시 세션 캐시를 최신 DB 값으로 갱신한다."""
     return await session.get(User, user_id, populate_existing=refresh)
 
 
-async def lock_identity(session, key: str) -> None:
+async def lock_identity(session: AsyncSession, key: str) -> None:
     # 행 생성 전에도 동일 이메일/Google sub의 경합을 직렬화한다.
     await lock_key(session, "identity", key)
 
 
-async def get_user_by_email(session, email: str) -> User | None:
-    return await session.scalar(
-        select(User).where(User.email == email).with_for_update()
-    )
+async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
+    statement = select(User).where(User.email == email).with_for_update()
+    return (await session.scalars(statement)).first()
 
 
-async def get_locked_user(session, user_id: UUID) -> User | None:
-    return await session.scalar(
-        select(User).where(User.id == user_id).with_for_update()
-    )
+async def get_locked_user(session: AsyncSession, user_id: UUID) -> User | None:
+    statement = select(User).where(User.id == user_id).with_for_update()
+    return (await session.scalars(statement)).first()
 
 
-async def get_google_user(session, sub: str) -> User | None:
-    return await session.scalar(
+async def get_google_user(session: AsyncSession, sub: str) -> User | None:
+    statement = (
         select(User)
         .join(UserOAuthAccount, User.id == UserOAuthAccount.user_id)
         .where(
@@ -49,10 +52,17 @@ async def get_google_user(session, sub: str) -> User | None:
         )
         .with_for_update(of=User)
     )
+    return (await session.scalars(statement)).first()
 
 
 async def create_user(
-    session, *, user_id, email, password_hash, verified, pending_expires_at
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    email: str,
+    password_hash: str | None,
+    verified: bool,
+    pending_expires_at: datetime | None,
 ) -> User | None:
     result = await session.execute(
         insert(User)
@@ -69,7 +79,7 @@ async def create_user(
     return result.scalar_one_or_none()
 
 
-async def create_google_account(session, user_id, sub) -> None:
+async def create_google_account(session: AsyncSession, user_id: UUID, sub: str) -> None:
     await session.execute(
         insert(UserOAuthAccount).values(
             user_id=user_id, provider="google", provider_user_id=sub
@@ -77,7 +87,7 @@ async def create_google_account(session, user_id, sub) -> None:
     )
 
 
-async def verify_user_email(session, user_id) -> User:
+async def verify_user_email(session: AsyncSession, user_id: UUID) -> User:
     return (
         await session.execute(
             update(User)
@@ -88,13 +98,15 @@ async def verify_user_email(session, user_id) -> User:
     ).scalar_one()
 
 
-async def update_password(session, user_id, password_hash) -> None:
+async def update_password(
+    session: AsyncSession, user_id: UUID, password_hash: str
+) -> None:
     await session.execute(
         update(User).where(User.id == user_id).values(password_hash=password_hash)
     )
 
 
-async def delete_pending_user(session, user_id) -> None:
+async def delete_pending_user(session: AsyncSession, user_id: UUID) -> None:
     await session.execute(
         delete(User).where(
             User.id == user_id,
@@ -105,7 +117,13 @@ async def delete_pending_user(session, user_id) -> None:
 
 
 async def create_session(
-    session, *, session_id, user_id, refresh_hash, now, expires_at
+    session: AsyncSession,
+    *,
+    session_id: UUID,
+    user_id: UUID,
+    refresh_hash: str,
+    now: datetime,
+    expires_at: datetime,
 ) -> None:
     await session.execute(
         insert(AuthSession).values(
@@ -118,13 +136,16 @@ async def create_session(
     )
 
 
-async def get_session(session, session_id) -> AuthSession | None:
-    return await session.scalar(
+async def get_session(session: AsyncSession, session_id: UUID) -> AuthSession | None:
+    statement = (
         select(AuthSession).where(AuthSession.id == session_id).with_for_update()
     )
+    return (await session.scalars(statement)).first()
 
 
-async def rotate_session(session, session_id, refresh_hash) -> None:
+async def rotate_session(
+    session: AsyncSession, session_id: UUID, refresh_hash: str
+) -> None:
     await session.execute(
         update(AuthSession)
         .where(AuthSession.id == session_id)
@@ -132,7 +153,9 @@ async def rotate_session(session, session_id, refresh_hash) -> None:
     )
 
 
-async def revoke_session(session, session_id, now) -> None:
+async def revoke_session(
+    session: AsyncSession, session_id: UUID, now: datetime
+) -> None:
     await session.execute(
         update(AuthSession)
         .where(AuthSession.id == session_id, AuthSession.revoked_at.is_(None))
@@ -140,7 +163,9 @@ async def revoke_session(session, session_id, now) -> None:
     )
 
 
-async def revoke_user_sessions(session, user_id, now) -> None:
+async def revoke_user_sessions(
+    session: AsyncSession, user_id: UUID, now: datetime
+) -> None:
     await session.execute(
         update(AuthSession)
         .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
@@ -148,7 +173,9 @@ async def revoke_user_sessions(session, user_id, now) -> None:
     )
 
 
-async def invalidate_action_tokens(session, user_id, purpose, now) -> None:
+async def invalidate_action_tokens(
+    session: AsyncSession, user_id: UUID, purpose: str | None, now: datetime
+) -> None:
     statement = update(AuthActionToken).where(
         AuthActionToken.user_id == user_id, AuthActionToken.consumed_at.is_(None)
     )
@@ -158,7 +185,12 @@ async def invalidate_action_tokens(session, user_id, purpose, now) -> None:
 
 
 async def create_action_token(
-    session, *, user_id, token_hash, purpose, expires_at
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    token_hash: str,
+    purpose: str,
+    expires_at: datetime,
 ) -> None:
     await session.execute(
         insert(AuthActionToken).values(
@@ -170,14 +202,17 @@ async def create_action_token(
     )
 
 
-async def get_action_token(session, token_hash) -> AuthActionToken | None:
+async def get_action_token(
+    session: AsyncSession, token_hash: str
+) -> AuthActionToken | None:
     # 사용자 ID를 먼저 읽고 사용자 → 토큰 순서로 잠근다. 재설정/로그인 사이 교착을 피한다.
-    return await session.scalar(
-        select(AuthActionToken).where(AuthActionToken.token_hash == token_hash)
-    )
+    statement = select(AuthActionToken).where(AuthActionToken.token_hash == token_hash)
+    return (await session.scalars(statement)).first()
 
 
-async def consume_action_token(session, token_id, now) -> UUID | None:
+async def consume_action_token(
+    session: AsyncSession, token_id: UUID, now: datetime
+) -> UUID | None:
     return await session.scalar(
         update(AuthActionToken)
         .where(
@@ -190,13 +225,17 @@ async def consume_action_token(session, token_id, now) -> UUID | None:
     )
 
 
-async def create_oauth_attempt(session, state_hash, expires_at) -> None:
+async def create_oauth_attempt(
+    session: AsyncSession, state_hash: str, expires_at: datetime
+) -> None:
     await session.execute(
         insert(AuthOAuthAttempt).values(state_hash=state_hash, expires_at=expires_at)
     )
 
 
-async def consume_oauth_attempt(session, state_hash, now) -> str | None:
+async def consume_oauth_attempt(
+    session: AsyncSession, state_hash: str, now: datetime
+) -> str | None:
     return await session.scalar(
         update(AuthOAuthAttempt)
         .where(
@@ -209,7 +248,9 @@ async def consume_oauth_attempt(session, state_hash, now) -> str | None:
     )
 
 
-async def increment_rate_limit(session, key, limit, expires_at) -> int | None:
+async def increment_rate_limit(
+    session: AsyncSession, key: str, limit: int, expires_at: datetime
+) -> int | None:
     # DB UPSERT가 여러 API 프로세스 사이에서도 원자적으로 상한을 적용한다.
     return await session.scalar(
         insert(AuthRateLimit)
@@ -223,10 +264,8 @@ async def increment_rate_limit(session, key, limit, expires_at) -> int | None:
     )
 
 
-async def delete_expired_records(
-    session, now: datetime
-) -> tuple[int, int, int, int, int]:
-    results = []
+async def delete_expired_records(session: AsyncSession, now: datetime) -> CleanupRow:
+    deletion_counts: list[int] = []
     for model, condition in (
         (User, (User.pending_expires_at <= now) & User.email_verified.is_(False)),
         (AuthActionToken, AuthActionToken.expires_at <= now),
@@ -235,5 +274,10 @@ async def delete_expired_records(
         (AuthRateLimit, AuthRateLimit.expires_at <= now),
     ):
         result = await session.execute(delete(model).where(condition))
-        results.append(result.rowcount)
-    return tuple(results)
+        # RETURNING 없는 DELETE는 CursorResult를 반환한다. AsyncSession.execute의
+        # 일반 Result 타입에는 PostgreSQL 드라이버의 실제 삭제 건수(rowcount)가 없다.
+        deletion_counts.append(cast(CursorResult[tuple[()]], result).rowcount)
+    user_count, token_count, session_count, attempt_count, rate_limit_count = (
+        deletion_counts
+    )
+    return user_count, token_count, session_count, attempt_count, rate_limit_count

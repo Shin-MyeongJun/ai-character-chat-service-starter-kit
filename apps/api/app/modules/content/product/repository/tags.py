@@ -1,21 +1,33 @@
 # This module owns these connections; dictionary data is read through tag service.
+from collections.abc import Sequence
+from uuid import UUID
+
 from sqlalchemy import delete as tag_delete
 from sqlalchemy import func
 from sqlalchemy import select as tag_select
 from sqlalchemy.dialects.postgresql import insert as tag_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.product import Product
 from app.db.models.tag import ProductInternalTag, ProductTag
 
 
-async def get_target_for_tag_access(session, target_id, *, lock=False):
+async def get_target_for_tag_access(
+    session: AsyncSession, target_id: UUID, *, lock: bool = False
+) -> Product | None:
     stmt = tag_select(Product).where(Product.id == target_id)
     if lock:
         stmt = stmt.with_for_update()
-    return await session.scalar(stmt.execution_options(populate_existing=True))
+    # The SELECT projects Product; scalar erases the result type in its stub.
+    entity: Product | None = await session.scalar(
+        stmt.execution_options(populate_existing=True)
+    )
+    return entity
 
 
-async def list_public_tag_links(session, target_id):
+async def list_public_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[ProductTag]:
     return list(
         await session.scalars(
             tag_select(ProductTag)
@@ -26,7 +38,9 @@ async def list_public_tag_links(session, target_id):
     )
 
 
-async def list_internal_tag_links(session, target_id):
+async def list_internal_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[ProductInternalTag]:
     return list(
         await session.scalars(
             tag_select(ProductInternalTag)
@@ -37,25 +51,32 @@ async def list_internal_tag_links(session, target_id):
     )
 
 
-async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
+async def replace_public_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID], actor_id: UUID
+) -> None:
     await session.execute(
         tag_delete(ProductTag).where(
             ProductTag.product_id == target_id, ProductTag.tag_id.not_in(tag_ids)
         )
     )
-    for order, tag_id in enumerate(tag_ids):
+    for sort_order, tag_id in enumerate(tag_ids):
         stmt = tag_insert(ProductTag).values(
-            product_id=target_id, tag_id=tag_id, sort_order=order, assigned_by=actor_id
+            product_id=target_id,
+            tag_id=tag_id,
+            sort_order=sort_order,
+            assigned_by=actor_id,
         )
         await session.execute(
             stmt.on_conflict_do_update(
                 index_elements=[ProductTag.product_id, ProductTag.tag_id],
-                set_={"sort_order": order},
+                set_={"sort_order": sort_order},
             )
         )
 
 
-async def remove_public_tag_link(session, target_id, tag_id):
+async def remove_public_tag_link(
+    session: AsyncSession, target_id: UUID, tag_id: UUID
+) -> None:
     await session.execute(
         tag_delete(ProductTag).where(
             ProductTag.product_id == target_id, ProductTag.tag_id == tag_id
@@ -63,7 +84,9 @@ async def remove_public_tag_link(session, target_id, tag_id):
     )
 
 
-async def remove_internal_tag_links(session, target_id, tag_ids):
+async def remove_internal_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID]
+) -> None:
     await session.execute(
         tag_delete(ProductInternalTag).where(
             ProductInternalTag.product_id == target_id,
@@ -72,7 +95,13 @@ async def remove_internal_tag_links(session, target_id, tag_ids):
     )
 
 
-async def set_internal_tag_link(session, target_id, tag_id, source, actor_id):
+async def set_internal_tag_link(
+    session: AsyncSession,
+    target_id: UUID,
+    tag_id: UUID,
+    source: str,
+    actor_id: UUID | None,
+) -> None:
     stmt = tag_insert(ProductInternalTag).values(
         product_id=target_id, tag_id=tag_id, source=source, assigned_by=actor_id
     )

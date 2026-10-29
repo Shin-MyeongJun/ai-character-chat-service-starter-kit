@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.reporting import get_reporting_period
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.query import (
@@ -17,7 +19,10 @@ from app.modules.reporting.creator_reporting.mapper import (
 
 
 async def get_product_report(
-    session, command: Types.GetCreatorProductReportCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetCreatorProductReportCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.CreatorProductReportView:
     """활성 작가의 소유 작품 집계만 영역별 결과 타입으로 제공한다.
 
@@ -52,13 +57,13 @@ async def get_product_report(
         )
 
 
-async def _require_actor(session, actor) -> None:
+async def _require_actor(session: AsyncSession, actor: Types.ActorCommand) -> None:
     """인증 경계의 ID로 최신 활성 사용자 상태를 확인한다."""
     if not isinstance(actor.user_id, UUID):
         raise Types.ReportError("invalid_input")
     try:
         await IdentityQueryService.require_active_user(
-            session, IdentityTypes.GetUserCommand(actor.user_id)
+            session, IdentityTypes.GetUserCommand(user_id=actor.user_id)
         )
     except LookupError as exc:
         raise Types.ReportError("forbidden") from exc

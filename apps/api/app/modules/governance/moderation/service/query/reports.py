@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.governance.moderation import types as Types
 from app.modules.governance.moderation.mapper import persistence as PersistenceMapper
 from app.modules.governance.moderation.repository import review as ReviewRepository
@@ -11,7 +13,10 @@ from app.modules.governance.moderation.service.util import (
 
 
 async def get_own_report(
-    session, command: Types.GetReportCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetReportCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ReportSummaryInfo:
     """활성 신고자의 본인 신고만 조회하며 내부 증거·평가·메모를 반환하지 않는다."""
     actor_id = actor.user_id
@@ -26,7 +31,10 @@ async def get_own_report(
 
 
 async def list_own_reports(
-    session, command: Types.ListReportsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListReportsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.PageInfo[Types.ReportSummaryInfo]:
     """신고자 범위를 저장소 쿼리에 적용해 본인 신고의 요약 페이지를 반환한다."""
     actor_id = actor.user_id
@@ -39,7 +47,10 @@ async def list_own_reports(
 
 
 async def get_admin_report(
-    session, command: Types.GetReportCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetReportCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ReportInfo:
     """활성 관리자가 증거와 legacy provenance를 포함한 신고를 조회한다."""
     actor_id = actor.user_id
@@ -51,7 +62,10 @@ async def get_admin_report(
 
 
 async def list_admin_reports(
-    session, command: Types.ListReportsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListReportsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.PageInfo[Types.ReportInfo]:
     """관리자가 신고를 커서 조회하며 legacy 완료 건은 기본 대기 목록에서 제외한다."""
     actor_id = actor.user_id
@@ -61,7 +75,7 @@ async def list_admin_reports(
     return PersistenceMapper.reports_row_to_page(row)
 
 
-def _validate_report_page(command):
+def _validate_report_page(command: Types.ListReportsCommand) -> None:
     """신고 페이지 크기·대상·상태 필터를 검증한다."""
     ValidationServiceUtil.validate_page(command)
     if command.intake_status not in {None, "received", "duplicate", "rejected"}:

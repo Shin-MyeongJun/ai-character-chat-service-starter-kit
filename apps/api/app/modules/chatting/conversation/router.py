@@ -1,4 +1,4 @@
-# 대화 시작은 최상위 use_case, 업데이트 안내는 product View, 실제 버전 전환은 conversation Command에 연결한다.
+# 대화 시작·버전 전환은 conversation Command, 업데이트 안내는 product View에 연결한다.
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -16,15 +16,26 @@ from app.modules.content.product import types as ProductTypes
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
-@router.get("/{conversation_id}/manual-lore")
-async def manual_lore(conversation_id: UUID, session: Session, owner: Owner):
+@router.get("/{conversation_id}/manual-lore", response_model=None)
+async def manual_lore(
+    conversation_id: UUID, session: Session, owner: Owner
+) -> dict[str, tuple[Types.ManualLoreInfo, ...]]:
     """Expose authorized manual choices; selection applies to a single answer request."""
     with errors():
-        return {"items": await ViewsService.list_manual_lore(session, Types.OwnedConversationCommand(conversation_id=conversation_id, user_id=owner))}
+        return {
+            "items": await ViewsService.list_manual_lore(
+                session,
+                Types.OwnedConversationCommand(
+                    conversation_id=conversation_id, user_id=owner
+                ),
+            )
+        }
 
 
 @router.post("", status_code=201, response_model=Schemas.ConversationStartedResponseDto)
-async def start(body: Schemas.StartRequest, session: Session, owner: Owner):
+async def start(
+    body: Schemas.StartRequest, session: Session, owner: Owner
+) -> Schemas.ConversationStartedResponseDto:
     command = SchemaMapper.conversation_start_request_to_command(body, owner)
     with errors():
         return SchemaMapper.conversation_started_info_to_response(
@@ -35,7 +46,9 @@ async def start(body: Schemas.StartRequest, session: Session, owner: Owner):
 @router.get(
     "/{conversation_id}/updates", response_model=Schemas.PendingUpdatesInfoResponseDto
 )
-async def updates(conversation_id: UUID, session: Session, owner: Owner):
+async def updates(
+    conversation_id: UUID, session: Session, owner: Owner
+) -> Schemas.PendingUpdatesInfoResponseDto:
     from app.modules.content.product.service.views.notices import get_pending_updates
 
     with errors():
@@ -54,7 +67,7 @@ async def updates(conversation_id: UUID, session: Session, owner: Owner):
 )
 async def switch(
     conversation_id: UUID, body: Schemas.SwitchRequest, session: Session, owner: Owner
-):
+) -> Schemas.VersionSwitchedResponseDto:
     command = SchemaMapper.conversation_switch_request_to_command(
         body, conversation_id, owner
     )
@@ -71,7 +84,9 @@ async def switch(
 @router.get(
     "/{conversation_id}/start", response_model=Schemas.ConversationStartResponseDto
 )
-async def get_start(conversation_id: UUID, session: Session, owner: Owner):
+async def get_start(
+    conversation_id: UUID, session: Session, owner: Owner
+) -> Schemas.ConversationStartResponseDto:
     with errors():
         result = await ViewsService.get_conversation_start(
             session,

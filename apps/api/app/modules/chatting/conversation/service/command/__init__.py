@@ -1,5 +1,7 @@
 # 상품 최신 발행 버전으로 대화를 만든다. 시작 항목이 하나면 자동 선택하고, 복수면 명시 선택이 필요하다.
 # 첫 대사는 최초 스냅샷에서 조회하며 messages에는 저장하지 않는다.
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import repository as Repository
 from app.modules.chatting.conversation import types as Types
@@ -13,7 +15,7 @@ from app.modules.content.product.service.command.statistics_queue import (
 
 
 async def start_conversation(
-    session, command: Types.StartConversationCommand
+    session: AsyncSession, command: Types.StartConversationCommand
 ) -> Types.ConversationStartedInfo:
     product_id = command.product_id
     user_id = command.user_id
@@ -28,18 +30,26 @@ async def start_conversation(
         if not product.latest_snapshot_id:
             raise ValueError("Product has no published version.")
         snapshot = await ProductQueryService.ensure_snapshot_available(
-            session, ProductTypes.ProductSnapshotCommand(product.latest_snapshot_id)
+            session,
+            ProductTypes.ProductSnapshotCommand(snapshot_id=product.latest_snapshot_id),
         )
         runtime = await ProductViewsService.get_snapshot_runtime(
-            session, ProductTypes.ProductSnapshotCommand(snapshot.id)
+            session, ProductTypes.ProductSnapshotCommand(snapshot_id=snapshot.id)
         )
         starts = runtime.composition.starts
         if start_set_id is None and len(starts) == 1:
             start_set_id = starts[0].id
-        if start_set_id not in {s.id for s in starts}:
+        if start_set_id not in {start_option.id for start_option in starts}:
             raise ValueError("Choose exactly one start option from this version.")
+        # Every published start has a UUID, so membership excludes None.
+        assert start_set_id is not None
         primary = next(
-            (c for c in runtime.composition.characters if c.is_primary), None
+            (
+                character
+                for character in runtime.composition.characters
+                if character.is_primary
+            ),
+            None,
         )
         if primary is None:
             raise ValueError("Version has no primary character.")
@@ -51,7 +61,7 @@ async def start_conversation(
         await mark_statistics_dirty(
             session,
             ProductTypes.MarkStatisticsDirtyCommand(
-                product_id, conversation.created_at
+                product_id=product_id, instant=conversation.created_at
             ),
         )
         return Types.ConversationStartedInfo(conversation.id, snapshot.id, start_set_id)

@@ -15,7 +15,7 @@ router = APIRouter(prefix="/admin/models", tags=["model administration"])
 @router.put("/{model_id}/retirement", status_code=204)
 async def announce(
     model_id: UUID, body: Schemas.RetirementRequest, session: Session, owner: Owner
-):
+) -> None:
     value = SchemaMapper.retirement_request_to_command(body)
     with errors():
         await announce_retirement(

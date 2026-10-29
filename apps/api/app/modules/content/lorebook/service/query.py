@@ -1,5 +1,5 @@
 # owner 조회와 인가가 끝난 ID용 내부 조회를 구분한다. 원본 활성화는 쿼리 우선순위, 스냅샷 활성화는 저장 순서를 따른다.
-# always/keyword만 자동 선택하며 start_set과 disabled는 제외한다. 항목별 예산·placement는 적용하지 않는다.
+# 스냅샷 선택은 activation의 v1 옵션·수동 선택·예산 규칙을 사용한다. 원본 조회 활성화는 기존 규칙이다.
 """Lorebook reads and prompt-entry activation.
 
 These functions never commit or roll back the caller's transaction. Management
@@ -8,6 +8,7 @@ consumed by chat prompt assembly.
 """
 
 from collections.abc import Sequence
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,19 +20,38 @@ from app.modules.content.lorebook.service.activation import diagnose_entries
 from app.modules.content.lorebook.service.util import matching as MatchingServiceUtil
 
 
-def diagnose_draft_entries(command: Types.DiagnoseDraftEntriesCommand) -> tuple[list[dict], list[dict]]:
+def diagnose_draft_entries(
+    command: Types.DiagnoseDraftEntriesCommand,
+) -> tuple[list[Types.LorebookSnapshotEntryData], list[Types.LorebookEntryDiagnostic]]:
     """Validate transient entries using write rules, then use the snapshot selector.
 
     IDs here identify a transient draft only; this API cannot activate any live
     conversation or authorize arbitrary server lore. No database or AI is called.
     """
     from app.modules.content.lorebook.service.command import _validate_lorebook_entry
-    if len(command.entries) > 100 or len({str(entry["id"]) for entry in command.entries}) != len(command.entries):
+
+    if len(command.entries) > 100 or len(
+        {str(entry["id"]) for entry in command.entries}
+    ) != len(command.entries):
         raise ValueError("Draft lore IDs must be distinct and at most 100.")
     for entry in command.entries:
-        value = {key: field for key, field in entry.items() if key != "id"}
-        _validate_lorebook_entry(Types.CreateLorebookEntryCommand(lorebook_id=command.owner_id, owner_id=command.owner_id, **value))
-    return diagnose_entries(list(command.entries), messages=command.messages, manual_entry_ids=command.manual_entry_ids)
+        # The command's typed entry fields match CreateLorebookEntryCommand;
+        # removing only its transient ID preserves the original **kwargs behavior,
+        # including rejection of unknown keys. Business validation still follows.
+        entry_fields = cast(
+            Types.LorebookEntryCommandFields,
+            {key: field for key, field in entry.items() if key != "id"},
+        )
+        _validate_lorebook_entry(
+            Types.CreateLorebookEntryCommand(
+                lorebook_id=command.owner_id, owner_id=command.owner_id, **entry_fields
+            )
+        )
+    return diagnose_entries(
+        list(command.entries),
+        messages=command.messages,
+        manual_entry_ids=command.manual_entry_ids,
+    )
 
 
 async def list_lorebooks(
@@ -159,10 +179,16 @@ def activate_snapshot_entries(
 ) -> Types.ActivatedSnapshotEntriesInfo:
     """Select automatic entries from an authorized snapshot without reading live data.
 
-    Preserve snapshot order. Empty text activates only always entries; semantic
-    and manual activation are not supported here. Never mutate the snapshot.
+    Legacy snapshots retain their order; opt-in v1 options control ranking,
+    history search, budgets and exclusive groups. Manual IDs must belong to this
+    snapshot. Semantic selection stays unsupported. Never mutate the snapshot.
     """
-    active, _ = diagnose_entries(command.snapshot.snapshot_data["entries"], text=command.text, messages=command.messages, manual_entry_ids=command.manual_entry_ids)
+    active, _ = diagnose_entries(
+        command.snapshot.snapshot_data["entries"],
+        text=command.text,
+        messages=command.messages,
+        manual_entry_ids=command.manual_entry_ids,
+    )
     return PersistenceMapper.lorebook_snapshot_entries_to_active_info(active)
 
 
@@ -190,17 +216,20 @@ async def activate_keyword_entries(
     )
     entries = PersistenceMapper.lorebook_entries_entities_to_info(entities)
     active = []
-    for entity in entries:
-        triggers = entity.key_triggers or []
+    for entry_info in entries:
+        triggers = entry_info.key_triggers or []
         if any(
-            _keyword_matches(text, trigger, entity.match_mode) for trigger in triggers
+            _keyword_matches(text, trigger, entry_info.match_mode)
+            for trigger in triggers
         ):
-            active.append(PersistenceMapper.lorebook_entry_info_to_active_info(entity))
+            active.append(
+                PersistenceMapper.lorebook_entry_info_to_active_info(entry_info)
+            )
     return active
 
 
 async def list_start_sets(
-    session, command: Types.ListStartSetsCommand
+    session: AsyncSession, command: Types.ListStartSetsCommand
 ) -> list[Types.LorebookEntryInfo]:
     lorebook_id = command.lorebook_id
     owner_id = command.owner_id

@@ -5,8 +5,40 @@ import hashlib
 import json
 from functools import lru_cache
 from importlib.resources import files
+from typing import TypedDict
+from uuid import UUID
 
 from app.modules.chatting.prompt import types as Types
+from app.modules.content.character import types as CharacterTypes
+from app.modules.content.lorebook import types as LorebookTypes
+from app.modules.content.product import types as ProductTypes
+
+
+class _CharacterReference(TypedDict):
+    id: str
+    data: dict[str, CharacterTypes.CharacterSnapshotJsonValue]
+
+
+class _SceneReference(TypedDict):
+    title: str | None
+    content: str
+
+
+class _ReferenceData(TypedDict):
+    answer_character_id: str
+    characters: list[_CharacterReference]
+    settings: ProductTypes.ProductJsonObject
+    scene: _SceneReference
+    active_lore: list[LorebookTypes.LorebookSnapshotEntryData]
+    memories: list[str]
+
+
+def _has_positioned_lore(entry: LorebookTypes.LorebookSnapshotEntryData) -> bool:
+    metadata = entry.get("metadata", {})
+    # The renderer already required supplied metadata to be an object; None must
+    # remain a failure rather than being silently converted to legacy metadata.
+    assert metadata is not None, "Prompt lore metadata must be an object when supplied."
+    return bool(metadata.get("activation_options"))
 
 
 def validate_template(value: object) -> Types.TemplateInfo:
@@ -68,11 +100,15 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
         raise ValueError("Answer character is absent from runtime.")
     if command.current_message.sender_type != "user":
         raise ValueError("Current input must be a user message.")
-    references = {
+    start = runtime.start
+    # Rendering already reads both scene fields unconditionally. A nullable view
+    # may describe legacy absence, but no empty scene is synthesized for a prompt.
+    assert start is not None, "Prompt rendering requires a start scene."
+    references: _ReferenceData = {
         "answer_character_id": target,
         "characters": [{"id": c.id, "data": c.data} for c in runtime.characters],
         "settings": runtime.settings,
-        "scene": {"title": runtime.start.title, "content": runtime.start.content},
+        "scene": {"title": start.title, "content": start.content},
         "active_lore": [
             entry
             for book in runtime.lorebooks
@@ -81,8 +117,12 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
         ],
         "memories": [item.content for item in command.memories],
     }
-    positioned = [entry for entry in references["active_lore"] if entry.get("metadata", {}).get("activation_options")]
-    references["active_lore"] = [entry for entry in references["active_lore"] if not entry.get("metadata", {}).get("activation_options")]
+    positioned = [
+        entry for entry in references["active_lore"] if _has_positioned_lore(entry)
+    ]
+    references["active_lore"] = [
+        entry for entry in references["active_lore"] if not _has_positioned_lore(entry)
+    ]
     messages = [
         {
             "role": "system",
@@ -97,11 +137,28 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
     ]
     if runtime.opening_message is not None:
         messages.append({"role": "assistant", "content": runtime.opening_message})
-    before = [entry for entry in positioned if entry.get("placement") != "near_user_message"]
-    after = [entry for entry in positioned if entry.get("placement") == "near_user_message"]
+    before = [
+        entry for entry in positioned if entry.get("placement") != "near_user_message"
+    ]
+    after = [
+        entry for entry in positioned if entry.get("placement") == "near_user_message"
+    ]
     if before:
-        messages.append({"role": "user", "content": json.dumps({"reference_data": {"active_lore": before, "position": "before_history"}}, ensure_ascii=False)})
-    seen = set()
+        messages.append(
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {
+                        "reference_data": {
+                            "active_lore": before,
+                            "position": "before_history",
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        )
+    seen: set[UUID] = set()
     last_position = -1
     for item in command.recent_messages:
         if item.id in seen or item.position <= last_position:
@@ -121,7 +178,20 @@ def build_prompt(command: Types.BuildPromptCommand) -> Types.PromptInfo:
             }
         )
     if after:
-        messages.append({"role": "user", "content": json.dumps({"reference_data": {"active_lore": after, "position": "after_history"}}, ensure_ascii=False)})
+        messages.append(
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {
+                        "reference_data": {
+                            "active_lore": after,
+                            "position": "after_history",
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        )
     messages.append({"role": "user", "content": command.current_message.content})
     request = json.dumps(
         {"chat_message_format": 1, "messages": messages}, ensure_ascii=False

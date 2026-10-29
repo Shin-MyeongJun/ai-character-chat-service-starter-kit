@@ -42,6 +42,7 @@ def _validate_lorebook_entry(
 ) -> None:
     """Validate authored entry values and opt-in options before persisting or freezing."""
     from app.modules.content.lorebook.service.activation import validate_options
+
     validate_options(command.metadata)
     if not command.content.strip():
         raise ValueError("Lorebook entry content must not be blank.")
@@ -129,8 +130,12 @@ async def create_lorebook(
         info = PersistenceMapper.lorebook_entity_to_info(row)
         if command.tags:
             from app.modules.content.lorebook.service import tags as TagsCommandService
+
             await TagsCommandService.replace_public_tags(
-                session, Types.PublicTagsCommand(info.id, command.owner_id, command.tags)
+                session,
+                Types.PublicTagsCommand(
+                    target_id=info.id, user_id=command.owner_id, names=command.tags
+                ),
             )
         return info
 

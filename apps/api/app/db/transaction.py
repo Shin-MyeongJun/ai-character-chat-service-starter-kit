@@ -3,6 +3,7 @@
 # 이 범위 밖에서 이미 autobegin된 세션은 채택하지 않으므로 SQLAlchemy가 시작 오류를 낸다.
 """Explicitly composed use cases share one transaction and rollback-only state."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,7 @@ _STATE_KEY = "application_use_case_transaction"
 
 
 @asynccontextmanager
-async def use_case_transaction(session: AsyncSession):
+async def use_case_transaction(session: AsyncSession) -> AsyncIterator[None]:
     """Join an application scope, never silently take ownership of autobegin.
 
     A caller with an existing transaction must explicitly enter this scope before

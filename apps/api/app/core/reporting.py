@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 class ReportingError(Exception):
     """HTTP 표현과 독립적인 조회 실패 코드."""
 
-    def __init__(self, code: str):
+    def __init__(self, code: str) -> None:
         """조회 실패 종류를 안정적인 코드로 저장한다."""
         self.code = code
         super().__init__(code)

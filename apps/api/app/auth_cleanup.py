@@ -9,7 +9,7 @@ from app.modules.identity.service import AuthenticationService
 from app.modules.identity.settings import load_auth_settings
 
 
-async def main():
+async def main() -> None:
     engine = create_async_engine(os.environ["DATABASE_URL"])
     try:
         settings = load_auth_settings()

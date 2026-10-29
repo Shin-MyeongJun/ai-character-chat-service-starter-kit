@@ -7,12 +7,13 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from app.modules.content.tag import types as TagTypes
-from app.modules.content.tag.service import command as TagCommandService
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.content.tag import types as TagTypes
+from app.modules.content.tag.service import command as TagCommandService
 
 
 @pytest.fixture(params=("product", "character", "lorebook"))
@@ -173,6 +174,46 @@ async def test_public_owner_access_and_invalid_names_rollback(domain):
                 session, d.types.PublicTagsCommand(d.target, uuid4())
             )
         d.service._get_tag_target.assert_called_with(session, d.target)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("domain", ["product"], indirect=True)
+@pytest.mark.parametrize(
+    ("is_owner", "status", "visibility", "allowed"),
+    [
+        (True, "draft", "private", True),
+        (True, "rejected", "private", True),
+        (False, "approved", "public", True),
+        (False, "approved", "unlisted", True),
+        (False, "approved", "private", False),
+        (False, "draft", "public", False),
+        (False, "rejected", "unlisted", False),
+    ],
+)
+async def test_product_public_tag_read_scope_does_not_grant_write_access(
+    domain, is_owner, status, visibility, allowed
+):
+    d = domain
+    async with AsyncSession() as session:
+        await d.service.add_public_tags(
+            session, d.types.PublicTagsCommand(d.target, d.owner, ("Readable",))
+        )
+        d.content.status, d.content.visibility = status, visibility
+        user_id = d.owner if is_owner else uuid4()
+        command = d.types.PublicTagsCommand(d.target, user_id)
+        if allowed:
+            result = await d.service.list_public_tags(session, command)
+            assert [tag.name for tag in result] == ["Readable"]
+        else:
+            with pytest.raises(LookupError, match="Product not found"):
+                await d.service.list_public_tags(session, command)
+        if not is_owner:
+            with pytest.raises(LookupError, match="Product not found"):
+                await d.service.add_public_tags(
+                    session, d.types.PublicTagsCommand(d.target, user_id, ("Forged",))
+                )
+            assert set(d.dictionary) == {"Readable"}
+        assert not session.in_transaction()
 
 
 @pytest.mark.asyncio

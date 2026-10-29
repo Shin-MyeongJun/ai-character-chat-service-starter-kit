@@ -3,14 +3,27 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Generic, TypeVar
+from typing import Generic, TypedDict, TypeVar
 from uuid import UUID
+
+# JSONB의 object/array 내부는 legacy 및 향후 증거 키를 포함해 그대로 보존한다.
+JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject = dict[str, JsonValue]
+
+
+class LegacyModerationFlag(TypedDict, total=False):
+    """0027 이관이 저장하는 과거 검토 출처. 신규 신고에는 키 자체가 없다."""
+
+    id: str
+    status: str | None
+    reviewed_by: str | None
+    reviewed_at: str | None
 
 
 class ModerationError(Exception):
     """실패 종류를 code로 전달하며 HTTP 표현은 호출 계층에 맡긴다."""
 
-    def __init__(self, code: str):
+    def __init__(self, code: str) -> None:
         """업무 오류의 안정적인 코드를 저장한다."""
         self.code = code
         super().__init__(code)
@@ -103,8 +116,8 @@ class ReportInfo:
     occurred_at: datetime | None
     received_at: datetime
     form_elapsed_ms: int | None
-    evidence_snapshot: dict
-    attachment_refs: list
+    evidence_snapshot: JsonObject
+    attachment_refs: list[JsonValue]
     evidence_captured_at: datetime | None
     intake_status: str
     duplicate_of_report_id: UUID | None
@@ -161,12 +174,12 @@ class AssessmentInfo:
     evaluated_at: datetime
     window_start: datetime | None
     window_end: datetime | None
-    signals: dict
+    signals: JsonObject
     confidence_score: Decimal | None
     outcome: str
     violation_code: str | None
     severity: int | None
-    recommended_actions: list
+    recommended_actions: list[JsonValue]
     rationale: str
     supersedes_assessment_id: UUID | None
     evaluation_key: str

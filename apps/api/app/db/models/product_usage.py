@@ -24,6 +24,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.json_types import JsonObject
 from app.db.models._mixins import UuidPkMixin
 
 
@@ -76,7 +77,7 @@ class ProductGeneration(UuidPkMixin, Base):
     history_invalidated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
-    answer_metadata: Mapped[dict | None] = mapped_column(JSONB)
+    answer_metadata: Mapped[JsonObject | None] = mapped_column(JSONB)
     answer_lease_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )

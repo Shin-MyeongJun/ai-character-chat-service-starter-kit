@@ -1,5 +1,7 @@
 """Pure conversion of credit-owned rows into immutable public values."""
 
+from typing import overload
+
 from app.db.models.credit import CreditReservation
 from app.modules.commerce.credit import repository as Repository
 from app.modules.commerce.credit import types as Types
@@ -33,6 +35,16 @@ def credit_account_entity_to_info(
     )
 
 
+@overload
+def credit_reservation_entity_to_info(
+    entity: CreditReservation,
+) -> Types.CreditReservationInfo: ...
+
+
+@overload
+def credit_reservation_entity_to_info(entity: None) -> None: ...
+
+
 def credit_reservation_entity_to_info(
     entity: CreditReservation | None,
 ) -> Types.CreditReservationInfo | None:
@@ -57,6 +69,16 @@ def credit_reservation_entity_to_info(
         reserved_credit=entity.reserved_credit,
         result_id=entity.result_id,
     )
+
+
+@overload
+def credit_transaction_row_to_info(
+    row: Repository.CreditTransactionRow,
+) -> Types.CreditTransactionInfo: ...
+
+
+@overload
+def credit_transaction_row_to_info(row: None) -> None: ...
 
 
 def credit_transaction_row_to_info(

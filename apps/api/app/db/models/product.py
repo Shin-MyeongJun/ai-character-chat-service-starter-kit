@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.json_types import JsonObject
 from app.db.models._mixins import TimestampMixin, UuidPkMixin
 
 
@@ -85,7 +86,7 @@ class Product(TimestampMixin, UuidPkMixin, Base):
         ForeignKey("models.id", ondelete="SET NULL"),
     )
     reasoning_effort: Mapped[str | None] = mapped_column(Text)
-    replacement_policy: Mapped[dict] = mapped_column(
+    replacement_policy: Mapped[JsonObject] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     latest_snapshot_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
@@ -93,16 +94,20 @@ class Product(TimestampMixin, UuidPkMixin, Base):
 
 class ProductStudioDraft(TimestampMixin, Base):
     __tablename__ = "product_studio_drafts"
-    __table_args__ = (CheckConstraint("revision > 0", name="ck_product_studio_drafts_revision"),)
+    __table_args__ = (
+        CheckConstraint("revision > 0", name="ck_product_studio_drafts_revision"),
+    )
 
     product_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), primary_key=True
+        PGUUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     content_digest: Mapped[str] = mapped_column(Text, nullable=False)
-    document: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    document: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
     publication_digest: Mapped[str | None] = mapped_column(Text)
-    publication_release: Mapped[dict | None] = mapped_column(JSONB)
+    publication_release: Mapped[JsonObject | None] = mapped_column(JSONB)
 
 
 class ProductCharacter(UuidPkMixin, Base):

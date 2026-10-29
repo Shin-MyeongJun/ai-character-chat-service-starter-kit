@@ -1,7 +1,9 @@
 """평가에 근거한 조치 접수·취소. 실제 제재 상태는 변경하지 않는다."""
 
-from dataclasses import asdict
+from typing import cast
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
@@ -15,7 +17,7 @@ from app.modules.governance.moderation.service.util import (
 )
 
 
-def _validate_action(command):
+def _validate_action(command: Types.RequestActionCommand) -> None:
     """현재 지원하는 조치·scope·기간·해제 입력을 검증한다."""
     ValidationServiceUtil.validate_target(command.target_type, command.target_id)
     scopes = {"user": {"login", "publish"}, "product": {"product_access", "publish"}}
@@ -42,7 +44,10 @@ def _validate_action(command):
 
 
 async def request_action(
-    session, command: Types.RequestActionCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.RequestActionCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ActionInfo:
     """관리자가 확정 평가에 근거해 pending 조치를 멱등 기록한다. 적용 성공은 기록하지 않는다."""
     actor_id = actor.user_id
@@ -50,8 +55,10 @@ async def request_action(
     async with use_case_transaction(session):
         await ValidationServiceUtil._require_actor(session, actor_id, admin=True)
         await lock_key(session, "moderation.action", str(command.idempotency_key))
-        row = await ReviewRepository.get_action_by_key(session, command.idempotency_key)
-        existing = PersistenceMapper.action_entity_to_info(row)
+        existing_action_entity = await ReviewRepository.get_action_by_key(
+            session, command.idempotency_key
+        )
+        existing = PersistenceMapper.action_entity_to_info(existing_action_entity)
         if existing is not None:
             ValidationServiceUtil.require_match(
                 ValidationServiceUtil.request_fingerprint(command),
@@ -61,17 +68,21 @@ async def request_action(
             )
             return existing
         # 재평가와 조치 요청을 직렬화해 이미 대체된 판단으로 새 제재를 요청하지 않는다.
-        row = await ReviewRepository.get_assessment(session, command.assessment_id)
+        assessment_row = await ReviewRepository.get_assessment(
+            session, command.assessment_id
+        )
         assessment = ValidationServiceUtil.require_info(
-            PersistenceMapper.assessment_row_to_info(row)
+            PersistenceMapper.assessment_row_to_info(assessment_row)
         )
         await lock_key(
             session,
             "moderation.target",
             f"{assessment.target_type}:{assessment.target_id}",
         )
-        row = await ReviewRepository.get_superseding_assessment(session, assessment.id)
-        if PersistenceMapper.scalar_row_to_value(row) is not None:
+        superseding_id_row = await ReviewRepository.get_superseding_assessment(
+            session, assessment.id
+        )
+        if PersistenceMapper.scalar_row_to_value(superseding_id_row) is not None:
             raise Types.ModerationError("state_conflict")
         if command.action_type != "revoke" and assessment.outcome != "violation":
             raise Types.ModerationError("state_conflict")
@@ -88,11 +99,11 @@ async def request_action(
             if product is None or product.owner_id != command.target_id:
                 raise Types.ModerationError("invalid_link")
         if command.reverses_action_id is not None:
-            row = await ReviewRepository.get_action(
+            previous_action_entity = await ReviewRepository.get_action(
                 session, command.reverses_action_id, lock=True
             )
             previous = ValidationServiceUtil.require_info(
-                PersistenceMapper.action_entity_to_info(row)
+                PersistenceMapper.action_entity_to_info(previous_action_entity)
             )
             if (
                 previous.status != "applied"
@@ -101,13 +112,27 @@ async def request_action(
                 != (command.target_type, command.target_id, command.scope)
             ):
                 raise Types.ModerationError("invalid_link")
-            row = await ReviewRepository.get_active_reversal_id(session, previous.id)
-            if PersistenceMapper.scalar_row_to_value(row) is not None:
+            reversal_id_row = await ReviewRepository.get_active_reversal_id(
+                session, previous.id
+            )
+            if PersistenceMapper.scalar_row_to_value(reversal_id_row) is not None:
                 raise Types.ModerationError("state_conflict")
-        row = await ReviewRepository.create_action(
-            session, {**asdict(command), "status": "pending"}
+        created_action_entity = await ReviewRepository.create_action(
+            session,
+            {
+                "assessment_id": command.assessment_id,
+                "target_type": command.target_type,
+                "target_id": command.target_id,
+                "action_type": command.action_type,
+                "scope": command.scope,
+                "starts_at": command.starts_at,
+                "ends_at": command.ends_at,
+                "idempotency_key": command.idempotency_key,
+                "reverses_action_id": command.reverses_action_id,
+                "status": "pending",
+            },
         )
-        result = PersistenceMapper.action_entity_to_info(row)
+        result = PersistenceMapper.action_entity_to_info(created_action_entity)
         await ReviewRepository.create_admin_audit(
             session,
             actor_id,
@@ -119,22 +144,32 @@ async def request_action(
 
 
 async def cancel_pending_action(
-    session, command: Types.CancelActionCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.CancelActionCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ActionInfo:
     """활성 관리자가 pending 조치만 취소하고 동일 취소 재호출은 재사용한다."""
     actor_id = actor.user_id
     async with use_case_transaction(session):
         await ValidationServiceUtil._require_actor(session, actor_id, admin=True)
-        row = await ReviewRepository.get_action(session, command.action_id, lock=True)
+        action_entity = await ReviewRepository.get_action(
+            session, command.action_id, lock=True
+        )
         info = ValidationServiceUtil.require_info(
-            PersistenceMapper.action_entity_to_info(row)
+            PersistenceMapper.action_entity_to_info(action_entity)
         )
         if info.status == "cancelled":
             return info
         if info.status != "pending":
             raise Types.ModerationError("state_conflict")
-        row = await ReviewRepository.cancel_action(session, info.id)
-        result = PersistenceMapper.action_entity_to_info(row)
+        cancelled_action_entity = await ReviewRepository.cancel_action(session, info.id)
+        # 위에서 존재를 확인하고 잠근 동일 ID를 같은 트랜잭션에서 UPDATE RETURNING한다.
+        # 삭제 경쟁이 없으므로 mapper 결과는 존재한다. 기존 오류/반환 동작은 유지한다.
+        result = cast(
+            Types.ActionInfo,
+            PersistenceMapper.action_entity_to_info(cancelled_action_entity),
+        )
         await ReviewRepository.create_admin_audit(
             session, actor_id, "moderation.action.cancel", result.id, {}
         )

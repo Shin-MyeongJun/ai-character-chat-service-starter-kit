@@ -7,6 +7,14 @@
 - `service/query.py`: 상품 통계에 BillingStatisticsInfo를 제공한다.
 - `repository.py`: 자체 결제/사용량/귀속 이력 저장과 집계용 원시 조회. `mapper/persistence.py`: Entity/Row를 공개 Info로 변환한다.
 
+저장소는 입력·nullable Entity·집계 튜플의 타입을 명시하며, 매출/환불 생성은 명시적 키워드
+인자를 받는다. 집계 Row 타입은 repository에 두고 공개 `UsageStatisticsFact`와
+`PaymentStatisticsFact`는 기존 목록/튜플 순서를 유지한다. PostgreSQL `SUM(bigint)`의
+정수 Decimal 크레딧 합계는 mapper에서 손실 없이 int로 변환하며, 통화별 금액은 Decimal로
+보존한다. nullable 스냅샷 ID는 SQL에서 제외하고, `ARRAY(UUID)`의 목록 표현도 유지한다.
+견적의 버전 1 JSON envelope는 repository의 `BillingQuoteSnapshot`으로 표현한다.
+mapper의 기존 Decimal/UUID 문자열 직렬화와 저장 JSON 키·값은 바꾸지 않는다.
+
 상품 버전 정보는 product 공개 query에서 받고, 통계 갱신 요청은 product 공개 Command로 전달한다. 타 모듈 ORM/JOIN 예외는 없다. use_case_transaction 및 멱등 잠금으로 재시도와 동시 환불을 처리한다.
 
 귀속 기능은 이미 확정된 결제 사실의 귀속을 기록한다. 실제 결제 승인·외부 PG 호출·구독 상태 처리는 구현하지 않는다. 크레딧 예약/차감은 아래 별도 서비스로 구현했다. 귀속과 사용량 쓰기는 서로 다른 유스케이스이므로 파일을 나눴고 공통 저장소는 규모와 응집도를 고려해 유지했다.

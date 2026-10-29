@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from math import isfinite
 from numbers import Integral, Real
-from typing import Any
+from typing import cast
 
 import voyageai
 from voyageai import error as voyage_error
 
+from app.modules.llm.adapters.sdk import (
+    VoyageClient,
+    integer_attribute,
+    string_attribute,
+)
 from app.modules.llm.types import (
     EmbeddingError,
     EmbeddingErrorKind,
@@ -37,7 +42,7 @@ class VoyageEmbeddingAdapter:
     def __init__(
         self,
         *,
-        client: Any | None = None,
+        client: VoyageClient | None = None,
         api_key: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 0,
@@ -68,7 +73,8 @@ class VoyageEmbeddingAdapter:
                 timeout=float(timeout),
                 max_retries=max_retries,
             )
-        self._client = client
+        # The SDK is untyped locally; this is exactly the embed subset invoked.
+        self._client = cast(VoyageClient, client)
 
     def supports_model(self, model: str) -> bool:
         return model in self._models
@@ -94,7 +100,7 @@ class VoyageEmbeddingAdapter:
             raise ValueError(f"Unsupported embedding purpose {purpose!r}.") from exc
 
         try:
-            response = await self._client.embed(
+            provider_response = await self._client.embed(
                 request_texts,
                 model=model,
                 input_type=selected_purpose.value,
@@ -155,7 +161,7 @@ class VoyageEmbeddingAdapter:
                 exc, model, EmbeddingErrorKind.PROVIDER, retryable=False
             ) from exc
 
-        return self._response_to_info(response, model, len(request_texts))
+        return self._response_to_info(provider_response, model, len(request_texts))
 
     def _validate_request(
         self,
@@ -276,16 +282,16 @@ class VoyageEmbeddingAdapter:
             provider=self.provider,
             model=model,
             retryable=retryable,
-            request_id=getattr(exc, "request_id", None),
-            status_code=getattr(exc, "http_status", None),
+            request_id=string_attribute(exc, "request_id"),
+            status_code=integer_attribute(exc, "http_status"),
         )
 
     async def aclose(self) -> None:
         if not self._owns_client:
             return
-        close = getattr(self._client, "aclose", None) or getattr(
-            self._client, "close", None
-        )
+        close: Callable[[], object] | None = getattr(
+            self._client, "aclose", None
+        ) or getattr(self._client, "close", None)
         if close is not None:
             result = close()
             if inspect.isawaitable(result):

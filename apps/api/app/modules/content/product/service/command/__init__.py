@@ -14,7 +14,7 @@ from app.modules.identity import types as IdentityTypes
 from app.modules.identity.service import query as IdentityQueryService
 
 
-def validate_profile(value: Types.ProductProfileCommand):
+def validate_profile(value: Types.ProductProfileCommand) -> None:
     if not value.title.strip() or len(value.title) > 200:
         raise ValueError("Title must contain 1–200 characters.")
     if value.visibility not in ("private", "public", "unlisted"):
@@ -35,7 +35,13 @@ async def create_product(
         info = product_entity_to_info(row)
         if command.tags:
             from app.modules.content.product.service import tags as TagsCommandService
-            await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(info.id, owner_id, command.tags))
+
+            await TagsCommandService.replace_public_tags(
+                session,
+                Types.PublicTagsCommand(
+                    target_id=info.id, user_id=owner_id, names=command.tags
+                ),
+            )
         return info
 
 
@@ -48,13 +54,24 @@ async def update_product(
     validate_profile(value)
     async with use_case_transaction(session):
         await QueryService.get_owned_product(
-            session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+            session,
+            Types.OwnedProductCommand(
+                product_id=product_id, owner_id=owner_id, lock=True
+            ),
         )
         row = await Repository.update_product(session, product_id, owner_id, value)
         info = product_entity_to_info(row)
+        # The owned product remains locked throughout this update transaction.
+        assert info is not None, "Locked product disappeared."
         if command.tags is not None:
             from app.modules.content.product.service import tags as TagsCommandService
-            await TagsCommandService.replace_public_tags(session, Types.PublicTagsCommand(info.id, owner_id, command.tags))
+
+            await TagsCommandService.replace_public_tags(
+                session,
+                Types.PublicTagsCommand(
+                    target_id=info.id, user_id=owner_id, names=command.tags
+                ),
+            )
         return info
 
 
@@ -65,7 +82,10 @@ async def delete_product(
     owner_id = command.owner_id
     async with use_case_transaction(session):
         await QueryService.get_owned_product(
-            session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+            session,
+            Types.OwnedProductCommand(
+                product_id=product_id, owner_id=owner_id, lock=True
+            ),
         )
         if await Repository.has_product_snapshot(session, product_id):
             raise ValueError("Published products must be retired, not deleted.")
@@ -73,7 +93,7 @@ async def delete_product(
 
 
 async def change_snapshot_expiry(
-    session, command: Types.ChangeSnapshotExpiryCommand
+    session: AsyncSession, command: Types.ChangeSnapshotExpiryCommand
 ) -> Types.ProductSnapshotInfo:
     if not command.reason.strip() or len(command.reason) > 2000:
         raise ValueError("Reason must contain 1–2000 characters.")
@@ -83,7 +103,7 @@ async def change_snapshot_expiry(
         raise ValueError("Expiry must include a timezone.")
     async with use_case_transaction(session):
         await IdentityQueryService.require_admin(
-            session, IdentityTypes.GetUserCommand(command.actor_id)
+            session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
         )
         await QueryService.get_product_snapshot(
             session, Types.ProductSnapshotCommand(command.snapshot_id, lock=True)
@@ -101,13 +121,13 @@ async def change_snapshot_expiry(
 
 
 async def change_product_status(
-    session, command: Types.ChangeProductStatusCommand
+    session: AsyncSession, command: Types.ChangeProductStatusCommand
 ) -> Types.ProductInfo:
     if command.status not in ("approved", "rejected", "draft"):
         raise ValueError("Invalid product status.")
     async with use_case_transaction(session):
         await IdentityQueryService.require_admin(
-            session, IdentityTypes.GetUserCommand(command.actor_id)
+            session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
         )
         row = await Repository.get_product(session, command.product_id, lock=True)
         info = PersistenceMapper.product_entity_to_state_info(row)
@@ -115,4 +135,7 @@ async def change_product_status(
             raise LookupError("Product not found.")
         await Repository.set_product_status(session, command.product_id, command.status)
         row = await Repository.get_product(session, command.product_id)
-        return PersistenceMapper.product_entity_to_info(row)
+        result = PersistenceMapper.product_entity_to_info(row)
+        # The status write cannot delete the product locked above.
+        assert result is not None, "Locked product disappeared."
+        return result

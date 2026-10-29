@@ -1,8 +1,10 @@
 # 항목 metadata는 얕은 dict 복사, 스냅샷 JSON과 활성 스냅샷 항목은 deepcopy다. 활성화 판단은 query가 수행한다.
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import cast, overload
 
 from app.db.models import lorebook as lorebook_models
+from app.db.models.snapshot.lorebook import LorebookSnapshot
 from app.modules.content.lorebook import repository as Repository
 from app.modules.content.lorebook import types as Types
 
@@ -115,12 +117,14 @@ def lorebook_entry_entity_to_active(
     )
 
 
-def lorebook_entries_entities_to_info(entities) -> list[Types.LorebookEntryInfo]:
+def lorebook_entries_entities_to_info(
+    entities: Iterable[lorebook_models.LorebookEntry],
+) -> list[Types.LorebookEntryInfo]:
     return [lorebook_entry_entity_to_info(entity) for entity in entities]
 
 
 def lorebook_entries_entities_to_active_info(
-    entities,
+    entities: Iterable[lorebook_models.LorebookEntry],
 ) -> list[Types.ActiveLorebookEntryInfo]:
     return [lorebook_entry_entity_to_active(entity) for entity in entities]
 
@@ -140,21 +144,31 @@ def lorebook_entry_info_to_active_info(
     )
 
 
-def lorebooks_entities_to_info(entities) -> list[Types.LorebookInfo]:
+def lorebooks_entities_to_info(
+    entities: Iterable[lorebook_models.Lorebook],
+) -> list[Types.LorebookInfo]:
     return [lorebook_entity_to_info(entity) for entity in entities]
 
 
-def lorebook_snapshot_entity_to_info(entity) -> Types.LorebookSnapshotInfo:
+def lorebook_snapshot_entity_to_info(
+    entity: LorebookSnapshot,
+) -> Types.LorebookSnapshotInfo:
+    # freeze_lorebook writes the declared entry fields. The shared JSONB mixin
+    # cannot express per-domain keys; this cast preserves all legacy/extensions.
+    # It adds no schema validation: malformed stored entries still fail in runtime.
+    snapshot_data = cast(Types.LorebookSnapshotData, deepcopy(entity.snapshot_data))
     return Types.LorebookSnapshotInfo(
-        entity.id, entity.lorebook_id, entity.version, deepcopy(entity.snapshot_data)
+        entity.id, entity.lorebook_id, entity.version, snapshot_data
     )
 
 
-def lorebook_snapshots_entities_to_info(entities) -> list[Types.LorebookSnapshotInfo]:
+def lorebook_snapshots_entities_to_info(
+    entities: Iterable[LorebookSnapshot],
+) -> list[Types.LorebookSnapshotInfo]:
     return [lorebook_snapshot_entity_to_info(entity) for entity in entities]
 
 
 def lorebook_snapshot_entries_to_active_info(
-    entries: list[dict],
+    entries: list[Types.LorebookSnapshotEntryData],
 ) -> Types.ActivatedSnapshotEntriesInfo:
     return Types.ActivatedSnapshotEntriesInfo(entries=deepcopy(entries))

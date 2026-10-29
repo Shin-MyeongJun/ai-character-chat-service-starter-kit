@@ -1,5 +1,6 @@
 """Only prompt list/detail reporting is HTTP-exposed; active admin is checked by services."""
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
 from uuid import UUID
@@ -19,7 +20,7 @@ router = APIRouter(
 
 
 @contextmanager
-def _report_errors():
+def _report_errors() -> Iterator[None]:
     """업무 실패를 원문 없는 고정 HTTP 오류로 변환한다."""
     try:
         yield
@@ -36,7 +37,7 @@ async def list_generation_prompts(
     session: Session,
     owner: Owner,
     response: Response,
-):
+) -> Schemas.GenerationPromptPageResponseDto:
     """관리자 목록 요청을 변환하고 민감 응답의 캐시를 막는다."""
     response.headers["Cache-Control"] = "no-store"
     with _report_errors():
@@ -56,7 +57,7 @@ async def get_generation_prompt(
     session: Session,
     owner: Owner,
     response: Response,
-):
+) -> Schemas.GenerationPromptDetailResponseDto:
     """관리자에게 지정 생성의 저장 원문만 상세 조회로 반환한다."""
     response.headers["Cache-Control"] = "no-store"
     with _report_errors():

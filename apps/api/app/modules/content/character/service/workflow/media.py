@@ -1,15 +1,21 @@
 """Durable media I/O. Hold row locks until cancelled provider work settles."""
 
 import asyncio
+from collections.abc import Coroutine
+from typing import TypeVar
 
 from app.db.transaction import use_case_transaction
 from app.modules.asset_storage import types as AssetStorageTypes
 from app.modules.content.character import types as Types
 from app.modules.content.character.service.media import CharacterMediaService
 
+TStorageResult = TypeVar("TStorageResult")
+
 
 # 취소를 기억하되 공급자 작업 종료까지 기다린다. 동기 SDK 스레드가 끝나기 전에 DB 잠금을 풀지 않기 위한 경계다.
-async def _settle_storage(operation):
+async def _settle_storage(
+    operation: Coroutine[object, object, TStorageResult],
+) -> TStorageResult:
     # to_thread-backed providers can keep writing after cancellation. Keep the
     # DB lock until the provider settles so retry/GC cannot race that write.
     task = asyncio.create_task(operation)

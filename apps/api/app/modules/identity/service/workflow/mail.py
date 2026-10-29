@@ -1,15 +1,18 @@
 """Commit account/token state before sending mail; SMTP failure preserves it."""
 
 from app.modules.identity import types as Types
+from app.modules.identity.adapters import MailSender
 from app.modules.identity.service.authentication import AuthenticationService
 
 
 class AuthenticationMailWorkflow:
-    def __init__(self, authentication: AuthenticationService, mailer):
+    def __init__(
+        self, authentication: AuthenticationService, mailer: MailSender
+    ) -> None:
         self.auth = authentication
         self.mailer = mailer
 
-    async def _send_action_mail(self, value):
+    async def _send_action_mail(self, value: Types.ActionMailInfo | None) -> None:
         if value is None:
             return
         page = "/verify-email" if value.purpose == "verify" else "/reset-password"

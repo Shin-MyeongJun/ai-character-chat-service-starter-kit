@@ -18,11 +18,13 @@ router = APIRouter(prefix="", tags=["product tags"])
 
 
 @router.get("/{target_id}/tags", response_model=list[Schemas.PublicTagResponseDto])
-async def list_public_tags(target_id: UUID, session: Session, owner: Owner):
+async def list_public_tags(
+    target_id: UUID, session: Session, owner: Owner
+) -> list[Schemas.PublicTagResponseDto]:
     with errors():
         return SchemaMapper.public_tag_infos_to_response(
             await TagsService.list_public_tags(
-                session, Types.PublicTagsCommand(target_id, owner)
+                session, Types.PublicTagsCommand(target_id=target_id, user_id=owner)
             )
         )
 
@@ -30,7 +32,7 @@ async def list_public_tags(target_id: UUID, session: Session, owner: Owner):
 @router.post("/{target_id}/tags", response_model=list[Schemas.PublicTagResponseDto])
 async def add_public_tags(
     target_id: UUID, body: Schemas.TagsRequestDto, session: Session, owner: Owner
-):
+) -> list[Schemas.PublicTagResponseDto]:
     with errors():
         return SchemaMapper.public_tag_infos_to_response(
             await TagsService.add_public_tags(
@@ -43,7 +45,7 @@ async def add_public_tags(
 @router.put("/{target_id}/tags", response_model=list[Schemas.PublicTagResponseDto])
 async def replace_public_tags(
     target_id: UUID, body: Schemas.TagsRequestDto, session: Session, owner: Owner
-):
+) -> list[Schemas.PublicTagResponseDto]:
     with errors():
         return SchemaMapper.public_tag_infos_to_response(
             await TagsService.replace_public_tags(
@@ -56,8 +58,9 @@ async def replace_public_tags(
 @router.delete("/{target_id}/tags/{tag_id}", status_code=204)
 async def remove_public_tag(
     target_id: UUID, tag_id: UUID, session: Session, owner: Owner
-):
+) -> None:
     with errors():
         await TagsService.remove_public_tag(
-            session, Types.PublicTagsCommand(target_id, owner, tag_id=tag_id)
+            session,
+            Types.PublicTagsCommand(target_id=target_id, user_id=owner, tag_id=tag_id),
         )

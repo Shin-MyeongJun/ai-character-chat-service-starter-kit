@@ -26,3 +26,17 @@
 `tag_router.py`는 /admin/tags 사전 생성·단건 조회·수정·비활성화와 /admin/{products|characters|lorebooks}/{id}/internal-tags 조회·추가·전체 교체·해제를 제공한다. 공통 세션과 검증된 owner 인증 훅을 재사용하며 콘텐츠/tag 공개 서비스가 identity.require_admin으로 최신 DB 역할·활성 상태를 재검증한다. 기존 미연결 character/lorebook 관리자 훅을 우회해 관리자라고 가정하지 않는다. source와 assigned_by는 요청 본문에서 받지 않는다. mapper/tags.py는 공개 Info만 DTO로 변환한다. SQL/콘텐츠 repository/ORM은 참조하지 않는다.
 
 API 및 예제: [태그 관리](../../../../../../references_document/reference/content-tags.md).
+
+## 타입 정리 (2026-10-28)
+
+모듈 전체를 공용 엄격 검사에 편입했다. 태그 router는 목록/단건 DTO와 본문 없는
+None 반환을, 상품 정책·모델 종료 router는 기존 DTO/204 반환을 명시했다.
+mapper/tags는 공개 TagInfo/InternalTagInfo를 받아 기존 Pydantic from_attributes 변환을
+수행한다. 목록 입력은 Iterable로 표현해 기존 tuple/list/generator 소비를 유지한다.
+상품 정책 command의 실행 세션은 AsyncSession이다.
+
+여러 ID/행위자/이름을 갖는 Command 생성은 키워드로 구분한다. 기존 target_id·actor_id,
+tag_id·names, 만료 시각·reason·status의 값과 source/assigned_by의 서비스 결정 책임은
+같다. 반환 DTO·경로·상태 코드·의존성 함수 정체성·오류 변환·관리자 재검증 순서는
+유지한다. 새로운 인증 연결·타 모듈 접근·SQL·JSON 검증이나 Any/cast/ignore는 추가하지
+않았다. 별도 서비스/mapper 클래스 통합이나 파일 분리도 하지 않았다.

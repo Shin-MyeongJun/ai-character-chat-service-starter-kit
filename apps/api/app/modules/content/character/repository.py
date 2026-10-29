@@ -2,7 +2,9 @@
 # 일반 페이지는 created_at/id 내림차순, 이미지는 기본 이미지 우선 후 최신순이다.
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal, overload
 from uuid import UUID, uuid4
 
 from sqlalchemy import Select, exists, func, select, update
@@ -12,6 +14,7 @@ from sqlalchemy import delete as tag_delete
 from sqlalchemy import select as tag_select
 from sqlalchemy.dialects.postgresql import insert as tag_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.db.models import character as character_models
 from app.db.models.character import (
@@ -423,14 +426,14 @@ def _create_character_asset_entity(
 
 async def create_character_command(
     session: AsyncSession, command: Types.CreateCharacterCommand
-):
+) -> Character:
     entity = _create_character_entity(command)
     return await create_character(session, entity)
 
 
 async def update_character_command(
     session: AsyncSession, command: Types.UpdateCharacterCommand
-):
+) -> Character:
     entity = await get_character_by_id_and_owner_id(
         session, command.character_id, command.owner_id, for_update=True
     )
@@ -441,7 +444,7 @@ async def update_character_command(
 
 async def change_character_status_command(
     session: AsyncSession, command: Types.ChangeCharacterStatusCommand
-):
+) -> Character:
     entity = await get_character_by_id_and_owner_id(
         session, command.character_id, command.owner_id, for_update=True
     )
@@ -452,7 +455,7 @@ async def change_character_status_command(
 
 async def delete_character_command(
     session: AsyncSession, command: Types.DeleteCharacterCommand
-):
+) -> None:
     entity = await get_character_by_id_and_owner_id(
         session, command.character_id, command.owner_id, for_update=True
     )
@@ -499,8 +502,12 @@ async def get_character_promotion(
 
 
 async def list_owned_characters(
-    session: AsyncSession, ids: tuple[UUID, ...], owner_id: UUID, *, lock=False
-):
+    session: AsyncSession,
+    ids: tuple[UUID, ...],
+    owner_id: UUID,
+    *,
+    lock: bool = False,
+) -> list[Character]:
     stmt = (
         select(Character)
         .where(Character.id.in_(ids), Character.owner_id == owner_id)
@@ -512,14 +519,26 @@ async def list_owned_characters(
 
 
 # MAX(version)+1 계산 자체는 잠금을 잡지 않는다. freeze를 호출하는 서비스의 원본 잠금과 함께 읽는다.
-async def next_version(session, cls, column, source_id):
+async def next_version(
+    session: AsyncSession,
+    cls: type[CharacterSnapshot],
+    column: InstrumentedAttribute[UUID | None],
+    source_id: UUID,
+) -> int:
     return (
         await session.scalar(select(func.max(cls.version)).where(column == source_id))
         or 0
     ) + 1
 
 
-async def freeze_character(session, source):
+async def freeze_character(
+    session: AsyncSession, source: Types.CharacterInfo
+) -> CharacterSnapshot:
+    snapshot_data: Types.CharacterSnapshotV2Data = {
+        "name": source.name,
+        "description": source.description,
+        "persona_prompt": source.persona_prompt,
+    }
     snapshot = CharacterSnapshot(
         id=uuid4(),
         character_id=source.id,
@@ -527,10 +546,7 @@ async def freeze_character(session, source):
             session, CharacterSnapshot, CharacterSnapshot.character_id, source.id
         ),
         snapshot_schema_version=2,
-        snapshot_data={
-            key: getattr(source, key)
-            for key in ("name", "description", "persona_prompt")
-        },
+        snapshot_data=snapshot_data,
     )
     session.add(snapshot)
     await session.flush()
@@ -574,7 +590,9 @@ class SnapshotMediaRow:
     assets: list[CharacterSnapshotAsset]
 
 
-async def get_snapshot_media(session, snapshot_ids) -> SnapshotMediaRow:
+async def get_snapshot_media(
+    session: AsyncSession, snapshot_ids: tuple[UUID, ...]
+) -> SnapshotMediaRow:
     images = list(
         await session.scalars(
             select(CharacterSnapshotImage).where(
@@ -592,7 +610,7 @@ async def get_snapshot_media(session, snapshot_ids) -> SnapshotMediaRow:
     return SnapshotMediaRow(images, assets)
 
 
-async def has_snapshot_media_reference(session, url) -> bool:
+async def has_snapshot_media_reference(session: AsyncSession, url: str) -> bool:
     image = await session.scalar(
         select(CharacterSnapshotImage.id)
         .where(CharacterSnapshotImage.image_url == url)
@@ -606,7 +624,9 @@ async def has_snapshot_media_reference(session, url) -> bool:
     return image is not None or asset is not None
 
 
-async def list_character_snapshots(session, snapshot_ids):
+async def list_character_snapshots(
+    session: AsyncSession, snapshot_ids: tuple[UUID, ...]
+) -> list[CharacterSnapshot]:
     return list(
         await session.scalars(
             select(CharacterSnapshot).where(CharacterSnapshot.id.in_(snapshot_ids))
@@ -617,7 +637,9 @@ async def list_character_snapshots(session, snapshot_ids):
 # Durable storage intents; no transaction ownership.
 
 
-async def get_media(session, media_id, *, lock=False):
+async def get_media(
+    session: AsyncSession, media_id: UUID, *, lock: bool = False
+) -> CharacterMedia | None:
     stmt = (
         select(CharacterMedia)
         .where(CharacterMedia.id == media_id)
@@ -628,7 +650,9 @@ async def get_media(session, media_id, *, lock=False):
     return (await session.scalars(stmt)).one_or_none()
 
 
-async def get_media_request(session, command):
+async def get_media_request(
+    session: AsyncSession, command: Types.UploadCharacterMediaCommand
+) -> CharacterMedia | None:
     return (
         await session.scalars(
             select(CharacterMedia).where(
@@ -640,22 +664,38 @@ async def get_media_request(session, command):
     ).one_or_none()
 
 
-async def create_media(session, info):
+async def create_media(
+    session: AsyncSession, info: Types.CharacterMediaInfo
+) -> CharacterMedia:
     entity = CharacterMedia(
-        **{name: getattr(info, name) for name in info.__dataclass_fields__}
+        id=info.id,
+        character_id=info.character_id,
+        owner_id=info.owner_id,
+        request_id=info.request_id,
+        storage_kind=info.storage_kind,
+        storage_id=info.storage_id,
+        object_key=info.object_key,
+        content_type=info.content_type,
+        size_bytes=info.size_bytes,
+        original_filename=info.original_filename,
+        purpose=info.purpose,
+        sha256=info.sha256,
+        state=info.state,
+        binding=info.binding,
+        updated_at=info.updated_at,
     )
     session.add(entity)
     await session.flush()
     return entity
 
 
-async def set_media_state(session, media_id, state):
+async def set_media_state(session: AsyncSession, media_id: UUID, state: str) -> None:
     await session.execute(
         update(CharacterMedia).where(CharacterMedia.id == media_id).values(state=state)
     )
 
 
-async def bind_media(session, media_id, binding):
+async def bind_media(session: AsyncSession, media_id: UUID, binding: str) -> None:
     await session.execute(
         update(CharacterMedia)
         .where(CharacterMedia.id == media_id)
@@ -663,33 +703,87 @@ async def bind_media(session, media_id, binding):
     )
 
 
-async def has_media_references(session, media_id, snapshot_ids=None):
-    models = (
-        CharacterImage,
-        CharacterAsset,
-        CharacterSnapshotImage,
-        CharacterSnapshotAsset,
-    )
-    if snapshot_ids is not None:
-        models = models[2:]
-    for model in models:
-        stmt = select(model.id).where(model.media_id == media_id)
-        if snapshot_ids is not None:
-            stmt = stmt.where(model.character_snapshot_id.in_(snapshot_ids))
+async def has_media_references(
+    session: AsyncSession, media_id: UUID, snapshot_ids: Sequence[UUID] | None = None
+) -> bool:
+    if snapshot_ids is None:
+        statements = [
+            select(model.id).where(model.media_id == media_id)
+            for model in (
+                CharacterImage,
+                CharacterAsset,
+                CharacterSnapshotImage,
+                CharacterSnapshotAsset,
+            )
+        ]
+    else:
+        statements = [
+            select(model.id)
+            .where(model.media_id == media_id)
+            .where(model.character_snapshot_id.in_(snapshot_ids))
+            for model in (CharacterSnapshotImage, CharacterSnapshotAsset)
+        ]
+    for stmt in statements:
         if await session.scalar(select(exists(stmt))):
             return True
     return False
 
 
-async def get_media_attachment(session, media_id, kind):
-    model = CharacterImage if kind == "image" else CharacterAsset
+@overload
+async def get_media_attachment(
+    session: AsyncSession, media_id: UUID, kind: Literal["image"]
+) -> CharacterImage | None: ...
+
+
+@overload
+async def get_media_attachment(
+    session: AsyncSession, media_id: UUID, kind: Literal["asset"]
+) -> CharacterAsset | None: ...
+
+
+async def get_media_attachment(
+    session: AsyncSession, media_id: UUID, kind: Literal["image", "asset"]
+) -> CharacterImage | CharacterAsset | None:
+    if kind == "image":
+        return (
+            await session.scalars(
+                select(CharacterImage).where(CharacterImage.media_id == media_id)
+            )
+        ).one_or_none()
     return (
-        await session.scalars(select(model).where(model.media_id == media_id))
+        await session.scalars(
+            select(CharacterAsset).where(CharacterAsset.media_id == media_id)
+        )
     ).one_or_none()
 
 
-async def create_media_attachment(session, command, media_id, kind):
+@overload
+async def create_media_attachment(
+    session: AsyncSession,
+    command: Types.CreateCharacterImageCommand,
+    media_id: UUID | None,
+    kind: Literal["image"],
+) -> CharacterImage: ...
+
+
+@overload
+async def create_media_attachment(
+    session: AsyncSession,
+    command: Types.CreateCharacterAssetCommand,
+    media_id: UUID | None,
+    kind: Literal["asset"],
+) -> CharacterAsset: ...
+
+
+async def create_media_attachment(
+    session: AsyncSession,
+    command: Types.CreateCharacterImageCommand | Types.CreateCharacterAssetCommand,
+    media_id: UUID | None,
+    kind: Literal["image", "asset"],
+) -> CharacterImage | CharacterAsset:
+    entity: CharacterImage | CharacterAsset
     if kind == "image":
+        assert isinstance(command, Types.CreateCharacterImageCommand)
         entity = CharacterImage(
             character_id=command.character_id,
             emotion_tag=command.emotion_tag,
@@ -698,6 +792,7 @@ async def create_media_attachment(session, command, media_id, kind):
             media_id=media_id,
         )
     else:
+        assert isinstance(command, Types.CreateCharacterAssetCommand)
         entity = CharacterAsset(
             character_id=command.character_id,
             asset_type=command.asset_type,
@@ -711,17 +806,20 @@ async def create_media_attachment(session, command, media_id, kind):
     return entity
 
 
-
-
-
-async def get_target_for_tag_access(session, target_id, *, lock=False):
+async def get_target_for_tag_access(
+    session: AsyncSession, target_id: UUID, *, lock: bool = False
+) -> Character | None:
     stmt = tag_select(Character).where(Character.id == target_id)
     if lock:
         stmt = stmt.with_for_update()
-    return await session.scalar(stmt.execution_options(populate_existing=True))
+    return (
+        await session.scalars(stmt.execution_options(populate_existing=True))
+    ).first()
 
 
-async def list_public_tag_links(session, target_id):
+async def list_public_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[CharacterTag]:
     return list(
         await session.scalars(
             tag_select(CharacterTag)
@@ -734,7 +832,9 @@ async def list_public_tag_links(session, target_id):
     )
 
 
-async def list_internal_tag_links(session, target_id):
+async def list_internal_tag_links(
+    session: AsyncSession, target_id: UUID
+) -> list[CharacterInternalTag]:
     return list(
         await session.scalars(
             tag_select(CharacterInternalTag)
@@ -745,7 +845,9 @@ async def list_internal_tag_links(session, target_id):
     )
 
 
-async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
+async def replace_public_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID], actor_id: UUID
+) -> None:
     await session.execute(
         tag_delete(CharacterTag).where(
             CharacterTag.character_id == target_id, CharacterTag.tag_id.not_in(tag_ids)
@@ -766,7 +868,9 @@ async def replace_public_tag_links(session, target_id, tag_ids, actor_id):
         )
 
 
-async def remove_public_tag_link(session, target_id, tag_id):
+async def remove_public_tag_link(
+    session: AsyncSession, target_id: UUID, tag_id: UUID
+) -> None:
     await session.execute(
         tag_delete(CharacterTag).where(
             CharacterTag.character_id == target_id, CharacterTag.tag_id == tag_id
@@ -774,7 +878,9 @@ async def remove_public_tag_link(session, target_id, tag_id):
     )
 
 
-async def remove_internal_tag_links(session, target_id, tag_ids):
+async def remove_internal_tag_links(
+    session: AsyncSession, target_id: UUID, tag_ids: Sequence[UUID]
+) -> None:
     await session.execute(
         tag_delete(CharacterInternalTag).where(
             CharacterInternalTag.character_id == target_id,
@@ -783,7 +889,13 @@ async def remove_internal_tag_links(session, target_id, tag_ids):
     )
 
 
-async def set_internal_tag_link(session, target_id, tag_id, source, actor_id):
+async def set_internal_tag_link(
+    session: AsyncSession,
+    target_id: UUID,
+    tag_id: UUID,
+    source: str,
+    actor_id: UUID | None,
+) -> None:
     stmt = tag_insert(CharacterInternalTag).values(
         character_id=target_id, tag_id=tag_id, source=source, assigned_by=actor_id
     )

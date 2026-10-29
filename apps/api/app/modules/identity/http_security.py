@@ -2,16 +2,20 @@
 
 import hmac
 import logging
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import uuid4
 
-from fastapi import Request
+from fastapi import Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.modules.identity import types as Types
+from app.modules.identity.service.authentication import AuthenticationService
+from app.modules.identity.settings import AuthSettings
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 ERROR_STATUS = {
@@ -33,14 +37,21 @@ ERROR_STATUS = {
 }
 
 
-def get_authentication(request):
-    service = getattr(request.app.state, "authentication", None)
+def get_authentication(request: Request) -> AuthenticationService:
+    # Application composition installs this service; missing configuration still
+    # follows the existing None/503 path, without adding runtime type checks.
+    service = cast(
+        AuthenticationService | None,
+        getattr(request.app.state, "authentication", None),
+    )
     if service is None:
         raise Types.AuthError("auth_not_configured")
     return service
 
 
-def set_cookie(response, settings, kind, value, max_age):
+def set_cookie(
+    response: Response, settings: AuthSettings, kind: str, value: str, max_age: int
+) -> None:
     response.set_cookie(
         settings.cookie_name(kind),
         value,
@@ -52,7 +63,7 @@ def set_cookie(response, settings, kind, value, max_age):
     )
 
 
-def delete_cookie(response, settings, kind):
+def delete_cookie(response: Response, settings: AuthSettings, kind: str) -> None:
     response.delete_cookie(
         settings.cookie_name(kind),
         path="/",
@@ -62,7 +73,9 @@ def delete_cookie(response, settings, kind):
     )
 
 
-def set_session_cookies(response, settings, login):
+def set_session_cookies(
+    response: Response, settings: AuthSettings, login: Types.LoginInfo
+) -> None:
     remaining = max(0, int((login.expires_at - datetime.now(UTC)).total_seconds()))
     set_cookie(
         response,
@@ -74,12 +87,12 @@ def set_session_cookies(response, settings, login):
     set_cookie(response, settings, "refresh", login.refresh_token, remaining)
 
 
-def clear_session_cookies(response, settings):
+def clear_session_cookies(response: Response, settings: AuthSettings) -> None:
     for kind in ("access", "refresh", "csrf", "flow"):
         delete_cookie(response, settings, kind)
 
 
-def issue_csrf_token(service):
+def issue_csrf_token(service: AuthenticationService) -> str:
     return service.codec.encode_token(
         kind="csrf",
         subject=str(uuid4()),
@@ -88,7 +101,7 @@ def issue_csrf_token(service):
     )
 
 
-def verify_csrf(request, service):
+def verify_csrf(request: Request, service: AuthenticationService) -> None:
     if request.method in SAFE_METHODS:
         return
     # Origin 없는 상태 변경도 거절한다. 비브라우저 클라이언트 역시 명시적으로 보내야 한다.
@@ -108,7 +121,7 @@ def verify_csrf(request, service):
         raise Types.AuthError("csrf_failed") from exc
 
 
-def error_response(error, request):
+def error_response(error: Types.AuthError, request: Request) -> JSONResponse:
     response = JSONResponse(
         {"error": {"code": error.code}}, status_code=ERROR_STATUS.get(error.code, 400)
     )
@@ -117,7 +130,12 @@ def error_response(error, request):
     )
     if error.code == "rate_limited":
         response.headers["Retry-After"] = "900"
-    service = getattr(request.app.state, "authentication", None)
+    # Same optional composition contract as get_authentication; errors can also
+    # be rendered before authentication has been configured.
+    service = cast(
+        AuthenticationService | None,
+        getattr(request.app.state, "authentication", None),
+    )
     # An expired/missing access token must not erase the refresh cookie.
     # Do not emit cookie deletion here: a concurrent successful refresh may
     # already have installed new cookies before this 401 reaches the browser.
@@ -132,10 +150,12 @@ def error_response(error, request):
 
 
 class AuthRoute(APIRoute):
-    def get_route_handler(self):
+    def get_route_handler(
+        self,
+    ) -> Callable[[Request], Coroutine[object, object, Response]]:
         handler = super().get_route_handler()
 
-        async def protected_handler(request: Request):
+        async def protected_handler(request: Request) -> Response:
             try:
                 service = get_authentication(request)
                 # 프록시 헤더를 직접 신뢰하지 않는다. 배포 시 Uvicorn trusted proxy만 설정한다.
@@ -170,8 +190,15 @@ class AuthRoute(APIRoute):
 
 
 class CookieCSRFMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        service = getattr(request.app.state, "authentication", None)
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        # Application-owned dynamic state; leave the unconfigured/pass-through
+        # behavior unchanged rather than calling the required-service accessor.
+        service = cast(
+            AuthenticationService | None,
+            getattr(request.app.state, "authentication", None),
+        )
         if (
             service is not None
             and request.method not in SAFE_METHODS
@@ -190,7 +217,7 @@ class CookieCSRFMiddleware(BaseHTTPMiddleware):
 class AuthAccessLogFilter(logging.Filter):
     """기본 Uvicorn access logger에도 OAuth code/state 쿼리가 남지 않도록 제거한다."""
 
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple) and len(record.args) == 5:
             client, method, target, version, status = record.args
             if isinstance(target, str) and target.split("?", 1)[0].startswith("/auth/"):

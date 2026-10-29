@@ -10,11 +10,14 @@ import json
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from time import monotonic
+from typing import Literal, TypeAlias, TypedDict, cast
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
+from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import prompt as PromptMapper
 from app.modules.chatting.chat.service.command import answers as AnswersCommandService
@@ -46,17 +49,56 @@ TOKEN_ESTIMATOR = "utf8-bytes-plus-32-per-message-plus-32-v1"
 ANSWER_KEY_NAMESPACE = uuid5(NAMESPACE_URL, "chatkit:answers:billing:v1")
 
 
+_Preparation: TypeAlias = tuple[
+    Types.MessageInfo,
+    ConversationTypes.ConversationRuntimeView,
+    LLMTypes.ModelInfo,
+    ConversationTypes.ConversationInfo,
+    str,
+]
+_Outcome: TypeAlias = Literal["succeeded", "failed", "cancelled"]
+
+
+class _StoredIdentity(TypedDict):
+    product_character_id: str
+
+
+class _StoredBilling(TypedDict):
+    request_key: str
+    reservation_id: str
+    reserved_credit: int
+
+
+class _StoredAnswer(TypedDict, total=False):
+    """Read view of fields written by this workflow's v1/v2 metadata writers.
+
+    Casts at storage reads describe those writers, not arbitrary JSON validation.
+    Keep missing-key errors, extension keys, references and legacy defaults intact.
+    """
+
+    execution_token: str | None
+    identity: _StoredIdentity
+    usage: dict[str, Types.AnswerJsonValue]
+    billing: _StoredBilling | None
+    outcome: _Outcome
+    content: str
+    latency_ms: int | None
+    error_code: str | None
+    retryable: bool
+    uncertain: bool
+
+
 class AnswerOrchestrator:
     def __init__(
         self,
-        session_factory,
+        session_factory: SessionFactory,
         text_service: TextGenerationService,
         memory_retriever: MemoryService.MemoryRetriever,
         *,
         config: Types.AnswerConfig | None = None,
         template: PromptTypes.TemplateInfo | None = None,
         pricing: BillingPricingConfiguration | None = None,
-    ):
+    ) -> None:
         self.sessions = session_factory
         self.text = text_service
         self.retriever = memory_retriever
@@ -64,7 +106,12 @@ class AnswerOrchestrator:
         self.template = template or PromptService.load_template()
         self.pricing = pricing
 
-    async def _get_request(self, session, command, identity):
+    async def _get_request(
+        self,
+        session: AsyncSession,
+        command: Types.GenerateAnswerCommand,
+        identity: Types.AnswerMetadata,
+    ) -> Types.GenerationStateInfo | None:
         existing = await AnswersCommandService.get_answer_request(
             session,
             Types.GetAnswerRequestCommand(
@@ -87,7 +134,9 @@ class AnswerOrchestrator:
                 )
         return existing
 
-    async def _read_preparation(self, session, command):
+    async def _read_preparation(
+        self, session: AsyncSession, command: Types.GenerateAnswerCommand
+    ) -> _Preparation:
         """Collect owner history before runtime so diagnostic and answer lore rules agree."""
         current = await AnswersCommandService.get_answer_input(
             session,
@@ -123,7 +172,9 @@ class AnswerOrchestrator:
                 conversation_id=command.conversation_id,
                 user_id=command.user_id,
                 activation_text=current.content,
-                activation_messages=tuple((item.sender_type, item.content) for item in source.messages),
+                activation_messages=tuple(
+                    (item.sender_type, item.content) for item in source.messages
+                ),
                 manual_entry_ids=tuple(map(str, command.manual_entry_ids)),
             ),
         )
@@ -143,7 +194,7 @@ class AnswerOrchestrator:
         )
         return current, runtime, model, conversation, snapshot
 
-    async def _resume(self, run):
+    async def _resume(self, run: Types.GenerationStateInfo) -> Types.AnswerInfo:
         metadata = run.answer_metadata or {}
         if run.status == "pending" and (
             metadata.get("phase") == "result_ready"
@@ -169,12 +220,16 @@ class AnswerOrchestrator:
             or command.expected_revision < 1
         ):
             raise ValueError("Invalid answer request key or revision.")
-        identity = {
+        identity: Types.AnswerMetadata = {
             "input_message_id": str(command.input_message_id),
             "expected_revision": command.expected_revision,
             "product_character_id": str(command.product_character_id),
-            **({"manual_entry_ids": sorted(map(str, command.manual_entry_ids))} if command.manual_entry_ids else {}),
         }
+        if command.manual_entry_ids:
+            manual_entry_ids: list[Types.AnswerJsonValue] = [
+                entry_id for entry_id in sorted(map(str, command.manual_entry_ids))
+            ]
+            identity["manual_entry_ids"] = manual_entry_ids
         # Existing requests precede configuration, preparation, prices and expiry.
         async with self.sessions() as session, use_case_transaction(session):
             existing = await self._get_request(session, command, identity)
@@ -193,9 +248,10 @@ class AnswerOrchestrator:
         maximum = min(config.max_prompt_tokens, model.context_window)
         if maximum <= config.response_tokens:
             raise ValueError("Output reserve exceeds model context window.")
-        metadata = {
+        execution_token = str(uuid4())
+        metadata: Types.AnswerMetadata = {
             "version": 2,
-            "execution_token": str(uuid4()),
+            "execution_token": execution_token,
             "identity": identity,
             "template": {
                 "id": template.template_id,
@@ -374,7 +430,7 @@ class AnswerOrchestrator:
                             Types.SaveGenerationPromptCommand(
                                 generation_id=run.id,
                                 user_id=command.user_id,
-                                execution_token=metadata["execution_token"],
+                                execution_token=execution_token,
                                 request_json=prompt.request_json,
                                 provider=runtime.execution.provider,
                                 max_output_tokens=config.response_tokens,
@@ -469,7 +525,9 @@ class AnswerOrchestrator:
             return await self._reconcile_storage(run.id, command.user_id, exc)
         return await self._complete_staged(run.id, command.user_id)
 
-    async def _reconcile_storage(self, generation_id, user_id, error):
+    async def _reconcile_storage(
+        self, generation_id: UUID, user_id: UUID, error: Exception
+    ) -> Types.AnswerInfo:
         try:
             async with self.sessions() as session:
                 run = await GenerationQueryService.get_generation_state(
@@ -488,7 +546,9 @@ class AnswerOrchestrator:
             "Answer storage is pending recovery; replay the same request key."
         ) from error
 
-    async def _complete_staged(self, generation_id, user_id):
+    async def _complete_staged(
+        self, generation_id: UUID, user_id: UUID
+    ) -> Types.AnswerInfo:
         try:
             return await self._finalize(generation_id, user_id)
         except Exception as exc:
@@ -511,7 +571,15 @@ class AnswerOrchestrator:
                 "Answer storage is pending recovery; replay the same request key."
             ) from exc
 
-    async def _stage(self, generation_id, user_id, metadata, lease):
+    async def _stage(
+        self,
+        generation_id: UUID,
+        user_id: UUID,
+        metadata: Types.AnswerMetadata,
+        lease: datetime,
+    ) -> None:
+        # The token is the string generated above (or absent on legacy metadata).
+        stored = cast(_StoredAnswer, metadata)
         async with self.sessions() as session:
             await AnswersCommandService.update_answer(
                 session,
@@ -520,14 +588,16 @@ class AnswerOrchestrator:
                     user_id=user_id,
                     metadata=metadata,
                     lease_until=lease,
-                    execution_token=metadata.get("execution_token"),
+                    execution_token=stored.get("execution_token"),
                 ),
             )
 
     # 잠금 아래 생성 상태를 다시 확인하고 staging된 결과를 메시지·usage·memory 예약에
     # 반영한다.
     # recover=True라도 공급자를 다시 호출하지 않는다.
-    async def _finalize(self, generation_id, user_id, *, recover=False):
+    async def _finalize(
+        self, generation_id: UUID, user_id: UUID, *, recover: bool = False
+    ) -> Types.AnswerInfo:
         async with self.sessions() as session, use_case_transaction(session):
             run = await GenerationQueryService.get_generation_state(
                 session,
@@ -579,12 +649,18 @@ class AnswerOrchestrator:
                         user_id=user_id,
                         metadata=metadata,
                         lease_until=datetime.now(UTC),
-                        execution_token=metadata.get("execution_token"),
+                        # Recovery retains the original writer-owned token.
+                        execution_token=cast(_StoredAnswer, metadata).get(
+                            "execution_token"
+                        ),
                         recover=True,
                     ),
                 )
-            usage = metadata.get("usage", {})
-            billing = metadata.get("billing")
+            # Both the staged result and interrupted-call failure are written by
+            # this workflow. This view does not validate or rewrite stored JSON.
+            stored = cast(_StoredAnswer, metadata)
+            usage = stored.get("usage", {})
+            billing = stored.get("billing")
             if (
                 metadata.get("version") == 2
                 and billing is None
@@ -600,14 +676,14 @@ class AnswerOrchestrator:
                 cost_credit=billing["reserved_credit"] if billing else 0,
                 messages=(
                     Types.GeneratedMessage(
-                        UUID(metadata["identity"]["product_character_id"]),
-                        metadata["content"],
+                        UUID(stored["identity"]["product_character_id"]),
+                        stored["content"],
                     ),
                 )
-                if metadata["outcome"] == "succeeded"
+                if stored["outcome"] == "succeeded"
                 else (),
-                outcome=metadata["outcome"],
-                latency_ms=metadata.get("latency_ms"),
+                outcome=stored["outcome"],
+                latency_ms=stored.get("latency_ms"),
             )
             finished = await finish_generation_and_schedule_memory(
                 session,
@@ -675,11 +751,11 @@ class AnswerOrchestrator:
         return len(expired)
 
 
-def _usage_count(value):
+def _usage_count(value: object) -> int:
     return value if type(value) is int and 0 <= value < 2**31 else 0
 
 
-def _digest(value):
+def _digest(value: object) -> str:
     return hashlib.sha256(
         json.dumps(
             value,
@@ -691,7 +767,7 @@ def _digest(value):
     ).hexdigest()
 
 
-def _validate_result(result):
+def _validate_result(result: LLMTypes.LLMResultInfo) -> None:
     if not isinstance(result.content, str) or not result.content.strip():
         raise ValueError("empty_response")
     if (
@@ -706,7 +782,9 @@ def _validate_result(result):
             raise ValueError("invalid_usage")
 
 
-def _classify_error(exc, phase):
+def _classify_error(
+    exc: Exception, phase: Types.AnswerJsonValue
+) -> tuple[str, bool, bool]:
     if isinstance(exc, MemoryTypes.ContextBudgetExceededError):
         return (
             "summary_required" if exc.summary_required else "fixed_context_exceeded",
@@ -740,8 +818,14 @@ def _classify_error(exc, phase):
 
 
 def _failure(
-    metadata, code, usage, *, retryable=False, uncertain=False, outcome="failed"
-):
+    metadata: Types.AnswerMetadata,
+    code: str,
+    usage: LLMTypes.TokenUsageInfo,
+    *,
+    retryable: bool = False,
+    uncertain: bool = False,
+    outcome: _Outcome = "failed",
+) -> Types.AnswerMetadata:
     return {
         **metadata,
         "phase": "result_ready",
@@ -755,8 +839,9 @@ def _failure(
     }
 
 
-def _answer_info(run):
-    metadata = run.answer_metadata or {}
+def _answer_info(run: Types.GenerationStateInfo) -> Types.AnswerInfo:
+    # v1/v2 writers own these response fields; preserve the existing billing guard.
+    metadata = cast(_StoredAnswer, run.answer_metadata or {})
     billing = metadata.get("billing")
     price_credit = billing.get("reserved_credit") if isinstance(billing, dict) else None
     return Types.AnswerInfo(
@@ -773,7 +858,7 @@ def _answer_info(run):
 
 # 성공 생성 저장과 기억 작업 예약을 같은 트랜잭션으로 묶는다. 완료 재전송은 세대를 다시 올리지 않는다.
 async def finish_generation_and_schedule_memory(
-    session, command: Types.FinishGenerationCommand
+    session: AsyncSession, command: Types.FinishGenerationCommand
 ) -> Types.GenerationInfo:
     """The successful response and queue generation commit atomically."""
     async with use_case_transaction(session):

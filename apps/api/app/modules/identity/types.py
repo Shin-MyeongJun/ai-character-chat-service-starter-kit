@@ -2,7 +2,22 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TypedDict
 from uuid import UUID
+
+
+class AuthTokenClaims(TypedDict):
+    """Existing validated JWT claims; decoding retains the original extension keys."""
+
+    iss: str
+    aud: str
+    sub: str
+    sid: str
+    jti: str
+    iat: int
+    nbf: int
+    exp: int
+    type: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,7 +33,7 @@ class UserAccessInfo:
 
 
 class AuthError(Exception):
-    def __init__(self, code: str):
+    def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
 

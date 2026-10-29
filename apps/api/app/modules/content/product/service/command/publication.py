@@ -4,6 +4,10 @@
 
 import hashlib
 import json
+from typing import TypedDict, cast
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service import command as CharacterCommandService
@@ -22,8 +26,33 @@ from app.modules.llm import types as LlmTypes
 from app.modules.llm.service import query as LlmQueryService
 
 
+class _CanonicalCharacterData(TypedDict):
+    source_id: str
+    data: dict[str, CharacterTypes.CharacterSnapshotJsonValue]
+    order: int
+    role: str | None
+    primary: bool
+
+
+class _CanonicalLorebookData(TypedDict):
+    source_id: str
+    data: LorebookTypes.LorebookSnapshotData
+    role: str
+    priority: int
+    required: bool
+    scope: str
+    targets: list[str]
+
+
+class _CanonicalPublicationData(TypedDict):
+    product: Types.ProductSnapshotData
+    characters: list[_CanonicalCharacterData]
+    lorebooks: list[_CanonicalLorebookData]
+    starts: list[str]
+
+
 async def _build_publication(
-    session, command: Types.BuildPublicationCommand
+    session: AsyncSession, command: Types.BuildPublicationCommand
 ) -> Types.ProductSnapshotInfo:
     """Caller must own a transaction. Product/source locks serialize all publication reads."""
     product_id = command.product_id
@@ -31,28 +60,39 @@ async def _build_publication(
     if not session.in_transaction():
         raise RuntimeError("Publication requires a caller transaction.")
     product = await QueryService.get_owned_product(
-        session, Types.OwnedProductCommand(product_id, owner_id, lock=True)
+        session,
+        Types.OwnedProductCommand(product_id=product_id, owner_id=owner_id, lock=True),
     )
-    row = await Repository.get_product_composition(session, product_id)
-    composition = PersistenceMapper.product_composition_row_to_state_info(row)
-    char_links, book_links, targets = (
+    composition_row = await Repository.get_product_composition(session, product_id)
+    composition = PersistenceMapper.product_composition_row_to_state_info(
+        composition_row
+    )
+    character_links, lorebook_links, targets = (
         composition.characters,
-        sorted(composition.books, key=lambda b: b.id),
+        sorted(composition.books, key=lambda lorebook_link: lorebook_link.id),
         composition.targets,
     )
     await CharacterQueryService.get_owned_characters(
         session,
         CharacterTypes.GetOwnedCharactersCommand(
-            tuple(c.character_id for c in char_links), owner_id, lock=True
+            ids=tuple(
+                character_link.character_id for character_link in character_links
+            ),
+            owner_id=owner_id,
+            lock=True,
         ),
     )
     await LorebookQueryService.get_owned_lorebooks(
         session,
         LorebookTypes.GetOwnedLorebooksCommand(
-            tuple(b.lorebook_id for b in book_links), owner_id, lock=True
+            ids=tuple(lorebook_link.lorebook_id for lorebook_link in lorebook_links),
+            owner_id=owner_id,
+            lock=True,
         ),
     )
     _, starts = await SettingsCommandService._validate_publication(session, product)
+    # _validate_publication above requires both fields while product stays locked.
+    assert product.default_model_id is not None and product.reasoning_effort is not None
     model = await SettingsCommandService._validate_model(
         session, product.default_model_id, product.reasoning_effort
     )
@@ -61,11 +101,17 @@ async def _build_publication(
     )
     if provider is None:
         raise ValueError("Configured provider is missing.")
-    for b in book_links:
-        count = sum(t.product_lorebook_id == b.id for t in targets)
-        if b.scope == "selected" and count == 0 or (b.scope == "all" and count):
+    for lorebook_link in lorebook_links:
+        count = sum(
+            target.product_lorebook_id == lorebook_link.id for target in targets
+        )
+        if (
+            lorebook_link.scope == "selected"
+            and count == 0
+            or (lorebook_link.scope == "all" and count)
+        ):
             raise ValueError("Invalid lorebook targets.")
-    data = {
+    data: Types.ProductSnapshotData = {
         "title": product.title,
         "description": product.description,
         "opening_message": product.opening_message,
@@ -79,87 +125,117 @@ async def _build_publication(
         },
         "replacement_policy": product.replacement_policy,
     }
-    row = await Repository.create_product_snapshot(session, product_id, data)
-    snapshot = PersistenceMapper.product_snapshot_entity_to_info(row)
-    chars, books, canonical_chars, canonical_books = ({}, {}, [], [])
-    scene_options = {}
-    for c in char_links:
-        component = await CharacterCommandService.freeze_character(
-            session, CharacterTypes.FreezeCharacterCommand(c.character_id, owner_id)
+    created_snapshot_row = await Repository.create_product_snapshot(
+        session, product_id, data
+    )
+    snapshot = PersistenceMapper.product_snapshot_entity_to_info(created_snapshot_row)
+    snapshot_character_ids_by_link_id: dict[UUID, UUID] = {}
+    snapshot_lorebook_ids_by_link_id: dict[UUID, UUID] = {}
+    canonical_characters: list[_CanonicalCharacterData] = []
+    canonical_lorebooks: list[_CanonicalLorebookData] = []
+    scene_options: Types.ProductJsonObject = {}
+    for character_link in character_links:
+        character_snapshot = await CharacterCommandService.freeze_character(
+            session,
+            CharacterTypes.FreezeCharacterCommand(
+                character_id=character_link.character_id, owner_id=owner_id
+            ),
         )
-        chars[c.id] = await Repository.add_snapshot_character(
-            session, snapshot.id, component.id, c
+        snapshot_character_ids_by_link_id[
+            character_link.id
+        ] = await Repository.add_snapshot_character(
+            session, snapshot.id, character_snapshot.id, character_link
         )
-        canonical_chars.append(
+        canonical_characters.append(
             {
-                "source_id": str(c.character_id),
-                "data": component.snapshot_data,
-                "order": c.role_order,
-                "role": c.role_name,
-                "primary": c.is_primary,
+                "source_id": str(character_link.character_id),
+                "data": character_snapshot.snapshot_data,
+                "order": character_link.role_order,
+                "role": character_link.role_name,
+                "primary": character_link.is_primary,
             }
         )
-    source_ids = {c.id: str(c.character_id) for c in char_links}
-    for b in book_links:
-        book_component = await LorebookCommandService.freeze_lorebook(
-            session, LorebookTypes.FreezeLorebookCommand(b.lorebook_id, owner_id)
+    source_character_ids_by_link_id = {
+        character_link.id: str(character_link.character_id)
+        for character_link in character_links
+    }
+    for lorebook_link in lorebook_links:
+        lorebook_snapshot = await LorebookCommandService.freeze_lorebook(
+            session,
+            LorebookTypes.FreezeLorebookCommand(
+                lorebook_id=lorebook_link.lorebook_id, owner_id=owner_id
+            ),
         )
-        books[b.id] = await Repository.add_snapshot_lorebook(
-            session, snapshot.id, book_component.id, b
+        snapshot_lorebook_ids_by_link_id[
+            lorebook_link.id
+        ] = await Repository.add_snapshot_lorebook(
+            session, snapshot.id, lorebook_snapshot.id, lorebook_link
         )
-        canonical_books.append(
+        canonical_lorebooks.append(
             {
-                "source_id": str(b.lorebook_id),
-                "data": book_component.snapshot_data,
-                "role": b.role,
-                "priority": b.priority,
-                "required": b.is_required,
-                "scope": b.scope,
+                "source_id": str(lorebook_link.lorebook_id),
+                "data": lorebook_snapshot.snapshot_data,
+                "role": lorebook_link.role,
+                "priority": lorebook_link.priority,
+                "required": lorebook_link.is_required,
+                "scope": lorebook_link.scope,
                 "targets": sorted(
-                    source_ids[t.product_character_id]
-                    for t in targets
-                    if t.product_lorebook_id == b.id
+                    source_character_ids_by_link_id[target.product_character_id]
+                    for target in targets
+                    if target.product_lorebook_id == lorebook_link.id
                 ),
             }
         )
-    for t in targets:
+    for target in targets:
         await Repository.add_snapshot_target(
             session,
             snapshot.id,
-            chars[t.product_character_id],
-            books[t.product_lorebook_id],
+            snapshot_character_ids_by_link_id[target.product_character_id],
+            snapshot_lorebook_ids_by_link_id[target.product_lorebook_id],
         )
-    book_by_source = {b.lorebook_id: b.id for b in book_links}
+    lorebook_link_ids_by_source_id = {
+        lorebook_link.lorebook_id: lorebook_link.id for lorebook_link in lorebook_links
+    }
     for start in starts:
-        entry = await LorebookQueryService.get_lorebook_entry(
+        start_entry = await LorebookQueryService.get_lorebook_entry(
             session,
             LorebookTypes.GetLorebookEntryCommand(
                 lorebook_id=start.lorebook_id, entry_id=start.entry_id
             ),
         )
+        # Parent lorebooks remain locked; publication validation found this start.
+        assert start_entry is not None, "Validated start entry disappeared."
         await Repository.add_snapshot_start(
             session,
             snapshot.id,
-            books[book_by_source[start.lorebook_id]],
-            entry,
+            snapshot_lorebook_ids_by_link_id[
+                lorebook_link_ids_by_source_id[start.lorebook_id]
+            ],
+            start_entry,
             start.sort_order,
         )
-        if "studio_scene_v1" in entry.metadata:
-            scene_options[str(entry.id)] = entry.metadata["studio_scene_v1"]
-    canonical = {
+        if "studio_scene_v1" in start_entry.metadata:
+            # Lorebook metadata came from JSONB. This open scene payload is JSON,
+            # although the public metadata type also permits other objects.
+            scene_options[str(start_entry.id)] = cast(
+                Types.ProductJsonValue, start_entry.metadata["studio_scene_v1"]
+            )
+    canonical: _CanonicalPublicationData = {
         "product": data,
-        "characters": canonical_chars,
-        "lorebooks": sorted(canonical_books, key=lambda b: str(b["source_id"])),
+        "characters": canonical_characters,
+        "lorebooks": sorted(
+            canonical_lorebooks,
+            key=lambda lorebook_link: str(lorebook_link["source_id"]),
+        ),
         "starts": [str(s.entry_id) for s in sorted(starts, key=lambda s: s.sort_order)],
     }
-    final_data = {
-        **data,
-        **({"studio_start_options": scene_options} if scene_options else {}),
-        "content_digest": hashlib.sha256(
-            json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
-        ).hexdigest(),
-    }
-    row = await Repository.finish_product_snapshot(
+    final_data = data.copy()
+    if scene_options:
+        final_data["studio_start_options"] = scene_options
+    final_data["content_digest"] = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()
+    finished_snapshot_row = await Repository.finish_product_snapshot(
         session, product_id, snapshot.id, final_data
     )
-    return PersistenceMapper.product_snapshot_entity_to_info(row)
+    return PersistenceMapper.product_snapshot_entity_to_info(finished_snapshot_row)

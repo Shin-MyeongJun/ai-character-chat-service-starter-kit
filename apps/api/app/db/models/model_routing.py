@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.json_types import JsonObject
 from app.db.models._mixins import TimestampMixin, UuidPkMixin
 
 
@@ -49,7 +50,7 @@ class Model(TimestampMixin, UuidPkMixin, Base):
     context_window: Mapped[int] = mapped_column(Integer, nullable=False)
     input_price: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
     output_price: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
-    capabilities: Mapped[dict] = mapped_column(
+    capabilities: Mapped[JsonObject] = mapped_column(
         JSONB,
         nullable=False,
         server_default=text("'{}'::jsonb"),

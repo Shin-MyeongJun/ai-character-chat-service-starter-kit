@@ -45,3 +45,71 @@ runtime은 최초 snapshot의 시작 옵션을 조회한다. 현재 버전에서
 현재 클라이언트는 `.local_test/static/app.js`와 `apps/web`이다. 고정 내용을 별도 aside로 표시하고 답변 대상은 시작 조회의 primary_product_character_id로 정한다.
 
 소유 대화 목록 `GET /conversations/mine`은 사용자 ID로 제한하고 생성 시각·ID 내림차순 커서를 사용한다. 대화 제목은 생성 당시 상품 스냅샷의 고정 제목이다. 마지막 메시지 문구는 상위 use case가 chat 공개 서비스를 통해 결합한다. 이미지 정보는 현재 계약에 없다.
+
+## 저장소·조회·mapper 타입 정리 (2026-10-28)
+
+repository.py, service/query.py, mapper/persistence.py와 types.py를 엄격 검사에 추가했다.
+세션·UUID·시각·Command·Entity/목록/None 반환을 명시한다. 단건 조회와 이력 갱신의
+scalar, 잠긴 조회의 FOR UPDATE/populate_existing, 생성·전환의 flush/참여자 교체 순서는
+유지한다. 커서 인자 쌍·COUNT의 non-null·상위에서 잠근 전환 대상 존재는 assertion으로
+표현한다. 공개 service의 미소유/미존재 LookupError와 커서 검증 정책은 유지한다.
+
+대화 Info 변환은 필드를 명시한다. 원본 character ID, character snapshot ID, 상품 참여
+슬롯 ID를 구별하고 Command는 키워드로 구성한다. 목록은 기존 limit+1과 생성 시각/ID
+내림차순, 참여자는 role_order/ID 오름차순이다. 전체 개수는 페이지 커서와 독립적이다.
+통계 raw 결과는 repository의 ConversationStatisticsRows로 표현하고 mapper에서 값 tuple
+목록으로 바꾼다. 생성은 최초 snapshot, 전환은 도착 snapshot별로 세며 [start,end)와
+상품 범위를 유지한다. 최초 snapshot IS NOT NULL 조건도 유지한다.
+
+runtime의 캐릭터 JSON·로어 항목·설정과 통계 tuple 요소를 공개 값 타입으로 구체화했다.
+RuntimeStart.title과 ConversationRuntimeView.start는 실제 nullable 입력/반환을 표현한다.
+빈 제목/장면을 합성하거나 HTTP 스키마를 바꾸지 않는다. 최초 장면의 scene opening,
+명시적 빈 문자열/None과 legacy 첫 대사 없음, 기존 default 키 조회의 KeyError를 유지한다.
+상품 JSON의 TypedDict→개방형 JSON 및 발행 scene 옵션 구조에만 근거를 남긴 cast 2곳을
+둔다. 런타임의 최상위 settings 사전 생성, 중첩 JSON/캐릭터 data/활성 entry의 기존 참조
+공유도 유지하며 추가 깊은 복사나 실행 시 버전 검증을 도입하지 않는다.
+
+test_conversation_query_contracts의 17건은 최소 SQLite 테이블의 소유자 범위·커서·개수,
+조회 캐시 갱신·참여자 순서/nullable ID, 생성/원문 세대/전환 보존, 통계 시간 경계와
+순수 mapper의 슬롯/JSON/시작 값 계약을 확인한다. FK/UNIQUE를 복제하지 않은 테스트이며
+실제 PostgreSQL 잠금·동시성 보장은 검증하지 않는다. 당시 남긴 쓰기/시작/runtime service와
+prompt 소비부 진단의 후속 결과는 아래에 기록한다. HTTP는 후속 엄격 검사 범위다.
+
+## 쓰기·views 및 프롬프트 소비부 타입 정리 (2026-10-28)
+
+service/ 디렉터리 전체를 엄격 검사에 포함했다. 시작·버전 전환·원문 세대·runtime 준비와
+시작 내용/수동 로어 views의 AsyncSession을 명시한다. 같은 모듈의 버전 전환은 구체적
+query 진입점을 참조하고, 상품 snapshot·통계 갱신 Command는 키워드로 구성한다.
+character_commands/start_option/lorebook/snapshot_id/known_entry_ids로 역할을 구별한다.
+시작 ID의 membership 검사 뒤 UUID non-null 가정은 assertion으로 표현한다.
+
+기존 시작 옵션 자동/명시 선택과 primary 요구, 상품 잠금, 버전 전환의 대화 잠금·동일 버전
+멱등 성공·순방향/노트/동의 검증은 유지한다. 원문 세대 변경은 소유 대화 잠금 안에서
+실행한다. 각 트랜잭션·가용성/모델 선택/활성화/수동 ID 검증/최초 시작 조회의 순서도 같다.
+runtime의 lock 인자나 최초 만료 snapshot 조회 정책을 새로 바꾸지 않았다.
+
+test_conversation_command_contracts의 26건은 시작 성공/거절, 전환 멱등·동의·구성 검증과
+저장/통계 호출, 원문 세대 잠금, 최초 시작/현재 primary 및 실제 참여자 구별, legacy 수동
+목록과 pinned manual 항목, 스냅샷별 수동 ID 선택과 실패 후 세션 트랜잭션 종료를 확인한다.
+서비스·저장소는 대역이며 실제 AsyncSession으로 상위 트랜잭션 범위를 실행한다. DB 잠금·
+교차 도메인 쓰기 원자성·경합까지 검증한 것은 아니다. 프롬프트 쪽 내부 입력 전제와
+직렬화 보존 검증은 prompt/ARCHITECTURE.md를 따른다.
+
+## HTTP·모듈 전체 엄격 검사 완료 (2026-10-28)
+
+router의 시작·전환·업데이트·시작 내용 반환을 기존 ResponseDto로 명시했다. manual-lore는
+기존 dict[str, tuple[ManualLoreInfo,...]]를 반환하고 response_model=None으로 raw 응답
+처리를 유지한다. DTO 이름·경로·필드·상태 코드·인증 훅은 보존한다. 단독 conversation
+router의 OpenAPI는 전후 동일하다(5경로·12스키마). schema mapper는 포맷만 정리했고
+schemas의 필드/검증은 변경하지 않았다.
+
+필수 검사 범위를 conversation 디렉터리 전체로 묶었다. 전체 15 source files의 mypy가
+통과하고 conversation의 시그니처 기준선은 0개다. 다른 디렉터리의 DB 모델·최상위 use case·
+공유 HTTP 조립 코드까지 모두 완료했다는 뜻은 아니다.
+
+test_conversation_http의 12건은 신뢰된 owner/session·경로/본문 ID, 201 시작·멱등 전환,
+업데이트의 만료/노트, snapshot/legacy 시작 내용·nullable 참여자, manual raw 응답,
+404/422 변환·미연결 의존성의 서비스 미호출·본문 user_id 거절을 확인한다. 시작 객체의
+title=None은 기존 HTTP 모델이 여전히 거절하며 현재 errors 경계에서 422가 됨을 확인했다.
+nullable 제목 정책은 별도 결함 검토 대상이며 이 단계에서 문자열을 합성하거나 DTO를
+완화하지 않았다. 서비스 대역을 사용한 HTTP 계약 검사이며 실제 인가/DB 검증은 아니다.

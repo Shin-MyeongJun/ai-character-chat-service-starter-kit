@@ -2,6 +2,10 @@
 import hashlib
 import json
 from datetime import UTC, datetime
+from typing import Literal, overload
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as Repository
@@ -16,12 +20,17 @@ from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.chatting.memory.service import invalidate_conversation_memories
 
 
-def _validate_content(content):
+def _validate_content(content: str) -> None:
     if not content.strip() or len(content) > 200000:
         raise ValueError("Message must contain 1–200000 nonblank characters.")
 
 
-async def _lock_conversation(session, command):
+async def _lock_conversation(
+    session: AsyncSession,
+    command: Types.CreateMessageCommand
+    | Types.ReplaceMessageCommand
+    | Types.RewindMessagesCommand,
+) -> ConversationTypes.ConversationInfo:
     return await get_owned_conversation(
         session,
         ConversationTypes.OwnedConversationCommand(
@@ -30,12 +39,20 @@ async def _lock_conversation(session, command):
     )
 
 
-async def _ensure_idle(session, conversation_id):
+async def _ensure_idle(session: AsyncSession, conversation_id: UUID) -> None:
     if await Repository.has_pending_generation(session, conversation_id):
         raise Types.MessageConflictError("A generation is in progress.")
 
 
-async def _get_character(session, command):
+async def _get_character(
+    session: AsyncSession,
+    command: Types.CreateMessageCommand | Types.ReplaceMessageCommand,
+) -> ConversationTypes.ConversationCharacterInfo:
+    # Only the trusted character create/replace wrappers call this helper.
+    assert isinstance(
+        command,
+        (Types.CreateCharacterMessageCommand, Types.ReplaceCharacterMessageCommand),
+    )
     participants = await list_conversation_characters(
         session,
         ConversationTypes.OwnedConversationCommand(
@@ -44,9 +61,9 @@ async def _get_character(session, command):
     )
     character = next(
         (
-            c
-            for c in participants
-            if c.product_character_id == command.product_character_id
+            participant
+            for participant in participants
+            if participant.product_character_id == command.product_character_id
         ),
         None,
     )
@@ -57,42 +74,66 @@ async def _get_character(session, command):
 
 # 사용자 입력 저장의 공개 경계다. 소유 대화를 잠그고 요청 키 영수증과 현재 생성 상태를 확인한다.
 async def create_message(
-    session, command: Types.CreateMessageCommand
+    session: AsyncSession, command: Types.CreateMessageCommand
 ) -> Types.MessageInfo:
     return await _create_message(session, command, character=False)
 
 
 async def create_character_message(
-    session, command: Types.CreateCharacterMessageCommand
+    session: AsyncSession, command: Types.CreateCharacterMessageCommand
 ) -> Types.MessageInfo:
     return await _create_message(session, command, character=True)
 
 
-async def _create_message(session, command, *, character):
+@overload
+async def _create_message(
+    session: AsyncSession,
+    command: Types.CreateCharacterMessageCommand,
+    *,
+    character: Literal[True],
+) -> Types.MessageInfo: ...
+
+
+@overload
+async def _create_message(
+    session: AsyncSession,
+    command: Types.CreateMessageCommand,
+    *,
+    character: Literal[False],
+) -> Types.MessageInfo: ...
+
+
+async def _create_message(
+    session: AsyncSession, command: Types.CreateMessageCommand, *, character: bool
+) -> Types.MessageInfo:
     _validate_content(command.content)
     if not command.request_key.strip() or len(command.request_key) > 128:
         raise ValueError("Invalid message request key.")
     sender_type = "character" if character else "user"
-    product_character_id = command.product_character_id if character else None
+    if character:
+        assert isinstance(command, Types.CreateCharacterMessageCommand)
+        product_character_id = command.product_character_id
+    else:
+        product_character_id = None
     digest = hashlib.sha256(
         json.dumps([sender_type, str(product_character_id), command.content]).encode()
     ).hexdigest()
     async with use_case_transaction(session):
         conversation = await _lock_conversation(session, command)
-        row = await Repository.get_message_request(
+        receipt_entity = await Repository.get_message_request(
             session, command.conversation_id, command.request_key
         )
-        receipt = PersistenceMapper.message_request_entity_to_info(row)
+        receipt = PersistenceMapper.message_request_entity_to_info(receipt_entity)
         # 삭제 후에도 receipt는 남는다. 본문 digest나 원본 revision이 다르면 재생성하지 않고 충돌 처리한다.
         if receipt:
             if receipt.input_digest != digest:
                 raise Types.MessageConflictError(
                     "Request key was used with different input."
                 )
-            row = await Repository.get_message(
+            message_entity = await Repository.get_message(
                 session, command.conversation_id, receipt.message_id
             )
-            existing = PersistenceMapper.message_entity_to_info(row)
+            existing = PersistenceMapper.message_entity_to_info(message_entity)
             if existing is None or existing.revision != 1:
                 raise Types.MessageConflictError(
                     "The original message was replaced or deleted."
@@ -100,7 +141,7 @@ async def _create_message(session, command, *, character):
             return existing
         await _ensure_idle(session, command.conversation_id)
         participant = await _get_character(session, command) if character else None
-        row = await Repository.create_message(
+        message_entity = await Repository.create_message(
             session,
             command,
             conversation.product_snapshot_id,
@@ -109,35 +150,55 @@ async def _create_message(session, command, *, character):
             product_character_id,
             digest,
         )
-        result = PersistenceMapper.message_entity_to_info(row)
+        result = PersistenceMapper.message_entity_to_info(message_entity)
         assert result is not None
         return result
 
 
 # 마지막 사용자 메시지의 예상 revision이 일치할 때만 같은 ID/position으로 내용을 교체한다.
 async def replace_message(
-    session, command: Types.ReplaceMessageCommand
+    session: AsyncSession, command: Types.ReplaceMessageCommand
 ) -> Types.MessageInfo:
     return await _replace_message(session, command, character=False)
 
 
 async def replace_character_message(
-    session, command: Types.ReplaceCharacterMessageCommand
+    session: AsyncSession, command: Types.ReplaceCharacterMessageCommand
 ) -> Types.MessageInfo:
     return await _replace_message(session, command, character=True)
 
 
-async def _replace_message(session, command, *, character):
+@overload
+async def _replace_message(
+    session: AsyncSession,
+    command: Types.ReplaceCharacterMessageCommand,
+    *,
+    character: Literal[True],
+) -> Types.MessageInfo: ...
+
+
+@overload
+async def _replace_message(
+    session: AsyncSession,
+    command: Types.ReplaceMessageCommand,
+    *,
+    character: Literal[False],
+) -> Types.MessageInfo: ...
+
+
+async def _replace_message(
+    session: AsyncSession, command: Types.ReplaceMessageCommand, *, character: bool
+) -> Types.MessageInfo:
     _validate_content(command.content)
     if type(command.expected_revision) is not int or command.expected_revision < 1:
         raise ValueError("Invalid expected revision.")
     async with use_case_transaction(session):
         conversation = await _lock_conversation(session, command)
         await _ensure_idle(session, command.conversation_id)
-        row = await Repository.get_message(
+        message_entity = await Repository.get_message(
             session, command.conversation_id, command.message_id
         )
-        target = PersistenceMapper.message_entity_to_info(row)
+        target = PersistenceMapper.message_entity_to_info(message_entity)
         if target is None:
             raise LookupError("Message not found.")
         if target.sender_type != ("character" if character else "user"):
@@ -145,6 +206,7 @@ async def _replace_message(session, command, *, character):
                 "This command cannot replace that sender's message."
             )
         if character:
+            assert isinstance(command, Types.ReplaceCharacterMessageCommand)
             await _get_character(session, command)
             if (
                 target.product_character_id != command.product_character_id
@@ -153,31 +215,35 @@ async def _replace_message(session, command, *, character):
                 raise ValueError(
                     "Message does not belong to this character and version."
                 )
-        row = await Repository.get_last_message(session, command.conversation_id)
-        last = PersistenceMapper.message_entity_to_info(row)
+        last_entity = await Repository.get_last_message(
+            session, command.conversation_id
+        )
+        last = PersistenceMapper.message_entity_to_info(last_entity)
         if last is None or last.id != target.id:
             raise Types.MessageConflictError("Only the last message can be replaced.")
         if target.revision != command.expected_revision:
             raise Types.MessageConflictError("Message revision has changed.")
         # 교체와 같은 트랜잭션에서 대화 기억 전체를 무효화한다. 생성 비용·통계 사실은 되돌리지 않는다.
         await _invalidate_history(session, command)
-        row = await Repository.replace_message(session, target.id, command.content)
-        result = PersistenceMapper.message_entity_to_info(row)
+        replaced_entity = await Repository.replace_message(
+            session, target.id, command.content
+        )
+        result = PersistenceMapper.message_entity_to_info(replaced_entity)
         assert result is not None
         return result
 
 
 # 대상 position을 포함한 뒤쪽 이력을 삭제한다. 대화 버전은 유지하고 기억은 무효화한다.
 async def rewind_messages(
-    session, command: Types.RewindMessagesCommand
+    session: AsyncSession, command: Types.RewindMessagesCommand
 ) -> Types.RewindMessagesInfo:
     async with use_case_transaction(session):
         await _lock_conversation(session, command)
         await _ensure_idle(session, command.conversation_id)
-        row = await Repository.get_message(
+        message_entity = await Repository.get_message(
             session, command.conversation_id, command.message_id
         )
-        target = PersistenceMapper.message_entity_to_info(row)
+        target = PersistenceMapper.message_entity_to_info(message_entity)
         if target is None:
             raise LookupError("Message not found.")
         await _invalidate_history(session, command)
@@ -187,7 +253,10 @@ async def rewind_messages(
         return Types.RewindMessagesInfo(count)
 
 
-async def _invalidate_history(session, command):
+async def _invalidate_history(
+    session: AsyncSession,
+    command: Types.ReplaceMessageCommand | Types.RewindMessagesCommand,
+) -> None:
     await invalidate_conversation_memories(
         session,
         MemoryTypes.InvalidateConversationMemoriesCommand(

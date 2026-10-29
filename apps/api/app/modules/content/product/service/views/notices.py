@@ -1,5 +1,7 @@
 # 공개 상품 안내·대화 업데이트·소유자 버전 가용성 정보를 모델 종료 안내와 합친다.
 # 안내 조회는 만료 버전도 표현하며, 실제 사용 가능 여부는 시작/생성 단계에서 검사한다.
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service import get_owned_conversation
 from app.modules.content.product import types as Types
@@ -10,7 +12,7 @@ from app.modules.llm.service.replacement import execution_notice
 
 
 async def get_published_product(
-    session, command: Types.PublishedProductCommand
+    session: AsyncSession, command: Types.PublishedProductCommand
 ) -> Types.PublishedProductView:
     product_id = command.product_id
     user_id = command.user_id
@@ -35,7 +37,7 @@ async def get_published_product(
 
 
 async def get_pending_updates(
-    session, command: Types.PendingUpdatesCommand
+    session: AsyncSession, command: Types.PendingUpdatesCommand
 ) -> Types.PendingUpdatesView:
     conversation_id = command.conversation_id
     user_id = command.user_id
@@ -53,6 +55,9 @@ async def get_pending_updates(
     product = await QueryService.get_product_state(
         session, Types.GetProductStateCommand(product_id=conversation.product_id)
     )
+    # Conversation.product_id is a required RESTRICT FK. The existing view
+    # assumes its parent still exists; concurrent deletion needs a separate policy.
+    assert product is not None, "Conversation product disappeared."
     releases = await QueryService.list_product_releases(
         session,
         Types.ListProductReleasesCommand(
@@ -68,13 +73,13 @@ async def get_pending_updates(
 
 
 async def get_version_availability(
-    session, command: Types.VersionAvailabilityCommand
+    session: AsyncSession, command: Types.VersionAvailabilityCommand
 ) -> Types.VersionAvailabilityView:
     product_id = command.product_id
     snapshot_id = command.snapshot_id
     owner_id = command.owner_id
     await QueryService.get_owned_product(
-        session, Types.OwnedProductCommand(product_id, owner_id)
+        session, Types.OwnedProductCommand(product_id=product_id, owner_id=owner_id)
     )
     snapshot = await QueryService.get_product_snapshot(
         session, Types.ProductSnapshotCommand(snapshot_id)

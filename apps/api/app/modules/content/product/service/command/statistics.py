@@ -2,6 +2,8 @@
 # enqueue_recent(days)는 오늘을 포함해 days+1개 날짜를 다시 예약한다.
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.product_stats_queue import day_bounds, statistics_day
 from app.db.transaction import use_case_transaction
 from app.modules.content.product import repository as Repository
@@ -14,7 +16,7 @@ from app.modules.content.product.service.command.statistics_queue import (
 
 
 async def replace_statistics_day(
-    session, command: Types.ReplaceStatisticsDayCommand
+    session: AsyncSession, command: Types.ReplaceStatisticsDayCommand
 ) -> None:
     async with use_case_transaction(session):
         build = StatisticsMapper.statistics_facts_infos_to_build_info(command)
@@ -23,16 +25,22 @@ async def replace_statistics_day(
         )
 
 
-async def claim_statistics_work(session) -> Types.StatisticsWorkInfo | None:
+async def claim_statistics_work(
+    session: AsyncSession,
+) -> Types.StatisticsWorkInfo | None:
     row = await Repository.get_pending_statistics_work(session)
     return PersistenceMapper.statistics_work_entity_to_info(row)
 
 
-async def complete_statistics_work(session, command: Types.RebuildDayCommand) -> None:
+async def complete_statistics_work(
+    session: AsyncSession, command: Types.RebuildDayCommand
+) -> None:
     await Repository.delete_statistics_work(session, command.product_id, command.day)
 
 
-async def enqueue_recent(session, command: Types.EnqueueRecentCommand) -> None:
+async def enqueue_recent(
+    session: AsyncSession, command: Types.EnqueueRecentCommand
+) -> None:
     days = command.days
     now = command.now
     if not 1 <= days <= 31:
@@ -44,5 +52,6 @@ async def enqueue_recent(session, command: Types.EnqueueRecentCommand) -> None:
             for offset in range(days + 1):
                 start, _ = day_bounds(today - timedelta(days=offset))
                 await mark_statistics_dirty(
-                    session, Types.MarkStatisticsDirtyCommand(pid, start)
+                    session,
+                    Types.MarkStatisticsDirtyCommand(product_id=pid, instant=start),
                 )

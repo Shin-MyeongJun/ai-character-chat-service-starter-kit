@@ -10,6 +10,7 @@ import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import BinaryIO
 from uuid import uuid4
 
 from app.modules.asset_storage.types import (
@@ -33,7 +34,7 @@ _COPY_CHUNK_SIZE = 1024 * 1024
 class _LocalAssetReader:
     def __init__(
         self,
-        file_object,
+        file_object: BinaryIO,
         error_mapper: Callable[[OSError], AssetStorageError],
     ) -> None:
         self._file_object = file_object
@@ -204,7 +205,7 @@ class TestLocalStorageAdapter:
             last_modified=datetime.fromisoformat(raw["last_modified"]),
         )
 
-    def _open_sync(self, object_key: str):
+    def _open_sync(self, object_key: str) -> tuple[AssetMetadataInfo, BinaryIO]:
         metadata = self._read_metadata_sync(object_key)
         return metadata, self._data_path(object_key).open("rb")
 

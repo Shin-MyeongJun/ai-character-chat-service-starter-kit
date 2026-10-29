@@ -13,6 +13,9 @@
 
 ## 경계와 특이 계약
 
+미디어 서비스 생성자의 `sessions`는 공통 `app.db.types.SessionFactory`로 타입을 명시한다.
+기존 인자명과 `self.sessions`는 호환을 위해 유지하며 저장소/스트림 수명이나 잠금은 바꾸지 않는다.
+
 타 모듈은 `service`와 `types`만 사용한다. product는 잠긴 CharacterInfo와 freeze 결과를 받아 자기 스냅샷에 연결한다. 스냅샷의 이미지·에셋 이력은 이 모듈만 조회한다. 인가 JOIN 예외는 없다.
 
 `schemas.py`와 `dependencies.py`는 기존 import 및 FastAPI dependency override 호환성을 위한 재노출이다. 여러 접근 주체가 공유하는 HTTP 표현은 `app/http/contracts/character.py`, 실행 의존성 훅은 `app/http/character_dependencies.py`에 있다. 기존 클래스명·응답 필드와 미설정 인증의 503 동작을 유지한다. 기존 이미지/에셋 추가의 501 스텁은 실제 DB 참조 추가로 구현했다. 기존 URL 요청은 복사·다운로드 없이 보관하고, 신규 업로드의 앱 내부 URL은 소유 캐릭터의 준비된 미디어만 연결한다.
@@ -54,3 +57,109 @@
 공개 태그 HTTP는 기존 /me 콘텐츠 조회와 같은 소유자 정책이다. 일반 소유자 라우터와 관리자 내부 태그 라우터는 분리한다. 기존 생성·상세 응답의 구조는 바꾸지 않는다.
 
 API 경로·예제·검증은 [태그 관리](../../../../../../references_document/reference/content-tags.md)에 정리했다.
+
+## 기본 CRUD 패턴 정리 (2026-10-27)
+
+기본 생성·수정·상태 변경 저장소는 Character, 삭제 저장소는 None을 반환하도록 명시한다.
+서비스는 Entity를 persistence mapper로 변환한 Info로 존재·소유권을 판단하며, 기존
+use_case_transaction, 소유 캐릭터 FOR UPDATE와 저장소 재조회 순서를 유지한다.
+수정의 description/default_model_id=None은 해제이고, 상태 변경은 프로필을 바꾸지 않는다.
+생성 시 공개 태그 연결은 같은 트랜잭션에 남고 PublicTagsCommand는 키워드로 구성한다.
+
+query와 persistence/schema mapper 3개 파일을 Ruff/mypy 엄격 검사 범위에 추가했다.
+목록 mapper는 Entity의 Iterable을 받아 기존 list를 반환한다. 단건의 None/Info overload와
+공개 함수·인자·DTO 이름은 유지한다. 저장소의 기본 CRUD 및 조회 관련 타입도 보완했지만
+repository 전체가 엄격 검사를 통과한 것은 아니다.
+
+SnapshotMediaManifestItem은 기존 이미지 4필드/에셋 5필드 tuple을 표현한다. 비교 집합에서
+is_default 제외·중복 제거·URL/출처 ID 보존 정책은 그대로다. 스냅샷 JSON은 계속 깊게 복사하며
+character_id=None인 보존 스냅샷도 변환한다. JSON 필드별 검증 완료를 뜻하지 않는다.
+
+기본 CRUD 단계 종료 당시 command.py에는 미디어 첨부 함수의 반환 타입 누락에서 오는 기존 mypy 오류 2개가 남아
+전체 파일을 strict scope에 넣지 않았다. repository의 버전 계산·미디어/태그 함수,
+types의 snapshot_data 구조, media/tags service와 HTTP 라우터도 후속 범위다.
+미디어 예약·외부 저장 종료 대기·잠금 수명·정리/재시도 정책은 이번 변경 대상이 아니다.
+기존 파일 구성을 유지하고 타입 검사 편의를 위한 인위적인 파일 분리는 하지 않았다.
+
+검증은 기존 character CRUD/SQLite 조회 테스트와 test_character_mapping의 JSON 격리·발행
+비교 계약 테스트를 사용한다. 실제 PostgreSQL 잠금·동시성·외부 저장소 검증은 포함하지 않는다.
+
+## 미디어·저장소 타입 정리 (2026-10-27)
+
+위 기본 CRUD 단계의 후속으로 command.py, repository.py, mapper/media.py,
+service/media.py, service/workflow/media.py를 엄격 검사 범위에 추가했다.
+command의 미디어 반환 오류 2개와 repository의 남은 타입 오류를 해결했다.
+세션은 AsyncSession, 조회의 미존재는 None, 미디어 참조 범위는 Sequence[UUID]로 표현한다.
+정리 작업의 snapshot_ids=None은 원본과 모든 스냅샷을 검사하고, 지정된 목록은 해당
+스냅샷만 검사한다. 빈 목록을 전체 참조 조회로 바꾸지 않는다.
+
+미디어 첨부와 저장소의 image/asset overload는 종류와 Command·Entity·Info의 대응을
+표현한다. 구현의 isinstance assertion은 공개 command가 전달하는 이 대응 관계를
+명시한다. 미디어 Entity/Info는 getattr 일괄 복사 대신 명시적 필드 대응으로 변환한다.
+업로드 완료 시 잠근 예약 행이 상태 갱신 후에도 존재한다는 불변 조건을 assertion으로
+표현한다. 외부 저장 종료 대기 함수는 제네릭으로 공급자 작업의 반환 타입을 보존한다.
+예약·커밋 순서, 잠금 수명, 취소 후 종료 대기, 재전송·삭제된 연결의 정책은 유지한다.
+
+test_character_media_contracts는 이미지/에셋의 신규 첨부·재전송·삭제된 연결과 SQLite의
+원본/허가된 스냅샷 참조 범위를 확인한다. 실제 PostgreSQL 잠금이나 외부 저장 검증은 아니다.
+types의 snapshot_data, 태그 service/mapper, HTTP 라우터 등은 후속 정리 범위로 남는다.
+follow_imports=silent이므로 이번 파일의 검사 통과가 의존 모듈 전체의 통과를 의미하지 않는다.
+
+## 태그·스냅샷 JSON 타입 정리 (2026-10-27)
+
+service/tags.py, mapper/tags.py, mapper/tag_schema.py, types.py를 엄격 검사 범위에
+추가했다. 태그 서비스는 AsyncSession과 업무 Command를 받고 기존 Info tuple 또는
+None을 반환한다. mapper는 Entity/Info의 Iterable을 받아 기존 tuple/list를 유지한다.
+관리자 Command와 source="admin", 시스템 Command와 source="system"의 대응을 overload로
+표현한다. 관리자 분기의 isinstance assertion은 이 내부 호출 불변 조건을 명시한다.
+시스템 쓰기는 기존 공개 함수와 같이 추가만 허용하는 타입 계약이다. 관리자 재검증,
+부모 잠금, 관리자 지정 보호, 공개 태그 순서, 비활성 태그 유지 및 트랜잭션 정책은 유지한다.
+
+새 스냅샷의 본문은 CharacterSnapshotV2Data로 name/description/persona_prompt를
+명시하고 repository에서 해당 필드를 직접 저장한다. 읽기 결과의 snapshot_data는
+dict[str, CharacterSnapshotJsonValue]다. 이는 문자열·숫자·불리언·null·배열·객체의
+재귀 JSON 값 범위이며, 기존 스냅샷의 확장 필드와 중첩 구조를 그대로 보존한다.
+읽기 데이터에 v2의 필수 키가 있다고 단정하거나 과거 버전을 변환하지 않는다.
+DB JSONB 디코딩을 경계로 사용하며 공유 SnapshotMixin의 기존 Any 선언이나 저장 데이터의
+버전별 실행 검증을 이번에 정리한 것은 아니다. 기존 deepcopy 격리를 유지한다.
+
+검증은 태그 소유권·관리자/시스템 보호·롤백·HTTP 경계의 기존 테스트, 스냅샷의 중첩 변경
+격리 및 신규 v2 본문 테스트를 사용한다. None/빈 문자열·원문 공백을 보존하고 소유자·상태·
+모델 선택 정보가 스냅샷 본문에 추가되지 않음을 확인한다. HTTP 라우터 및 공유 DB/HTTP
+의존 파일 전체는 아직 엄격 검사 완료 범위가 아니다.
+
+## HTTP 경계 타입 정리 (2026-10-27)
+
+character 모듈 디렉터리 전체를 Ruff/mypy 검사 범위에 포함했다. HTTP 계약의 재노출인
+schemas.py와 dependency override 호환 파일인 dependencies.py도 포함한다. 공유 파일인
+http/character_dependencies.py, http/contracts/character.py, http/contracts/tags.py,
+http/dependencies.py도 직접 검사한다. 다른 HTTP/DB 의존 파일 전체가 검증됐다는 의미는 아니다.
+
+태그 조회·추가·교체는 list[PublicTagResponseDto], 삭제는 None을 반환한다고 명시한다.
+일반 라우터의 업무 요청 지역 변수는 command로 표현한다. 기존 경로·인자명·의존성 함수와
+DTO 재노출, 응답 모델, 204 빈 본문 및 미설정 의존성의 503 동작을 유지한다.
+태그의 공유 errors는 Iterator[None]인 contextmanager이며 LookupError→404,
+ValueError→422 변환을 유지한다. 일반 character 라우터의 별도 오류 응답 표현도 유지한다.
+
+test_character_http는 실제 FastAPI 요청으로 태그 4개 경로의 응답과 신뢰된 owner/session
+전달, 삭제의 OpenAPI 204 응답 본문 없음, 404/422 변환과 미설정 의존성의 503 거절을 확인한다.
+서비스는 mock이므로 DB·외부 저장소 실행 검증을 대신하지 않는다.
+
+## 공유 바이너리 HTTP 전송 타입 정리 (2026-10-28)
+
+app/http/media.py의 contextmanager·ASGI scope/receive/send·비동기 byte iterator와
+MediaStreamingResponse 반환을 명시했다. main의 미디어 서비스 주입 두 곳과 기본
+w+b SpooledTemporaryFile의 BinaryIO 계약만 cast로 연결한다. 새 isinstance 제한·
+BinaryIO wrapper·파일 복사나 의존성 실패 기본값은 추가하지 않았다.
+
+32 MiB 수신 한도·1 MiB spool 임계값·다운스트림의 fingerprint rewind·64 KiB 읽기,
+업로드 context 종료 시 파일 닫기와 전송 finally의 reader 종료, 소유자/상품 버전 전달·
+비공개 캐시/길이/MIME/nosniff/inline 헤더를 유지한다. 읽기 시작 전의 HTTP 오류
+변환과 전송 시작 후 예외 전파를 분리하는 기존 경계도 같다. 공용 http 디렉터리 전체를
+직접 Ruff/mypy로 검사한 뒤 엄격 범위에 편입했다. asset_storage 어댑터 전체 완료를
+뜻하지 않는다.
+
+test_media_transport_contracts는 바이너리 spool의 정상·검증 실패·예외와 수신 한도
+초과에서 파일 종료, ASGI 정상·읽기 오류·취소에서 reader 종료, 캐릭터/상품 소유자
+전달·응답 헤더/빈 OpenAPI 스키마를 오프라인으로 확인한다. 실제 DB 인가·S3·네트워크
+단절·공급자 스레드 정리는 이 HTTP 전송 테스트의 검증 범위가 아니다.

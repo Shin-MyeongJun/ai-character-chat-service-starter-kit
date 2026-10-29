@@ -48,6 +48,10 @@ contracts/openapi.json
 
 # local reference notes
 references_document/*
+!references_document/reference/
+references_document/reference/*
+!references_document/reference/module-architecture-and-naming.md
+!references_document/reference/backend-code-conventions.md
 !references_document/work/
 references_document/work/*
 !references_document/work/nonstream-chat-orchestration.md

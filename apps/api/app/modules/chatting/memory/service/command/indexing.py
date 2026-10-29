@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 from math import isfinite
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
@@ -69,7 +71,7 @@ class MemoryIndexer:
 
 # 대화 소유권·revision·요약 본문 digest가 유효한 경우에만 벡터와 사용량을 저장한다.
 async def save_summary_embedding(
-    session, command: Types.SaveEmbeddingCommand
+    session: AsyncSession, command: Types.SaveEmbeddingCommand
 ) -> Types.MemoryInfo:
     current_row = await Repository.get_memory(
         session,

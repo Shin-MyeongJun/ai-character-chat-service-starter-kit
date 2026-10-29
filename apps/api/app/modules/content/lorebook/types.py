@@ -1,11 +1,12 @@
 # 문자열 길이 제한은 문자 수, ENTRY_METADATA_MAX_BYTES는 JSON 직렬화 바이트 수다.
-# metadata=None은 저장 시 빈 객체가 된다. token_budget=None은 미지정이며 현재 답변 조립은 지정값도 적용하지 않는다.
+# metadata=None은 저장 시 빈 객체가 된다. token_budget=None은 미지정이다.
+# v1 옵션이 있는 스냅샷 항목은 UTF-8 바이트 추정 예산을 적용하고 기존 옵션 없는 항목은 이전 동작을 유지한다.
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, Literal, TypeAlias, TypeVar
+from typing import Generic, Literal, NotRequired, TypeAlias, TypedDict, TypeVar
 from uuid import UUID
 
 LorebookVisibilityValue: TypeAlias = Literal["private", "public", "unlisted"]
@@ -262,12 +263,84 @@ class FreezeLorebookCommand:
     owner_id: UUID
 
 
+class LorebookActivationOptions(TypedDict):
+    # The existing version equality check also accepts JSON number 1.0 and True.
+    version: int | float
+    match: Literal["any", "all"]
+    scan_depth: int
+    search_target: Literal["all", "user"]
+    partial_match: bool
+    case_sensitive: bool
+    order: int
+    exclusive_group: str
+
+
+class LorebookEntryCommandFields(TypedDict):
+    """Entry fields passed to CreateLorebookEntryCommand, excluding IDs."""
+
+    content: str
+    title: NotRequired[str | None]
+    entry_type: NotRequired[LorebookEntryTypeValue]
+    activation_type: NotRequired[LorebookEntryActivationTypeValue]
+    key_triggers: NotRequired[list[str] | None]
+    match_mode: NotRequired[LorebookEntryMatchModeValue]
+    priority: NotRequired[int]
+    token_budget: NotRequired[int | None]
+    placement: NotRequired[LorebookEntryPlacementValue]
+    is_enabled: NotRequired[bool]
+    metadata: NotRequired[dict[str, object] | None]
+
+
+class LorebookSnapshotEntryData(TypedDict):
+    """Runtime entry fields; legacy optional fields and extensions stay intact."""
+
+    id: str
+    content: str
+    entry_type: LorebookEntryTypeValue
+    activation_type: LorebookEntryActivationTypeValue
+    is_enabled: bool
+    match_mode: LorebookEntryMatchModeValue
+    title: NotRequired[str | None]
+    key_triggers: NotRequired[list[str] | None]
+    priority: NotRequired[int]
+    token_budget: NotRequired[int | None]
+    placement: NotRequired[LorebookEntryPlacementValue]
+    metadata: NotRequired[dict[str, object] | None]
+
+
+class LorebookSnapshotData(TypedDict):
+    entries: list[LorebookSnapshotEntryData]
+    title: NotRequired[str]
+    description: NotRequired[str | None]
+
+
+LorebookActivationReason: TypeAlias = Literal[
+    "included",
+    "disabled",
+    "start_scene",
+    "manual_not_selected",
+    "semantic_not_supported",
+    "keyword_mismatch",
+    "entry_budget_exceeded",
+    "exclusive_group",
+]
+
+
+class LorebookEntryDiagnostic(TypedDict):
+    id: str
+    included: bool
+    reason: LorebookActivationReason
+    order: int | None
+    estimated_tokens: int
+    placement: LorebookEntryPlacementValue | None
+
+
 @dataclass(frozen=True, slots=True)
 class LorebookSnapshotInfo:
     id: UUID
     lorebook_id: UUID | None
     version: int
-    snapshot_data: dict
+    snapshot_data: LorebookSnapshotData
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,13 +358,13 @@ class ActivateSnapshotEntriesCommand:
 
 @dataclass(frozen=True, slots=True)
 class ActivatedSnapshotEntriesInfo:
-    entries: list[dict]
+    entries: list[LorebookSnapshotEntryData]
 
 
 @dataclass(frozen=True, slots=True)
 class DiagnoseDraftEntriesCommand:
     owner_id: UUID
-    entries: tuple[dict, ...]
+    entries: tuple[LorebookSnapshotEntryData, ...]
     messages: tuple[tuple[str, str], ...]
     manual_entry_ids: tuple[str, ...] = ()
 

@@ -1,18 +1,18 @@
-from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
-
 # 바이너리 업로드를 최대 32 MiB까지 임시 스트림에 모아 미디어 서비스에 전달한다.
 # 읽기 권한 확인 후 64 KiB씩 전송하며 전송 완료·실패 모두 reader를 닫는다.
 # 전송 시작 뒤 발생한 읽기 오류는 media_errors의 HTTP 변환 범위 밖이다.
 """Additive binary HTTP transport; existing JSON media DTOs remain unchanged."""
 
+from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from tempfile import SpooledTemporaryFile
-from typing import Annotated
+from typing import Annotated, BinaryIO, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+from starlette.types import Receive, Scope, Send
 
 from app.http.character_dependencies import get_current_owner_id
 from app.http.dependencies import Owner
@@ -22,6 +22,7 @@ from app.modules.content.character.service.media import (
     MAX_MEDIA_BYTES,
     MEDIA_CONTENT_TYPES,
 )
+from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.views.media import ProductMediaService
 
@@ -39,15 +40,18 @@ class UploadCharacterMediaResponseDto(BaseModel):
 
 
 def get_character_media_service(request: Request) -> CharacterMediaWorkflow:
-    return request.app.state.character_media_service
+    # main installs this workflow; retain injected runtime/test doubles and the
+    # existing AttributeError when the state member is absent.
+    return cast(CharacterMediaWorkflow, request.app.state.character_media_service)
 
 
 def get_product_media_service(request: Request) -> ProductMediaService:
-    return request.app.state.product_media_service
+    # main constructs this service from the configured session/media dependencies.
+    return cast(ProductMediaService, request.app.state.product_media_service)
 
 
 @contextmanager
-def media_errors():
+def media_errors() -> Iterator[None]:
     try:
         yield
     except (LookupError, AssetStorageTypes.AssetNotFoundError) as exc:
@@ -63,10 +67,10 @@ def media_errors():
 
 
 class MediaStreamingResponse(StreamingResponse):
-    def __init__(self, opened: AssetStorageTypes.AssetReadInfo):
+    def __init__(self, opened: AssetStorageTypes.AssetReadInfo) -> None:
         self.opened = opened
 
-        async def chunks():
+        async def chunks() -> AsyncIterator[bytes]:
             while chunk := await opened.read(64 * 1024):
                 yield chunk
 
@@ -81,7 +85,7 @@ class MediaStreamingResponse(StreamingResponse):
             },
         )
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
             await super().__call__(scope, receive, send)
         finally:
@@ -121,13 +125,15 @@ async def upload_character_media(
             content.write(chunk)
         info = await service.upload_character_media(
             CharacterTypes.UploadCharacterMediaCommand(
-                character_id,
-                owner,
-                idempotency_key,
-                content,
-                content_type,
-                x_filename,
-                x_media_purpose,
+                character_id=character_id,
+                owner_id=owner,
+                request_id=idempotency_key,
+                # The default w+b spool implements the seek/read binary interface
+                # used by fingerprinting/storage; its stub is not nominal BinaryIO.
+                content=cast(BinaryIO, content),
+                content_type=content_type,
+                original_filename=x_filename,
+                purpose=x_media_purpose,
             )
         )
     return UploadCharacterMediaResponseDto(
@@ -145,10 +151,10 @@ async def read_character_media(
     media_id: UUID,
     owner: CharacterOwner,
     service: Annotated[CharacterMediaWorkflow, Depends(get_character_media_service)],
-):
+) -> MediaStreamingResponse:
     with media_errors():
         opened = await service.read_character_media(
-            CharacterTypes.ReadCharacterMediaCommand(media_id, owner)
+            CharacterTypes.ReadCharacterMediaCommand(media_id=media_id, owner_id=owner)
         )
     return MediaStreamingResponse(opened)
 
@@ -160,11 +166,14 @@ async def read_product_media(
     media_id: UUID,
     owner: Owner,
     service: Annotated[ProductMediaService, Depends(get_product_media_service)],
-):
+) -> MediaStreamingResponse:
     with media_errors():
         opened = await service.read_product_media(
             ProductTypes.ReadProductMediaCommand(
-                product_id, snapshot_id, media_id, owner
+                product_id=product_id,
+                snapshot_id=snapshot_id,
+                media_id=media_id,
+                user_id=owner,
             )
         )
     return MediaStreamingResponse(opened)

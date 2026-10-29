@@ -3,10 +3,11 @@
 # retryable은 오류 분류 정보다. 이 값 자체가 재시도나 중복 과금 방지를 실행하지 않는다.
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias, TypedDict
 from uuid import UUID
 
 
@@ -192,13 +193,38 @@ class ExecutionView:
     planned_model_id: UUID | None = None
 
 
+ModelCapabilityValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | list["ModelCapabilityValue"]
+    | dict[str, "ModelCapabilityValue"]
+)
+
+
+class ModelCapabilities(TypedDict, total=False):
+    """Read view of known catalog fields; ModelInfo retains an open dictionary."""
+
+    model_family: object
+    reasoning_efforts: Iterable[str]
+
+
+class SnapshotModelSettings(TypedDict):
+    """Model fields recorded by product snapshot creation, without JSON rewriting."""
+
+    id: str
+    reasoning_effort: str
+
+
 @dataclass(frozen=True, slots=True)
 class ModelInfo:
     id: UUID
     provider_id: UUID
     model_name: str
     is_enabled: bool
-    capabilities: dict
+    capabilities: dict[str, ModelCapabilityValue]
     retirement_announced_at: datetime | None
     shutdown_at: datetime | None
     context_window: int = 8000

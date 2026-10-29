@@ -4,6 +4,12 @@
 
 ## 공개 서비스와 저장 책임
 
+이 모듈의 사전 CRUD는 백엔드 작성 규칙의 첫 기준 사례다. session은 AsyncSession,
+repository 결과는 Tag/None, mapper는 overload로 미존재와 존재를 구분하고 공개 결과는
+기존 TagInfo다. `tags_by_name`은 이름별 해결 결과를 보관한다. 입력 정규화·인가·이름순
+잠금·반환 순서·기존 오류 의미는 바꾸지 않는다. UPDATE 결과의 비어 있지 않음은 같은
+트랜잭션의 선행 FOR UPDATE로 확보하며 해당 service의 cast에 근거를 기록한다.
+
 - `service/query.py`: GetTagCommand/GetTagByNameCommand/GetTagsCommand 기반 단건·정확한 이름·ID 묶음 조회. HTTP에 사전 검색/목록을 노출하지 않는다. get_admin_tag는 최신 active admin을 검사한다.
 - `service/command.py`: resolve_tags는 콘텐츠 서비스가 인가·부모 잠금 후 전달한 이름을 재사용/생성한다. create_tag/update_tag/deactivate_tag는 identity.require_admin으로 최신 DB 역할·상태를 검사한다. 공유 이름 수정은 관리자 전용이며 비활성화는 기존 연결을 보존한다. 생성 시 기존 이름의 설명을 덮어쓰지 않는다.
 - `repository.py`: tags만 접근한다. PostgreSQL ON CONFLICT DO NOTHING으로 동시 이름 생성을 처리하고 SELECT FOR SHARE로 이름·활성 상태를 연결 쓰기가 끝날 때까지 고정한다. 이름 묶음은 정렬하여 잠금을 취득하고 결과는 입력 순서로 복원한다. 여러 태그 작업을 조합하는 호출자는 일관된 콘텐츠/태그 잠금 순서를 유지한다.

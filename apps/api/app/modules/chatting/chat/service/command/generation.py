@@ -8,6 +8,8 @@ import json
 from dataclasses import asdict
 from datetime import UTC, datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as Repository
@@ -34,7 +36,7 @@ from app.modules.llm import types as LlmTypes
 from app.modules.llm.service.replacement import resolve_execution
 
 
-def result_digest(value):
+def result_digest(value: Types.GenerationResult) -> str:
     if value.outcome not in ("succeeded", "failed", "cancelled"):
         raise ValueError("Invalid outcome.")
     for n, maximum in (
@@ -65,7 +67,7 @@ def result_digest(value):
 # input_message_id가 있으면 기존 마지막 사용자 입력을 재사용하고, 없으면 입력 메시지를
 # 저장한다.
 async def begin_generation(
-    session, command: Types.BeginGenerationCommand
+    session: AsyncSession, command: Types.BeginGenerationCommand
 ) -> GenerationInfo:
     conversation_id = command.conversation_id
     user_id = command.user_id
@@ -88,8 +90,10 @@ async def begin_generation(
     digest = hashlib.sha256(digest_input.encode()).hexdigest()
     async with use_case_transaction(session):
         await lock_key(session, "generation", f"{user_id}:{request_key}")
-        row = await Repository.get_generation_by_request(session, user_id, request_key)
-        existing = PersistenceMapper.generation_entity_to_state_info(row)
+        generation_entity = await Repository.get_generation_by_request(
+            session, user_id, request_key
+        )
+        existing = PersistenceMapper.generation_entity_to_state_info(generation_entity)
         if existing:
             if (
                 existing.conversation_id != conversation_id
@@ -132,7 +136,7 @@ async def begin_generation(
                 snapshot_id=conversation.product_snapshot_id
             ),
         )
-        row = await Repository.create_generation(
+        generation_entity = await Repository.create_generation(
             session,
             conversation,
             execution,
@@ -142,22 +146,24 @@ async def begin_generation(
             input_text,
             command.input_message_id,
         )
-        return generation_record_to_info(row, created=True)
+        return generation_record_to_info(generation_entity, created=True)
 
 
 # 생성 결과·사용량을 확정한다. 버전이 바뀐 결과는 stale로 남겨 출력 메시지를 추가하지
 # 않는다.
 # 이미 확정된 생성의 재전송은 결과 digest가 같아야 하며 사용량을 다시 쓰지 않는다.
 async def finish_generation(
-    session, command: Types.FinishGenerationCommand
+    session: AsyncSession, command: Types.FinishGenerationCommand
 ) -> GenerationInfo:
     generation_id = command.generation_id
     user_id = command.user_id
     value = command.value
     fingerprint = result_digest(value)
     async with use_case_transaction(session):
-        row = await Repository.get_owned_generation(session, generation_id, user_id)
-        run = PersistenceMapper.generation_entity_to_state_info(row)
+        generation_entity = await Repository.get_owned_generation(
+            session, generation_id, user_id
+        )
+        run = PersistenceMapper.generation_entity_to_state_info(generation_entity)
         if run is None:
             raise LookupError("Generation not found.")
         conversation = await get_owned_conversation(
@@ -167,10 +173,10 @@ async def finish_generation(
             ),
         )
         # All history writers lock conversation first, then generation records.
-        row = await Repository.get_owned_generation(
+        generation_entity = await Repository.get_owned_generation(
             session, generation_id, user_id, lock=True
         )
-        run = PersistenceMapper.generation_entity_to_state_info(row)
+        run = PersistenceMapper.generation_entity_to_state_info(generation_entity)
         assert run is not None
         if run.status != "pending":
             if run.result_digest != fingerprint:
@@ -227,7 +233,7 @@ async def finish_generation(
                 created_at=now,
             ),
         )
-        row = await Repository.finish_generation(
+        generation_entity = await Repository.finish_generation(
             session,
             run.id,
             status,
@@ -235,7 +241,7 @@ async def finish_generation(
             now,
             len(value.messages) if status == "succeeded" else 0,
         )
-        result = generation_record_to_info(row)
+        result = generation_record_to_info(generation_entity)
         await mark_statistics_dirty(
             session, ProductTypes.MarkStatisticsDirtyCommand(run.product_id, now)
         )

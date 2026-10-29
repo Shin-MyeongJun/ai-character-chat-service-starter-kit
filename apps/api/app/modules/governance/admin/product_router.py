@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin/products", tags=["product administration"])
 )
 async def expiry(
     snapshot_id: UUID, body: Schemas.ExpiryRequest, session: Session, owner: Owner
-):
+) -> Schemas.ExpiryChangedResponseDto:
     value = SchemaMapper.expiry_request_to_command(body)
     with errors():
         return SchemaMapper.expiry_info_to_response(
@@ -36,7 +36,7 @@ async def expiry(
 @router.put("/{product_id}/status", status_code=204)
 async def status(
     product_id: UUID, body: Schemas.StatusRequest, session: Session, owner: Owner
-):
+) -> None:
     value = SchemaMapper.status_request_to_command(body)
     with errors():
         await moderate_product(

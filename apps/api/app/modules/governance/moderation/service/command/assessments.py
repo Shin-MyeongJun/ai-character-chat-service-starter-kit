@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
 from app.modules.governance.moderation import types as Types
@@ -42,7 +44,9 @@ def _normalize_assessment(
     ValidationServiceUtil.validate_time(command.window_start)
     ValidationServiceUtil.validate_time(command.window_end)
     if (command.window_start is None) != (command.window_end is None) or (
-        command.window_start is not None and command.window_end <= command.window_start
+        command.window_start is not None
+        and command.window_end is not None
+        and command.window_end <= command.window_start
     ):
         raise Types.ModerationError("invalid_input")
     if (
@@ -53,7 +57,7 @@ def _normalize_assessment(
         raise Types.ModerationError("invalid_input")
     for note in command.reviewer_notes:
         ValidationServiceUtil.validate_text(note, maximum=1000)
-    links = {}
+    links: dict[UUID, str] = {}
     for link in command.reports:
         if not isinstance(link.report_id, UUID) or link.disposition not in {
             "supported",
@@ -74,7 +78,10 @@ def _normalize_assessment(
 
 
 async def record_manual_assessment(
-    session, command: Types.RecordAssessmentCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.RecordAssessmentCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.AssessmentInfo:
     """활성 관리자의 판단과 근거를 원자 저장하고 재평가의 중복 분기를 거절한다."""
     actor_id = actor.user_id
@@ -83,10 +90,10 @@ async def record_manual_assessment(
     async with use_case_transaction(session):
         await ValidationServiceUtil._require_actor(session, actor_id, admin=True)
         await lock_key(session, "moderation.assessment", command.evaluation_key)
-        row = await ReviewRepository.get_assessment_by_key(
+        existing_assessment_row = await ReviewRepository.get_assessment_by_key(
             session, command.evaluation_key
         )
-        existing = PersistenceMapper.assessment_row_to_info(row)
+        existing = PersistenceMapper.assessment_row_to_info(existing_assessment_row)
         if existing is not None:
             ValidationServiceUtil.require_match(
                 existing.signals.get("request_fingerprint"), fingerprint
@@ -99,44 +106,48 @@ async def record_manual_assessment(
         )
         previous_id = command.supersedes_assessment_id
         if previous_id is not None:
-            row = await ReviewRepository.get_assessment(session, previous_id, lock=True)
+            previous_assessment_row = await ReviewRepository.get_assessment(
+                session, previous_id, lock=True
+            )
             previous = ValidationServiceUtil.require_info(
-                PersistenceMapper.assessment_row_to_info(row)
+                PersistenceMapper.assessment_row_to_info(previous_assessment_row)
             )
             if (previous.target_type, previous.target_id) != (
                 command.target_type,
                 command.target_id,
             ):
                 raise Types.ModerationError("invalid_link")
-            row = await ReviewRepository.get_superseding_assessment(
+            superseding_id_row = await ReviewRepository.get_superseding_assessment(
                 session, previous_id
             )
-            if PersistenceMapper.scalar_row_to_value(row) is not None:
+            if PersistenceMapper.scalar_row_to_value(superseding_id_row) is not None:
                 raise Types.ModerationError("state_conflict")
             # 신규 ID만 생성하므로 정상 경로에서 순환은 없지만 기존 이력 훼손도 검사한다.
-            visited = set()
+            visited: set[UUID] = set()
             while previous is not None:
                 if previous.id in visited:
                     raise Types.ModerationError("invalid_link")
                 visited.add(previous.id)
                 if previous.supersedes_assessment_id is None:
                     break
-                row = await ReviewRepository.get_assessment(
+                previous_assessment_row = await ReviewRepository.get_assessment(
                     session, previous.supersedes_assessment_id
                 )
                 previous = ValidationServiceUtil.require_info(
-                    PersistenceMapper.assessment_row_to_info(row)
+                    PersistenceMapper.assessment_row_to_info(previous_assessment_row)
                 )
                 if (previous.target_type, previous.target_id) != (
                     command.target_type,
                     command.target_id,
                 ):
                     raise Types.ModerationError("invalid_link")
-        reporters = set()
+        reporters: set[UUID] = set()
         for link in command.reports:
-            row = await ReviewRepository.get_report(session, link.report_id, lock=True)
+            report_entity = await ReviewRepository.get_report(
+                session, link.report_id, lock=True
+            )
             report = ValidationServiceUtil.require_info(
-                PersistenceMapper.report_entity_to_info(row)
+                PersistenceMapper.report_entity_to_info(report_entity)
             )
             if (report.target_type, report.target_id) != (
                 command.target_type,
@@ -151,13 +162,14 @@ async def record_manual_assessment(
                 raise Types.ModerationError("legacy_review_acknowledgement_required")
             if (
                 command.window_start is not None
+                and command.window_end is not None
                 and not command.window_start <= report.received_at < command.window_end
             ):
                 raise Types.ModerationError("invalid_link")
             if report.reporter_user_id is not None:
                 reporters.add(report.reporter_user_id)
         # 검증된 신호와 관리자 의견의 출처를 구분하며 전적·점수 공식은 만들지 않는다.
-        values = {
+        values: ReviewRepository.AssessmentCreateValues = {
             "target_type": command.target_type,
             "target_id": command.target_id,
             "assessment_type": "manual",
@@ -182,8 +194,10 @@ async def record_manual_assessment(
             "supersedes_assessment_id": command.supersedes_assessment_id,
             "evaluation_key": command.evaluation_key,
         }
-        row = await ReviewRepository.create_assessment(session, values, command.reports)
-        result = PersistenceMapper.assessment_row_to_info(row)
+        created_assessment_row = await ReviewRepository.create_assessment(
+            session, values, command.reports
+        )
+        result = PersistenceMapper.assessment_row_to_info(created_assessment_row)
         await ReviewRepository.create_admin_audit(
             session,
             actor_id,
@@ -195,7 +209,7 @@ async def record_manual_assessment(
 
 
 async def record_automatic_assessment(
-    session, command: Types.RecordAssessmentCommand
+    session: AsyncSession, command: Types.RecordAssessmentCommand
 ) -> Types.AssessmentInfo:
     """신뢰된 자동 실행 주체가 없어 쓰기 없이 명시적으로 거절한다."""
     raise Types.ModerationError("automatic_assessment_disabled")

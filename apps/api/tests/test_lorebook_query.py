@@ -9,7 +9,7 @@ from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.modules.content.lorebook import repository, types
 from app.modules.content.lorebook import types as LorebookTypes
 from app.modules.content.lorebook.service import query
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, update
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
@@ -166,6 +166,29 @@ async def test_lorebook_detail_is_owner_scoped(database, data):
         await query.get_lorebook_by_id(
             database, LorebookTypes.GetLorebookByIdCommand(lorebook_id=uid(999))
         )
+        is None
+    )
+
+
+@pytest.mark.parametrize("lock", [False, True])
+async def test_tag_target_returns_refreshed_row_or_none(
+    database: AsyncScalarsAdapter, lock: bool
+) -> None:
+    loaded = database.sync_session.get(Lorebook, uid(10))
+    assert loaded is not None
+    original_title = loaded.title
+    database.sync_session.execute(
+        update(Lorebook)
+        .where(Lorebook.id == uid(10))
+        .values(title="Updated title")
+        .execution_options(synchronize_session=False)
+    )
+    assert loaded.title == original_title
+    refreshed = await repository.get_target_for_tag_access(database, uid(10), lock=lock)
+    assert refreshed is loaded
+    assert refreshed.title == "Updated title"
+    assert (
+        await repository.get_target_for_tag_access(database, uid(999), lock=lock)
         is None
     )
 

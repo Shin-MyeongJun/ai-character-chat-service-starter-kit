@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Literal
+from decimal import Decimal
+from typing import Literal, NotRequired, TypeAlias, TypedDict
 from uuid import UUID
 
 from app.modules.content.character.types import CharacterSnapshotInfo
@@ -13,6 +14,62 @@ from app.modules.content.lorebook.types import LorebookSnapshotInfo
 from app.modules.llm.types import ModelNoticeView
 
 Visibility = Literal["private", "public", "unlisted"]
+
+# Open editor documents/mappings retain their JSON shape; runtime validation stays
+# with the existing studio workflow. This alias neither coerces nor validates.
+ProductJsonValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | list["ProductJsonValue"]
+    | dict[str, "ProductJsonValue"]
+)
+ProductJsonObject: TypeAlias = dict[str, ProductJsonValue]
+
+
+class ProductSnapshotData(TypedDict):
+    """Published profile fields; legacy omissions and extension data are retained."""
+
+    title: str
+    description: NotRequired[str | None]
+    opening_message: NotRequired[str | None]
+    model: NotRequired[ProductJsonObject]
+    replacement_policy: NotRequired[ProductJsonObject]
+    content_digest: NotRequired[str]
+    studio_start_options: NotRequired[ProductJsonObject]
+
+
+class RevenueValues(TypedDict):
+    sales: str
+    refunds: str
+    net: str
+    sale_count: int
+    refund_count: int
+
+
+class StatisticsMetricsValues(TypedDict):
+    active_users: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    stale: int
+    messages: int
+    conversations: int
+    transitions: int
+    input_tokens: int
+    output_tokens: int
+    cost_credit: int
+    revenue: dict[str, RevenueValues]
+
+
+# Values obtained through public statistics services, preserving tuple order.
+GenerationStatisticsFact: TypeAlias = tuple[UUID, str, int, int | None]
+UserStatisticsFact: TypeAlias = tuple[UUID, UUID]
+CountStatisticsFact: TypeAlias = tuple[UUID, int]
+UsageStatisticsFact: TypeAlias = tuple[UUID, int, int, int]
+PaymentStatisticsFact: TypeAlias = tuple[UUID, str, str, Decimal, int, list[UUID]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,18 +132,18 @@ class GetStudioDraftCommand:
 @dataclass(frozen=True, slots=True)
 class SaveStudioDraftCommand(GetStudioDraftCommand):
     expected_revision: int | None
-    document: dict
+    document: ProductJsonObject
 
 
 @dataclass(frozen=True, slots=True)
 class StudioDraftInfo:
     product_id: UUID
     revision: int
-    document: dict
+    document: ProductJsonObject
     updated_at: datetime
     content_digest: str = ""
     publication_digest: str | None = None
-    publication_release: dict | None = None
+    publication_release: ProductJsonObject | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +152,7 @@ class MarkStudioPublicationCommand:
     owner_id: UUID
     content_digest: str
     release: ReleaseInfo
-    mapping: dict | None = None
+    mapping: ProductJsonObject | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +160,7 @@ class SetStudioComponentsCommand:
     product_id: UUID
     owner_id: UUID
     expected_revision: int
-    mapping: dict
+    mapping: ProductJsonObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,7 +238,8 @@ class ReleaseInfo:
 @dataclass(frozen=True, slots=True)
 class StartOptionInfo:
     id: UUID
-    title: str
+    # SnapshotStartInfo/DB allow None; the HTTP restriction is a separate contract.
+    title: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,7 +330,7 @@ class ProductStateInfo(ProductInfo):
     owner_id: UUID
     default_model_id: UUID | None
     reasoning_effort: str | None
-    replacement_policy: dict
+    replacement_policy: ProductJsonObject
     latest_snapshot_id: UUID | None
 
 
@@ -281,7 +339,7 @@ class ProductSnapshotInfo:
     id: UUID
     product_id: UUID | None
     version: int
-    snapshot_data: dict
+    snapshot_data: ProductSnapshotData
     expires_at: datetime | None
     expiry_reason: str | None
 
@@ -408,9 +466,9 @@ class SnapshotRuntimeView:
 
 @dataclass(frozen=True, slots=True)
 class StatisticsBuildInfo:
-    metrics: dict
-    total: dict
-    users: list[tuple]
+    metrics: dict[UUID, StatisticsMetricsValues]
+    total: StatisticsMetricsValues
+    users: list[UserStatisticsFact]
     unique_users: set[UUID]
 
 
@@ -592,12 +650,12 @@ class MediaReferenceView:
 class ReplaceStatisticsDayCommand:
     product_id: UUID
     day: date
-    generations: list[tuple]
-    users: list[tuple]
-    conversations: list[tuple]
-    transitions: list[tuple]
-    usage: list[tuple]
-    payments: list[tuple]
+    generations: list[GenerationStatisticsFact]
+    users: list[UserStatisticsFact]
+    conversations: list[CountStatisticsFact]
+    transitions: list[CountStatisticsFact]
+    usage: list[UsageStatisticsFact]
+    payments: list[PaymentStatisticsFact]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

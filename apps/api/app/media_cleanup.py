@@ -5,7 +5,9 @@
 import argparse
 import asyncio
 import os
+from collections.abc import Iterable
 from datetime import datetime
+from typing import NoReturn, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -14,14 +16,17 @@ from app.modules.asset_storage.service import (
     create_asset_storage_service,
     load_asset_storage_settings,
 )
+from app.modules.asset_storage.types import S3StorageSettings, TestLocalStorageSettings
 from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.character.types import CleanupCharacterMediaCommand
 
 
-async def run_cleanup(media_ids, cutoff):
+async def run_cleanup(media_ids: Iterable[UUID], cutoff: datetime) -> int:
     settings = load_asset_storage_settings()
-    configured = (
-        settings.test_local if settings.storage_kind == "test_local" else settings.s3
+    # AssetStorageSettings validates the selected config at construction.
+    configured = cast(
+        TestLocalStorageSettings | S3StorageSettings,
+        (settings.test_local if settings.storage_kind == "test_local" else settings.s3),
     )
     engine = create_async_engine(os.environ["DATABASE_URL"])
     failed = False
@@ -48,7 +53,7 @@ async def run_cleanup(media_ids, cutoff):
     return 1 if failed else 0
 
 
-def main():
+def main() -> NoReturn:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--media-id", type=UUID, action="append", required=True)
     parser.add_argument("--older-than", type=datetime.fromisoformat, required=True)

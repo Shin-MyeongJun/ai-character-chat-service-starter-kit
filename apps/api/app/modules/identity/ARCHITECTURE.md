@@ -25,6 +25,19 @@
 
 ## 공개 서비스 계약
 
+### 핵심 저장소·조회 타입 계약
+
+- `repository.py`와 `service/query.py`의 실행 세션은 `AsyncSession`이다. 사용자·세션·토큰 ID는 `UUID`, 저장 시각은 `datetime`으로 표현하며 기존 시각 생성·만료 비교 위치를 유지한다.
+- 단건 조회와 이메일 충돌 시 `create_user`는 Entity 또는 `None`을 반환한다. `verify_user_email`은 기존 `scalar_one()` 계약에 따라 반드시 User를 반환하며 미존재 예외를 숨기지 않는다.
+- persistence mapper의 overload는 존재하는 `User`/`AuthSession`/`AuthActionToken` 입력에는 해당 Info, `None` 입력에는 `None`을 보장한다. Entity 내부의 nullable 비밀번호·대기 기한·폐기/사용 시각은 그대로 보존하며 Entity 미존재와 합치지 않는다. role/status/purpose는 기존 저장 문자열과 공개 `str` 호출 계약을 유지한다.
+- `scalar_row_to_used`는 토큰 UUID·OAuth state 해시·요청 제한 카운터의 **존재 여부**만 변환한다. `0`·빈 문자열도 존재하는 값이다. `CleanupRow`는 repository 내부의 기존 5개 정수 tuple 계약(사용자, 토큰, 세션, OAuth 시도, 요청 제한 순)이며 공개 결과는 `CleanupInfo`다. 공개 types에는 ORM을 노출하지 않는다.
+- SQL 조회 조건·`populate_existing`·사용자/세션 잠금과 토큰 선조회·조건부 소모·폐기 조건·SQL 실행/flush 순서는 유지한다. 단건 SELECT 결과는 동일 SQL의 `scalars(...).first()`로 받아 Entity 타입을 보존한다. 정리 DELETE의 `CursorResult` cast는 `RETURNING` 없는 DML의 라이브러리 반환 타입 한계에만 적용한다.
+- 인증·인가 정책을 재설계하지 않고 기존 파일 책임을 유지한다. 핵심 타입·nullable 매핑·최신 인가 조회·SQL 저장 계약의 DB 없는 회귀 검증은 `tests/test_identity_persistence_contracts.py`가 담당한다. 이 대역 검증은 실제 PostgreSQL 잠금·경쟁 조건 검증을 대체하지 않는다.
+
+인증 서비스의 기존 `sessions` 인자/속성은 호환을 유지한다. 실행 의존성 타입은
+`app.db.types.SessionFactory`, 설정은 `AuthSettings`로 명시한다. 인증 잠금·쿠키·폐기
+정책은 타입 정리의 변경 범위가 아니다.
+
 `AuthenticationService(sessions, settings)`는 실행 의존성을 생성자로 받는다. 모든 요청 값은 `types.py`의 Command로 받으며 HTTP 예외를 사용하지 않는다.
 
 | 메서드 | Command | 결과 |
@@ -82,3 +95,89 @@ API·쿠키·실행·외부 검증 절차는 [인증 실행 및 연동 문서](.
 - `service/workflow/google.py`: GoogleLoginService가 state 생성·쿠키/PKCE → state 선소모 commit → 외부 검증 → 계정 연결+세션 발급 단일 트랜잭션을 조율한다. 하위 google/authentication 서비스만 호출하며 repository에 접근하지 않는다.
 - 공유 `AuthenticationService.issue_session(session, IssueSessionCommand)`는 하위 세션 기능이다. 일반 로그인/Google 모두 사용하며 workflow끼리 비공개 세션 메서드를 호출하지 않는다. refresh 재사용 폐기 후 오류, 사용자→세션 잠금, 요청 제한과 만료 정리는 기존 하위 서비스에 유지한다.
 - main은 authentication, authentication_mail, google_login을 조립한다. router는 메일 작업만 workflow에 연결하며 비밀번호 확인/변경·토큰 소모·인증/세션은 하위 서비스에 직접 연결한다. HTTP DTO·쿠키·Google 보안 계약은 변경하지 않았다.
+
+## 인증·메일·JWT 내부 타입 정리 (2026-10-28)
+
+service/authentication.py, service/workflow/mail.py와 연결된 security.py/settings.py를
+공용 엄격 검사에 편입했다. sessions 인자/속성은 기존 SessionFactory 호환 이름을
+유지하며 현재 세션·UUID·시각·Info/tuple 반환과 내부 rate/mail/session helper를 명시했다.
+메일 의존성은 기존 MailSender Protocol이다. HTTP/Google 연결과 외부 어댑터 전체의
+엄격 검사 완료를 뜻하지 않는다.
+
+AuthTokenClaims는 기존 PyJWT 검증 및 codec의 type/jti/정수 시각/UUID 검사 뒤의
+문자열·정수 claim을 표현한다. 원본 사전과 확장 claim을 그대로 반환하며 JWT를 새로
+조립하거나 암호/알고리즘/issuer/audience/시간·세션 정책을 바꾸지 않는다. 기존 키 설정
+검증도 반환 None만 명시했다.
+
+cast 3곳은 이메일 validator의 ASCII 필드(기존 AttributeError→invalid_input 유지),
+검증된 JWT claim 사전, verify_password가 True일 때 존재하는 저장 hash를 연결한다.
+값 변환이나 새 검증은 아니다. refresh의 재사용 분기가 아닌 경로는 LoginInfo를 생성했다는
+내부 전제를 assertion으로 명시한다. 전제를 위반하는 잘못된 override의 None 반환만
+AssertionError로 드러나며 정상/재사용/실패의 외부 계약은 같다. Any/ignore/예외는 없다.
+
+사용자→세션 잠금, 잠금 뒤 현재 시각 재확인, refresh 재사용 폐기 commit 후 오류,
+회전 시 절대 만료 유지, 일회용 조건부 소모와 비밀번호/세션 폐기, 요청 제한과 신규/
+중복/Google-only 계정의 기존 분기, 메일 전송 전 DB 확정과 실패 시 상태 보존을 유지한다.
+토큰 원문은 기존 repr 제외와 메일 fragment 전달에 한정하며 로그/응답에 추가하지 않는다.
+
+test_identity_auth_contracts는 실제 JWT·mapper와 연결 없는 AsyncSession transaction
+event, 저장소/메일 대역으로 위 경계를 확인한다. 테스트 Argon2 비용은 작게 설정하며
+운영 보안 파라미터 검증을 대체하지 않는다. 실제 PostgreSQL 잠금/경합·폐기 영속성과
+SMTP/Google 통신은 미검증이다. TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거한
+기존 인증/암호/쿠키/저장소 회귀도 함께 실행한다.
+
+## Google OIDC·SMTP 내부 타입 정리 (2026-10-28)
+
+service/google.py, service/workflow/google.py, adapters.py를 공용 엄격 검사에 편입했다.
+state 생성/소모·계정 연결의 실행 세션은 AsyncSession이며 GoogleLoginService는 기존
+AuthenticationService와 GoogleVerifier Protocol을 받는다. SMTP/Google 구현의 설정은
+AuthSettings다. 새 실행 계층이나 공급자 wrapper는 추가하지 않았다.
+
+workflow 내부 _GoogleFlow는 자체 생성한 Fernet 인증 쿠키의 state/nonce/verifier/redirect
+문자열 형식이다. adapters 내부 _GoogleTokenResponse는 Google token 응답의 id_token
+문자열 계약이다. JSON 경계의 두 cast는 실행 시 검증이 아니며 원래 값을 그대로 읽는다.
+기존 복호화 TTL·state 비교·redirect 검증과 조회/형식 오류 번역을 유지하고, 손상 값에
+새 기본값·문자열 변환·추가 필터를 적용하지 않는다. JWT의 기존 서명/issuer/audience/
+azp/nonce/email_verified/sub 검증도 같다.
+
+SMTP는 SSL/일반 생성자를 명시적으로 구분해 SSLContext를 SSL 생성자에만 전달한다.
+기존 timeout=10·STARTTLS→선택적 login→send_message·with 종료 순서는 같다. 동기 SMTP와
+ID token 검증은 기존 to_thread에서 실행하고, HTTP는 timeout=10/follow_redirects=False로
+생성한 client를 닫은 뒤 ID token을 검증한다. 오류 범위·cause·재시도 없음도 유지한다.
+
+Google state 선소모 commit→외부 검증→계정 연결+세션 발급 단일 트랜잭션 순서와
+google sub→email 잠금을 유지한다. provider/sub가 기존 계정의 기준이며 공급자 이메일
+변경으로 이메일을 변경/병합하지 않는다. 충돌/비활성/미인증 계정은 세션 발급 전에 거절한다.
+
+test_identity_google_contracts의 26건은 실제 암호화 쿠키/PKCE·연결 없는 AsyncSession
+transaction event와 저장소/검증기 대역, SMTP 대역 및 httpx.MockTransport로 검증한다.
+state 재사용의 SQL 원자성·실제 DB rollback 영속성·Google/JWKS·SMTP/TLS 통신을 증명하지
+않는다. TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거하고 기존 인증 회귀도 실행한다.
+HTTP 인증 연결과 router는 후속 정리 범위다.
+
+## HTTP 보안·router·의존성 타입 정리 (2026-10-28)
+
+http_security.py, router.py, dependencies.py를 정리하고 DTO/schema mapper를 포함한
+identity 전체를 공용 엄격 검사에 편입했다. router는 기존 응답 DTO 또는 명시적
+Response/RedirectResponse를 반환한다. CookieCSRFMiddleware는 Starlette의
+RequestResponseEndpoint를, AuthRoute는 Request→coroutine→Response 계약을 사용한다.
+LogRecord filter의 기존 query 제거 조건도 유지한다.
+
+동적 app.state의 authentication은 AuthenticationService | None으로 연결하며
+미설정 시 get_authentication의 auth_not_configured와 오류 renderer/middleware의
+선택적 동작을 유지한다. dependencies의 get_authentication_mail/get_google_login은
+조립된 기존 workflow를 타입만 연결해 반환한다. cast 5곳은 main의 조립 계약을 표현하며
+실행 시 타입 검사·새 fallback을 추가하지 않는다. workflow 속성 미설정의 기존
+AttributeError도 그대로다. get_verified_user_id는 검증된 UserInfo.id를 UUID로 반환한다.
+
+Origin/CSRF 검사와 요청 제한 순서, HttpOnly/Secure/SameSite=lax/path=/ 쿠키, access의
+최대 900초와 절대 세션 만료까지의 refresh 수명, 204 빈 본문, no-store/no-referrer/
+nosniff 헤더를 유지한다. middleware의 조기 거절 헤더를 router 응답과 통일하는 변경은
+하지 않았다. access invalid_token의 refresh 복구 허용과 refresh invalid_token/
+invalid_session/refresh_reused의 전체 쿠키 정리, Google callback flow 정리도 같다.
+
+test_identity_http_contracts의 신규 31건은 실제 FastAPI/ASGITransport·DTO·JWT와
+서비스/workflow 대역으로 HTTP 입력 전달과 공개 사용자 필드 투영, 쿠키·CSRF·Origin·
+422 입력 반사 방지·외부 라우트 middleware·callback 303/실패·검증 UUID·429/503 계약을
+확인한다. TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거하고 기존 인증 회귀도
+실행한다. 실제 PostgreSQL·Google/JWKS·SMTP·브라우저/프록시 동작은 미검증이다.

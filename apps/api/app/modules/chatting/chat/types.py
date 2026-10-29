@@ -7,13 +7,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Literal, TypeAlias
 from uuid import UUID
 
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.memory import types as MemoryTypes
 from app.modules.llm import types as LLMTypes
 from app.modules.llm.types import ExecutionView
+
+# Stored answer metadata retains v1/v2 and extension JSON keys without coercion.
+AnswerJsonValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | list["AnswerJsonValue"]
+    | dict[str, "AnswerJsonValue"]
+)
+AnswerMetadata: TypeAlias = dict[str, AnswerJsonValue]
 
 
 class MessageConflictError(Exception):
@@ -211,8 +223,8 @@ class GetStatisticsFactsCommand:
 
 @dataclass(frozen=True, slots=True)
 class GenerationStatisticsInfo:
-    generations: list[tuple]
-    users: list[tuple]
+    generations: list[tuple[UUID, str, int, int]]
+    users: list[tuple[UUID, UUID]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,7 +271,7 @@ class GenerationStateInfo:
     status: str
     message_count: int
     history_invalidated_at: datetime | None
-    answer_metadata: dict | None = None
+    answer_metadata: AnswerMetadata | None = None
     answer_lease_until: datetime | None = None
 
 
@@ -306,7 +318,7 @@ class GetAnswerInputCommand:
 class UpdateAnswerCommand:
     generation_id: UUID
     user_id: UUID
-    metadata: dict
+    metadata: AnswerMetadata
     lease_until: datetime
     execution_token: str | None = None
     recover: bool = False
@@ -353,7 +365,7 @@ class AnswerConfig:
         default_factory=MemoryTypes.MemoryPolicy
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if (
             not 1 <= self.response_tokens < self.max_prompt_tokens
             or not 0 < self.timeout_seconds <= 600

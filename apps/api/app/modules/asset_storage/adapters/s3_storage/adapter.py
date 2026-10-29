@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import Any
+from typing import BinaryIO, Protocol, cast
 
 import boto3
-from boto3.s3.transfer import S3UploadFailedError, TransferConfig
+from boto3.exceptions import S3UploadFailedError
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 from botocore.exceptions import (
     BotoCoreError,
@@ -39,10 +40,36 @@ from app.modules.asset_storage.types import (
 )
 
 
+class S3ResponseBody(Protocol):
+    def read(self, size: int = -1) -> bytes: ...
+
+    def close(self) -> None: ...
+
+
+class S3StorageClient(Protocol):
+    """Injected client subset; optional close remains dynamically discovered."""
+
+    def upload_fileobj(
+        self,
+        *,
+        Fileobj: BinaryIO,
+        Bucket: str,
+        Key: str,
+        ExtraArgs: dict[str, str],
+        Config: TransferConfig,
+    ) -> None: ...
+
+    def get_object(self, *, Bucket: str, Key: str) -> Mapping[str, object]: ...
+
+    def head_object(self, *, Bucket: str, Key: str) -> Mapping[str, object]: ...
+
+    def delete_object(self, *, Bucket: str, Key: str) -> object: ...
+
+
 class _S3AssetReader:
     def __init__(
         self,
-        body: Any,
+        body: S3ResponseBody,
         error_mapper: Callable[[Exception], AssetStorageError],
     ) -> None:
         self._body = body
@@ -68,12 +95,12 @@ class S3StorageAdapter:
         self,
         settings: S3StorageSettings,
         *,
-        client: Any | None = None,
+        client: S3StorageClient | None = None,
     ) -> None:
         self._settings = settings
         self.storage_id = settings.storage_id
         self._owns_client = client is None
-        self._client = client or boto3.client(
+        self._client: S3StorageClient = client or boto3.client(
             "s3",
             region_name=settings.region,
             config=Config(
@@ -138,7 +165,9 @@ class S3StorageAdapter:
                 status_code=status_code,
                 request_id=request_id,
             )
-        if isinstance(exc, (NoCredentialsError, PartialCredentialsError)) or error_code in {
+        if isinstance(
+            exc, (NoCredentialsError, PartialCredentialsError)
+        ) or error_code in {
             "AccessDenied",
             "InvalidAccessKeyId",
             "SignatureDoesNotMatch",
@@ -176,29 +205,30 @@ class S3StorageAdapter:
 
     @staticmethod
     def _metadata_from_response(
-        response: dict[str, Any],
+        response: Mapping[str, object],
         *,
         storage_id: str,
         object_key: str,
     ) -> AssetMetadataInfo:
         etag = response.get("ETag")
+        last_modified = response.get("LastModified")
         return AssetMetadataInfo(
             storage_kind=StorageKind.S3,
             storage_id=storage_id,
             object_key=object_key,
-            size_bytes=int(response["ContentLength"]),
+            # S3 supplies an integer. Keep the existing int() conversion and its
+            # metadata-error handling for alternate/malformed injected responses.
+            size_bytes=int(cast(int, response["ContentLength"])),
             content_type=str(response.get("ContentType") or "application/octet-stream"),
             etag=str(etag).strip('"') if etag is not None else None,
             last_modified=(
-                response.get("LastModified")
-                if isinstance(response.get("LastModified"), datetime)
-                else None
+                last_modified if isinstance(last_modified, datetime) else None
             ),
         )
 
     def _parse_metadata(
         self,
-        response: dict[str, Any],
+        response: Mapping[str, object],
         *,
         operation: str,
         object_key: str,
@@ -244,7 +274,7 @@ class S3StorageAdapter:
 
     async def read_asset(self, command: ReadAssetCommand) -> AssetReadInfo:
         try:
-            response = await asyncio.to_thread(
+            provider_response = await asyncio.to_thread(
                 self._client.get_object,
                 Bucket=self._settings.bucket,
                 Key=self._provider_key(command.object_key),
@@ -255,17 +285,19 @@ class S3StorageAdapter:
             ) from exc
         try:
             metadata = self._parse_metadata(
-                response, operation="read", object_key=command.object_key
+                provider_response, operation="read", object_key=command.object_key
             )
         except AssetStorageError:
-            body = response.get("Body")
-            if callable(getattr(body, "close", None)):
-                await asyncio.to_thread(body.close)
+            body = provider_response.get("Body")
+            close = getattr(body, "close", None)
+            if callable(close):
+                await asyncio.to_thread(close)
             raise
         return AssetReadInfo(
             metadata,
             _S3AssetReader(
-                response["Body"],
+                # get_object returns an open StreamingBody with read/close.
+                cast(S3ResponseBody, provider_response["Body"]),
                 lambda exc: self._map_error(
                     exc, operation="read", object_key=command.object_key
                 ),
@@ -291,7 +323,7 @@ class S3StorageAdapter:
         self, command: GetAssetMetadataCommand
     ) -> AssetMetadataInfo:
         try:
-            response = await asyncio.to_thread(
+            provider_response = await asyncio.to_thread(
                 self._client.head_object,
                 Bucket=self._settings.bucket,
                 Key=self._provider_key(command.object_key),
@@ -301,11 +333,13 @@ class S3StorageAdapter:
                 exc, operation="metadata", object_key=command.object_key
             ) from exc
         return self._parse_metadata(
-            response,
+            provider_response,
             operation="metadata",
             object_key=command.object_key,
         )
 
     async def aclose(self) -> None:
-        if self._owns_client and callable(getattr(self._client, "close", None)):
-            await asyncio.to_thread(self._client.close)
+        if self._owns_client:
+            close = getattr(self._client, "close", None)
+            if callable(close):
+                await asyncio.to_thread(close)

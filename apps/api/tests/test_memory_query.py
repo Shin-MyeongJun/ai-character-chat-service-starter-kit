@@ -161,6 +161,84 @@ async def test_summary_and_type_filters_work_without_embeddings(database):
     ).items == []
 
 
+async def test_pending_index_preserves_scope_order_and_empty_result(
+    database: AsyncAdapter,
+) -> None:
+    later = database.session.get(ConversationMemory, uid(103))
+    later.source_start_position = 10
+    later.source_end_position = 20
+    later.index_status = "failed"
+    database.session.flush()
+
+    command = MemoryTypes.GetPendingIndexCommand(
+        conversation_id=uid(10), owner_id=uid(1)
+    )
+    pending = await query.get_pending_index(database, command)
+    assert pending.id == uid(101)
+    database.session.delete(database.session.get(ConversationMemory, uid(101)))
+    database.session.flush()
+    pending = await query.get_pending_index(database, command)
+    assert pending.id == uid(103)
+    assert (
+        await query.get_pending_index(
+            database,
+            MemoryTypes.GetPendingIndexCommand(
+                conversation_id=uid(10), owner_id=uid(2)
+            ),
+        )
+        is None
+    )
+    assert (
+        await query.get_pending_index(
+            database,
+            MemoryTypes.GetPendingIndexCommand(
+                conversation_id=uid(30), owner_id=uid(1)
+            ),
+        )
+        is None
+    )
+
+
+async def test_embedding_save_preserves_revision_guard_and_refreshes_loaded_row(
+    database: AsyncAdapter,
+) -> None:
+    memory = database.session.get(ConversationMemory, uid(101))
+    memory.conversation_revision = 7
+    database.session.flush()
+    settings: MemoryTypes.EmbeddingSettings = {
+        "purpose": "document",
+        "truncation": False,
+        "output_dimension": None,
+        "output_dtype": "float",
+    }
+
+    def embedded(revision: int) -> MemoryTypes.EmbeddedSummaryInfo:
+        return MemoryTypes.EmbeddedSummaryInfo(
+            memory_id=uid(101),
+            conversation_id=uid(10),
+            owner_id=uid(1),
+            content_digest="summary-digest",
+            conversation_revision=revision,
+            vector=(1.0,) * 1536,
+            provider=LLMTypes.EmbeddingProvider.VOYAGE,
+            model=EMBEDDING_MODEL,
+            dimension=1536,
+            settings=settings,
+            total_tokens=3,
+        )
+
+    assert await repository.save_embedding(database, value=embedded(6)) is None
+    assert memory.index_status == "pending"
+    saved = await repository.save_embedding(database, value=embedded(7))
+    assert saved is memory
+    assert saved.index_status == "ready"
+    assert saved.embedding_settings == settings
+    assert saved.embedded_content_digest == "summary-digest"
+    assert saved.embedding_tokens == 3
+    assert len(saved.embedding) == 1536
+    assert await repository.save_embedding(database, value=embedded(7)) is None
+
+
 async def test_unauthorized_search_does_not_embed(database):
     service = embedding_service()
     assert (

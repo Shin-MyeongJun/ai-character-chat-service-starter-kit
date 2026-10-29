@@ -4,12 +4,21 @@
 
 ## 트랜잭션과 잠금
 
+`types.SessionFactory`는 인자 없이 호출하면 `AsyncSession`의 비동기 컨텍스트를
+반환하는 공통 실행 의존성이다. async_sessionmaker와 컨텍스트 매니저 기반 팩토리를
+모두 표현하며 컨텍스트가 세션 종료를 소유한다. ORM 데이터 타입이나 트랜잭션
+관리자를 새로 공개하지 않는다. 기존 `transaction.use_case_transaction` 책임은 유지한다.
+
 1. `transaction.use_case_transaction`은 자신의 session.info 표식이 있으면 같은 범위에 참여한다. 안쪽 예외는 failed를 남겨 바깥에서 잡더라도 최외곽 종료 때 전체 롤백한다. savepoint가 아니다.
 2. 표식 없는 기존 autobegin 트랜잭션은 자동으로 채택하지 않는다. 첫 use_case_transaction은 `session.begin()`을 호출하므로 이미 시작된 세션이면 오류가 난다. 조회 후 Command 조합을 할 때 이 차이를 확인한다.
 3. `idempotency.lock_key`는 namespace:key 해시의 64비트 signed 정수로 `pg_advisory_xact_lock`을 요청한다. 행이 없어도 키별 실행을 직렬화한다. 충돌 내용 판정과 이전 결과 재사용은 각 서비스의 책임이다.
 4. chat의 메시지/생성 변경은 conversation 행 잠금을 공유한다. 생성 완료는 conversation → generation 순서다. 상품 발행은 product → 정렬된 character → 정렬된 lorebook 순서다.
 5. product.repository.core의 일반 `get_product(lock=True)`는 FOR SHARE, `get_owned_product(lock=True)`는 FOR UPDATE다. lock 인자 이름만으로 동일 잠금이라고 읽지 않는다.
 6. memory 작업과 상품 통계 큐는 SKIP LOCKED를 사용한다. 잠금을 건 채 외부 호출을 지속하는지 여부는 호출 흐름마다 다르다. 답변/기억 유스케이스는 외부 호출 전 읽기 세션을 닫지만 character 미디어 저장은 잠금을 유지한 채 저장 완료를 기다린다.
+
+`product_stats_queue.statistics_day(datetime) -> date`와
+`day_bounds(date) -> tuple[datetime, datetime]`도 엄격 타입 검사 대상이다.
+timezone-aware 입력 검증과 서울 날짜의 UTC [시작, 다음 날 시작) 정책을 유지한다.
 
 관련 테스트: `test_use_case_transaction`, `test_product_usage`, `test_nonstream_answers`, `test_hypha_memory`, `test_product_statistics`, `test_character_media`.
 
@@ -100,3 +109,39 @@ assessment_reports, actions를 추가한다. 고정 SQL은 alembic/sql/0027_mode
 generation 삭제 시 프롬프트만 CASCADE한다. 기록이 존재하면 downgrade는 거절한다.
 애플리케이션이 불변 snapshot 쓰기를 소유하며 별도 UPDATE 방지 트리거는 없다.
 ORM/초기 SQL/head 비교와 생성·결제·복구 DB 테스트는 PostgreSQL 환경을 필요로 한다.
+
+## 공통 실행 유틸 타입 정리 (2026-10-28)
+
+use_case_transaction은 AsyncSession→AsyncIterator[None]인 asynccontextmanager이고,
+lock_key는 AsyncSession/namespace/key→None이다. 실행 코드·SQL·해시·잠금과 트랜잭션
+소유권 정책은 바꾸지 않았다. ReportingError.__init__도 None 반환만 명시했다.
+세 파일은 엄격 검사에 편입했다. 기존 시그니처 기준선은 0개지만 전체 앱 직접 mypy의
+ORM JSON 컨테이너 진단 13건은 별도 후속 범위이며 모델 전체가 엄격 편입된 것은 아니다.
+
+test_db_execution_contracts의 7건은 연결 없는 AsyncSession의 commit/rollback event로
+중첩 단일 commit·잡힌 중첩 오류/취소의 rollback-only·다음 독립 트랜잭션 복구·기존
+트랜잭션 소유권 보존을 확인한다. execute 대역은 signed/Unicode 고정 해시 벡터·기존
+advisory lock SQL/인자와 오류 전파를 확인한다. 실제 저장 rollback·PostgreSQL 잠금 경합은
+기존 test_use_case_transaction 등 통합 테스트가 필요하며 이번에는 DB 없이 skip했다.
+
+## ORM JSON 타입·앱 전체 엄격 검사 완료 (2026-10-28)
+
+34차에서 남긴 ORM 8파일의 JSON 진단 13건을 해결했다. db/json_types.py의 JsonValue/
+JsonObject는 열린 저장 JSON의 scalar/null/array/object만 표현한다. 도메인 types를
+모델에서 가져오지 않고, 기존 도메인별 검증·읽기 뷰와 독립적으로 둔다. 타입 별칭은
+런타임 검증·변환·기본값을 추가하지 않으며 확장 키/legacy와 원래 손상 값의 동작도 같다.
+
+product의 편집/발행 문서·replacement policy, chat answer metadata, moderation의 증거/
+signals/배열·감사 metadata, 모델 capabilities, memory embedding settings를 연결했다.
+로어북 metadata는 기존 공개 입력의 dict[str, object] 계약을 유지한다. 통계 revenue는
+통화별 RevenueBucket으로 세 금액 문자열과 두 건수 정수를 구별하며 통화/Decimal
+계산 방식은 바꾸지 않는다. nullable은 기존 선언과 동일하다.
+
+변경 전후 PostgreSQL CreateTable/CreateIndex를 비교해 73개 테이블의 DDL과 인덱스가
+모두 같음을 확인했다. SQL 컬럼·제약·기본값·migration·저장 JSON 구조 변경은 없다.
+product 모델의 기존 포맷 차이도 적용했다. Any/ignore/cast/기준선 예외는 추가하지 않았다.
+
+tools/backend-quality-scope.json은 이제 apps/api/app 전체를 직접 검사한다. Ruff 388파일·
+mypy 367소스가 통과했고 함수 시그니처 기준선은 0개다. 현재 설정의 진단이 없다는
+뜻이며 기존 동적 경계의 Any까지 제거했다는 뜻은 아니다. 테스트/alembic/tools 디렉터리
+전체 타입 검사를 새로 포함한 것도 아니다. 실제 PostgreSQL·외부 공급자는 미검증이다.

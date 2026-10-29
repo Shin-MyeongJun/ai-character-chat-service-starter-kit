@@ -91,9 +91,9 @@ async def create_character(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.CreateCharacterResponseDto:
-    value = SchemaMapper.create_character_request_to_command(request, owner_id)
+    command = SchemaMapper.create_character_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.create_character(session, value)
+        result = await CommandService.create_character(session, command)
     return SchemaMapper.character_info_to_create_response(result)
 
 
@@ -103,9 +103,9 @@ async def update_character(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.UpdateCharacterResponseDto:
-    value = SchemaMapper.update_character_request_to_command(request, owner_id)
+    command = SchemaMapper.update_character_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.update_character(session, value)
+        result = await CommandService.update_character(session, command)
     return SchemaMapper.character_info_to_update_response(result)
 
 
@@ -115,9 +115,9 @@ async def delete_character(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.DeleteCharacterResponseDto:
-    value = SchemaMapper.delete_character_request_to_command(request, owner_id)
+    command = SchemaMapper.delete_character_request_to_command(request, owner_id)
     with _service_errors():
-        await CommandService.delete_character(session, value)
+        await CommandService.delete_character(session, command)
     return SchemaMapper.delete_character_result_to_response(None)
 
 
@@ -131,9 +131,9 @@ async def add_character_image(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.AddCharacterImageResponseDto:
-    value = SchemaMapper.add_character_image_request_to_command(request, owner_id)
+    command = SchemaMapper.add_character_image_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.add_character_image(session, value)
+        result = await CommandService.add_character_image(session, command)
     return SchemaMapper.character_image_info_to_add_response(result)
 
 
@@ -145,11 +145,11 @@ async def set_default_character_image(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.SetDefaultCharacterImageResponseDto:
-    value = SchemaMapper.set_default_character_image_request_to_command(
+    command = SchemaMapper.set_default_character_image_request_to_command(
         request, owner_id
     )
     with _service_errors():
-        result = await CommandService.set_default_character_image(session, value)
+        result = await CommandService.set_default_character_image(session, command)
     return SchemaMapper.character_image_info_to_default_response(result)
 
 
@@ -159,9 +159,9 @@ async def delete_character_image(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.DeleteCharacterImageResponseDto:
-    value = SchemaMapper.delete_character_image_request_to_command(request, owner_id)
+    command = SchemaMapper.delete_character_image_request_to_command(request, owner_id)
     with _service_errors():
-        await CommandService.delete_character_image(session, value)
+        await CommandService.delete_character_image(session, command)
     return SchemaMapper.delete_character_image_result_to_response(None)
 
 
@@ -175,9 +175,9 @@ async def add_character_asset(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.AddCharacterAssetResponseDto:
-    value = SchemaMapper.add_character_asset_request_to_command(request, owner_id)
+    command = SchemaMapper.add_character_asset_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.add_character_asset(session, value)
+        result = await CommandService.add_character_asset(session, command)
     return SchemaMapper.character_asset_info_to_add_response(result)
 
 
@@ -187,9 +187,9 @@ async def delete_character_asset(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.DeleteCharacterAssetResponseDto:
-    value = SchemaMapper.delete_character_asset_request_to_command(request, owner_id)
+    command = SchemaMapper.delete_character_asset_request_to_command(request, owner_id)
     with _service_errors():
-        await CommandService.delete_character_asset(session, value)
+        await CommandService.delete_character_asset(session, command)
     return SchemaMapper.delete_character_asset_result_to_response(None)
 
 

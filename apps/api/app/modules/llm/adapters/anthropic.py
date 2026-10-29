@@ -2,13 +2,23 @@
 # text 블록만 답변에 합치며 캐시 생성·읽기 사용량을 포함해 total_tokens를 계산한다.
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from typing import cast
 
 import anthropic
 
 from app.modules.llm.adapters.base import BaseTextGenerationAdapter
 from app.modules.llm.adapters.messages import decode_messages
+from app.modules.llm.adapters.sdk import (
+    AnthropicRequest,
+    MessagesClient,
+    integer_attribute,
+    sequence_attribute,
+    string_attribute,
+)
+from app.modules.llm.adapters.sdk import (
+    response_attribute as _attr,
+)
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -16,14 +26,6 @@ from app.modules.llm.types import (
     ReasoningEffort,
     TokenUsageInfo,
 )
-
-
-def _attr(value: object | None, name: str, default: Any = None) -> Any:
-    if value is None:
-        return default
-    if isinstance(value, dict):
-        return value.get(name, default)
-    return getattr(value, name, default)
 
 
 class AnthropicAdapter(BaseTextGenerationAdapter):
@@ -42,7 +44,7 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
     def __init__(
         self,
         *,
-        client: Any | None = None,
+        client: anthropic.AsyncAnthropic | MessagesClient | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 0,
@@ -60,7 +62,9 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
                 timeout=timeout,
                 max_retries=max_retries,
             )
-        self._client = client
+        # SDK/injected client calls use the known nonstream request subset below.
+        # Preserve existing duck typing and failure behavior for invalid clients.
+        self._client = cast(MessagesClient, client)
 
     async def _generate(
         self,
@@ -70,19 +74,21 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
     ) -> LLMResultInfo:
-        params: dict[str, Any] = {
+        params: AnthropicRequest = {
             "model": model,
             "max_tokens": max_output_tokens,
             "messages": [{"role": "user", "content": request_json}],
         }
         messages = decode_messages(request_json)
         if messages is not None:
-            params["system"] = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+            params["system"] = "\n\n".join(
+                m["content"] for m in messages if m["role"] == "system"
+            )
             params["messages"] = [m for m in messages if m["role"] != "system"]
         if reasoning_effort is not None:
             params["output_config"] = {"effort": reasoning_effort.value}
         try:
-            response = await self._client.messages.create(**params)
+            provider_response = await self._client.messages.create(**params)
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as exc:
             raise self._map_error(
                 exc, model, kind=LLMErrorKind.AUTHENTICATION, retryable=False
@@ -102,11 +108,11 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
         except Exception as exc:
             raise self._map_error(exc, model) from exc
 
-        usage_raw = _attr(response, "usage")
-        input_tokens = _attr(usage_raw, "input_tokens")
-        output_tokens = _attr(usage_raw, "output_tokens")
-        cache_creation = _attr(usage_raw, "cache_creation_input_tokens")
-        cache_read = _attr(usage_raw, "cache_read_input_tokens")
+        usage_raw = _attr(provider_response, "usage")
+        input_tokens = integer_attribute(usage_raw, "input_tokens")
+        output_tokens = integer_attribute(usage_raw, "output_tokens")
+        cache_creation = integer_attribute(usage_raw, "cache_creation_input_tokens")
+        cache_read = integer_attribute(usage_raw, "cache_read_input_tokens")
         known_counts = (input_tokens, output_tokens, cache_creation, cache_read)
         total_tokens = (
             sum(value for value in known_counts if value is not None)
@@ -120,34 +126,38 @@ class AnthropicAdapter(BaseTextGenerationAdapter):
             output_tokens=output_tokens,
             total_tokens=total_tokens,
             cache_creation_input_tokens=cache_creation,
-            cache_creation_5m_input_tokens=_attr(
+            cache_creation_5m_input_tokens=integer_attribute(
                 cache_creation_details, "ephemeral_5m_input_tokens"
             ),
-            cache_creation_1h_input_tokens=_attr(
+            cache_creation_1h_input_tokens=integer_attribute(
                 cache_creation_details, "ephemeral_1h_input_tokens"
             ),
             cache_read_input_tokens=cache_read,
-            reasoning_tokens=_attr(output_details, "thinking_tokens"),
+            reasoning_tokens=integer_attribute(output_details, "thinking_tokens"),
         )
         content = "".join(
-            _attr(block, "text", "") or ""
-            for block in (_attr(response, "content", ()) or ())
+            string_attribute(block, "text", "") or ""
+            for block in (sequence_attribute(provider_response, "content", ()) or ())
             if _attr(block, "type") == "text"
         )
-        stop_details = _attr(response, "stop_details")
-        finish_reason = _attr(stop_details, "type") or _attr(response, "stop_reason")
+        stop_details = _attr(provider_response, "stop_details")
+        finish_reason = string_attribute(stop_details, "type") or string_attribute(
+            provider_response, "stop_reason"
+        )
         return LLMResultInfo(
             content=content,
             provider=self.provider,
-            model=_attr(response, "model", model) or model,
+            model=string_attribute(provider_response, "model", model) or model,
             usage=usage,
-            response_id=_attr(response, "id"),
-            request_id=_attr(response, "_request_id"),
+            response_id=string_attribute(provider_response, "id"),
+            request_id=string_attribute(provider_response, "_request_id"),
             status="completed",
             finish_reason=finish_reason,
         )
 
     async def aclose(self) -> None:
-        close = getattr(self._client, "close", None)
+        close: Callable[[], Awaitable[object]] | None = getattr(
+            self._client, "close", None
+        )
         if close is not None:
             await close()

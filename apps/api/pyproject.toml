@@ -16,3 +16,26 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.modules.chatting.prompt.resources" = ["*.json"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "ANN"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+# Match .python-version and the API Docker image; Ruff still checks 3.11 syntax.
+python_version = "3.12"
+mypy_path = "$MYPY_CONFIG_FILE_DIR"
+follow_imports = "silent"
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_any_generics = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+show_error_codes = true

@@ -6,6 +6,8 @@ import hashlib
 import json
 from math import ceil
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
@@ -162,7 +164,9 @@ class SummaryGenerator:
 
 
 # 검증된 요약을 임베딩 전 pending 상태로 저장한다. 동일 출처 범위·리비전·프롬프트 버전은 기존 행을 재사용한다.
-async def save_summary(session, command: Types.SaveSummaryCommand) -> Types.MemoryInfo:
+async def save_summary(
+    session: AsyncSession, command: Types.SaveSummaryCommand
+) -> Types.MemoryInfo:
     if not 0 <= command.importance <= 1:
         raise ValueError("Memory importance must be between 0 and 1.")
     row = await Repository.create_summary(

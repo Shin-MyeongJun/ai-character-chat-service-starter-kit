@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import BinaryIO, Generic, Literal, TypeAlias, TypeVar
+from typing import BinaryIO, Generic, Literal, TypeAlias, TypedDict, TypeVar
 from uuid import UUID
 
 from app.modules.asset_storage import types as AssetStorageTypes
@@ -250,12 +250,33 @@ class FreezeCharacterCommand:
     owner_id: UUID
 
 
+# Reads retain historical/extension fields. JSONB decoding supplies JSON values;
+# this contract does not validate or reinterpret a stored schema version.
+CharacterSnapshotJsonValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | list["CharacterSnapshotJsonValue"]
+    | dict[str, "CharacterSnapshotJsonValue"]
+)
+
+
+class CharacterSnapshotV2Data(TypedDict):
+    """The body written by freeze_character with snapshot_schema_version=2."""
+
+    name: str
+    description: str | None
+    persona_prompt: str
+
+
 @dataclass(frozen=True, slots=True)
 class CharacterSnapshotInfo:
     id: UUID
     character_id: UUID | None
     version: int
-    snapshot_data: dict
+    snapshot_data: dict[str, CharacterSnapshotJsonValue]
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,9 +284,16 @@ class GetSnapshotMediaCommand:
     snapshot_ids: tuple[UUID, ...]
 
 
+# Existing comparison tuples: image has four fields; asset has five.
+# These are values used for publication comparison, not persisted snapshot JSON.
+SnapshotMediaManifestItem: TypeAlias = (
+    tuple[Literal["image"], str, str, str] | tuple[Literal["asset"], str, str, str, str]
+)
+
+
 @dataclass(frozen=True, slots=True)
 class SnapshotMediaInfo:
-    manifest: frozenset[tuple]
+    manifest: frozenset[SnapshotMediaManifestItem]
 
 
 @dataclass(frozen=True, slots=True)

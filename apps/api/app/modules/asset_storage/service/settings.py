@@ -67,9 +67,7 @@ def load_asset_storage_settings(
             environment=environment,
             storage_kind=storage_kind,
             test_local=TestLocalStorageSettings(
-                storage_id=source.get(
-                    "ASSET_STORAGE_ID", "test-local-default"
-                ).strip(),
+                storage_id=source.get("ASSET_STORAGE_ID", "test-local-default").strip(),
                 root=Path(
                     source.get("ASSET_TEST_LOCAL_ROOT", r"C:\testChatData").strip()
                 ),
@@ -87,9 +85,7 @@ def load_asset_storage_settings(
             connect_timeout_seconds=_float(
                 source, "ASSET_S3_CONNECT_TIMEOUT_SECONDS", 5.0
             ),
-            read_timeout_seconds=_float(
-                source, "ASSET_S3_READ_TIMEOUT_SECONDS", 60.0
-            ),
+            read_timeout_seconds=_float(source, "ASSET_S3_READ_TIMEOUT_SECONDS", 60.0),
             max_attempts=_int(source, "ASSET_S3_MAX_ATTEMPTS", 3),
         ),
     )

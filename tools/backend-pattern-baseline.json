@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "baseline_head": "f6d456c4f6b1767581261cbb45fb3430b9d56079",
+  "reason": "Legacy signature debt inventoried before phase-1 implementation. Entries may only be removed by --prune-baseline. No new or replacement violations are allowed.",
+  "violations": []
+}

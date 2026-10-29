@@ -18,3 +18,28 @@
 
 
 2026-09-27: 자체 `PromptMessageInfo(id, sender_type, content, position)`를 입력으로 받는다. chat mapper가 순수 변환하며 prompt는 chat.types나 업무 서비스로 재료를 수집하지 않는다. runtime의 opening_message가 있으면 고정 assistant 시작 문맥으로 한 번 넣는다. 현재 버전 settings의 opening_message는 conversation 경계에서 제거하고 start는 최초 선택 장면을 사용한다. legacy에서는 opening_message=null이므로 기존 메시지 이력만 전달된다. 첫 대사도 최종 렌더링 예산에 포함하며 일반 메시지 요약에는 저장하지 않는다.
+
+## 소비부 타입·참조 JSON 계약 (2026-10-28)
+
+prompt 디렉터리 전체를 엄격 검사에 포함했다. 내부 _ReferenceData/_CharacterReference/
+_SceneReference TypedDict로 캐릭터 JSON·설정·nullable 제목의 장면·활성 로어·기억 목록을
+구분한다. 출력 키·순서와 일반 JSON dict/list 표현은 같다. history의 seen은 UUID 집합이다.
+외부 모듈의 공개 types만 참조하며 DB/업무 서비스 의존성을 추가하지 않는다.
+
+렌더러는 기존부터 start.title/content와 명시된 lore metadata의 get을 직접 사용했다.
+이번에는 start 객체 및 supplied metadata가 None이 아니라는 전제를 assertion으로 명시한다.
+장면 없음/명시적 null metadata는 계속 실패하며 빈 장면·빈 metadata로 보정하지 않는다.
+이 두 잘못된 내부 입력의 예외는 이전 AttributeError에서 AssertionError로 바뀐다.
+기존의 답변 캐릭터·현재 사용자 역할 검증이 먼저 실행되고 정상 입력의 정책은 같다.
+metadata 생략은 {}, 빈 activation_options는 기존 truthiness에 따라 legacy 위치다.
+
+_has_positioned_lore는 metadata의 activation_options truthiness만 구별한다. 옵션/placement
+검증이나 로어 선택을 중복 수행하지 않는다. 레거시 로어는 기본 참조 메시지, 옵션이 있는
+로어는 기존 before_history/after_history 메시지로 배치한다. 첫 대사·이력·현재 입력 순서,
+권한 역할·현재 ID 중복 제거와 토큰 추정 알고리즘을 유지한다.
+
+test_prompt_type_contracts의 11건은 기존 구현에서 산출한 고정 입력의 request_json SHA-256
+d85cff1b1487f9058994c06408ae8ad2a5a755d348d091d7b243bf94e10393f9 및 1,625 추정 토큰을
+확인한다. 한국어·선택 대상·장면 null 제목·로어 배치·첫 대사와 이력 순서, 입력 비변경,
+opening 생략/빈 문자열 구분과 무효 내부 입력/이력/답변 대상 거절도 확인한다. 실제 모델의
+응답 품질·정확한 tokenizer 비용·운영 호출은 검증하지 않는다.

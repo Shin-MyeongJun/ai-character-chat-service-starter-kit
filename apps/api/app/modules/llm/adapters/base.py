@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 
+from app.modules.llm.adapters.sdk import integer_attribute, string_attribute
 from app.modules.llm.types import (
     LLMError,
     LLMErrorKind,
@@ -131,8 +132,8 @@ class BaseTextGenerationAdapter(ABC):
         retryable: bool = False,
     ) -> LLMError:
         """Build the shared error envelope; adapters classify SDK exceptions."""
-        status_code = getattr(exc, "status_code", None)
-        request_id = getattr(exc, "request_id", None)
+        status_code = integer_attribute(exc, "status_code")
+        request_id = string_attribute(exc, "request_id")
         if kind is None:
             if status_code in {401, 403}:
                 kind, retryable = LLMErrorKind.AUTHENTICATION, False

@@ -1,4 +1,7 @@
-# DTO를 값으로 변환하고 from_attributes로 응답을 만든다. owner와 경로 ID의 최종 조합은 router가 한다.
+# DTO와 신뢰된 경로/owner 값을 Command로 변환하고 from_attributes로 응답을 만든다.
+from typing import cast
+from uuid import UUID
+
 from app.modules.content.product import schemas as Schemas
 from app.modules.content.product import types as Types
 
@@ -7,11 +10,31 @@ class ProductSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
-    def catalog_page_info_to_response(result: Types.CatalogPageInfo) -> Schemas.CatalogPageResponseDto:
+    def studio_draft_request_to_command(
+        product_id: UUID, owner_id: UUID, request: Schemas.SaveStudioDraftRequestDto
+    ) -> Types.SaveStudioDraftCommand:
+        # HTTP JSON parsing supplies JSON-compatible values. The DTO deliberately
+        # keeps nested values opaque so inherited string stripping does not edit
+        # authored content. This cast preserves that existing boundary; the studio
+        # service still owns document structure/size/digest validation.
+        document = cast(Types.ProductJsonObject, request.document)
+        return Types.SaveStudioDraftCommand(
+            product_id=product_id,
+            owner_id=owner_id,
+            expected_revision=request.expected_revision,
+            document=document,
+        )
+
+    @staticmethod
+    def catalog_page_info_to_response(
+        result: Types.CatalogPageInfo,
+    ) -> Schemas.CatalogPageResponseDto:
         return Schemas.CatalogPageResponseDto.model_validate(result)
 
     @staticmethod
-    def studio_draft_info_to_response(result: Types.StudioDraftInfo) -> Schemas.StudioDraftResponseDto:
+    def studio_draft_info_to_response(
+        result: Types.StudioDraftInfo,
+    ) -> Schemas.StudioDraftResponseDto:
         return Schemas.StudioDraftResponseDto.model_validate(result)
 
     @staticmethod
@@ -50,22 +73,22 @@ class ProductSchemaMapper:
         return Types.ProductCompositionInfo(
             characters=tuple(
                 Types.CharacterSelection(
-                    character_id=c.character_id,
-                    is_primary=c.is_primary,
-                    role_name=c.role_name,
+                    character_id=character.character_id,
+                    is_primary=character.is_primary,
+                    role_name=character.role_name,
                 )
-                for c in request.characters
+                for character in request.characters
             ),
             lorebooks=tuple(
                 Types.LorebookSelection(
-                    lorebook_id=b.lorebook_id,
-                    scope=b.scope,
-                    character_ids=b.character_ids,
-                    role=b.role,
-                    priority=b.priority,
-                    is_required=b.is_required,
+                    lorebook_id=lorebook.lorebook_id,
+                    scope=lorebook.scope,
+                    character_ids=lorebook.character_ids,
+                    role=lorebook.role,
+                    priority=lorebook.priority,
+                    is_required=lorebook.is_required,
                 )
-                for b in request.lorebooks
+                for lorebook in request.lorebooks
             ),
         )
 

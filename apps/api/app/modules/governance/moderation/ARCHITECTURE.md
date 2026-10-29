@@ -169,3 +169,160 @@ test_moderation_review_schema(이관/제약/DDL). 대역 검증은 실제 DB 성
 Docker 데몬이 없고 TEST_DATABASE_URL이 설정되지 않아 신규 서비스의 실제 DB 4개와
 스키마 DB 2개를 포함한 DB/외부 환경 의존 검사는 미실행이다. 동시 접수·재평가,
 실제 SQL 페이지·삭제 정책·Alembic 이관을 DB에서 검증 완료했다고 해석하지 않는다.
+
+## 저장소·mapper·검증 타입 정리 (2026-10-28)
+
+이번 단계의 엄격 검사 완료 범위는 다음 네 파일이다. 공용
+`tools/backend-quality-scope.json`에는 주 대화의 통합 단계에서 이 경로만 추가한다.
+서비스 패키지나 moderation 전체를 완료 범위로 추가하지 않는다.
+
+```text
+apps/api/app/modules/governance/moderation/repository/review.py
+apps/api/app/modules/governance/moderation/mapper/persistence.py
+apps/api/app/modules/governance/moderation/types.py
+apps/api/app/modules/governance/moderation/service/util/validation.py
+```
+
+- 저장소는 AsyncSession, UUID, 실제 시각 컬럼, 조회 Command, 생성 TypedDict,
+  선택적 Entity/UUID 및 `PageRow[T]`를 명시한다. 생성 TypedDict와 Entity/Row는
+  저장소 내부 계약이며 공개 types에는 ORM을 노출하지 않는다. 단건은 동일 SQL의
+  `scalars(...).first()`로 첫 값/None을 반환하고 잠금·populate_existing·flush는 유지한다.
+- 공통 페이지 조회는 기존 시각/ID SQL과 limit+1을 유지한다. 동적 getattr 대신 각
+  테이블의 received_at/evaluated_at/created_at을 읽는 typed cursor 함수를 받는다.
+  사용하지 않던 max_limit과 factory 인자는 내부 함수에서 제거했으며 공개 Command와
+  페이지 형식은 바꾸지 않았다. 페이지 크기의 검증 책임은 여전히 서비스에 있다.
+- mapper는 명시적 필드 변환과 overload로 미존재 단건, 반드시 존재하는 페이지 항목,
+  신고자 요약/관리자 페이지를 구별한다. JSONB object/array 제약과 디코딩을 근거로
+  재귀 JsonValue에 cast하고 중첩 JSON은 깊은 복사한다. 알 수 없는 legacy/첨부/권고
+  키를 삭제하지 않는다. legacy status 접근의 cast 근거는 0027 이관의 object 형식이다.
+- 검증은 미검증 scalar 입력을 object로 받고 런타임 검사와 기존 None 반환을 유지한다.
+  require_info는 필수 Info를 반환한다. 지문 입력은 세 쓰기 Command로 한정하고
+  asdict→동일 JSON 직렬화/default→SHA256 규칙을 유지한다. 타입 주석이 실행 검증을
+  대체하지 않으며 bool/int, None/누락/빈 값의 구분을 합치지 않는다.
+- 연결 보완은 `service/command/assessments.py`의 생성 사전 타입과
+  `service/command/actions.py`의 명시적 생성 필드뿐이다. 이 두 서비스 파일 전체의
+  타입 정리가 완료된 것은 아니다. 인가·대상 일치·append-only·멱등 재사용/거절·
+  pending 요청과 실제 적용 구분·트랜잭션·오류 코드는 변경하지 않았다.
+
+### 검증과 통합 시 주의점
+
+프로젝트 `.venv/Scripts/python.exe`로 위 네 파일을 직접 지정한 Ruff format/check와
+mypy를 통과했다. 지정한 서비스·DB·스키마·content_actor_routes 테스트 합계는
+**37 passed / 0 failed / 6 skipped**다. 그중 기존 검증은 22 passed / 6 skipped이며,
+추가 15건은 중첩 JSON 격리, legacy 누락/null/빈 상태, 빈 페이지/단건 미존재,
+변경 전 구현에서 추출한 세 요청의 고정 지문과 UTC/Decimal 정규화, 런타임 검증을
+확인한다. 커서 테스트는 변경된 내부 함수 인자를 반영했다.
+
+TEST_DATABASE_URL을 제거했다. 서비스 DB 4건과 스키마 DB 2건은 PostgreSQL 필요로
+skip했으며 성공으로 계산하지 않는다. 실제 DB migration·초기화·삭제는 실행하지
+않았다. Windows 샌드박스의 asyncio socketpair 정지 때문에 지정 테스트는 로컬
+소켓이 허용되는 환경에서 다시 실행했다. DB 동시성·실제 잠금/flush/제약은 미검증이다.
+
+필수 `python tools/check_backend_quality.py`는 **종료 코드 1**이다. 최종 실행에서
+새 패턴 위반은 없으며 `123 resolved entries; run --prune-baseline to remove them.`
+때문에 실패했다. 이 수는 병행 작업을 포함한 공용 기준선 전체 결과다. 공용 범위의
+Ruff format(127개 파일)/check와 mypy(123개 소스)는 통과했고 아키텍처·패턴 테스트도
+13 passed다. 최초 샌드박스 실행은 임시 디렉터리 생성 오류로 테스트 2 errors였고,
+권한을 조정한 재실행에서 해소됐다. 공용 파일과 기준선은 수정하지 않았으며
+실제 기준선 prune은 주 대화의 통합 단계에 남겼다.
+
+### 미완료 범위와 기존 데이터 한계
+
+moderation 전체를 직접 검사하면 서비스 6개 파일에 mypy 42건, Ruff 23건이 남는다.
+이는 위 네 파일의 통과와 구별한다. 후속 작업은 아래 범위를 다룬다.
+
+- `service/command/reports.py`: 세션/대상 증거 반환 타입, product snapshot 내부
+  object의 get 접근(현재 52–54행), Entity/UUID를 재사용하는 row 변수, 접수 UPDATE
+  결과의 선택적 Info 처리. product 모듈 자체는 이 작업에서 수정하지 않았다.
+- `service/command/assessments.py`: 세션, 기간 쌍의 None narrowing, links 사전 타입,
+  AssessmentRow/Report/UUID 임시 변수의 구분.
+- `service/command/actions.py`: 세션/검증 함수 타입, Action/AssessmentRow/UUID 임시
+  변수의 구분, 취소 UPDATE 결과의 선택적 Info 처리.
+- `service/query/{reports,assessments,actions}.py`: 세션 및 신고 페이지 검증 입력 타입.
+- 기존 character/lorebook HTTP moderator dependency의 기본 503과 별도 인증 연결은
+  기존 후속 과제다. 이번 테스트는 거절 가드의 호출 차단만 검증한다.
+
+기존 데이터 한계도 재현했다. evidence_snapshot 자체의 object 제약은 내부
+`legacy_moderation_flag`의 object 형식까지 보장하지 않는다. 그 키가 명시적으로
+JSON null이면 `mapper/persistence.py::report_info_to_summary`와
+`service/util/validation.py::legacy_review_status`의 기존 get 접근이 AttributeError를
+발생시킨다. 새 `test_explicit_null_legacy_object_is_not_treated_as_missing`에서
+재현했으며 누락 시 기본 {}와 합치거나 오류를 임의의 업무 코드로 바꾸지 않았다.
+정상 0027 이관과 현재 신규 쓰기는 이런 null object를 생성하지 않는다. 손상 데이터의
+정책은 별도 후속 검토가 필요하다. U06 실패는 이번 범위에서 실행·변경하지 않았다.
+
+### 주 대화 통합 완료 (2026-10-28)
+
+주 대화에서 위 완료 4파일의 Ruff/mypy를 재확인하고 해당 경로만 필수 엄격 검사에
+편입했다. 병렬 실행 당시 resolved entries 때문에 발생한 공용 품질 실패는 이전 주 대화의
+기준선 prune과 이번 통합 검사에서 해소됐다. 101항목 제거를 중복 계산하지 않는다.
+moderation_services/DB/schema/content_actor_routes는 37 passed/6 skipped로 재검증했다.
+미완료 서비스 6파일은 아직 엄격 범위 밖이며 DB 동시성·실제 잠금·손상 legacy 정책의
+검증 한계는 그대로다. 이후 통합 전체 API의 U06 실패도 별도 계약 과제로 유지한다.
+
+## command/query 서비스 타입 정리 완료 (2026-10-28)
+
+위 단계에서 미완료였던 다음 6파일의 Ruff format/check 및 mypy 직접 검사를
+완료했다. 공용 엄격 검사 범위에는 기존 4파일에 아래 경로를 추가하면 된다.
+이 대화에서는 공용 scope·baseline·검사 도구·감사 REPORT를 수정하지 않았다.
+
+```text
+apps/api/app/modules/governance/moderation/service/command/reports.py
+apps/api/app/modules/governance/moderation/service/command/assessments.py
+apps/api/app/modules/governance/moderation/service/command/actions.py
+apps/api/app/modules/governance/moderation/service/query/reports.py
+apps/api/app/modules/governance/moderation/service/query/assessments.py
+apps/api/app/modules/governance/moderation/service/query/actions.py
+```
+
+- 모든 서비스에 AsyncSession과 실제 Command/Info 반환 타입을 명시했다. 동일 row
+  변수를 Entity·AssessmentRow·선택적 UUID에 재사용하지 않고 조회 의미에 따라
+  구분했다. ORM 필드나 조회 결과 None을 서비스에서 직접 판단하지 않는다.
+- `_capture_report_target`의 owner/snapshot/evidence 반환을 구체화했다. product
+  공개 서비스가 주는 JSON의 기존 평면/중첩 형식을 그대로 읽으며 cast는 발행 저장
+  계약을 근거로 한다. 누락, 명시적 null, 빈 문자열/빈 object를 합치지 않는다.
+  product·identity 코드와 HTTP 인증 정책은 수정하지 않았다.
+- 평가의 links·visited·reporters 자료형과 기간 쌍의 None narrowing을 명시했다.
+  기존 기간 쌍 검증 뒤에 end가 존재함을 표현했으며 [start,end) 판정은 유지한다.
+- 접수 변경/조치 취소의 UPDATE 결과는 앞선 존재 확인 및 같은 트랜잭션의 행 잠금과
+  동일 ID UPDATE RETURNING을 근거로 Info에 cast한다. 별도 not_found 처리나 기본값을
+  추가하지 않아 기존 오류 동작을 유지한다. 잠금 순서·감사 로그·flush·트랜잭션 경계,
+  활성 행위자 재검증·키 충돌 비교·이력 대상 일치·append-only·조치 상태 정책은 같다.
+- 연결 보완으로 `mapper/persistence.py`의 scalar 타입 변수를 `bound=UUID | None`으로
+  수정했다. 이전 constrained TypeVar는 실제 저장소의 `UUID | None` 입력에서 mypy
+  오류가 났다. 함수의 값 전달 동작과 허용 값 범위는 바꾸지 않았다.
+
+검증은 프로젝트 `.venv/Scripts/python.exe`를 사용했다. 시작 시 서비스 진단은 Ruff
+23건/mypy 42건이었으며 완료 후 위 6파일은 모두 0건이다. 연결 mapper를 포함한
+7파일도 mypy를 통과했다. 추가로 moderation 전체를 직접 지정한 Ruff format은
+23파일, Ruff check는 전체, mypy는 22개 소스에서 통과했다. 따라서 위의 서비스
+6파일 미완료 진단은 이번 단계에서 해소됐다. 이는 기능 후속 과제 완료를 뜻하지 않는다.
+
+지정 테스트는 **52 passed / 0 failed / 6 skipped**다.
+
+| 테스트 | passed | skipped |
+| --- | ---: | ---: |
+| test_moderation_services.py | 48 | 0 |
+| test_moderation_services_db.py | 0 | 4 |
+| test_moderation_review_schema.py | 2 | 2 |
+| test_content_actor_routes.py | 2 | 0 |
+
+추가 15건은 기간 쌍의 누락/정렬/동일 시각, 신고 접수의 [start,end) 경계,
+snapshot의 평면/중첩·누락/빈 값·손상 JSON 동작을 검증했다. TEST_DATABASE_URL을
+제거했으며 실제 DB migration·초기화·삭제를 실행하지 않았다. PostgreSQL 6건은
+여전히 미검증이다. Windows asyncio의 로컬 socketpair를 허용하는 환경에서 실행했다.
+
+필수 `python tools/check_backend_quality.py`는 **종료 코드 1**이다. 실행 시 공용
+범위의 Ruff format(157파일)/check, mypy(150소스), 아키텍처·패턴 테스트(13 passed)는
+모두 통과했다. 새 패턴 위반은 없으며
+`58 resolved entries; run --prune-baseline to remove them.` 사유만 남았다. 이 수는
+동시 작업을 포함한 실행 당시 공용 기준선 전체 결과이며 이전 단계의 123건과 별개다.
+실제 prune은 실행하지 않았으므로 주 대화의 통합 단계에서 처리한다.
+
+기능 후속 범위는 실제 DB 동시성/잠금/제약 검증, 기존 HTTP moderator 인증 연결,
+손상 JSON 정책 및 실제 조치 적용자다. 기존 legacy null object 한계도 유지된다.
+이번 snapshot 검증에서도 `product` 키가 명시적 null/array이면 기존 `.get` 접근이
+AttributeError를 내며 접수는 롤백되는 것을 재현했다. 정상 발행은 object를 저장한다.
+이를 누락 fallback이나 새 업무 오류로 바꾸지 않았고
+`test_report_snapshot_json_forms_preserve_existing_behavior`에 재현을 남겼다.
+타 모듈 수정과 전체 API/U06 재실행·skip/xfail 변경은 하지 않았다.

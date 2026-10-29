@@ -21,6 +21,23 @@ chat → conversation / memory / product / billing / llm 방향으로 공개 ser
 
 메시지 편집과 생성 수명주기는 입력·권한·실패 조건이 달라 기능 파일로 나눴다. 밀접한 메시지/생성 저장소는 단일 repository를 유지했다. 답변의 외부 호출과 복구는 선택적 workflow에 두며 리롤·스트리밍용 빈 계층은 추가하지 않았다.
 
+## 조회·변환 타입 계약 (2026-10-26)
+
+- `service/query`와 `mapper` 폴더 전체를 엄격 품질 검사 범위에 포함한다. 조회 서비스는
+  `AsyncSession`과 Command를 받고 공개 Info 또는 값 사전을 반환한다.
+- 미리보기는 `dict[UUID, str]`, 대화 활동은 `dict[UUID, ConversationActivityInfo]`다.
+  SQL Row 형태와 집계 컬럼 순서는 repository의 타입 별칭으로 표현하고 공개 반환에 노출하지 않는다.
+- 메시지·생성 상태·원문 프롬프트는 필드를 명시해 Info로 변환한다. 페이지와 기억 원문은
+  같은 메시지 mapper를 재사용하며, 추가 한 행에 따른 커서·truncated 의미를 유지한다.
+  단건 mapper의 overload는 None 입력과 존재하는 입력의 반환을 구별한다.
+- 프롬프트 목록 Row는 `_select_generation_summaries`의 12개 컬럼 순서와
+  `GenerationPromptSummaryValues`가 대응한다. 목록에는 원문과 answer_metadata를 포함하지 않는다.
+  OUTER JOIN의 원문 미기록 상태는 prompt_recorded=False와 nullable 필드로 유지한다.
+- 생성 통계의 공개 list/tuple 표현은 유지하고 각 요소 타입만 명시한다. HTTP 커서 형식,
+  소유권·관리자 검증, 잠금 옵션, JSON 공유/복사 정책, 기존 키워드 인자 이름은 유지한다.
+- 당시 남긴 repository 쓰기와 types의 나머지 타입 부채는 아래 메시지 쓰기 단계에서
+  정리했다. 생성/답변 command·workflow의 완료 범위와는 구별한다.
+
 ## HTTP 및 내부 쓰기 계약
 
 | 메서드·경로 | 입력 | 반환 |
@@ -88,6 +105,11 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 
 ## 답변 workflow (2026-09-27)
 
+세션 생성 의존성은 `app.db.types.SessionFactory`로 표현한다. 기억 workflow의 내부
+읽기/저장/색인/완료 함수도 공개 Info를 입력·반환 타입으로 명시하며 기존 tuple 결과를
+유지한다. `AnswerOrchestrator.sessions` 속성과 생성자의 호출 방식은 호환을 위해 유지한다.
+2026-10-26 타입 정리는 요약 임계치·작업 lease·재시도·잠금 정책을 변경하지 않는다.
+
 - `service/workflow/answers.py`: 준비 재검증 → 생성·견적·credit 예약 확정 → LLM → result_ready staging → 메시지·usage·기억 예약·과금 확정/해제. 정상 완료와 lease 복구는 동일 `_finalize`와 완료 규칙을 사용한다. 불확실한 공급자 호출을 다시 실행하지 않는다.
 - `service/workflow/answer_preparation.py`: 공개 conversation/memory 서비스와 chat 원문 조회로 문맥을 수집하고 고정 예산과 미요약 원문을 확보한다. 초과 원문을 조용히 잘라내지 않는다.
 - `service/workflow/memory.py`: `ProcessMemoryWorkCommand`로 받은 작업의 pending 색인 재개·요약·임베딩·저장 전 원문/revision 재검증·실패 기록. 요약 정책·검색·임베딩·저장·작업 전이는 memory 소유다.
@@ -150,3 +172,88 @@ SQL 스코핑해 현재 상태별 건수를 제공한다. 최대 731일 timezone
 pending도 포함한다. 기존 작품 통계의 finished_at 완료 코호트와 기간 기준이 다르다.
 repository/mapper/types에 최소 연산을 추가했고 메시지·metadata·다른 사용자·모델 내부
 정보는 반환하지 않는다. 읽기 중 autoflush를 금지하며 생성 쓰기나 회복은 수행하지 않는다.
+
+## 메시지 쓰기·공유 저장소 타입 정리 (2026-10-28)
+
+repository.py, service/command/messages.py와 types.py 전체를 엄격 검사에 추가했다.
+세션·UUID·시각·입력 Command·Entity/목록/None 반환을 명시했다. get_message는 삭제된
+receipt의 message_id=None도 기존대로 조회할 수 있고, service가 재생성 대신 충돌로
+판단한다. scalar SQL·populate_existing·잠금·flush 순서와 명시적 generation prompt 저장
+필드는 유지한다. 삭제 건수만 DML의 CursorResult 계약을 근거로 cast해 rowcount를 읽는다.
+생성 완료는 상위의 존재 확인/잠금 전제를 assertion으로 표현한다.
+
+메시지 내부 helper의 사용자/캐릭터 Command와 bool 분기를 overload·Literal로 연결하고
+캐릭터 분기 입력은 타입 assertion으로 명시한다. receipt_entity/message_entity/last_entity/
+replaced_entity를 구별한다. 기존 content/request/revision 검증·digest 직렬화, 정확한
+재전송의 pending 검사 이전 반환, 삭제/교체 후 요청 키 충돌, 마지막 메시지와 버전/참여자
+검증, memory→generation history 무효화→쓰기/되돌리기 순서는 유지한다.
+
+답변 metadata는 개방형 재귀 JSON 별칭으로 표현한다. 저장 v1/v2 및 확장 키·중첩 참조를
+보존하며 새로운 실행 시 JSON 검증·보정·깊은 복사를 추가하지 않는다. AnswerConfig의
+기존 __post_init__은 반환 None만 명시했다. 이 값 타입의 구체화가 생성/답변 command와
+workflow 전체의 엄격 검사 완료를 뜻하지는 않는다.
+
+test_chat_message_contracts의 24건은 서비스 대역/실제 AsyncSession으로 사용자/캐릭터
+저장·재전송·영수증 충돌·편집 거절·기억 무효화 실패·되돌리기·인가/입력 거절을 확인한다.
+SQL 검사는 SQLite 최소 테이블에서 재조회, 출처 초기화, 포함 삭제와 receipt SET NULL,
+기존 입력 참조에 따른 생성 입력 저장 여부, metadata/lease/원문 보존을 확인한다.
+메시지 position은 테스트용 증가 함수로 대체하며 PostgreSQL Identity 자체를 검증하지 않는다.
+선택한 receipt FK와 메시지 position UNIQUE만 복제했고 나머지 FK/CHECK·DB 잠금/경합·
+실제 memory/billing 원자성과 외부 모델 호출은 미검증이다.
+
+## 생성·답변·프롬프트 저장 command 타입 정리 (2026-10-28)
+
+service/command 전체 5파일을 엄격 검사에 편입했다. generation.py의 digest 입력/반환을
+GenerationResult/str로, generation·answers·prompts의 세션을 AsyncSession으로 명시했다.
+generation_entity는 mapper에 전달하는 저장 결과이며 업무 판단은 기존 Info로 수행한다.
+재귀 AnswerMetadata를 비교·저장하는 command는 기존 v1/v2 및 확장 키를 그대로 소비한다.
+새로운 JSON 정규화/복사나 기본값 정책은 추가하지 않았다.
+
+save_generation_prompt는 최초 소유 생성 확인 후 conversation 잠금 아래의 generation
+재조회가 존재한다는 기존 전제를 assertion으로 표현한다. 이 전제가 깨진 비정상 경로는
+기존 None 속성 접근의 AttributeError 대신 AssertionError가 된다. 정상·충돌·재전송의
+계약은 같다. 저장된 동일 프롬프트의 선행 반환, 실행권·예약·lease 검증 순서를 유지하며
+새 not-found 정책이나 동시성 안전성을 추가한 것으로 보지 않는다.
+
+생성의 request-key digest·잠금 순서·기존 입력 참조, terminal 결과 digest 재전송,
+stale의 출력/청구 크레딧 제외와 usage 기록, 메시지→usage→생성 완료→통계 예약의
+상위 트랜잭션을 유지한다. 답변의 소유 token·live/recovery lease·불변 실행 스냅샷과
+result_ready의 전체 metadata 일치 검사도 같다. Any/cast/ignore를 추가하지 않았다.
+
+기존 prompt command/workflow·answer prompt·message SQL 계약과 생성/과금/답변,
+billing persistence·moderation을 함께 재실행해 108 passed, 63 skipped를 확인했다.
+TEST_DATABASE_URL을 제거했으며 실제 PostgreSQL 잠금·동시성·원자성 검증을 대체하지
+않는다. workflow/answers.py와 chat HTTP router의 엄격 타입 편입은 후속 범위다.
+
+## 답변 workflow 타입 정리 (2026-10-28)
+
+service/workflow 전체 4파일을 엄격 검사에 편입했다. answers.py의 준비 결과는 기존
+5요소 tuple을 유지하는 타입 별칭으로 표현했다. 세션·UUID·예외·metadata·lease와
+준비/재개/staging/확정/복구의 반환을 명시했으며 self.sessions 호환 이름은 유지한다.
+digest는 기존 JSON 정렬/기본 str 변환을, usage는 bool 제외·저장 범위·알 수 없는 값의
+0 처리와 원본 TokenUsageInfo의 None 구분을 그대로 유지한다.
+
+내부 _StoredIdentity/_StoredBilling/_StoredAnswer는 workflow의 기존 v1/v2 작성 필드 중
+소비하는 필드만 표현하는 TypedDict 읽기 뷰다. 저장 JSON은 계속 개방형 AnswerMetadata다.
+staging token, 복구 token, 완료 결과, 응답 변환의 네 cast는 이 workflow의 기존 작성
+규칙을 근거로 한다. 런타임 검증·변환·기본값 추가가 아니며 누락 키/손상 타입의 기존
+오류나 참조 공유·확장 필드를 보정하지 않는다. 손상 JSON 정책은 별도 후속 과제다.
+
+요청 identity의 manual_entry_ids는 기존대로 값이 있을 때만 문자열 정렬 목록으로
+기록한다. 실행 token은 같은 생성 문자열을 지역 변수로 보관해 prompt 저장에 전달한다.
+준비 전 기존 요청 확인, 예약 재검증, quote/generation/credit/prompt의 commit 후 외부
+호출, calling/result_ready staging, 불확실 호출 재실행 금지와 lease 복구를 유지한다.
+완료 시 성공/실패/stale에 따른 예약 확정/해제, 금액 일치 검사, memory 예약도 같다.
+
+기존 prompt workflow/command·answer prompt·nonstream·과금·가격/HTTP·생성 관련 회귀는
+41 passed, 57 skipped다. 실제 PostgreSQL 트랜잭션/잠금·동시성·공급자 호출의 검증은
+아니며 테스트 대역을 사용하는 오프라인 흐름과 구분한다. Any/ignore/기준선 예외는
+추가하지 않았다. chat HTTP router의 통합 판정은 해당 병렬 작업의 후속 범위다.
+
+## HTTP 병렬 결과 통합 (2026-10-28)
+
+주 대화가 router를 포함한 모듈 전체를 직접 Ruff format/check·mypy로 확인하고 공용
+엄격 검사 범위를 chat 디렉터리로 통합했다. dependencies.get_answer_orchestrator는
+main이 설정한 앱 상태의 동적 값을 AnswerOrchestrator로 연결한다. cast는 조립 시
+할당 계약을 표현하며 None의 기존 503과 주입된 실행/테스트 대역을 유지한다.
+새 isinstance 제한·구성 기본값·인증 연결을 추가하지 않았다.

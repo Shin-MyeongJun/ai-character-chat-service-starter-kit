@@ -2,13 +2,23 @@
 # SDK 호출 예외만 LLMError로 바꾸며, 입력 봉투 검증 오류는 ValueError로 전달한다.
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from typing import Any
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from typing import cast
 
 import openai
 
 from app.modules.llm.adapters.base import BaseTextGenerationAdapter
 from app.modules.llm.adapters.messages import decode_messages
+from app.modules.llm.adapters.sdk import (
+    OpenAIRequest,
+    ResponsesClient,
+    integer_attribute,
+    sequence_attribute,
+    string_attribute,
+)
+from app.modules.llm.adapters.sdk import (
+    response_attribute as _attr,
+)
 from app.modules.llm.types import (
     LLMErrorKind,
     LLMProvider,
@@ -16,14 +26,6 @@ from app.modules.llm.types import (
     ReasoningEffort,
     TokenUsageInfo,
 )
-
-
-def _attr(value: object | None, name: str, default: Any = None) -> Any:
-    if value is None:
-        return default
-    if isinstance(value, dict):
-        return value.get(name, default)
-    return getattr(value, name, default)
 
 
 class OpenAIAdapter(BaseTextGenerationAdapter):
@@ -43,7 +45,7 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
     def __init__(
         self,
         *,
-        client: Any | None = None,
+        client: openai.AsyncOpenAI | ResponsesClient | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 0,
@@ -61,7 +63,9 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
                 timeout=timeout,
                 max_retries=max_retries,
             )
-        self._client = client
+        # The installed SDK and injected clients expose responses.create. Its
+        # overloads are wider than the request subset used here; keep duck typing.
+        self._client = cast(ResponsesClient, client)
 
     async def _generate(
         self,
@@ -71,7 +75,7 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
         reasoning_effort: ReasoningEffort | None,
         max_output_tokens: int,
     ) -> LLMResultInfo:
-        params: dict[str, Any] = {
+        params: OpenAIRequest = {
             "model": model,
             "input": decode_messages(request_json) or request_json,
             "max_output_tokens": max_output_tokens,
@@ -80,7 +84,7 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
         if reasoning_effort is not None:
             params["reasoning"] = {"effort": reasoning_effort.value}
         try:
-            response = await self._client.responses.create(**params)
+            provider_response = await self._client.responses.create(**params)
         except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
             raise self._map_error(
                 exc, model, kind=LLMErrorKind.AUTHENTICATION, retryable=False
@@ -100,42 +104,46 @@ class OpenAIAdapter(BaseTextGenerationAdapter):
         except Exception as exc:
             raise self._map_error(exc, model) from exc
 
-        usage_raw = _attr(response, "usage")
+        usage_raw = _attr(provider_response, "usage")
         input_details = _attr(usage_raw, "input_tokens_details")
         output_details = _attr(usage_raw, "output_tokens_details")
         usage = TokenUsageInfo(
-            input_tokens=_attr(usage_raw, "input_tokens"),
-            output_tokens=_attr(usage_raw, "output_tokens"),
-            total_tokens=_attr(usage_raw, "total_tokens"),
-            cached_input_tokens=_attr(input_details, "cached_tokens"),
-            cache_creation_input_tokens=_attr(input_details, "cache_write_tokens"),
-            reasoning_tokens=_attr(output_details, "reasoning_tokens"),
+            input_tokens=integer_attribute(usage_raw, "input_tokens"),
+            output_tokens=integer_attribute(usage_raw, "output_tokens"),
+            total_tokens=integer_attribute(usage_raw, "total_tokens"),
+            cached_input_tokens=integer_attribute(input_details, "cached_tokens"),
+            cache_creation_input_tokens=integer_attribute(
+                input_details, "cache_write_tokens"
+            ),
+            reasoning_tokens=integer_attribute(output_details, "reasoning_tokens"),
         )
-        status = _attr(response, "status")
-        incomplete = _attr(response, "incomplete_details")
-        finish_reason = _attr(incomplete, "reason") if incomplete else status
-        if self._contains_refusal(response):
+        status = string_attribute(provider_response, "status")
+        incomplete = _attr(provider_response, "incomplete_details")
+        finish_reason = string_attribute(incomplete, "reason") if incomplete else status
+        if self._contains_refusal(provider_response):
             finish_reason = "refusal"
         return LLMResultInfo(
-            content=_attr(response, "output_text", "") or "",
+            content=string_attribute(provider_response, "output_text", "") or "",
             provider=self.provider,
-            model=_attr(response, "model", model) or model,
+            model=string_attribute(provider_response, "model", model) or model,
             usage=usage,
-            response_id=_attr(response, "id"),
-            request_id=_attr(response, "_request_id"),
+            response_id=string_attribute(provider_response, "id"),
+            request_id=string_attribute(provider_response, "_request_id"),
             status=status,
             finish_reason=finish_reason,
         )
 
     @staticmethod
     def _contains_refusal(response: object) -> bool:
-        for item in _attr(response, "output", ()) or ():
-            for block in _attr(item, "content", ()) or ():
+        for item in sequence_attribute(response, "output", ()) or ():
+            for block in sequence_attribute(item, "content", ()) or ():
                 if _attr(block, "type") == "refusal":
                     return True
         return False
 
     async def aclose(self) -> None:
-        close = getattr(self._client, "close", None)
+        close: Callable[[], Awaitable[object]] | None = getattr(
+            self._client, "close", None
+        )
         if close is not None:
             await close()

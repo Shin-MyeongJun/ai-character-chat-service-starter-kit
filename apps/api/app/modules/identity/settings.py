@@ -30,7 +30,7 @@ class AuthSettings:
     access_seconds: int = 900
     session_seconds: int = 14 * 86400
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # HS256 키는 base64로 인코딩한 32바이트 이상 난수만 설정한다.
         try:
             if len(base64.b64decode(self.jwt_key, validate=True)) < 32:

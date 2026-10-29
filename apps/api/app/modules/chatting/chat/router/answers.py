@@ -62,7 +62,7 @@ async def generate_answer(
     return SchemaMapper.answer_info_to_response(result)
 
 
-def _failure_status(code):
+def _failure_status(code: str | None) -> int:
     if code in ("summary_required", "stale", "cancelled", "interrupted_before_call"):
         return 409
     if code in ("fixed_context_exceeded", "unsupported_model"):

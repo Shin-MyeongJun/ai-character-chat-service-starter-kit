@@ -71,3 +71,21 @@ Ruff와 git diff --check 통과. TEST_DATABASE_URL과 Docker 데몬 부재로
 신규 reporting_db 4개 및 기존 product_statistics DB 3개를 포함한
 DB/외부 환경 검증은 미실행이다. 실제 SQL 쓰기 금지·스코프·DISTINCT·서울 경계는
 DB 테스트로 작성했으나 DB 검증 완료라고 표시하지 않는다.
+
+## 타입·패턴 검증 경계 (2026-10-28)
+
+- service는 AsyncSession과 이 영역의 Command·ActorCommand를 받아 활성 사용자 검증
+  후 product 공개 ReportingStatisticsInfo를 조합한다. 소유권 조회 경계는 유지한다.
+- mapper는 ReportingMetricsInfo | None, ReportingStatisticsInfo, PeriodInfo,
+  datetime을 명시하며 일별 결과는 tuple[CreatorDayInfo, ...]로 연결된다.
+- 지표를 명시적인 허용 필드로 변환한다. 기간 DISTINCT를 다시 합산하지 않고,
+  totals·recorded_totals·일별 metrics의 None과 실제 0, missing/pending 최신성을 보존한다.
+- 상태 문자열과 별도 영역 결과 타입은 유지한다. 공통화나 파일 분리 없이 기존
+  service/views·mapper 책임을 유지하며 전체 디렉터리를 직접 Ruff/mypy로 검사한다.
+
+이번 범위 검증: 세 모듈과 reporting 전용 회귀 및 프롬프트 HTTP/Command 검증은
+70 passed / 14 skipped였다. TEST_DATABASE_URL을 제거해 reporting DB 4건과
+프롬프트 DB 10건은 미검증이며 통과에 포함하지 않는다. DB migration/초기화/삭제 및
+외부 모델 호출은 수행하지 않았다. 필수 check_backend_quality.py는 샌드박스의
+임시 디렉터리 권한 문제를 피해 재실행해 통과했다. 공용 기준선/검사 범위 파일은
+이 작업에서 수정하지 않았고, 엄격 범위 편입은 주 대화의 통합 작업으로 남긴다.

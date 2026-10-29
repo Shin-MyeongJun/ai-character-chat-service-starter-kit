@@ -25,7 +25,7 @@ async def get_credit_reservation(
     CommandService._validate_identifiers(command.user_id, command.request_key)
     CommandService._validate_metadata(command.namespace)
     CommandService._validate_currency(command.currency_code)
-    row = await Repository.get_credit_reservation_by_key(
+    reservation_entity = await Repository.get_credit_reservation_by_key(
         session,
         command.user_id,
         command.namespace,
@@ -33,10 +33,10 @@ async def get_credit_reservation(
         command.currency_code,
         for_update=False,
     )
-    return PersistenceMapper.credit_reservation_entity_to_info(row)
+    return PersistenceMapper.credit_reservation_entity_to_info(reservation_entity)
 
 
-def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> dict:
+def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> None:
     """Validate shared history bounds; direction is meaningful only for signed transactions."""
     CommandService._validate_identifiers(command.user_id)
     if command.currency_code is not None:
@@ -69,7 +69,17 @@ def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> d
         raise Types.InvalidCreditCommandError("History range must be non-empty.")
     if command.cursor is not None:
         CommandService._validate_identifiers(command.cursor.id)
-    return dict(
+
+
+async def list_credit_transactions(
+    session: AsyncSession, command: Types.ListCreditTransactionsCommand
+) -> Types.CreditTransactionPageInfo:
+    """Filter signed wallet movements before paging, including refunds and adjustments."""
+    if command.direction not in (None, "usage", "acquisition"):
+        raise Types.InvalidCreditCommandError("Invalid credit direction.")
+    _validate_history_command(command)
+    rows = await Repository.list_credit_transactions(
+        session,
         user_id=command.user_id,
         currency_code=command.currency_code,
         namespace=command.namespace,
@@ -80,17 +90,7 @@ def _validate_history_command(command: Types.ListCreditTransactionsCommand) -> d
         cursor=(command.cursor.created_at, command.cursor.id)
         if command.cursor
         else None,
-    )
-
-
-async def list_credit_transactions(
-    session: AsyncSession, command: Types.ListCreditTransactionsCommand
-) -> Types.CreditTransactionPageInfo:
-    """Filter signed wallet movements before paging, including refunds and adjustments."""
-    if command.direction not in (None, "usage", "acquisition"):
-        raise Types.InvalidCreditCommandError("Invalid credit direction.")
-    rows = await Repository.list_credit_transactions(
-        session, **_validate_history_command(command), direction=command.direction
+        direction=command.direction,
     )
     infos = tuple(PersistenceMapper.credit_transaction_row_to_info(row) for row in rows)
     items = tuple(info for info in infos[: command.limit] if info is not None)
@@ -105,16 +105,28 @@ async def list_credit_transactions(
 async def list_credit_reservations(
     session: AsyncSession, command: Types.ListCreditReservationsCommand
 ) -> Types.CreditReservationPageInfo:
-    filters = _validate_history_command(command)
+    _validate_history_command(command)
     if command.status is not None and not isinstance(
         command.status, Types.CreditReservationStatus
     ):
         raise Types.InvalidCreditCommandError("Invalid reservation status.")
-    rows = await Repository.list_credit_reservations(
-        session, **filters, status=command.status
+    reservation_entities = await Repository.list_credit_reservations(
+        session,
+        user_id=command.user_id,
+        currency_code=command.currency_code,
+        namespace=command.namespace,
+        reason=command.reason,
+        start=command.start,
+        end=command.end,
+        limit=command.limit,
+        cursor=(command.cursor.created_at, command.cursor.id)
+        if command.cursor
+        else None,
+        status=command.status,
     )
     infos = tuple(
-        PersistenceMapper.credit_reservation_entity_to_info(row) for row in rows
+        PersistenceMapper.credit_reservation_entity_to_info(entity)
+        for entity in reservation_entities
     )
     items = tuple(info for info in infos[: command.limit] if info is not None)
     cursor = (

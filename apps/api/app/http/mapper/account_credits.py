@@ -1,5 +1,7 @@
 """Translate public credit values without exposing private metadata or executing I/O."""
 
+from datetime import datetime
+from typing import cast
 from uuid import UUID
 
 from app.http.contracts import account_credits as Schemas
@@ -18,7 +20,9 @@ def credit_history_request_to_command(
         limit=request.limit,
         direction=request.direction,
         cursor=CreditTypes.CreditCursor(
-            created_at=request.cursor_created_at, id=request.cursor_id
+            # CreditHistoryRequestDto validates that both cursor fields coexist.
+            created_at=cast(datetime, request.cursor_created_at),
+            id=request.cursor_id,
         )
         if request.cursor_id is not None
         else None,

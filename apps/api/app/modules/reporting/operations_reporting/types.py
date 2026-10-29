@@ -31,6 +31,8 @@ class GetGenerationPromptCommand:
 
 @dataclass(frozen=True, slots=True)
 class GenerationPromptSummaryView:
+    """목록·상세 공용 메타데이터. 원문·digest·내부 metadata를 포함하지 않는다."""
+
     generation_id: UUID
     conversation_id: UUID
     model_id: UUID
@@ -65,6 +67,8 @@ class GenerationPromptPageView:
 
 @dataclass(frozen=True, slots=True)
 class GenerationPromptDetailView:
+    """존재하는 생성의 상세. prompt=None은 원문 미기록이고 생성 미존재가 아니다."""
+
     generation: GenerationPromptSummaryView
     prompt: GenerationPromptView | None
 
@@ -106,6 +110,8 @@ class OperationsDayInfo:
 
 @dataclass(frozen=True, slots=True)
 class OperationsProductReportView:
+    """관리자 전용 집계. 기록된 부분 합계와 확정 totals를 구분한다."""
+
     product_id: UUID
     snapshot_id: UUID | None
     period: PeriodInfo
@@ -126,6 +132,8 @@ class GetRecordedServiceReportCommand:
 
 @dataclass(frozen=True, slots=True)
 class RecordedServiceReportView:
+    """기록 행의 합계이며 coverage는 전체 작품·날짜 수집 완료를 보장하지 않는다."""
+
     period: PeriodInfo
     queried_at: datetime
     recorded_totals: OperationsMetricsInfo | None

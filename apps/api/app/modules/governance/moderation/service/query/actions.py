@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.governance.moderation import types as Types
 from app.modules.governance.moderation.mapper import persistence as PersistenceMapper
 from app.modules.governance.moderation.repository import review as ReviewRepository
@@ -11,7 +13,10 @@ from app.modules.governance.moderation.service.util import (
 
 
 async def get_action(
-    session, command: Types.GetActionCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.GetActionCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.ActionInfo:
     """활성 관리자가 조치 단건의 현재 적용 상태를 조회한다."""
     actor_id = actor.user_id
@@ -23,7 +28,10 @@ async def get_action(
 
 
 async def list_actions(
-    session, command: Types.ListActionsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListActionsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.PageInfo[Types.ActionInfo]:
     """관리자가 평가·대상·상태별 조치를 커서 조회한다."""
     actor_id = actor.user_id
@@ -39,7 +47,10 @@ async def list_actions(
 
 
 async def list_retry_actions(
-    session, command: Types.ListActionsCommand, *, actor: Types.ActorCommand
+    session: AsyncSession,
+    command: Types.ListActionsCommand,
+    *,
+    actor: Types.ActorCommand,
 ) -> Types.PageInfo[Types.ActionInfo]:
     """pending/failed 요청만 조회하며 적용이나 상태 변경은 수행하지 않는다."""
     return await list_actions(

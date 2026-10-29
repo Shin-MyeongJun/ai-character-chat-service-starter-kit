@@ -44,6 +44,8 @@ class RecordedUsageInfo:
 
 @dataclass(frozen=True, slots=True)
 class AccountReportView:
+    """예약 코호트와 별도 usage 기록. empty는 양쪽 기록이 모두 없다는 뜻이다."""
+
     period: PeriodInfo
     queried_at: datetime
     generations: GenerationCountsInfo

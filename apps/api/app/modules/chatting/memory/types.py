@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Generic, Literal, TypeAlias, TypeVar
+from typing import Generic, Literal, TypeAlias, TypedDict, TypeVar
 from uuid import UUID
 
 from app.modules.llm import types as LLMTypes
@@ -119,6 +119,15 @@ class EmbedSummaryCommand:
     truncation: bool = False
 
 
+class EmbeddingSettings(TypedDict, total=False):
+    """Persisted options; keep previously accepted partial settings representable."""
+
+    purpose: Literal["document"]
+    truncation: bool
+    output_dimension: int | None
+    output_dtype: Literal["float"]
+
+
 @dataclass(frozen=True, slots=True)
 class EmbeddedSummaryInfo:
     memory_id: UUID
@@ -130,7 +139,7 @@ class EmbeddedSummaryInfo:
     provider: LLMTypes.EmbeddingProvider
     model: str
     dimension: int
-    settings: dict
+    settings: EmbeddingSettings
     total_tokens: int | None
 
 

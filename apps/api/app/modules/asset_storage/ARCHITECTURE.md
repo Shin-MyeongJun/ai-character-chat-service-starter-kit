@@ -1,5 +1,35 @@
 # asset_storage 모듈
 
+## 어댑터·팩토리 타입 정리 (2026-10-28)
+
+모듈 전체를 공용 엄격 검사에 편입했다. 로컬 reader/open 반환은 BinaryIO와
+tuple[AssetMetadataInfo, BinaryIO]로 명시한다. S3StorageClient는 실제로 사용하는
+keyword-only upload/get/head/delete subset이고 S3ResponseBody는 동기 read/close
+Protocol이다. 주입 팩토리도 같은 client 타입을 사용한다. SDK stub의 실제 S3Client가
+이 Protocol에 맞는지 검사했으며 새 client wrapper나 실행 계층은 추가하지 않았다.
+
+S3 메타데이터는 Mapping[str, object]로 읽는다. 두 cast는 SDK의 ContentLength 정수와
+get_object의 StreamingBody 계약만 표현하며 기존 int()/str() 변환, ETag 처리와
+LastModified의 datetime 선택을 유지한다. 실패 시 body 종료와 원래 cause/오류 변환도
+같다. S3UploadFailedError는 재노출 지점 대신 boto3.exceptions의 정의에서 가져오며
+설치 환경에서 같은 클래스 정체성임을 확인했다.
+
+개발 의존성 requirements-dev.txt에 boto3-stubs[s3]를 추가해 import-untyped를 우회하지
+않고 검사한다. 로컬 boto3-stubs는 설치 boto3와 같은 1.43.93이며 연관 stub은 배포된
+1.43 계열을 사용한다. boto3/botocore 런타임 1.43.93은 변경하지 않았고 production
+requirements에는 stub을 추가하지 않았다. 새 환경도 기존 개발 의존성 설치 절차를
+따른다. Any/ignore/기준선 예외는 추가하지 않았다.
+
+객체 키·prefix·현재 stream 위치·seek 가능 입력의 길이 검증과 non-seekable 크기 신뢰,
+입력 stream의 호출자 소유권·반환 reader의 종료 책임, 동기 SDK 작업의 to_thread,
+소유 client만 닫는 정책·추가 재시도 없음은 유지한다. 로컬 임시 파일 교체/복구·잠금도
+바꾸지 않았다. falsey 주입 client를 다루는 기존 client-or-default 동작도 변경하지 않았다.
+
+test_asset_storage_type_contracts는 메타데이터 실패 body 종료, 기존 메타데이터 변환,
+부분 위치/비-seek 업로드·입력 수명, reader 오류의 원인과 반복 종료를 대역으로 확인한다.
+임시 로컬 파일과 fake S3의 기존 공통 계약도 유지한다. 실제 S3/DB/네트워크 경합 검증은
+아니며 실제 AWS 자격 증명/버킷/객체를 읽거나 변경하지 않는다.
+
 ## 책임과 경계
 
 `asset_storage`는 객체 키로 파일을 저장·스트리밍 읽기·삭제·메타데이터 조회하는 독립 모듈이다. 소유 DB 테이블은 없으며 repository, mapper, router도 필요하지 않아 만들지 않았다. 호출자의 상품·캐릭터 권한 판단, 파일 참조의 도메인 영속화, HTTP 파일 제공, URL 발급은 이 모듈의 책임이 아니다.
@@ -102,3 +132,13 @@ $env:RUN_ASSET_STORAGE_S3_INTEGRATION='1'
 로컬 잠금은 어댑터 인스턴스 안의 asyncio.Lock이다. 메타데이터와 본문을 각각 교체하고 실패 복원을 시도하지만 여러 프로세스와 두 파일 전체의 원자성을 보장하지 않는다. 읽기 시 저장된 크기는 검사하지만 SHA-256을 재계산하지 않는다. S3는 SDK의 최대 시도 횟수와 thread I/O, reader 수명을 별도로 확인한다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../references_document/backend_review/README.md)에 모았다.
+
+## 앱 조립·미디어 정리 CLI 타입 (2026-10-28)
+
+create_app의 asset_read_settings는 Iterable[AssetStorageSettings]이며 기존 generator/
+목록의 순회 순서와 소비 시점을 유지한다. read_storages는 (kind, storage_id)→서비스
+사전이다. 선택한 설정의 cast는 AssetStorageSettings 생성자 불변 조건을 표현하며
+새 검증/기본값은 없다. 기존 중복 identity 거절과 시작 실패/종료 시 역순 close도 같다.
+media_cleanup.run_cleanup은 Iterable[UUID]/datetime→int, CLI main은 NoReturn이다.
+명시 ID만 순회하고 건별 실패 후 계속하며 일부 실패 시 1을 반환한다. 기존 cutoff/
+저장소/참조 검사는 변경하지 않았다. runtime_entrypoint 회귀는 공급자/DB 대역이다.

@@ -3,6 +3,8 @@
 import hashlib
 from datetime import UTC, datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as PromptsRepository
 from app.modules.chatting.chat import types as Types
@@ -13,7 +15,7 @@ from app.modules.chatting.conversation import types as ConversationTypes
 
 
 async def save_generation_prompt(
-    session, command: Types.SaveGenerationPromptCommand
+    session: AsyncSession, command: Types.SaveGenerationPromptCommand
 ) -> None:
     """실행권과 예약을 확인해 원문을 한 번 저장한다. 실패하면 예약 전체가 롤백된다."""
     async with use_case_transaction(session):
@@ -35,6 +37,8 @@ async def save_generation_prompt(
                 session, command.generation_id, command.user_id, lock=True
             )
         )
+        # The owned generation exists under the conversation lock, as in finish_generation.
+        assert info is not None
         metadata = info.answer_metadata or {}
         digest = hashlib.sha256(command.request_json.encode("utf-8")).hexdigest()
         if (

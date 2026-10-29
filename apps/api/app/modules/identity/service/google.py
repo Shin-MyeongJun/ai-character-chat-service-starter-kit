@@ -3,6 +3,8 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.identity import repository as Repository
 from app.modules.identity import security as Security
@@ -10,7 +12,9 @@ from app.modules.identity import types as Types
 from app.modules.identity.mapper import persistence as PersistenceMapper
 
 
-async def create_google_state(session, command: Types.GoogleStateCommand) -> None:
+async def create_google_state(
+    session: AsyncSession, command: Types.GoogleStateCommand
+) -> None:
     async with use_case_transaction(session):
         await Repository.create_oauth_attempt(
             session,
@@ -19,7 +23,9 @@ async def create_google_state(session, command: Types.GoogleStateCommand) -> Non
         )
 
 
-async def consume_google_state(session, command: Types.GoogleStateCommand) -> None:
+async def consume_google_state(
+    session: AsyncSession, command: Types.GoogleStateCommand
+) -> None:
     async with use_case_transaction(session):
         used = PersistenceMapper.scalar_row_to_used(
             await Repository.consume_oauth_attempt(
@@ -31,7 +37,7 @@ async def consume_google_state(session, command: Types.GoogleStateCommand) -> No
 
 
 async def link_google_account(
-    session, command: Types.LinkGoogleAccountCommand
+    session: AsyncSession, command: Types.LinkGoogleAccountCommand
 ) -> Types.CredentialInfo:
     email = Security.normalize_email(command.email)
     async with use_case_transaction(session):

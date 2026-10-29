@@ -41,13 +41,13 @@ class CatalogPageResponseDto(ResponseDto):
 
 class SaveStudioDraftRequestDto(RequestDto):
     expected_revision: int | None = Field(default=None, ge=1)
-    document: dict
+    document: dict[str, object]
 
 
 class StudioDraftResponseDto(ResponseDto):
     product_id: UUID
     revision: int
-    document: dict
+    document: dict[str, object]
     updated_at: datetime
 
 

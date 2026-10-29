@@ -4,9 +4,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from app.db.transaction import use_case_transaction
+from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
 from app.modules.chatting.conversation import service as ConversationService
@@ -35,7 +34,7 @@ def _memory_sources(
 
 # claim된 작업의 미완성 색인을 먼저 처리하고 필요한 요약을 생성한다. 오류 종류에 따라 큐의 실패/재시도를 기록한다.
 async def process_memory_work(
-    session_factory: Callable,
+    session_factory: SessionFactory,
     command: Types.ProcessMemoryWorkCommand,
     *,
     summary_generator: MemoryService.SummaryGenerator,
@@ -77,7 +76,7 @@ def _error_kind(exc: Exception) -> str:
 
 
 async def _process_memory_work(
-    session_factory: Callable,
+    session_factory: SessionFactory,
     work: MemoryTypes.MemoryWorkInfo,
     *,
     policy: MemoryTypes.MemoryPolicy,
@@ -132,7 +131,9 @@ async def _process_memory_work(
     await _complete(session_factory, work, more_work=more_work)
 
 
-async def _read_pending_index(session_factory, work):
+async def _read_pending_index(
+    session_factory: SessionFactory, work: MemoryTypes.MemoryWorkInfo
+) -> MemoryTypes.MemoryInfo | None:
     async with session_factory() as session:
         return await MemoryService.get_pending_index(
             session,
@@ -142,7 +143,11 @@ async def _read_pending_index(session_factory, work):
         )
 
 
-async def _read_unsummarized(session_factory, work):
+async def _read_unsummarized(
+    session_factory: SessionFactory, work: MemoryTypes.MemoryWorkInfo
+) -> tuple[
+    ConversationTypes.ConversationInfo, tuple[MemoryTypes.SourceMessageInfo, ...]
+]:
     async with session_factory() as session:
         conversation = await ConversationService.get_owned_conversation(
             session,
@@ -169,7 +174,9 @@ async def _read_unsummarized(session_factory, work):
         return conversation, _memory_sources(source)
 
 
-async def _persist_summary(session_factory, generated):
+async def _persist_summary(
+    session_factory: SessionFactory, generated: MemoryTypes.GeneratedSummaryInfo
+) -> MemoryTypes.MemoryInfo:
     plan = generated.plan
     async with session_factory() as session, use_case_transaction(session):
         conversation = await ConversationService.get_owned_conversation(
@@ -201,7 +208,13 @@ async def _persist_summary(session_factory, generated):
         )
 
 
-async def _index_summary(session_factory, work, summary, models, indexer):
+async def _index_summary(
+    session_factory: SessionFactory,
+    work: MemoryTypes.MemoryWorkInfo,
+    summary: MemoryTypes.MemoryInfo,
+    models: MemoryTypes.MemoryModelConfig,
+    indexer: MemoryService.MemoryIndexer,
+) -> None:
     if summary.conversation_revision is None:
         raise MemoryTypes.StaleMemoryWorkError(
             "Legacy memory cannot be indexed as a summary."
@@ -236,7 +249,12 @@ async def _index_summary(session_factory, work, summary, models, indexer):
         )
 
 
-async def _complete(session_factory, work, *, more_work):
+async def _complete(
+    session_factory: SessionFactory,
+    work: MemoryTypes.MemoryWorkInfo,
+    *,
+    more_work: bool,
+) -> None:
     async with session_factory() as session:
         await MemoryService.complete_memory_work(
             session,

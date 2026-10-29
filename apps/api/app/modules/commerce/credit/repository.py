@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TypeVar
 from uuid import UUID
 
-from sqlalchemy import select, tuple_, update
+from sqlalchemy import Select, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,8 @@ from app.db.models.credit import (
     CreditTransactionEntry,
     CreditWallet,
 )
+
+_HistoryEntity = TypeVar("_HistoryEntity", CreditTransaction, CreditReservation)
 
 
 @dataclass
@@ -132,7 +135,8 @@ async def get_credit_reservation_by_key(
     )
     if for_update:
         statement = statement.with_for_update()
-    return await session.scalar(statement.execution_options(populate_existing=True))
+    result = await session.scalars(statement.execution_options(populate_existing=True))
+    return result.first()
 
 
 async def has_settlement_key(
@@ -271,8 +275,34 @@ async def create_credit_movement(
     return CreditTransactionRow(entity, entries)
 
 
-async def create_credit_debit(session: AsyncSession, **values) -> None:
-    await create_credit_movement(session, operation="consume", **values)
+async def create_credit_debit(
+    session: AsyncSession,
+    *,
+    transaction_id: UUID,
+    user_id: UUID,
+    currency_code: str,
+    namespace: str,
+    request_key: UUID,
+    reason: str,
+    key: str,
+    reference_id: UUID,
+    free_amount: int,
+    paid_amount: int,
+) -> None:
+    await create_credit_movement(
+        session,
+        operation="consume",
+        transaction_id=transaction_id,
+        user_id=user_id,
+        currency_code=currency_code,
+        namespace=namespace,
+        request_key=request_key,
+        reason=reason,
+        key=key,
+        reference_id=reference_id,
+        free_amount=free_amount,
+        paid_amount=paid_amount,
+    )
 
 
 async def get_credit_grant(
@@ -304,20 +334,18 @@ async def get_credit_grant(
 
 
 def _history_statement(
-    model,
+    model: type[_HistoryEntity],
     *,
-    user_id,
-    currency_code,
-    namespace,
-    reason,
-    start,
-    end,
-    cursor,
-    limit,
-    status=None,
-    direction=None,
-):
-    """Build owner/currency/time and signed movement predicates before LIMIT."""
+    user_id: UUID,
+    currency_code: str | None,
+    namespace: str | None,
+    reason: str | None,
+    start: datetime | None,
+    end: datetime | None,
+    cursor: tuple[datetime, UUID] | None,
+    limit: int,
+) -> Select[tuple[_HistoryEntity]]:
+    """Build common history predicates while retaining the selected Entity type."""
     statement = select(model).where(
         model.user_id == user_id, model.currency_code == currency_code
     )
@@ -330,22 +358,43 @@ def _history_statement(
         statement = statement.where(model.created_at < end)
     if cursor is not None:
         statement = statement.where(tuple_(model.created_at, model.id) < cursor)
-    if status is not None:
-        statement = statement.where(model.status == status)
-    # Operations describe causes; the signed wallet delta defines usage/acquisition.
-    # Zero movements remain visible in the unfiltered ledger only.
-    if direction is not None:
-        statement = statement.where(model.amount < 0 if direction == "usage" else model.amount > 0)
     return statement.order_by(model.created_at.desc(), model.id.desc()).limit(limit + 1)
 
 
 async def list_credit_transactions(
-    session: AsyncSession, **filters
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    currency_code: str | None,
+    namespace: str | None,
+    reason: str | None,
+    start: datetime | None,
+    end: datetime | None,
+    cursor: tuple[datetime, UUID] | None,
+    limit: int,
+    direction: str | None = None,
 ) -> list[CreditTransactionRow]:
     """Load a filtered ledger page and its free/paid allocations without extra metadata."""
-    entities = list(
-        await session.scalars(_history_statement(CreditTransaction, **filters))
+    statement = _history_statement(
+        CreditTransaction,
+        user_id=user_id,
+        currency_code=currency_code,
+        namespace=namespace,
+        reason=reason,
+        start=start,
+        end=end,
+        cursor=cursor,
+        limit=limit,
     )
+    # Operations describe causes; the signed wallet delta defines usage/acquisition.
+    # WHERE still applies before LIMIT; zero movements appear only without a filter.
+    if direction is not None:
+        statement = statement.where(
+            CreditTransaction.amount < 0
+            if direction == "usage"
+            else CreditTransaction.amount > 0
+        )
+    entities = list(await session.scalars(statement))
     entries = (
         list(
             await session.scalars(
@@ -368,9 +417,32 @@ async def list_credit_transactions(
 
 
 async def list_credit_reservations(
-    session: AsyncSession, **filters
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    currency_code: str | None,
+    namespace: str | None,
+    reason: str | None,
+    start: datetime | None,
+    end: datetime | None,
+    cursor: tuple[datetime, UUID] | None,
+    limit: int,
+    status: str | None = None,
 ) -> list[CreditReservation]:
-    return list(await session.scalars(_history_statement(CreditReservation, **filters)))
+    statement = _history_statement(
+        CreditReservation,
+        user_id=user_id,
+        currency_code=currency_code,
+        namespace=namespace,
+        reason=reason,
+        start=start,
+        end=end,
+        cursor=cursor,
+        limit=limit,
+    )
+    if status is not None:
+        statement = statement.where(CreditReservation.status == status)
+    return list(await session.scalars(statement))
 
 
 async def finalize_credit_reservation(

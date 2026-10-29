@@ -1,4 +1,6 @@
 # 메시지 파괴적 변경 때 memory 무효화가 호출한다. 대화 잠금 안에서 history_revision만 증가시킨다.
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.conversation import repository as Repository
 from app.modules.chatting.conversation import types as Types
@@ -7,7 +9,7 @@ from app.modules.chatting.conversation.service.query import get_owned_conversati
 
 
 async def advance_history_revision(
-    session, command: Types.AdvanceHistoryRevisionCommand
+    session: AsyncSession, command: Types.AdvanceHistoryRevisionCommand
 ) -> Types.ConversationInfo:
     async with use_case_transaction(session):
         await get_owned_conversation(

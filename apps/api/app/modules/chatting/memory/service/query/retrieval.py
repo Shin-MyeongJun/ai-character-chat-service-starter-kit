@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.types import SessionFactory
 from app.modules.chatting.memory import repository as Repository
 from app.modules.chatting.memory import types as Types
 from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
@@ -23,7 +24,9 @@ class MemoryRetriever:
     """Run authorization/read, provider I/O, and vector read in separate sessions."""
 
     def __init__(
-        self, session_factory, embedding_service: LLMService.EmbeddingService
+        self,
+        session_factory: SessionFactory,
+        embedding_service: LLMService.EmbeddingService,
     ) -> None:
         self._session_factory = session_factory
         self._embedding_service = embedding_service

@@ -68,7 +68,9 @@ async def conversation_is_owned(
     )
 
 
-async def delete_conversation_memories(session, conversation_id) -> None:
+async def delete_conversation_memories(
+    session: AsyncSession, conversation_id: UUID
+) -> None:
     await session.execute(
         delete(ConversationMemory).where(
             ConversationMemory.conversation_id == conversation_id
@@ -76,27 +78,31 @@ async def delete_conversation_memories(session, conversation_id) -> None:
     )
 
 
-async def delete_memory_job(session, conversation_id) -> None:
+async def delete_memory_job(session: AsyncSession, conversation_id: UUID) -> None:
     await session.execute(
         delete(MemoryJob).where(MemoryJob.conversation_id == conversation_id)
     )
 
 
-async def create_memory(session, memory: ConversationMemory) -> ConversationMemory:
+async def create_memory(
+    session: AsyncSession, memory: ConversationMemory
+) -> ConversationMemory:
     session.add(memory)
     await session.flush()
     await session.refresh(memory)
     return memory
 
 
-async def update_memory(session, memory: ConversationMemory) -> ConversationMemory:
+async def update_memory(
+    session: AsyncSession, memory: ConversationMemory
+) -> ConversationMemory:
     session.add(memory)
     await session.flush()
     await session.refresh(memory)
     return memory
 
 
-async def delete_memory(session, memory: ConversationMemory) -> None:
+async def delete_memory(session: AsyncSession, memory: ConversationMemory) -> None:
     await session.delete(memory)
     await session.flush()
 
@@ -146,7 +152,7 @@ async def list_memories(
 async def get_latest_summary(
     session: AsyncSession, *, conversation_id: UUID, owner_id: UUID
 ) -> ConversationMemory | None:
-    return await session.scalar(
+    stmt = (
         _scoped_select(conversation_id, owner_id)
         .where(ConversationMemory.memory_type == "summary")
         .order_by(
@@ -156,12 +162,13 @@ async def get_latest_summary(
         )
         .limit(1)
     )
+    return (await session.scalars(stmt)).first()
 
 
 async def get_pending_index(
     session: AsyncSession, *, conversation_id: UUID, owner_id: UUID
 ) -> ConversationMemory | None:
-    return await session.scalar(
+    stmt = (
         _scoped_select(conversation_id, owner_id)
         .where(
             ConversationMemory.memory_type == "summary",
@@ -174,6 +181,7 @@ async def get_pending_index(
         )
         .limit(1)
     )
+    return (await session.scalars(stmt)).first()
 
 
 async def create_summary(
@@ -219,7 +227,7 @@ async def create_summary(
 async def save_embedding(
     session: AsyncSession, *, value: Types.EmbeddedSummaryInfo
 ) -> ConversationMemory | None:
-    return await session.scalar(
+    stmt = (
         update(ConversationMemory)
         .where(
             ConversationMemory.id == value.memory_id,
@@ -239,6 +247,7 @@ async def save_embedding(
         .returning(ConversationMemory)
         .execution_options(populate_existing=True)
     )
+    return (await session.scalars(stmt)).first()
 
 
 async def has_searchable_memories(

@@ -132,9 +132,9 @@ async def create_lorebook(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.CreateLorebookResponseDto:
-    value = SchemaMapper.create_lorebook_request_to_command(request, owner_id)
+    command = SchemaMapper.create_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.create_lorebook(session, value)
+        result = await CommandService.create_lorebook(session, command)
     return SchemaMapper.lorebook_info_to_create_response(result)
 
 
@@ -144,9 +144,9 @@ async def update_lorebook(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.UpdateLorebookResponseDto:
-    value = SchemaMapper.update_lorebook_request_to_command(request, owner_id)
+    command = SchemaMapper.update_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.update_lorebook(session, value)
+        result = await CommandService.update_lorebook(session, command)
     return SchemaMapper.lorebook_info_to_update_response(result)
 
 
@@ -156,9 +156,9 @@ async def delete_lorebook(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.DeleteLorebookResponseDto:
-    value = SchemaMapper.delete_lorebook_request_to_command(request, owner_id)
+    command = SchemaMapper.delete_lorebook_request_to_command(request, owner_id)
     with _service_errors():
-        await CommandService.delete_lorebook(session, value)
+        await CommandService.delete_lorebook(session, command)
     return SchemaMapper.delete_lorebook_result_to_response(None)
 
 
@@ -172,9 +172,9 @@ async def create_lorebook_entry(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.CreateLorebookEntryResponseDto:
-    value = SchemaMapper.create_entry_request_to_command(request, owner_id)
+    command = SchemaMapper.create_entry_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.create_lorebook_entry(session, value)
+        result = await CommandService.create_lorebook_entry(session, command)
     return SchemaMapper.entry_info_to_create_response(result)
 
 
@@ -184,9 +184,9 @@ async def update_lorebook_entry(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.UpdateLorebookEntryResponseDto:
-    value = SchemaMapper.update_entry_request_to_command(request, owner_id)
+    command = SchemaMapper.update_entry_request_to_command(request, owner_id)
     with _service_errors():
-        result = await CommandService.update_lorebook_entry(session, value)
+        result = await CommandService.update_lorebook_entry(session, command)
     return SchemaMapper.entry_info_to_update_response(result)
 
 
@@ -196,9 +196,9 @@ async def delete_lorebook_entry(
     owner_id: OwnerDependency,
     session: SessionDependency,
 ) -> Schemas.DeleteLorebookEntryResponseDto:
-    value = SchemaMapper.delete_entry_request_to_command(request, owner_id)
+    command = SchemaMapper.delete_entry_request_to_command(request, owner_id)
     with _service_errors():
-        await CommandService.delete_lorebook_entry(session, value)
+        await CommandService.delete_lorebook_entry(session, command)
     return SchemaMapper.delete_entry_result_to_response(None)
 
 
