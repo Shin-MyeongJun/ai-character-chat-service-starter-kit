@@ -19,6 +19,23 @@ build/
 *.egg-info/
 **/*.egg-info/
 
+# local runtime, test data, and generated reports
+# Keep JSON configuration, packaged resources, and committed fixtures tracked.
+/tmp/
+/output/
+/.local_test/
+.asset_storage/
+# Malformed Windows --basetemp paths created with stripped backslashes.
+/Users*chat_kittmp*/
+
+# test and coverage output
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+test-results/
+playwright-report/
+
 # env
 .env
 .env.local
@@ -27,7 +44,7 @@ build/
 # next
 .next/
 **/.next/
-apps/web/.next-workflow-check/
+.next-*/
 out/
 *.tsbuildinfo
 
@@ -42,6 +59,10 @@ redis-data/
 # IDE
 .idea/
 .vscode/
+*.iml
+
+# local Figma export backups at the repository root
+/*.fig
 
 # generated contracts
 contracts/openapi.json

@@ -69,6 +69,14 @@ references_document/  # 설계 및 개발 참고 문서
 - [프롬프트 모듈](apps/api/app/modules/chatting/prompt/ARCHITECTURE.md)
 - [상품 모듈](apps/api/app/modules/content/product/ARCHITECTURE.md)
 
+## Git에 포함할 파일
+
+소스 코드, 마이그레이션, 의존성 잠금 파일, 실행 설정과 테스트 기준 데이터는 추적합니다. `package.json`, `tsconfig.json`, 기본 프롬프트 JSON, OpenAPI 테스트 fixture, `tools/`의 품질 검사 JSON은 코드 동작과 검증에 필요하므로 확장자로 일괄 제외하지 않습니다. 앱 이미지와 `docs/`의 설계·검증 자료도 유지합니다.
+
+테스트 임시 데이터와 로컬 실행 파일은 `tmp/`, 생성 보고서·렌더링 결과는 `output/`에 저장합니다. 이 디렉터리와 `.local_test/`, Next.js 빌드·테스트·커버리지 출력, IDE 설정, 저장소 루트의 Figma 백업은 `.gitignore`로 제외합니다. 제외된 파일은 로컬에만 남으며 새로 clone한 저장소에는 포함되지 않습니다.
+
+이미 추적 중인 생성 파일은 `.gitignore`를 추가해도 계속 추적됩니다. 해당 파일만 `git rm --cached -- <파일>`로 추적 해제하고, 디렉터리는 `git rm -r --cached -- <디렉터리>`를 사용합니다. 이 명령은 로컬 파일을 보존합니다.
+
 ## 현재 개발 환경 준비
 
 현재 `docker-compose.yml`은 **PostgreSQL과 Redis를 실행**하며 `auth-dev` 프로필로 Mailpit을 추가할 수 있습니다. API와 프런트엔드를 포함한 전체 서비스의 Compose 실행은 향후 목표입니다.
