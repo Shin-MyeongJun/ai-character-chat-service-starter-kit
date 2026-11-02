@@ -1,15 +1,17 @@
 # 인증 테이블 조회·쓰기와 PostgreSQL 잠금을 담당한다. 상태 판단과 commit은 서비스 소유다.
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TypeAlias, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, delete, func, select, update
+from sqlalchemy import CursorResult, and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.idempotency import lock_key
 from app.db.models.identity import (
     AuthActionToken,
+    AuthMailOutbox,
     AuthOAuthAttempt,
     AuthRateLimit,
     AuthSession,
@@ -18,6 +20,97 @@ from app.db.models.identity import (
 )
 
 CleanupRow: TypeAlias = tuple[int, int, int, int, int]
+
+
+async def create_mail_outbox(
+    session: AsyncSession, *, token_hash: str, encrypted_token: str, now: datetime
+) -> None:
+    await session.execute(
+        insert(AuthMailOutbox).values(
+            token_hash=token_hash,
+            encrypted_token=encrypted_token,
+            created_at=now,
+            available_at=now,
+        )
+    )
+
+
+async def get_due_mail_outbox(
+    session: AsyncSession, now: datetime
+) -> AuthMailOutbox | None:
+    statement = (
+        select(AuthMailOutbox)
+        .where(
+            or_(
+                and_(
+                    AuthMailOutbox.status == "pending",
+                    AuthMailOutbox.available_at <= now,
+                ),
+                and_(
+                    AuthMailOutbox.status == "processing",
+                    AuthMailOutbox.lease_until <= now,
+                ),
+            )
+        )
+        .order_by(AuthMailOutbox.available_at, AuthMailOutbox.id)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+        .execution_options(populate_existing=True)
+    )
+    return (await session.scalars(statement)).first()
+
+
+async def get_claimed_mail_outbox(
+    session: AsyncSession, outbox_id: UUID, claim_token: UUID, now: datetime
+) -> AuthMailOutbox | None:
+    statement = (
+        select(AuthMailOutbox)
+        .where(
+            AuthMailOutbox.id == outbox_id,
+            AuthMailOutbox.status == "processing",
+            AuthMailOutbox.claim_token == claim_token,
+            AuthMailOutbox.lease_until > now,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return (await session.scalars(statement)).first()
+
+
+async def update_mail_outbox(
+    session: AsyncSession,
+    *,
+    outbox_id: UUID,
+    status: str,
+    attempt_count: int,
+    available_at: datetime,
+    claim_token: UUID | None,
+    lease_until: datetime | None,
+    last_error: str | None,
+    clear_payload: bool,
+) -> None:
+    # The service holds this outbox row lock; completion first verifies its fence.
+    statement = (
+        update(AuthMailOutbox)
+        .where(AuthMailOutbox.id == outbox_id)
+        .values(
+            status=status,
+            attempt_count=attempt_count,
+            available_at=available_at,
+            claim_token=claim_token,
+            lease_until=lease_until,
+            last_error=last_error,
+        )
+    )
+    if clear_payload:
+        statement = statement.values(encrypted_token=None)
+    await session.execute(statement)
+
+
+@dataclass(frozen=True)
+class AuthenticatedSessionRow:
+    user: User
+    session: AuthSession
 
 
 async def get_user(
@@ -32,13 +125,26 @@ async def lock_identity(session: AsyncSession, key: str) -> None:
     await lock_key(session, "identity", key)
 
 
-async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    statement = select(User).where(User.email == email).with_for_update()
+async def get_user_by_email(
+    session: AsyncSession, email: str, *, lock: bool = True
+) -> User | None:
+    statement = (
+        select(User)
+        .where(User.email == email)
+        .execution_options(populate_existing=True)
+    )
+    if lock:
+        statement = statement.with_for_update()
     return (await session.scalars(statement)).first()
 
 
 async def get_locked_user(session: AsyncSession, user_id: UUID) -> User | None:
-    statement = select(User).where(User.id == user_id).with_for_update()
+    statement = (
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     return (await session.scalars(statement)).first()
 
 
@@ -138,9 +244,26 @@ async def create_session(
 
 async def get_session(session: AsyncSession, session_id: UUID) -> AuthSession | None:
     statement = (
-        select(AuthSession).where(AuthSession.id == session_id).with_for_update()
+        select(AuthSession)
+        .where(AuthSession.id == session_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     return (await session.scalars(statement)).first()
+
+
+async def get_authenticated_session(
+    session: AsyncSession, user_id: UUID, session_id: UUID
+) -> AuthenticatedSessionRow | None:
+    # One statement observes user/session state together without write locks.
+    statement = (
+        select(User, AuthSession)
+        .join(AuthSession, AuthSession.user_id == User.id)
+        .where(User.id == user_id, AuthSession.id == session_id)
+        .execution_options(populate_existing=True)
+    )
+    row = (await session.execute(statement)).first()
+    return AuthenticatedSessionRow(row[0], row[1]) if row is not None else None
 
 
 async def rotate_session(

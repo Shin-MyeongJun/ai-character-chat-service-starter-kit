@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+
 from app.modules.governance.moderation import types as Types
 from app.modules.governance.moderation.mapper import persistence as PersistenceMapper
 from app.modules.governance.moderation.repository import review as ReviewRepository
@@ -100,6 +101,14 @@ def memory_backend(monkeypatch):
         return next(
             (row for row in store["reports"].values() if row.request_key == key), None
         )
+
+    async def reports_by_ids(session, report_ids, *, target_type, target_id):
+        """실제 일괄 조회처럼 존재하는 신고만 ID 순서로 반환한다."""
+        return [
+            store["reports"][report_id]
+            for report_id in sorted(set(report_ids))
+            if report_id in store["reports"]
+        ]
 
     async def change_intake(session, report_id, *, status, duplicate_id, reason):
         """대역의 접수 상태를 저장한다."""
@@ -219,6 +228,7 @@ def memory_backend(monkeypatch):
     for name, function in {
         "create_report": create_report,
         "get_report": get_report,
+        "list_reports_by_ids": reports_by_ids,
         "get_report_by_key": report_key,
         "update_report_intake": change_intake,
         "create_assessment": create_assessment,
@@ -351,6 +361,40 @@ async def test_intake_links_state_and_legacy(memory_backend):
             ),
             actor=b.admin,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["target_id", "target_type", "deleted"])
+async def test_intake_revalidates_target_after_lock(
+    memory_backend, monkeypatch, change
+):
+    """대기 중 대상 불변 계약이 깨지거나 신고가 삭제되면 잘못된 잠금으로 쓰지 않는다."""
+    b = memory_backend
+    report = await ReportsCommandService.submit_report(
+        b.session, report_command(), actor=b.user
+    )
+
+    async def change_while_waiting(session, namespace, key):
+        assert namespace == "moderation.target"
+        assert key == f"{report.target_type}:{report.target_id}"
+        if change == "deleted":
+            del b.store["reports"][report.id]
+        elif change == "target_type":
+            b.store["reports"][report.id].target_type = "character"
+        else:
+            b.store["reports"][report.id].target_id = uuid4()
+
+    monkeypatch.setattr(ReportsCommandService, "lock_key", change_while_waiting)
+    code = "not_found" if change == "deleted" else "state_conflict"
+    with pytest.raises(Types.ModerationError, match=code):
+        await ReportsCommandService.change_report_intake(
+            b.session,
+            Types.ChangeReportIntakeCommand(
+                report_id=report.id, intake_status="rejected", reason="종결"
+            ),
+            actor=b.admin,
+        )
+    assert b.store["reports"][report.id].intake_status == "received"
 
 
 @pytest.mark.asyncio
@@ -641,13 +685,14 @@ async def test_query_policies_redaction_and_retry_filters(memory_backend, monkey
 @pytest.mark.parametrize("kind", ["report", "assessment", "action"])
 async def test_repository_cursor_uses_actual_timestamp_column(kind):
     """각 테이블의 다른 시각 이름을 커서로 사용하고 동률 ID 필터를 SQL에 포함한다."""
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
     from app.db.models.moderation_review import (
         ModerationAction,
         ModerationAssessment,
         ModerationReport,
     )
-    from sqlalchemy import select
-    from sqlalchemy.dialects import postgresql
 
     models = {
         "report": (ModerationReport, "received_at"),

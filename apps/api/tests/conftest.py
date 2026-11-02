@@ -1,6 +1,7 @@
 # TEST_DATABASE_URL의 테스트 DB에 UUID 스키마를 만들어 격리한다. 미설정이면 DB 검사를 skip한다.
 # create_all은 현재 ORM 검증용이며 Alembic 업그레이드 검증은 별도 테스트가 담당한다.
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import app.db.models  # noqa: F401
@@ -35,6 +36,10 @@ async def db():
         await connection.run_sync(
             lambda conn: Base.metadata.create_all(conn, checkfirst=False)
         )
+        # create_all does not install PostgreSQL functions/triggers. Exercise the
+        # same history version contract as migrated/initialized databases.
+        history_sql = Path(__file__).parents[1] / "alembic/sql/0033_chat_history_versions.sql"
+        await connection.execute(text(history_sql.read_text(encoding="utf-8")))
     try:
         async with AsyncSession(engine, expire_on_commit=False) as session:
             yield session

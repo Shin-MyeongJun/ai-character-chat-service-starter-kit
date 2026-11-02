@@ -64,8 +64,15 @@ class SMTPMailSender:
         try:
             await asyncio.to_thread(deliver)
         except (OSError, smtplib.SMTPException) as exc:
-            # 메일 장애를 개발 로그 발송이나 성공 응답으로 바꾸지 않는다.
-            raise Types.AuthError("mail_unavailable") from exc
+            can_retry = True
+            if isinstance(exc, smtplib.SMTPResponseException):
+                can_retry = exc.smtp_code < 500
+            elif isinstance(exc, smtplib.SMTPRecipientsRefused):
+                can_retry = any(code < 500 for code, _ in exc.recipients.values())
+            elif isinstance(exc, smtplib.SMTPNotSupportedError):
+                can_retry = False
+            # Preserve the adapter error code; only the worker handles retries.
+            raise Types.MailDeliveryError(can_retry=can_retry) from exc
 
 
 class GoogleOIDCVerifier:

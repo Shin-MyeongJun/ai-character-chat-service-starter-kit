@@ -12,16 +12,15 @@ export function useAccount(preview?: AccountPreview) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [balance, setBalance] = useState<Resource<CreditBalance | null>>(loading(null));
   const [conversations, setConversations] = useState<Resource<CursorPage<OwnedConversation>>>(loading({ items: [], next_cursor_id: null, next_cursor_created_at: null }));
-  const [products, setProducts] = useState<Resource<OwnedProduct[]>>(loading([]));
   const [counts, setCounts] = useState<Resource<{conversations: number; products: number} | null>>(loading(null));
   useEffect(() => {
     if (preview) return;
     let active = true;
-    setSession("loading"); setUser(null); setBalance(loading(null)); setConversations(loading({ items: [], next_cursor_id: null, next_cursor_created_at: null })); setProducts(loading([])); setCounts(loading(null));
+    setSession("loading"); setUser(null); setBalance(loading(null)); setConversations(loading({ items: [], next_cursor_id: null, next_cursor_created_at: null })); setCounts(loading(null));
     void readAccountOverview().then(value => {
       if (!active) return;
       setUser(value.user); setSession("ready");
-      setBalance(resource(value.balance, null)); setProducts(resource(value.products, []));
+      setBalance(resource(value.balance, null));
       setCounts(resource(value.counts, null));
       setConversations(resource(value.conversations, { items: [], next_cursor_id: null, next_cursor_created_at: null }));
     }).catch(cause => { if (active) setSession(cause instanceof ApiError && cause.status === 401 ? "guest" : "error"); });
@@ -38,5 +37,6 @@ export function useAccount(preview?: AccountPreview) {
     const status = preview.state === "loading" ? "loading" : preview.state === "error" ? "error" : "ready";
     return { counts: {status, data: {conversations: preview.state === "empty" ? 0 : preview.conversations.length, products: preview.state === "empty" ? 0 : preview.products.length}}, session: "ready" as const, user: preview.user, balance: { status, data: status === "ready" ? preview.balance : null } as Resource<CreditBalance | null>, products: { status, data: preview.state === "empty" ? [] : preview.products } as Resource<OwnedProduct[]>, conversations: { status, data: { items: preview.state === "empty" ? [] : preview.conversations, next_cursor_id: null, next_cursor_created_at: null } } as Resource<CursorPage<OwnedConversation>>, retry: () => setVersion(v => v + 1) };
   }
-  return { session, user, balance, conversations, products, counts, retry: () => setVersion(v => v + 1) };
+  // Live works have their own paginated hook; this resource is only used by previews.
+  return { session, user, balance, conversations, products: { status: "ready", data: [] } as Resource<OwnedProduct[]>, counts, retry: () => setVersion(v => v + 1) };
 }

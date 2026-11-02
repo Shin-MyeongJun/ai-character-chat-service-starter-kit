@@ -14,6 +14,7 @@ import asyncio
 import os
 import socket
 from contextlib import suppress
+from math import isfinite
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -77,6 +78,15 @@ def _text_service(provider: str) -> TextGenerationService:
 
 
 async def run_worker(*, once: bool, concurrency: int, poll_seconds: float) -> None:
+    lease_seconds = _int_env("MEMORY_WORK_LEASE_SECONDS", 300)
+    timeout_seconds = float(os.getenv("MEMORY_WORK_TIMEOUT_SECONDS", "240"))
+    if not 1 <= lease_seconds <= 3600:
+        raise ValueError("MEMORY_WORK_LEASE_SECONDS must be between 1 and 3600.")
+    if not isfinite(timeout_seconds) or not 0 < timeout_seconds < lease_seconds:
+        raise ValueError(
+            "MEMORY_WORK_TIMEOUT_SECONDS must be positive, finite and shorter "
+            "than MEMORY_WORK_LEASE_SECONDS."
+        )
     engine = create_async_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
     session_factory = async_sessionmaker(
         engine, expire_on_commit=False, class_=AsyncSession
@@ -115,7 +125,12 @@ async def run_worker(*, once: bool, concurrency: int, poll_seconds: float) -> No
             try:
                 await process_memory_work(
                     session_factory,
-                    ChatTypes.ProcessMemoryWorkCommand(work, _policy(), models),
+                    ChatTypes.ProcessMemoryWorkCommand(
+                        work=work,
+                        policy=_policy(),
+                        models=models,
+                        timeout_seconds=timeout_seconds,
+                    ),
                     summary_generator=generator,
                     indexer=indexer,
                 )
@@ -136,7 +151,7 @@ async def run_worker(*, once: bool, concurrency: int, poll_seconds: float) -> No
                         session,
                         MemoryTypes.ClaimMemoryWorkCommand(
                             worker_id=worker_id,
-                            lease_seconds=_int_env("MEMORY_WORK_LEASE_SECONDS", 300),
+                            lease_seconds=lease_seconds,
                         ),
                     )
                 if work is None:

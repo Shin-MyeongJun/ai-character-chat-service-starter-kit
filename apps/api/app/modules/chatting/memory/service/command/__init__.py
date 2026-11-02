@@ -14,7 +14,9 @@ from app.modules.chatting.memory.service.command.scheduling import (
 )
 from app.modules.chatting.memory.service.command.summarization import (
     SummaryGenerator,
+    estimate_message_tokens,
     estimate_tokens,
+    plan_context_compaction,
     plan_summarization,
     save_summary,
     validate_summary_source,
@@ -26,9 +28,11 @@ __all__ = [
     "claim_memory_work",
     "complete_memory_work",
     "content_digest",
+    "estimate_message_tokens",
     "estimate_tokens",
     "fail_memory_work",
     "invalidate_conversation_memories",
+    "plan_context_compaction",
     "plan_summarization",
     "save_summary",
     "save_summary_embedding",

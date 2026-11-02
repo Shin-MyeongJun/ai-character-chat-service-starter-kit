@@ -1,5 +1,49 @@
 # asset_storage 모듈
 
+## U23 로컬 reader·파일·락 수명 (2026-10-29)
+
+test_local의 키별 락은 WeakValueDictionary에 보관한다. 실행자와 대기자가 같은 락을
+강하게 참조하는 동안 직렬화를 유지하고 마지막 사용 뒤 키를 제거한다. reader는 키 락을
+보유하지 않으므로 느린 스트리밍이 삭제·덮어쓰기를 기다리게 하지 않는다.
+
+Windows에서는 CPython의 _winapi.CreateFile을 FILE_SHARE_READ | FILE_SHARE_DELETE로
+호출하고 msvcrt.open_osfhandle/os.fdopen으로 BinaryIO 소유권을 넘긴다. 변환 단계 실패 시
+해당 단계가 소유한 handle/descriptor를 닫는다. 다른 플랫폼은 기존 rb open을 사용한다.
+열린 reader는 획득 당시 본문·metadata를 유지한다. 삭제 후 새 read/metadata는 미존재이며
+같은 키를 즉시 새로 저장할 수 있다. Windows가 열린 대상의 os.replace를 거절하면 기존
+본문 이름을 임시 .old로 옮기고 새 본문을 발행한 뒤 이전 이름을 unlink한다. 새 본문 발행이나
+.old 정리가 실패하면 기존 본문과 sidecar 복원을 시도한다. 전체 파일 복사·영속 버전 manifest·
+새 metadata 필드는 추가하지 않았다. 공개 object_key·Info·저장 레이아웃은 유지한다.
+
+store/delete/metadata의 to_thread 작업은 취소 후에도 완료를 회수한 뒤 키 락을 해제한다.
+read 획득 취소는 늦게 반환된 reader까지 닫고 첫 CancelledError를 전달한다. reader별 read와
+close도 직렬화하며 read 취소 시 진행 중인 스레드 I/O가 끝난 뒤 close가 실행된다. close는
+락 대기·스레드 종료까지 소유하므로 반복 취소로 회수를 중단하지 않는다. 취소가 없다면 기존
+OS/metadata 오류와 cause를 전달하고, 취소가 있으면 작업/close 오류를 회수한 뒤 첫 취소가
+우선한다. 취소된 쓰기는 이미 반영됐을 수 있으며 취소 반환은 실제 I/O 종료까지 늦어질 수 있다.
+반환 reader의 종료와 입력 stream의 수명은 여전히 호출자 책임이고 adapter.aclose는 reader를
+일괄 종료하지 않는다. S3 어댑터와 공유 AssetReadInfo의 계약은 변경하지 않았다.
+
+test_local_storage_lifecycle의 22건은 실제 Windows 파일의 reader 중 삭제·키 재사용·다중
+덮어쓰기, .old 발행/정리 실패 복원, native handle/descriptor 회수와 제어된 스레드의 반복
+취소·동일 키 대기·read/close 순서·키 락 회수를 검증한다. Linux 대상 mypy도 통과하지만
+Linux 런타임·다중 어댑터/프로세스·네트워크 파일시스템·프로세스 중단 복구는 미검증이다.
+두 파일의 전역 원자성과 복원 자체 실패의 완전 복구를 보장하지 않으며, 중단 시 남은 .old를
+무조건 삭제하는 정리 작업은 추가하지 않았다. 상세 결과는 U23-WORKLOG.md에 기록한다.
+
+## U08 S3 읽기 획득 중 취소와 자원 회수 (2026-10-29)
+
+read_asset는 _open_asset 태스크를 소유하고 shield로 get_object/메타데이터 해석이
+끝날 때까지 기다린다. 취소가 없으면 기존 reader/오류를 전달하고, 취소됐다면 늦게
+반환된 reader의 aclose를 별도 태스크로 끝까지 기다린 뒤 첫 CancelledError를 전달한다.
+획득/메타데이터/close 예외는 회수하며 취소가 최종 결과다. 반복 취소는 close 작업을
+중단하지 않는다. close 자체 실패 시에는 1회 시도를 회수하며 성공을 보장하지 않는다.
+
+정상 반환한 reader의 수명·idempotent close, 주입 client 소유권, SDK timeout/retry·키·
+오류 번역은 그대로다. 취소는 즉시 반환하지 않고 SDK 작업/close 종료까지 지연될 수 있다.
+정상 반환 후의 개별 read/close 취소 정책 전체와 로컬 adapter를 이번에 재설계하지 않았다.
+지연 get/close는 실제 테스트 스레드와 gate로 검증했지만 실제 S3 네트워크는 미검증이다.
+
 ## 어댑터·팩토리 타입 정리 (2026-10-28)
 
 모듈 전체를 공용 엄격 검사에 편입했다. 로컬 reader/open 반환은 BinaryIO와

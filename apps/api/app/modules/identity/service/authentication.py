@@ -1,4 +1,4 @@
-"""인증 유스케이스와 트랜잭션 경계. 사용자 → 세션/토큰 순으로 잠가 폐기를 직렬화한다."""
+"""Access는 읽기 전용 검증, 인증 쓰기는 사용자 → 세션/토큰 잠금으로 직렬화한다."""
 
 import asyncio
 import hmac
@@ -15,6 +15,24 @@ from app.modules.identity import security as Security
 from app.modules.identity import types as Types
 from app.modules.identity.mapper import persistence as PersistenceMapper
 from app.modules.identity.settings import AuthSettings
+
+
+def _require_valid_session(
+    user: Types.CredentialInfo | None,
+    info: Types.SessionInfo | None,
+    now: datetime,
+) -> tuple[Types.CredentialInfo, Types.SessionInfo]:
+    if (
+        user is None
+        or user.status != "active"
+        or not user.user.email_verified
+        or info is None
+        or info.user_id != user.user.id
+        or info.revoked_at is not None
+        or info.expires_at <= now
+    ):
+        raise Types.AuthError("invalid_session")
+    return user, info
 
 
 class AuthenticationService:
@@ -57,6 +75,14 @@ class AuthenticationService:
             token_hash=Security.token_hash(token),
             purpose=purpose,
             expires_at=now + timedelta(minutes=30 if purpose == "verify" else 15),
+        )
+        # Persist delivery intent in the same transaction as the proof. Neither
+        # a commit failure nor a process exit after commit can lose the mail job.
+        await Repository.create_mail_outbox(
+            session,
+            token_hash=Security.token_hash(token),
+            encrypted_token=Security.encrypt_mail_token(token, self.settings),
+            now=now,
         )
         return token
 
@@ -239,33 +265,48 @@ class AuthenticationService:
         await self._check_email_rate("login", email, limit=10, seconds=300)
         async with self.sessions() as session, use_case_transaction(session):
             user = PersistenceMapper.user_entity_to_credential_info(
-                await Repository.get_user_by_email(session, email)
+                await Repository.get_user_by_email(session, email, lock=False)
             )
-            valid = await asyncio.to_thread(
-                Security.verify_password,
-                command.password,
-                user.password_hash if user else None,
+        # Release the read transaction/connection before expensive Argon2 work.
+        # Missing accounts still verify the dummy hash to keep the existing path.
+        valid = await asyncio.to_thread(
+            Security.verify_password,
+            command.password,
+            user.password_hash if user else None,
+        )
+        if (
+            not valid
+            or user is None
+            or user.status != "active"
+            or not user.user.email_verified
+        ):
+            raise Types.AuthError("invalid_credentials")
+        # verify_password returns True only for a non-null stored hash.
+        password_hash = cast(str, user.password_hash)
+        encoded = None
+        if Security.PASSWORD_HASHER.check_needs_rehash(password_hash):
+            encoded = await asyncio.to_thread(
+                Security.PASSWORD_HASHER.hash, command.password
             )
+
+        async with self.sessions() as session, use_case_transaction(session):
+            current = PersistenceMapper.user_entity_to_credential_info(
+                await Repository.get_locked_user(session, user.user.id)
+            )
+            # A reset or another rehash may have committed during Argon2 work.
+            # Never overwrite that hash or issue a session using its predecessor.
             if (
-                not valid
-                or user is None
-                or user.status != "active"
-                or not user.user.email_verified
+                current is None
+                or current.status != "active"
+                or not current.user.email_verified
+                or current.user.email != email
+                or current.password_hash != password_hash
             ):
                 raise Types.AuthError("invalid_credentials")
-            # verify_password returns True only for a non-null stored hash. Keep
-            # the original value and failure behavior if an injected verifier lies.
-            password_hash = cast(str, user.password_hash)
-            if Security.PASSWORD_HASHER.check_needs_rehash(password_hash):
-                await Repository.update_password(
-                    session,
-                    user.user.id,
-                    await asyncio.to_thread(
-                        Security.PASSWORD_HASHER.hash, command.password
-                    ),
-                )
+            if encoded is not None:
+                await Repository.update_password(session, current.user.id, encoded)
             return await self.issue_session(
-                session, Types.IssueSessionCommand(user, datetime.now(UTC))
+                session, Types.IssueSessionCommand(current, datetime.now(UTC))
             )
 
     async def _require_session(
@@ -277,25 +318,22 @@ class AuthenticationService:
         info = PersistenceMapper.session_entity_to_info(
             await Repository.get_session(session, UUID(claims["sid"]))
         )
-        now = datetime.now(UTC)  # 잠금 대기 중 만료한 세션도 거절한다.
-        if (
-            user is None
-            or user.status != "active"
-            or not user.user.email_verified
-            or info is None
-            or info.user_id != user.user.id
-            or info.revoked_at is not None
-            or info.expires_at <= now
-        ):
-            raise Types.AuthError("invalid_session")
-        return user, info
+        # Recheck the clock after both locks, including time spent waiting.
+        return _require_valid_session(user, info, datetime.now(UTC))
 
     async def get_authenticated_user(
         self, command: Types.TokenCommand
     ) -> Types.UserInfo:
         claims = self.codec.decode_token(command.token, "access")
         async with self.sessions() as session, use_case_transaction(session):
-            user, _ = await self._require_session(session, claims, datetime.now(UTC))
+            infos = PersistenceMapper.authenticated_session_row_to_infos(
+                await Repository.get_authenticated_session(
+                    session, UUID(claims["sub"]), UUID(claims["sid"])
+                )
+            )
+            if infos is None:
+                raise Types.AuthError("invalid_session")
+            user, _ = _require_valid_session(*infos, datetime.now(UTC))
             return user.user
 
     async def refresh_session(self, command: Types.TokenCommand) -> Types.LoginInfo:

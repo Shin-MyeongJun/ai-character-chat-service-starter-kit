@@ -4,15 +4,13 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.product_stats_queue import day_bounds, statistics_day
+from app.db.product_stats_queue import statistics_day
 from app.db.transaction import use_case_transaction
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
 from app.modules.content.product.mapper import statistics as StatisticsMapper
-from app.modules.content.product.service.command.statistics_queue import (
-    mark_statistics_dirty,
-)
+from app.modules.content.product.repository import statistics as StatisticsRepository
 
 
 async def replace_statistics_day(
@@ -48,10 +46,11 @@ async def enqueue_recent(
     today = statistics_day(now or datetime.now(UTC))
     async with use_case_transaction(session):
         product_ids = await Repository.list_published_product_ids(session)
-        for pid in product_ids:
-            for offset in range(days + 1):
-                start, _ = day_bounds(today - timedelta(days=offset))
-                await mark_statistics_dirty(
-                    session,
-                    Types.MarkStatisticsDirtyCommand(product_id=pid, instant=start),
-                )
+        await StatisticsRepository.upsert_statistics_work_batch(
+            session,
+            (
+                (product_id, today - timedelta(days=offset))
+                for product_id in product_ids
+                for offset in range(days + 1)
+            ),
+        )

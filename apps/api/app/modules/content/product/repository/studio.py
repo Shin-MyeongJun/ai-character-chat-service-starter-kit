@@ -56,3 +56,6 @@ async def mark_studio_publication(
     row.publication_digest = digest
     row.publication_release = release
     await session.flush()
+    # updated_at has a SQL onupdate expression and is expired by flush. Load it
+    # here so the following pure Info mapper never triggers implicit async I/O.
+    await session.refresh(row)

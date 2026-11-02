@@ -99,8 +99,7 @@ async def record_manual_assessment(
                 existing.signals.get("request_fingerprint"), fingerprint
             )
             return existing
-        # 접수 상태 편집과 평가를 같은 순서로 잠가 검토 중 거절·중복 전환을 막는다.
-        await lock_key(session, "moderation.intake", "graph")
+        # 접수 편집·재평가·조치와 같은 대상 잠금을 행 잠금보다 먼저 획득한다.
         await lock_key(
             session, "moderation.target", f"{command.target_type}:{command.target_id}"
         )
@@ -117,10 +116,10 @@ async def record_manual_assessment(
                 command.target_id,
             ):
                 raise Types.ModerationError("invalid_link")
-            superseding_id_row = await ReviewRepository.get_superseding_assessment(
+            superseding_id = await ReviewRepository.get_superseding_assessment(
                 session, previous_id
             )
-            if PersistenceMapper.scalar_row_to_value(superseding_id_row) is not None:
+            if superseding_id is not None:
                 raise Types.ModerationError("state_conflict")
             # 신규 ID만 생성하므로 정상 경로에서 순환은 없지만 기존 이력 훼손도 검사한다.
             visited: set[UUID] = set()
@@ -141,13 +140,21 @@ async def record_manual_assessment(
                     command.target_id,
                 ):
                     raise Types.ModerationError("invalid_link")
+        report_entities = await ReviewRepository.list_reports_by_ids(
+            session,
+            [link.report_id for link in command.reports],
+            target_type=command.target_type,
+            target_id=command.target_id,
+        )
+        reports = [
+            PersistenceMapper.report_entity_to_info(entity)
+            for entity in report_entities
+        ]
+        reports_by_id = {report.id: report for report in reports}
         reporters: set[UUID] = set()
         for link in command.reports:
-            report_entity = await ReviewRepository.get_report(
-                session, link.report_id, lock=True
-            )
             report = ValidationServiceUtil.require_info(
-                PersistenceMapper.report_entity_to_info(report_entity)
+                reports_by_id.get(link.report_id)
             )
             if (report.target_type, report.target_id) != (
                 command.target_type,

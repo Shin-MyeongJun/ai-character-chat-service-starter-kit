@@ -36,6 +36,8 @@ class MessageResponseDto(BaseModel):
 class MessagePageResponseDto(BaseModel):
     items: list[MessageResponseDto]
     next_cursor: str | None
+    history_revision: int | None = None
+    sync_cursor: str | None = None
 
 
 class RewindMessagesResponseDto(BaseModel):

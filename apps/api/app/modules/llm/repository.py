@@ -9,20 +9,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.model_routing import Model, ModelReplacement, Provider
 
 
-async def get_model(session: AsyncSession, model_id: UUID) -> Model | None:
+async def get_model(
+    session: AsyncSession, model_id: UUID, *, refresh: bool = False
+) -> Model | None:
+    if refresh:
+        return await session.get(Model, model_id, populate_existing=True)
     return await session.get(Model, model_id)
 
 
-async def get_provider(session: AsyncSession, provider_id: UUID) -> Provider | None:
+async def get_provider(
+    session: AsyncSession, provider_id: UUID, *, refresh: bool = False
+) -> Provider | None:
+    if refresh:
+        return await session.get(Provider, provider_id, populate_existing=True)
     return await session.get(Provider, provider_id)
 
 
-async def list_candidate_models(session: AsyncSession) -> list[Model]:
-    return list(
-        await session.scalars(
-            select(Model).join(Provider).where(Provider.is_enabled.is_(True))
-        )
-    )
+async def list_candidate_models(
+    session: AsyncSession, *, refresh: bool = False
+) -> list[Model]:
+    statement = select(Model).join(Provider).where(Provider.is_enabled.is_(True))
+    if refresh:
+        statement = statement.execution_options(populate_existing=True)
+    return list(await session.scalars(statement))
 
 
 async def get_model_replacement(

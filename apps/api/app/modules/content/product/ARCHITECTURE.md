@@ -1,12 +1,93 @@
 # Product 모듈
 
+## U04 스튜디오 잠금 순서 통일 (2026-10-30)
+
+스튜디오 잠금 진입점은 `product-studio-draft` 상품 ID의 transaction advisory →
+product → draft 순서를 사용한다. 직접 `save_studio_draft`뿐 아니라
+`get_studio_draft_for_publication`, `set_studio_components`, `mark_studio_publication`도
+행 잠금 전에 같은 advisory를 얻는다. revision 저장·업로드 준비·발행의 상위 유스케이스는
+공개 잠금 조회로 시작하며, 그 전에 product/draft 행 잠금을 선점하지 않는다. 중첩 서비스의
+같은 키 재획득은 같은 트랜잭션에 참여하고 최외곽 commit/rollback까지 잠금을 유지한다.
+행이 없는 최초 생성의 직렬화도 유지한다. 일반 잠금 없는 초안 조회는 바꾸지 않는다.
+
+동일 digest는 기존대로 revision 비교보다 먼저 반환한다. stale/누락 revision의 동일 내용
+재시도는 저장된 revision·digest·문서·영수증·updated_at을 반환하며, 다른 내용의 stale
+revision은 충돌이다. legacy 구성 매핑 채택과 문서 CAS는 같은 트랜잭션이며 실패 시 함께
+rollback한다. 영수증/매핑 저장소는 flush 후 SQL onupdate로 만료된 updated_at을 명시적으로
+refresh하여 순수 mapper가 암묵적 async 조회를 실행하지 않도록 한다.
+
+`test_studio_locking_db.py`는 실제 PostgreSQL의 두 작업 연결과 별도 관찰 연결로
+advisory 대기를 확인한 뒤 실행 장벽을 해제한다. 이전 순서의 SQLSTATE 40P01 대조 재현,
+양방향 교차 실행·CAS 단일 승자·동일 문서 생성/수정 재시도·legacy 매핑 및 저장 실패
+rollback을 검증한다. U06/U14 발행/저장 회귀는 함께 실행하며 상세 결과는
+`docs/audits/2026-10-26-pattern-standardization/U04-WORKLOG.md`에 기록한다.
+
+## U14 발행 조회 재사용·단계별 저장 (2026-10-29)
+
+발행 builder는 상품 잠금 뒤 읽은 ProductCompositionStateInfo를 내부 설정 검증에 전달한다.
+`_validate_publication`은 모델 Info·시작 설정·ID별 시작 항목 Info를 `_PublicationSettings`로
+반환한다. 모델/구성을 다시 조회하거나 검증한 시작 항목을 건별로 재조회하지 않는다.
+시작 항목은 연결 로어북 범위·enabled/start_set·설정의 부모 ID를 확인한다. 이 결과는
+잠긴 상품·원본의 현재 발행 범위에서만 사용하며 공개 검증 생략 옵션은 없다.
+
+repository의 `add_snapshot_composition`은 Info와 원본별 스냅샷 ID를 받아 새 슬롯을
+add_all/flush하고, 그 슬롯을 참조하는 대상·시작 행을 add_all/flush한다. 미리 만든 UUID만
+믿고 FK 부모 flush를 생략하지 않는다. 상품/원본 snapshot 생성 flush는 유지하며 이미
+존재하는 상품 snapshot 본문과 latest_snapshot_id 갱신만 마지막 한 flush로 합친다.
+service는 Entity/Row를 mapper에 전달하고 저장소만 새 슬롯 Entity·ID 대응을 해석한다.
+
+공개 character/lorebook freeze의 개별 인가·버전 계산·미디어/항목 조회와 부모 flush는
+유지한다. 같은 AsyncSession을 순차 실행하고 상품→정렬된 캐릭터→정렬된 로어북 잠금,
+상위 트랜잭션 원자성·실패 rollback·digest/버전·공개 HTTP/Python 계약은 같다.
+스튜디오 원본 편집/태그/미디어 준비·영수증 조립은 기존 공개 서비스 경계를 유지한다.
+
+`test_publication_batch_contracts`는 SQLite FK/복합 FK·유일 제약과 실제 freeze/release SQL을
+실행한다. 캐릭터 3·로어북 3·대상 3·시작 6의 첫 발행에서 SELECT 41→32회,
+명시 flush 28→14회(실제 flush 이벤트 25→11회)를 확인했다. 모델 검증/공급자 조회만
+대역이며 스튜디오 준비/영수증 SQL·실제 PostgreSQL 경합/격리/처리량 측정은 포함하지 않는다.
+후속 발행·원본 편집 후 이전 snapshot 유지·4단계 실패 rollback·누락/미소유 거절을
+검증하고 기존 스튜디오 영수증 재시도 테스트를 함께 실행한다.
+
+## U25 통계 재예약 배치 저장 (2026-10-29)
+
+`command/statistics.enqueue_recent`는 기존 발행 상품 ID 조회 결과에서 상품×서울 날짜 키를
+지연 생성한다. `repository/statistics.upsert_statistics_work_batch`가 최대 500개 입력 키씩
+읽고 배치 내부 중복을 제거한 뒤 다중 VALUES upsert를 순차 실행한다. 전체 조합 목록이나
+전체 중복 집합은 만들지 않으며 기존 상품 ID 목록 조회는 유지한다. SQL당 키는 최대 500개,
+바인딩 값은 최대 1,000개다. 배치 사이 같은 키는 다시 갱신할 수 있다.
+
+유효 days=1..31과 오늘 포함 days+1일, aware 시각의 서울 날짜 경계,
+latest_snapshot_id가 존재하는 상품 선택을 유지한다. 단건 공개 `mark_statistics_dirty`와
+Command/HTTP/CLI는 그대로이며 저장소 단건 upsert도 같은 배치 구현에 한 키를 전달한다.
+신규 requested_at은 DB 기본 now(), 충돌 시 requested_at도 now()다. PostgreSQL now()는
+트랜잭션 기준 시각이므로 command.now를 재예약 시각으로 저장하지 않는다.
+
+enqueue_recent의 상위 use_case_transaction에 모든 배치가 참여한다. 내부 commit/savepoint나
+동일 AsyncSession 병렬 실행은 없으며 중간 실패는 전파한다. 상위 호출자가 예외를 잡아도
+rollback-only 계약으로 신규 키·기존 요청 시각·동일 트랜잭션의 다른 쓰기를 함께 되돌린다.
+claim/complete의 requested_at/product_id/day 순서·SKIP LOCKED와 날짜 전체 재집계는 유지한다.
+태그 이름 resolve와 발행 저장소는 이 변경 범위에 포함하지 않는다.
+
+`test_statistics_repair_batch_contracts`는 실제 저장소 SQL을 SQLite 메모리 DB에서 실행하고
+PG 구문을 컴파일한다. SQL/트랜잭션 메서드는 AsyncSession 어댑터이며 실제 PG 잠금·경합·
+격리는 검증하지 않는다. 같은 상품 16개×32일에서 upsert 512→2회(상품 조회 각 1회),
+빈 입력·범위/날짜 경계·재예약·중복·500개 경계/부분 배치·중간 실패 rollback과 job 연결을
+검증한다. 상세 측정 범위와 통합 검증 명령은 U25-STATISTICS-WORKLOG.md에 기록한다.
+
+2026-11-02 `test_u25_postgres_concurrency.py`의 실제 PG 후속 검증은 502키의 동시 repair,
+worker claim/SKIP LOCKED·미확정 complete 삭제와 repair의 commit/rollback 경합,
+repair와 단건 dirty 요청의 대기·requested_at 보존 및 이후 작업 소진을 확인한다.
+별도 연결의 pg_blocking_pids로 실제 대기를 관찰한다. requested_at은 DB 트랜잭션 시작
+시각이며 모든 실행의 단조 증가를 뜻하지 않는다. 제품 코드·공개 계약은 변경하지 않았다.
+통합 결과·환경·유한한 실행 순서/운영 성능 등의 한계는 감사 U25-PG-INTEGRATION.md를 따른다.
+
 ## 소유 데이터
 
 `product_tags`, `product_internal_tags`: 작품의 현재 공개/내부 태그 연결. 공통 사전 `tags`는 content/tag 영역이 소유한다. ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 표시 순서·부여 사용자, 내부 연결은 admin/system 출처·부여 사용자·갱신 시각을 기록한다. 양쪽에서 같은 사전 ID를 사용할 수 있고 연결은 작품·태그당 각 테이블에 한 행이다. 관리자 지정값은 시스템 쓰기/삭제에서 보호하며 DB만으로 인가를 보장하지 않는다.
 
 normalized_name·동의어 통합·개수 제한·태그 snapshot은 없다. 작품 삭제는 연결만 CASCADE하고 연결된 사전 항목 삭제는 RESTRICT한다. 부여 사용자 삭제는 assigned_by를 SET NULL하되 연결은 보존한다. 공개 태그는 작품의 현재 분류 정보로 사용하며 내부 태그는 운영/추천에 사용한다. 공개 태그 전용 API가 현재 연결을 조립하며 기존 콘텐츠 응답·목록·발행 snapshot 구조는 유지한다.
 
-`product_studio_drafts`: 상품별 스튜디오 편집 문서(JSONB), revision·digest, 최초 발행 digest·결과. 상품 삭제 시 함께 삭제된다.
+`product_studio_drafts`: 상품별 스튜디오 편집 문서(JSONB), revision·digest, 최근 발행 digest·결과와 구성 ID/revision별 영수증. 상품 삭제 시 함께 삭제된다.
 
 `products`, `product_characters`, `product_lorebooks`, `product_lorebook_characters`, `product_start_sets`; `product_snapshots`, `product_snapshot_characters`, `product_snapshot_lorebooks`, `product_snapshot_lorebook_characters`, `product_snapshot_start_sets`, `product_snapshot_policy_changes`; `product_release_notes`, `product_release_note_revisions`; `product_daily_stats`, `product_version_daily_stats`, `product_user_daily_activity`, `product_version_user_daily_activity`, `product_stats_dirty_days`.
 
@@ -14,10 +95,12 @@ normalized_name·동의어 통합·개수 제한·태그 snapshot은 없다. 작
 
 ## 파일별 책임
 
+- `service/studio_validation.py`: 편집 JSON의 공유 구조 검증. 알려진 필드의 자료형·배열/객체·로컬 ID 중복·문서 내부 참조·이미지 usage/UUID를 검사하며 값을 변환하거나 DB를 조회하지 않는다. 저장 서비스와 상위 저장/업로드 준비/발행이 재사용한다. 빈 본문·업로드 전 이미지는 초안으로 허용하고 발행 가능 조건은 상위 발행 검증에 남긴다.
+
 - `service/command/__init__.py`: draft 생성·수정·삭제, identity 인가를 거친 관리자 정책 변경.
 - `service/command/composition.py`: 구성 검증·변경. 캐릭터·로어북 소유권과 잠금을 각 공개 서비스로 확인한다.
 - `service/command/settings.py`: 모델·시작 항목·대체 정책 설정. `_validate_*`는 같은 모듈의 발행에서 쓰는 내부 검증이다.
-- `service/command/studio.py`, `service/query/studio.py`, `repository/studio.py`: 소유권 확인 후 스튜디오 JSON 문서를 비교 갱신하거나 조회한다. revision 충돌은 409, 동일 문서 재전송은 같은 결과다. 최대 2 MiB다. 발행 결과를 문서 digest와 함께 기록해 응답 유실 재호출을 복구한다. 현재 구현은 발행 후 변경 문서도 저장하며 이미 발행된 상품의 프로필/태그는 이 저장에서 변경하지 않는다. 상위 `use_cases/studio_publication.py`는 재발행 경로를 포함한다. 과거의 재발행 거절 문서/테스트와의 계약 불일치는 감사 U06으로 남아 있다. 실제 교차 도메인 조합은 최상위 use case가 소유한다.
+- `service/command/studio.py`, `service/query/studio.py`, `repository/studio.py`: 소유권 확인 후 스튜디오 JSON 문서를 비교 갱신하거나 조회한다. revision 충돌은 409, 동일 문서 재전송은 같은 결과다. 최대 2 MiB다. 발행 결과를 문서 digest와 함께 기록해 응답 유실 재호출을 복구한다. 2026-10-29 U06 계약 확정에 따라 발행 후 변경 문서 저장과 후속 발행을 허용한다. 초안 저장은 이미 발행된 상품의 프로필/태그/공개·승인 상태를 바꾸지 않으며 명시적 발행에서 반영한다. 실제 교차 도메인 조합·로어북 제목/설명/태그 동기화는 최상위 use case가 소유한다. 기존 구성 ID·이전 스냅샷·영수증 재시도는 유지한다.
 - `service/command/publication.py`: 잠긴 소스의 발행 스냅샷 조합 및 digest. 상위 publish 유스케이스가 트랜잭션을 소유하며 character/lorebook freeze도 같은 범위에 참여한다.
 - `service/command/releases.py`: `publish_product`, `correct_note`; 내용·미디어 비교에 따른 업데이트 정책과 릴리스 노트 이력.
 - `service/command/statistics.py`: 수집된 사실의 집계·저장, 상위 트랜잭션의 작업 잠금·완료, 최근 날짜 재요청을 담당한다. 도메인 간 수집 및 배치 반복은 최상위 product_statistics 유스케이스로 이동했다.
@@ -351,3 +434,14 @@ CancelledError 전달에서 세션 종료 후 엔진 dispose와 원래 예외 �
 실제 AsyncSession의 연결 없는 트랜잭션·종료를 사용하고 엔진/업무 서비스는 대역이다.
 성공 시 기존 처리 건수 문구만 출력하고 실패 시 성공 문구가 없음을 확인한다.
 실제 PostgreSQL 연결·큐 경합·반복 취소·운영 스케줄러 실행은 검증하지 않았다.
+
+
+## U16 태그 순수 정책 공통화 (2026-10-30)
+
+`service/tags.py`는 content/tag의 공개 `service/policy.py`와 Command/Info를 사용하여
+공개 태그 추가/교체 순서와 내부 태그 선택/제거·관리자 지정 보호를 판단한다.
+부모 존재·인가·FOR UPDATE, 잠금 아래 기존 연결 ID 수집, resolve_tags 호출,
+연결 저장·응답 조합과 use_case_transaction 경계는 이 모듈이 계속 소유한다.
+공통 서비스는 세션·ORM·콜백을 받지 않는 순수 정책이다. 저장소·mapper·router는
+도메인별 책임과 접근 차이가 있어 유지하며 공통 repository를 추가하지 않는다.
+비활성 태그 유지/신규 거절과 U25 이름 해석·잠금은 기존 tag command 책임이다.

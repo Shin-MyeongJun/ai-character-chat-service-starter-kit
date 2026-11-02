@@ -187,7 +187,7 @@ async def test_lease_recovery_never_rebuilds_or_repeats_prompt(db, monkeypatch, 
     if phase == "result_ready":
         monkeypatch.setattr(
             Answers,
-            "finish_generation_and_schedule_memory",
+            "_finish_locked_generation_and_schedule_memory",
             AsyncMock(side_effect=RuntimeError("storage down")),
         )
     else:

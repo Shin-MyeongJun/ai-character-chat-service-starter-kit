@@ -1,6 +1,7 @@
 """Tag service policies and HTTP boundaries without a PostgreSQL dependency."""
 
 import importlib
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -51,6 +52,13 @@ def domain(request, monkeypatch):
         return dictionary[tag_name]
 
     monkeypatch.setattr(TagCommandService.Repository, "resolve_tag", resolve)
+
+    async def resolve_batch(
+        session: AsyncSession, names: Sequence[str]
+    ) -> list[SimpleNamespace]:
+        return [await resolve(session, name) for name in sorted(set(names))]
+
+    monkeypatch.setattr(TagCommandService.Repository, "resolve_tags", resolve_batch)
 
     async def get_tags(session, command):
         return tuple(
@@ -258,6 +266,62 @@ async def test_internal_admin_system_protection_and_no_public_leak(domain):
         )
         assert not d.internal
         assert len(d.dictionary) == 2
+
+
+@pytest.mark.asyncio
+async def test_public_append_preserves_link_metadata_and_empty_append(domain):
+    d = domain
+    async with AsyncSession() as session:
+        original = await d.service.add_public_tags(
+            session, d.types.PublicTagsCommand(d.target, d.owner, ("B", "A"))
+        )
+        metadata = {
+            tid: (row.assigned_by, row.created_at) for tid, row in d.public.items()
+        }
+        d.dictionary["B"].is_active = False
+        result = await d.service.add_public_tags(
+            session, d.types.PublicTagsCommand(d.target, d.owner, ("A", "C", "B"))
+        )
+        assert [tag.name for tag in result] == ["B", "A", "C"]
+        assert result[0].id == original[0].id and not result[0].is_active
+        assert all(
+            (d.public[tid].assigned_by, d.public[tid].created_at) == fields
+            for tid, fields in metadata.items()
+        )
+        assert await d.service.add_public_tags(
+            session, d.types.PublicTagsCommand(d.target, d.owner, ())
+        ) == result
+
+
+@pytest.mark.asyncio
+async def test_internal_inactive_retention_takeover_clear_and_missing_remove(domain):
+    d = domain
+    async with AsyncSession() as session:
+        result = await d.service.set_system_tags(
+            session, d.types.SystemTagsCommand(d.target, ("retained",))
+        )
+        tag_id = result[0].id
+        d.dictionary["retained"].is_active = False
+        result = await d.service.add_internal_tags(
+            session, d.types.InternalTagsCommand(d.target, d.admin, ("retained",))
+        )
+        assert result[0].id == tag_id and not result[0].is_active
+        assert result[0].source == "admin" and result[0].assigned_by == d.admin
+        result = await d.service.set_system_tags(
+            session, d.types.SystemTagsCommand(d.target, ("retained",))
+        )
+        assert result[0].source == "admin" and result[0].assigned_by == d.admin
+        assert await d.service.replace_internal_tags(
+            session, d.types.InternalTagsCommand(d.target, d.admin, ())
+        ) == ()
+        await d.service.remove_system_tag(
+            session, d.types.SystemTagsCommand(d.target, tag_id=tag_id)
+        )
+        with pytest.raises(ValueError, match="Inactive"):
+            await d.service.set_system_tags(
+                session, d.types.SystemTagsCommand(d.target, ("retained",))
+            )
+        assert not d.internal
 
 
 @pytest.mark.asyncio

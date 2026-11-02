@@ -21,7 +21,60 @@ def estimate_tokens(text: str) -> int:
 
 
 def _message_tokens(message: Types.SourceMessageInfo) -> int:
-    return estimate_tokens(f"{message.sender_type}: {message.content}\n")
+    return estimate_message_tokens(message.sender_type, message.content)
+
+
+def estimate_message_tokens(
+    sender_type: str, content: str, *, conservative: bool = False
+) -> int:
+    if conservative:
+        return len(content.encode("utf-8")) + 32
+    return estimate_tokens(f"{sender_type}: {content}\n")
+
+
+def _protected_start(token_counts: list[int], recent_raw_tokens: int) -> int:
+    start = len(token_counts)
+    protected_tokens = 0
+    while start > 0 and protected_tokens < recent_raw_tokens:
+        start -= 1
+        protected_tokens += token_counts[start]
+    return start
+
+
+def plan_context_compaction(command: Types.PlanContextCompactionCommand) -> int:
+    """Return the oldest prefix needed to fit, without touching protected raw text."""
+    _validate_policy(command.policy)
+    if type(command.available_tokens) is not int or command.available_tokens < 0:
+        raise ValueError("Available history tokens must be a nonnegative integer.")
+    messages = tuple(sorted(command.messages, key=lambda item: item.position))
+    protected_start = _protected_start(
+        [_message_tokens(item) for item in messages], command.policy.recent_raw_tokens
+    )
+    token_counts = [
+        estimate_message_tokens(
+            item.sender_type,
+            item.content,
+            conservative=command.conservative_token_budget,
+        )
+        for item in messages
+    ]
+    remaining_tokens = sum(token_counts)
+    protected_tokens = sum(token_counts[protected_start:])
+    history_budget = max(
+        protected_tokens, command.available_tokens - command.policy.memory_token_budget
+    )
+    if protected_tokens > command.available_tokens:
+        raise Types.ContextCompactionUnavailableError(
+            "Protected recent messages exceed the available history budget."
+        )
+    for index in range(protected_start):
+        remaining_tokens -= token_counts[index]
+        if remaining_tokens <= history_budget:
+            return messages[index].position
+    raise Types.ContextCompactionUnavailableError(
+        "Protected recent messages exceed the available history budget; "
+        "reduce the input, fixed context, response reserve, or recent raw policy."
+    )
 
 
 def _validate_policy(policy: Types.MemoryPolicy) -> None:
@@ -56,7 +109,7 @@ def _source_digest(messages: tuple[Types.SourceMessageInfo, ...]) -> str:
     ).hexdigest()
 
 
-# 미요약 메시지에서 최근 원문을 남기고 오래된 배치를 선택한다. 임계치 미달이면 None이다.
+# 최근 원문을 남기고 오래된 배치를 선택한다. 답변 목표가 있으면 일반 임계치를 우회한다.
 def plan_summarization(
     command: Types.PlanSummarizationCommand,
 ) -> Types.SummaryPlanInfo | None:
@@ -73,16 +126,26 @@ def plan_summarization(
     if len({item.position for item in messages}) != len(messages):
         raise ValueError("Summary source positions must be unique.")
     token_counts = [_message_tokens(item) for item in messages]
-    if sum(token_counts) < command.policy.summarization_threshold_tokens:
+    target = command.summary_through_position
+    if target is not None and (type(target) is not int or target < 1):
+        raise ValueError("Summary target position must be a positive integer.")
+    required = target is not None and any(item.position <= target for item in messages)
+    if (
+        not required
+        and sum(token_counts) < command.policy.summarization_threshold_tokens
+    ):
         return None
 
-    protected_start = len(messages)
-    protected_tokens = 0
-    while protected_start > 0 and protected_tokens < command.policy.recent_raw_tokens:
-        protected_start -= 1
-        protected_tokens += token_counts[protected_start]
+    protected_start = _protected_start(token_counts, command.policy.recent_raw_tokens)
     eligible = messages[:protected_start]
     eligible_tokens = token_counts[:protected_start]
+    if required and target is not None:
+        if any(item.position <= target for item in messages[protected_start:]):
+            raise Types.ContextCompactionUnavailableError(
+                "Summary target overlaps protected recent messages."
+            )
+        eligible = tuple(item for item in eligible if item.position <= target)
+        eligible_tokens = eligible_tokens[: len(eligible)]
     if not eligible:
         return None
 
@@ -169,6 +232,13 @@ async def save_summary(
 ) -> Types.MemoryInfo:
     if not 0 <= command.importance <= 1:
         raise ValueError("Memory importance must be between 0 and 1.")
+    plan = command.generated.plan
+    if (
+        plan.conversation_id != command.work.conversation_id
+        or plan.owner_id != command.work.owner_id
+        or not await Repository.lock_memory_work(session, work=command.work)
+    ):
+        raise Types.StaleMemoryWorkError("Memory claim no longer owns this summary.")
     row = await Repository.create_summary(
         session, generated=command.generated, importance=command.importance
     )

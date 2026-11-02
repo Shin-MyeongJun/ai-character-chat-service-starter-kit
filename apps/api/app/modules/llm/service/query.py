@@ -13,19 +13,27 @@ from app.modules.llm.mapper import persistence as PersistenceMapper
 async def get_model(
     session: AsyncSession, command: Types.GetModelCommand
 ) -> Types.ModelInfo | None:
-    entity = await Repository.get_model(session, command.model_id)
+    entity = await Repository.get_model(
+        session, command.model_id, refresh=command.refresh
+    )
     return PersistenceMapper.model_entity_to_info(entity)
 
 
 async def get_provider(
     session: AsyncSession, command: Types.GetProviderCommand
 ) -> Types.ProviderInfo | None:
-    entity = await Repository.get_provider(session, command.provider_id)
+    entity = await Repository.get_provider(
+        session, command.provider_id, refresh=command.refresh
+    )
     return PersistenceMapper.provider_entity_to_info(entity)
 
 
-async def list_candidate_models(session: AsyncSession) -> list[Types.ModelInfo]:
-    entities = await Repository.list_candidate_models(session)
+async def list_candidate_models(
+    session: AsyncSession, command: Types.ListCandidateModelsCommand | None = None
+) -> list[Types.ModelInfo]:
+    entities = await Repository.list_candidate_models(
+        session, refresh=command.refresh if command is not None else False
+    )
     return PersistenceMapper.models_entities_to_info(entities)
 
 

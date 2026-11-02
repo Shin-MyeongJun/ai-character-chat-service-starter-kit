@@ -1,5 +1,6 @@
 # 대화별 기억 작업 예약·claim·완료·실패 경계. 재시도 지연은 초 단위이며 기본 5초부터 최대 300초다.
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,11 @@ from app.modules.chatting.memory.mapper import persistence as PersistenceMapper
 async def schedule_memory_work(
     session: AsyncSession, command: Types.ScheduleMemoryWorkCommand
 ) -> None:
+    if command.summary_through_position is not None and (
+        type(command.summary_through_position) is not int
+        or command.summary_through_position < 1
+    ):
+        raise ValueError("Summary target position must be a positive integer.")
     async with use_case_transaction(session):
         if not await Repository.conversation_is_owned(
             session,
@@ -24,6 +30,7 @@ async def schedule_memory_work(
             conversation_id=command.conversation_id,
             owner_id=command.owner_id,
             now=datetime.now(UTC),
+            summary_through_position=command.summary_through_position,
         )
 
 
@@ -39,13 +46,14 @@ async def claim_memory_work(
         row = await Repository.claim_memory_work(
             session,
             worker_id=command.worker_id,
+            claim_token=uuid4(),
             now=datetime.now(UTC),
             lease_seconds=command.lease_seconds,
         )
         return PersistenceMapper.memory_job_entity_to_work(row)
 
 
-# claim의 worker와 scope가 여전히 일치할 때 완료한다. 그 뒤 쌓인 요청 세대는 다음 처리로 남긴다.
+# worker/scope/claim 토큰이 일치할 때 완료한다. 오래된 실행의 완료는 무변경이다.
 async def complete_memory_work(
     session: AsyncSession, command: Types.CompleteMemoryWorkCommand
 ) -> None:

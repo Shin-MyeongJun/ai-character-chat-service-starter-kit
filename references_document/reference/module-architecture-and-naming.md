@@ -107,7 +107,7 @@ service → mapper/persistence
 
 1. 모듈이 소유한 테이블의 조회와 쓰기를 담당한다. 소유 테이블은 모듈의 ARCHITECTURE.md에 기록한다.
 2. 동일 모듈 안의 여러 쿼리 결과를 모아 raw 결과 묶음인 XxxRow를 반환할 수 있다. Info/View로의 변환은 수행하지 않는다.
-3. 다른 모듈 테이블의 컬럼을 가져와 결과 데이터를 구성하는 JOIN은 금지한다. 모듈 간 데이터 조합은 공개 service와 views를 통해 수행한다.
+3. 다른 모듈 테이블의 컬럼을 가져와 결과 데이터를 구성하는 JOIN은 금지한다. 모듈 간 데이터 조합은 공개 service와 views를 통해 수행하며, 아래 §C.2에 명시된 최근 대화 목록 projection만 제한적으로 예외다.
 4. **예외: 소유권·인가 스코핑 JOIN.** 타 모듈 컬럼을 반환 결과에 포함하지 않고 접근 범위를 제한하는 조건으로만 사용할 때 허용한다. 사용 테이블·관계·목적을 ARCHITECTURE.md에 기록한다. 이 예외는 다른 모듈의 repository/mapper를 호출할 권한을 부여하지 않는다.
 5. repository는 업무 상태 전이나 HTTP 응답을 결정하지 않는다. service가 결정한 작업을 저장소에 반영한다.
 6. commit/rollback을 임의로 수행하지 않는다. 필요한 flush는 허용하되 트랜잭션을 종료하지 않는다.
@@ -121,6 +121,13 @@ service → mapper/persistence
 - mapper에 인자로 전달하는 것은 허용한다. 공개 service의 반환값으로 내보내는 것은 금지한다.
 - router 및 다른 모듈에는 변환된 Info/View만 전달한다.
 - mapper에서 ORM lazy loading으로 DB 조회가 발생해서는 안 된다. 필요한 데이터는 repository에서 미리 조회한다.
+
+#### C.2 지정된 읽기 전용 목록 projection
+
+- 최근 대화 목록에 한해 `chat/repository.py:list_recent_conversations`는 conversation 소유의 `conversations`와 chat 소유의 `messages`를 함께 읽을 수 있다. 대화 전체 수집 없이 활동순 정렬·커서·LIMIT을 DB에서 처리하기 위한 예외다.
+- 대화에서 읽는 컬럼은 `id`, `user_id`, `product_id`, `title`, `created_at`으로 한정하고, 요청자의 `user_id` 조건을 커서·LIMIT보다 먼저 적용한다. 마지막 생존 메시지의 시각·position과 빈 대화의 생성 시각을 정렬 기준으로 사용한다.
+- 쓰기·행 잠금·타 모듈 repository/mapper 호출은 추가하지 않는다. raw 결과는 chat persistence mapper를 거쳐 공개 View로 반환하며, 소유권과 정확한 COUNT 계약을 유지한다.
+- 이 예외의 책임·쿼리·테스트는 chat/conversation의 ARCHITECTURE.md에 기록한다. 다른 목록이나 일반 repository에 대한 포괄적 JOIN 허용으로 확장하지 않는다.
 
 ### D. Mapper
 

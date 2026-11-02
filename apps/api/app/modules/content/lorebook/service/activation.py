@@ -66,7 +66,7 @@ def validate_options(
 def _matches(
     text: str, trigger: str, mode: str, options: Types.LorebookActivationOptions | None
 ) -> bool:
-    """Use Unicode word boundaries for v1 whole-word matching and retain legacy modes."""
+    """Keep exact equality, v1 contains word boundaries and legacy matching rules."""
     if not options:
         if mode == "regex":
             try:
@@ -81,10 +81,13 @@ def _matches(
             return trigger.casefold() in text.casefold()
         raise ValueError("Stored lorebook entry has an invalid match mode.")
     if mode == "regex":
-        # v1 studio uses contains; legacy regex uses its existing safety validator.
-        return MatchingServiceUtil.regex_matches(trigger, text)
+        return MatchingServiceUtil.regex_matches(
+            trigger, text, case_sensitive=options["case_sensitive"]
+        )
     if not options["case_sensitive"]:
         text, trigger = text.casefold(), trigger.casefold()
+    if mode == "exact":
+        return text == trigger
     if options["partial_match"]:
         return trigger in text
     return re.search(r"(?<!\w)" + re.escape(trigger) + r"(?!\w)", text) is not None

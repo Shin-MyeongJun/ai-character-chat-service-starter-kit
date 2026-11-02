@@ -1,8 +1,8 @@
-# main에서 DB 및 선택적 owner 인증을 주입하는 공통 훅. 관리자·모더레이터 가드는 별도다.
+# main에서 DB·owner 인증과 최신 DB의 활성 admin 검사(검수 포함)를 연결하는 훅.
 """Integration hooks for the lorebook HTTP adapter.
 
-The application can replace these with FastAPI dependency overrides until
-shared database and authentication dependencies are available.
+main connects these through FastAPI dependency overrides. Standalone routers
+reject requests until the corresponding hooks have been configured.
 """
 
 from uuid import UUID

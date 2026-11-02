@@ -25,17 +25,17 @@ async def resolve_tags(
     """Trusted content caller supplies only retained IDs read under its parent lock."""
     names = _prepare_tag_names(command.names)
     async with use_case_transaction(session):
-        tags_by_name: dict[str, Types.TagInfo] = {}
-        # All writers resolve shared names in the same order to avoid deadlocks.
+        infos = PersistenceMapper.tags_entities_to_info(
+            await Repository.resolve_tags(session, names)
+        )
+        tags_by_name: dict[str, Types.TagInfo] = {info.name: info for info in infos}
+        # Preserve the first missing/inactive name and the authored return order.
         for name in sorted(names):
-            info = PersistenceMapper.tag_entity_to_info(
-                await Repository.resolve_tag(session, name)
-            )
+            info = tags_by_name.get(name)
             if info is None:
                 raise ValueError("Tag name changed concurrently; retry the request.")
             if not info.is_active and info.id not in command.retained_ids:
                 raise ValueError("Inactive tags cannot be newly assigned.")
-            tags_by_name[name] = info
         return tuple(tags_by_name[name] for name in names)
 
 

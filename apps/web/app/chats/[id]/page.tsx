@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, request, createMessage, generateAnswer, getConversationStart, getCreditBalance, getMe, listConversationMessages, type ChatMessage, type ConversationStart, type CreditBalance } from "@/lib/api";
+import { ApiError, request, createMessage, generateAnswer, getConversationStart, getCreditBalance, getMe, type ChatMessage, type ConversationStart, type CreditBalance } from "@/lib/api";
 import { demoWorkById, isDemoWork } from "@/lib/works";
 import { useUserTheme } from "@/components/user-theme";
 import { ActionLink, Button, Card, Field, Section, StatusRow } from "@/components/account/account-ui";
 import { ChatSettings, CreditShortageDialog } from "@/components/account/chat-settings";
 import styles from "@/components/account/account.module.css";
-import { updateRecentChatMessage } from "@/lib/recent-chats";
+import { ConversationHistorySession, type ConversationHistory } from "@/lib/chat-history";
+import { AUTH_CHANGED_KEY, updateRecentChatMessage } from "@/lib/recent-chats";
 
 type DisplayMessage = { id: string; sender_type: string; content: string; position: number; revision: number };
 type Pending = { ownerId: string; content: string; messageKey: string; answerKey: string; participant: string; message?: ChatMessage; retryFailed?: boolean; manualEntryIds?: string[] };
@@ -61,16 +62,42 @@ function ChatContent() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const answerController = useRef<AbortController | null>(null);
   const running = useRef(false);
+  const historySession = useRef<ConversationHistorySession | null>(null);
+  const [authVersion, setAuthVersion] = useState(0);
 
   const pendingKey = (userId: string) => `moseori_pending_${userId}_${id}`;
   const draftKey = demo ? `moseori_draft_${id}` : ownerId ? `moseori_draft_${ownerId}_${id}` : null;
 
-  const refreshMessages = useCallback(async () => {
-    const items = await listConversationMessages(id);
-    setMessages(items);
-    const latest = items.at(-1);
-    if (latest) updateRecentChatMessage(id, latest.content, ownerId);
-  }, [id, ownerId]);
+  const publishHistory = useCallback((scope: ConversationHistorySession, history: ConversationHistory) => {
+    if (historySession.current !== scope) return;
+    setMessages(history.messages);
+    const latest = history.messages.at(-1);
+    updateRecentChatMessage(scope.conversationId, latest?.content ?? "", scope.ownerId);
+  }, []);
+
+  const refreshMessages = useCallback(async (reset = false, scope = historySession.current, signal?: AbortSignal) => {
+    if (!scope || scope.conversationId !== id) return;
+    const history = await scope.sync(reset, signal);
+    if (history) publishHistory(scope, history);
+  }, [id, publishHistory]);
+
+  useEffect(() => {
+    const changed = () => setAuthVersion(value => value + 1);
+    const storage = (event: StorageEvent) => { if (event.key === AUTH_CHANGED_KEY || event.key === null) changed(); };
+    window.addEventListener(AUTH_CHANGED_KEY, changed); window.addEventListener("storage", storage);
+    return () => { window.removeEventListener(AUTH_CHANGED_KEY, changed); window.removeEventListener("storage", storage); };
+  }, []);
+
+  useEffect(() => {
+    if (demo || loading || !ownerId) return;
+    const sync = () => {
+      if (running.current) return;
+      const scope = historySession.current;
+      void refreshMessages(false, scope).catch(cause => { if (scope === historySession.current) setError(errorText(cause)); });
+    };
+    window.addEventListener("focus", sync);
+    return () => window.removeEventListener("focus", sync);
+  }, [demo, loading, ownerId, refreshMessages]);
 
   useEffect(() => {
     setDraft(draftKey ? localStorage.getItem(draftKey) ?? "" : "");
@@ -79,7 +106,7 @@ function ChatContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     setManualLore([]); setManualIds([]); setManualError("");
-    setLoading(true); setMessages([]); setStart(null); setOwnerId(null); setPending(null); setError(null); setNotice(null); setAnswerPrice(null); setBalance(null); setBalanceUnavailable(false);
+    setLoading(true); setBusy(false); setMessages([]); setStart(null); setOwnerId(null); setPending(null); setError(null); setNotice(null); setAnswerPrice(null); setBalance(null); setBalanceUnavailable(false);
     if (demo) {
       try {
         const saved = JSON.parse(localStorage.getItem(`moseori_demo_${id}`) ?? "[]") as DisplayMessage[];
@@ -90,22 +117,29 @@ function ChatContent() {
       return;
     }
     let active = true;
+    let scope: ConversationHistorySession | null = null;
+    const controller = new AbortController();
     getMe().then(async (user) => {
-      const [opening, items] = await Promise.all([getConversationStart(id), listConversationMessages(id)]);
       if (!active) return;
+      scope = new ConversationHistorySession(id, user.id);
+      historySession.current = scope;
+      const [opening, history] = await Promise.all([getConversationStart(id), scope.sync(false, controller.signal)]);
+      if (!active || !history) return;
       void getCreditBalance().then(value => { if (active) { setBalance(value); setBalanceUnavailable(false); } }).catch(() => { if (active) setBalanceUnavailable(true); });
-      setOwnerId(user.id); setStart(opening); setMessages(items);
+      setOwnerId(user.id); setStart(opening); publishHistory(scope, history);
       void request<{items: {id: string; title: string}[]}>(`/conversations/${encodeURIComponent(id)}/manual-lore`).then(value => {if (active) setManualLore(value.items);}).catch(() => {if (active) setManualError("수동 로어 목록을 불러오지 못했어요.");});
-      const latest = items.at(-1);
-      if (latest) updateRecentChatMessage(id, latest.content, user.id);
       const key = `moseori_pending_${user.id}_${id}`;
       try {
         const stored = JSON.parse(sessionStorage.getItem(key) ?? sessionStorage.getItem(`moseori_pending_${id}`) ?? "null") as Pending | null;
         if (stored?.ownerId === user.id) setPending(stored);
       } catch { sessionStorage.removeItem(key); }
     }).catch((cause) => { if (active) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [demo, id]);
+    return () => {
+      active = false; controller.abort(); scope?.dispose();
+      historySession.current = null;
+      answerController.current?.abort(); answerController.current = null; running.current = false;
+    };
+  }, [demo, id, authVersion, publishHistory]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, busy]);
 
@@ -120,6 +154,9 @@ function ChatContent() {
 
   async function continuePending(value: Pending) {
     if (running.current) return;
+    const scope = historySession.current;
+    if (!scope || scope.conversationId !== id || scope.ownerId !== value.ownerId) return;
+    const isCurrent = () => historySession.current === scope;
     running.current = true;
     const controller = new AbortController();
     answerController.current = controller;
@@ -128,18 +165,23 @@ function ChatContent() {
       let message = value.message;
       if (!message) {
         message = await createMessage(id, value.content, value.messageKey);
+        if (!isCurrent()) return;
         value = { ...value, message };
         savePending(value);
-        await refreshMessages();
+        const history = scope.append(message);
+        if (history) publishHistory(scope, history);
       }
       for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (!isCurrent()) return;
         if (controller.signal.aborted) { setNotice("대기만 중단했어요. 저장된 요청으로 결과를 다시 확인할 수 있어요."); return; }
         try {
           const answer = await generateAnswer(id, message, value.participant, value.answerKey, controller.signal, value.manualEntryIds ?? []);
+          if (!isCurrent()) return;
           if (typeof answer.price_credit === "number") setAnswerPrice(answer.price_credit);
           if (answer.status === "pending") { await new Promise((resolve) => setTimeout(resolve, 3000)); continue; }
-          await refreshMessages();
-          void getCreditBalance().then(value => { setBalance(value); setBalanceUnavailable(false); }).catch(() => setBalanceUnavailable(true));
+          await refreshMessages(false, scope, controller.signal);
+          if (!isCurrent()) return;
+          void getCreditBalance().then(value => { if (isCurrent()) { setBalance(value); setBalanceUnavailable(false); } }).catch(() => { if (isCurrent()) setBalanceUnavailable(true); });
           if (answer.status !== "succeeded") {
             if (answer.retryable) savePending({ ...value, answerKey: crypto.randomUUID(), retryFailed: true });
             else savePending(null);
@@ -149,17 +191,19 @@ function ChatContent() {
           } else savePending(null);
           return;
         } catch (cause) {
+          if (!isCurrent()) return;
           if (cause instanceof ApiError && cause.code === "storage_pending_recovery") { await new Promise((resolve) => setTimeout(resolve, 3000)); continue; }
-          if (cause instanceof ApiError && ![401, 402, 429].includes(cause.status) && cause.code !== "csrf_failed" && cause.status < 500) { savePending(null); await refreshMessages(); }
+          if (cause instanceof ApiError && ![401, 402, 429].includes(cause.status) && cause.code !== "csrf_failed" && cause.status < 500) { savePending(null); await refreshMessages(true, scope, controller.signal); }
           throw cause;
         }
       }
-      setNotice("답변을 계속 처리 중이에요. 같은 요청으로 다시 확인해 주세요.");
+      if (isCurrent()) setNotice("답변을 계속 처리 중이에요. 같은 요청으로 다시 확인해 주세요.");
     } catch (cause) {
+      if (!isCurrent()) return;
       if (controller.signal.aborted) setNotice("대기만 중단했어요. 저장된 요청으로 결과를 다시 확인할 수 있어요.");
       else { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 402) setCreditDialog(true); }
     }
-    finally { answerController.current = null; running.current = false; setBusy(false); }
+    finally { if (answerController.current === controller) { answerController.current = null; running.current = false; setBusy(false); } }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {

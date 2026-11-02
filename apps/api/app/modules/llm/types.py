@@ -240,11 +240,18 @@ class ProviderInfo:
 @dataclass(frozen=True, slots=True)
 class GetModelCommand:
     model_id: UUID
+    refresh: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class GetProviderCommand:
     provider_id: UUID
+    refresh: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ListCandidateModelsCommand:
+    refresh: bool = False
 
 
 @dataclass(frozen=True, slots=True)

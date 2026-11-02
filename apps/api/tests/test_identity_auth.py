@@ -13,6 +13,7 @@ import pytest_asyncio
 from app.db.base import Base
 from app.db.models.identity import (
     AuthActionToken,
+    AuthMailOutbox,
     AuthOAuthAttempt,
     AuthRateLimit,
     AuthSession,
@@ -43,17 +44,24 @@ AUTH_TABLES = [
     AuthActionToken.__table__,
     AuthOAuthAttempt.__table__,
     AuthRateLimit.__table__,
+    AuthMailOutbox.__table__,
 ]
 
 
 class RecordingMailer:
     def __init__(self):
         self.messages = []
+        self.workflow = None
 
     async def send_mail(self, recipient, purpose, link):
         self.messages.append((recipient, purpose, link))
 
-    def token(self, purpose):
+    async def token(self, purpose):
+        # Integration helpers explicitly run the separate delivery path before
+        # using a link; HTTP request completion itself never calls the mailer.
+        assert self.workflow is not None
+        while await self.workflow.deliver_next_mail():
+            pass
         return next(
             link.split("#token=", 1)[1]
             for _, p, link in reversed(self.messages)
@@ -107,6 +115,7 @@ async def auth_http(identity_db, auth_settings):  # noqa: F811 - pytest 재사�
     auth = AuthenticationService(identity_db, auth_settings)
     app.state.authentication = auth
     app.state.authentication_mail = AuthenticationMailWorkflow(auth, mailer)
+    mailer.workflow = app.state.authentication_mail
     app.state.google_login = GoogleLoginService(auth, google)
 
     @app.get("/verified-identity")
@@ -138,7 +147,7 @@ async def register_verified(client, mailer, email=EMAIL):
     )
     assert response.status_code == 202, response.text
     response = await client.post(
-        "/auth/email/verify", json={"token": mailer.token("verify")}
+        "/auth/email/verify", json={"token": await mailer.token("verify")}
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -159,7 +168,7 @@ async def test_register_verify_login_refresh_logout_http(auth_http):
     ).status_code == 202
     assert (await login(client)).status_code == 401
     assert not client.cookies.get(auth.settings.cookie_name("access"))
-    token = mailer.token("verify")
+    token = await mailer.token("verify")
     assert (await client.post("/auth/email/verify", json={"token": token})).json()[
         "email_verified"
     ] is True
@@ -224,7 +233,7 @@ async def test_reset_revokes_every_session_and_is_single_use(auth_http):
     assert (
         await client.post("/auth/password/reset/request", json={"email": EMAIL})
     ).status_code == 202
-    token = mailer.token("reset")
+    token = await mailer.token("reset")
     new_password = "새 비밀번호 password 456!"
     response = await client.post(
         "/auth/password/reset", json={"token": token, "password": new_password}
@@ -313,7 +322,7 @@ async def test_duplicate_registration_and_action_token_races(auth_http, identity
     assert [x.status_code for x in responses] == [202, 202]
     async with identity_db() as session:
         assert await session.scalar(select(func.count()).select_from(User)) == 1
-    token = mailer.token("verify")
+    token = await mailer.token("verify")
     responses = await asyncio.gather(
         *(client.post("/auth/email/verify", json={"token": token}) for _ in range(2))
     )
@@ -321,7 +330,7 @@ async def test_duplicate_registration_and_action_token_races(auth_http, identity
     await AuthenticationMailWorkflow(auth, mailer).request_password_reset(
         Types.EmailCommand(EMAIL)
     )
-    command = Types.ResetPasswordCommand(mailer.token("reset"), PASSWORD + "2")
+    command = Types.ResetPasswordCommand(await mailer.token("reset"), PASSWORD + "2")
     results = await asyncio.gather(
         auth.reset_password(command),
         auth.reset_password(command),
@@ -335,11 +344,11 @@ async def test_duplicate_registration_and_action_token_races(auth_http, identity
 async def test_resend_expiry_cleanup_and_no_raw_token_storage(auth_http, identity_db):
     client, auth, mailer, _, _ = auth_http
     await client.post("/auth/register", json={"email": EMAIL, "password": PASSWORD})
-    old = mailer.token("verify")
+    old = await mailer.token("verify")
     assert (
         await client.post("/auth/email/resend", json={"email": EMAIL})
     ).status_code == 202
-    new = mailer.token("verify")
+    new = await mailer.token("verify")
     assert new != old
     assert (
         await client.post("/auth/email/verify", json={"token": old})
@@ -599,7 +608,7 @@ async def test_suspended_user_and_google_only_reset_token_are_rejected(
     await AuthenticationMailWorkflow(auth, mailer).request_password_reset(
         Types.EmailCommand(EMAIL)
     )
-    reset = mailer.token("reset")
+    reset = await mailer.token("reset")
     async with identity_db.begin() as session:
         await session.execute(update(User).values(status="suspended"))
     with pytest.raises(Types.AuthError):

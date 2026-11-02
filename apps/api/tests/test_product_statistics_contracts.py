@@ -1,14 +1,17 @@
 """Exact monetary/count aggregation and offline report/rebuild contracts."""
 
+from collections.abc import Iterable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import JSON, Column, MetaData, Table, Uuid, func, select, text
+from sqlalchemy import JSON, Column, MetaData, Result, Table, Uuid, func, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+from sqlalchemy.sql.base import Executable
 from test_product_core_contracts import database as core_database_fixture
 
 from app.db.models.product_statistics import (
@@ -26,7 +29,9 @@ from app.modules.content.product.service.command import statistics as CommandSer
 core_database = core_database_fixture
 
 
-def facts(product_id=None, day=date(2026, 10, 26)):
+def facts(
+    product_id: UUID | None = None, day: date = date(2026, 10, 26)
+) -> types.ReplaceStatisticsDayCommand:
     return types.ReplaceStatisticsDayCommand(
         product_id=product_id or uuid4(),
         day=day,
@@ -39,7 +44,9 @@ def facts(product_id=None, day=date(2026, 10, 26)):
     )
 
 
-def sample_facts(product_id=None, day=date(2026, 10, 26)):
+def sample_facts(
+    product_id: UUID | None = None, day: date = date(2026, 10, 26)
+) -> tuple[types.ReplaceStatisticsDayCommand, UUID, UUID, UUID, UUID]:
     first, second, user, other_user, payment, other_payment, krw_payment = [
         uuid4() for _ in range(7)
     ]
@@ -67,7 +74,9 @@ def sample_facts(product_id=None, day=date(2026, 10, 26)):
     return value, first, second, user, other_user
 
 
-def test_fact_aggregation_keeps_version_counts_distinct_users_and_exact_currencies():
+def test_fact_aggregation_keeps_version_counts_distinct_users_and_exact_currencies() -> (
+    None
+):
     value, first, second, user, other_user = sample_facts()
     build = Mapper.statistics_facts_infos_to_build_info(value)
     assert build.metrics[first]["active_users"] == 2
@@ -108,7 +117,7 @@ def test_fact_aggregation_keeps_version_counts_distinct_users_and_exact_currenci
     assert build.total["revenue"]["USD"]["sales"] == "0.30"
 
 
-def test_empty_facts_keep_zero_metrics_and_unexpected_status_is_not_hidden():
+def test_empty_facts_keep_zero_metrics_and_unexpected_status_is_not_hidden() -> None:
     value = facts()
     build = Mapper.statistics_facts_infos_to_build_info(value)
     assert build.metrics == {} and build.unique_users == set()
@@ -120,7 +129,9 @@ def test_empty_facts_keep_zero_metrics_and_unexpected_status_is_not_hidden():
 
 
 @pytest.fixture
-def statistics_database(core_database):
+def statistics_database(
+    core_database: tuple[Session, AsyncMock],
+) -> Iterator[tuple[Session, AsyncMock]]:
     sync_session, session = core_database
     metadata = MetaData()
     for model in (
@@ -153,8 +164,8 @@ def statistics_database(core_database):
 
 @pytest.mark.asyncio
 async def test_rebuild_is_idempotent_and_report_uses_period_distinct_users(
-    statistics_database,
-):
+    statistics_database: tuple[Session, AsyncMock],
+) -> None:
     sync_session, session = statistics_database
     value, first, _second, user, _other_user = sample_facts()
     now = datetime.now(UTC)
@@ -224,8 +235,8 @@ async def test_rebuild_is_idempotent_and_report_uses_period_distinct_users(
 
 @pytest.mark.asyncio
 async def test_failed_replace_propagates_and_preserves_rows_after_caller_rollback(
-    statistics_database,
-):
+    statistics_database: tuple[Session, AsyncMock],
+) -> None:
     sync_session, session = statistics_database
     value, *_ = sample_facts()
     now = datetime.now(UTC)
@@ -238,10 +249,10 @@ async def test_failed_replace_propagates_and_preserves_rows_after_caller_rollbac
     )
     count = 0
 
-    def execute_then_fail(statement, *args, **kwargs):
+    async def execute_then_fail(statement: Executable) -> Result[tuple[object, ...]]:
         nonlocal count
         count += 1
-        result = sync_session.execute(statement, *args, **kwargs)
+        result = sync_session.execute(statement)
         if count == 2:
             raise RuntimeError("Interrupted replacement")
         return result
@@ -265,8 +276,8 @@ async def test_failed_replace_propagates_and_preserves_rows_after_caller_rollbac
 
 @pytest.mark.asyncio
 async def test_queue_claim_order_and_completion_are_product_day_scoped(
-    statistics_database,
-):
+    statistics_database: tuple[Session, AsyncMock],
+) -> None:
     sync_session, session = statistics_database
     product_id, other_id = uuid4(), uuid4()
     day, now = date(2026, 10, 27), datetime.now(UTC)
@@ -284,15 +295,21 @@ async def test_queue_claim_order_and_completion_are_product_day_scoped(
 
 
 @pytest.mark.asyncio
-async def test_enqueue_recent_keeps_inclusive_days_and_seoul_boundaries(monkeypatch):
+async def test_enqueue_recent_keeps_inclusive_days_and_seoul_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     ids = [uuid4(), uuid4()]
     monkeypatch.setattr(
         CommandService.Repository,
         "list_published_product_ids",
         AsyncMock(return_value=ids),
     )
-    upsert = AsyncMock()
-    monkeypatch.setattr(Repository, "upsert_statistics_work", upsert)
+    keys: list[tuple[UUID, date]] = []
+
+    async def upsert(session: AsyncSession, work: Iterable[tuple[UUID, date]]) -> None:
+        keys.extend(work)
+
+    monkeypatch.setattr(Repository, "upsert_statistics_work_batch", upsert)
     async with AsyncSession() as session:
         await CommandService.enqueue_recent(
             session,
@@ -301,7 +318,7 @@ async def test_enqueue_recent_keeps_inclusive_days_and_seoul_boundaries(monkeypa
             ),
         )
         assert not session.in_transaction()
-    assert [(call.args[1], call.args[2]) for call in upsert.await_args_list] == [
+    assert keys == [
         (product_id, day)
         for product_id in ids
         for day in (date(2026, 10, 27), date(2026, 10, 26), date(2026, 10, 25))

@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from math import isfinite
+
 from app.db.transaction import use_case_transaction
 from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
@@ -41,16 +44,32 @@ async def process_memory_work(
     indexer: MemoryService.MemoryIndexer,
 ) -> None:
     """Process one fixed work generation without holding DB state across I/O."""
+    if (
+        isinstance(command.timeout_seconds, bool)
+        or not isfinite(command.timeout_seconds)
+        or command.timeout_seconds <= 0
+    ):
+        raise ValueError("timeout_seconds must be positive and finite.")
     work, policy, models = command.work, command.policy, command.models
     try:
-        await _process_memory_work(
-            session_factory,
-            work,
-            policy=policy,
-            models=models,
-            summary_generator=summary_generator,
-            indexer=indexer,
-        )
+        try:
+            async with asyncio.timeout(command.timeout_seconds) as timeout:
+                await _process_memory_work(
+                    session_factory,
+                    work,
+                    policy=policy,
+                    models=models,
+                    summary_generator=summary_generator,
+                    indexer=indexer,
+                    deadline=timeout,
+                )
+                _check_work_deadline(timeout)
+        except TimeoutError as exc:
+            if timeout.expired():
+                raise MemoryTypes.MemoryWorkDeadlineExceededError(
+                    "Memory work exceeded its total processing deadline."
+                ) from exc
+            raise
     except Exception as exc:
         retryable = (
             isinstance(exc, (LLMTypes.LLMError, LLMTypes.EmbeddingError))
@@ -70,6 +89,22 @@ async def process_memory_work(
         raise
 
 
+def _check_work_deadline(deadline: asyncio.Timeout | None) -> None:
+    # A client may suppress cancellation or spend time in synchronous parsing.
+    # Reject a late result before starting the next persistence/provider step.
+    if deadline is None:
+        return
+    expires_at = deadline.when()
+    # Timer callbacks can run within the loop's clock resolution before when().
+    # Once cancellation fired, a provider that suppressed it still lost its budget.
+    if deadline.expired() or (
+        expires_at is not None and asyncio.get_running_loop().time() >= expires_at
+    ):
+        raise MemoryTypes.MemoryWorkDeadlineExceededError(
+            "Memory work exceeded its total processing deadline."
+        )
+
+
 def _error_kind(exc: Exception) -> str:
     kind = getattr(exc, "kind", None)
     return getattr(kind, "value", None) or type(exc).__name__
@@ -83,12 +118,19 @@ async def _process_memory_work(
     models: MemoryTypes.MemoryModelConfig,
     summary_generator: MemoryService.SummaryGenerator,
     indexer: MemoryService.MemoryIndexer,
+    deadline: asyncio.Timeout | None = None,
 ) -> None:
     pending = await _read_pending_index(session_factory, work)
+    _check_work_deadline(deadline)
     if pending is not None:
-        await _index_summary(session_factory, work, pending, models, indexer)
+        await _index_summary(
+            session_factory, work, pending, models, indexer, deadline=deadline
+        )
 
-    conversation, messages = await _read_unsummarized(session_factory, work)
+    conversation, messages, has_more = await _read_unsummarized(
+        session_factory, work, policy=policy
+    )
+    _check_work_deadline(deadline)
     plan = MemoryService.plan_summarization(
         MemoryTypes.PlanSummarizationCommand(
             conversation_id=work.conversation_id,
@@ -96,8 +138,10 @@ async def _process_memory_work(
             conversation_revision=conversation.history_revision,
             messages=messages,
             policy=policy,
+            summary_through_position=work.summary_through_position,
         )
     )
+    _check_work_deadline(deadline)
     if plan is None:
         await _complete(session_factory, work, more_work=False)
         return
@@ -110,13 +154,19 @@ async def _process_memory_work(
             max_output_tokens=policy.summary_output_tokens,
         )
     )
-    summary = await _persist_summary(session_factory, generated)
-    await _index_summary(session_factory, work, summary, models, indexer)
+    _check_work_deadline(deadline)
+    summary = await _persist_summary(
+        session_factory, generated, work=work, deadline=deadline
+    )
+    _check_work_deadline(deadline)
+    await _index_summary(
+        session_factory, work, summary, models, indexer, deadline=deadline
+    )
 
     remaining = tuple(
         item for item in messages if item.position > plan.source_end_position
     )
-    more_work = (
+    more_work = has_more or (
         MemoryService.plan_summarization(
             MemoryTypes.PlanSummarizationCommand(
                 conversation_id=work.conversation_id,
@@ -124,10 +174,12 @@ async def _process_memory_work(
                 conversation_revision=conversation.history_revision,
                 messages=remaining,
                 policy=policy,
+                summary_through_position=work.summary_through_position,
             )
         )
         is not None
     )
+    _check_work_deadline(deadline)
     await _complete(session_factory, work, more_work=more_work)
 
 
@@ -144,15 +196,18 @@ async def _read_pending_index(
 
 
 async def _read_unsummarized(
-    session_factory: SessionFactory, work: MemoryTypes.MemoryWorkInfo
+    session_factory: SessionFactory,
+    work: MemoryTypes.MemoryWorkInfo,
+    *,
+    policy: MemoryTypes.MemoryPolicy,
 ) -> tuple[
-    ConversationTypes.ConversationInfo, tuple[MemoryTypes.SourceMessageInfo, ...]
+    ConversationTypes.ConversationInfo, tuple[MemoryTypes.SourceMessageInfo, ...], bool
 ]:
-    async with session_factory() as session:
+    async with session_factory() as session, use_case_transaction(session):
         conversation = await ConversationService.get_owned_conversation(
             session,
             ConversationTypes.OwnedConversationCommand(
-                conversation_id=work.conversation_id, user_id=work.owner_id
+                conversation_id=work.conversation_id, user_id=work.owner_id, lock=True
             ),
         )
         latest = await MemoryService.get_latest_summary(
@@ -161,21 +216,48 @@ async def _read_unsummarized(
                 conversation_id=work.conversation_id, owner_id=work.owner_id
             ),
         )
-        source = await MessagesQueryService.list_memory_source(
+        after = (
+            latest.source_end_position if latest and latest.source_end_position else 0
+        )
+        # A batch-sized prefix decides work/threshold; the real suffix protects
+        # recent text even when a large middle range is intentionally not loaded.
+        prefix = await MessagesQueryService.read_message_window(
             session,
-            Types.ListMemorySourceCommand(
+            Types.ReadMessageWindowCommand(
                 conversation_id=work.conversation_id,
                 user_id=work.owner_id,
-                after_position=latest.source_end_position
-                if latest and latest.source_end_position
-                else 0,
+                after_position=after,
+                token_budget=max(
+                    policy.summarization_threshold_tokens, policy.summary_batch_tokens
+                )
+                + policy.recent_raw_tokens,
+                newest_first=False,
             ),
         )
-        return conversation, _memory_sources(source)
+        by_position = {item.position: item for item in prefix.messages}
+        if prefix.has_more:
+            tail = await MessagesQueryService.read_message_window(
+                session,
+                Types.ReadMessageWindowCommand(
+                    conversation_id=work.conversation_id,
+                    user_id=work.owner_id,
+                    after_position=after,
+                    token_budget=policy.recent_raw_tokens,
+                ),
+            )
+            by_position.update((item.position, item) for item in tail.messages)
+        source = Types.MemorySourceInfo(
+            tuple(by_position[position] for position in sorted(by_position)), False
+        )
+        return conversation, _memory_sources(source), prefix.has_more
 
 
 async def _persist_summary(
-    session_factory: SessionFactory, generated: MemoryTypes.GeneratedSummaryInfo
+    session_factory: SessionFactory,
+    generated: MemoryTypes.GeneratedSummaryInfo,
+    *,
+    work: MemoryTypes.MemoryWorkInfo,
+    deadline: asyncio.Timeout | None = None,
 ) -> MemoryTypes.MemoryInfo:
     plan = generated.plan
     async with session_factory() as session, use_case_transaction(session):
@@ -187,24 +269,31 @@ async def _persist_summary(
                 lock=True,
             ),
         )
-        source = await MessagesQueryService.list_memory_source(
+        source = await MessagesQueryService.read_message_window(
             session,
-            Types.ListMemorySourceCommand(
+            Types.ReadMessageWindowCommand(
                 conversation_id=plan.conversation_id,
                 user_id=plan.owner_id,
                 after_position=plan.source_start_position - 1,
                 through_position=plan.source_end_position,
+                token_budget=plan.estimated_input_tokens,
+                newest_first=False,
             ),
         )
+        if source.has_more:
+            raise MemoryTypes.StaleMemoryWorkError("Summary source range changed.")
         MemoryService.validate_summary_source(
             MemoryTypes.ValidateSummarySourceCommand(
                 plan=plan,
-                current_messages=_memory_sources(source),
+                current_messages=_memory_sources(
+                    Types.MemorySourceInfo(source.messages, source.has_more)
+                ),
                 current_conversation_revision=conversation.history_revision,
             )
         )
+        _check_work_deadline(deadline)
         return await MemoryService.save_summary(
-            session, MemoryTypes.SaveSummaryCommand(generated=generated)
+            session, MemoryTypes.SaveSummaryCommand(generated=generated, work=work)
         )
 
 
@@ -214,7 +303,10 @@ async def _index_summary(
     summary: MemoryTypes.MemoryInfo,
     models: MemoryTypes.MemoryModelConfig,
     indexer: MemoryService.MemoryIndexer,
+    *,
+    deadline: asyncio.Timeout | None = None,
 ) -> None:
+    _check_work_deadline(deadline)
     if summary.conversation_revision is None:
         raise MemoryTypes.StaleMemoryWorkError(
             "Legacy memory cannot be indexed as a summary."
@@ -233,6 +325,7 @@ async def _index_summary(
             output_dimension=models.embedding_output_dimension,
         )
     )
+    _check_work_deadline(deadline)
     async with session_factory() as session, use_case_transaction(session):
         conversation = await ConversationService.get_owned_conversation(
             session,
@@ -244,8 +337,9 @@ async def _index_summary(
         )
         if conversation.history_revision != summary.conversation_revision:
             raise MemoryTypes.StaleMemoryWorkError("History changed during indexing.")
+        _check_work_deadline(deadline)
         await MemoryService.save_summary_embedding(
-            session, MemoryTypes.SaveEmbeddingCommand(value=embedded)
+            session, MemoryTypes.SaveEmbeddingCommand(value=embedded, work=work)
         )
 
 

@@ -76,6 +76,11 @@ def lore_entry_value(
         or not lore["id"]
     ):
         raise ValueError("Lore ID, title and content must be strings.")
+    if any(
+        not isinstance(lore.get(key, ""), str)
+        for key in ("category", "priority", "placement")
+    ):
+        raise ValueError("Invalid lore category, priority or placement.")
     keywords = lore.get("keywords", [])
     if (
         not isinstance(keywords, list)

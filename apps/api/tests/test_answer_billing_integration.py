@@ -504,12 +504,15 @@ async def test_lost_commit_acknowledgement_never_repeats_llm_or_releases_blindly
             injected = True
             raise RuntimeError("commit acknowledged late")
 
-    # All three public writes use the common transaction context. Replace the
-    # imported boundary only, commit to PostgreSQL first, then lose its response.
+    # Staging/finalization own their outer transaction in _locked_generation;
+    # their inner write scopes only join it. Lose the acknowledgement after the
+    # actual owner commits to PostgreSQL, including the reservation workflow.
     from app.modules.chatting.chat.service.command import answers as ChatAnswers
+    from app.modules.chatting.chat.service.command import generation as ChatGeneration
 
     monkeypatch.setattr(Answers, "use_case_transaction", lose_ack)
     monkeypatch.setattr(ChatAnswers, "use_case_transaction", lose_ack)
+    monkeypatch.setattr(ChatGeneration, "use_case_transaction", lose_ack)
     if phase == "calling":
         with pytest.raises(ChatTypes.AnswerStorageError):
             await orchestrator.generate_answer(command)
@@ -679,6 +682,19 @@ async def test_failed_recovery_release_rolls_back_and_fences_late_worker(
         monkeypatch.setattr(
             Answers.BillingCreditService, "release_credit_reservation", original
         )
+        # The internal failure quarantines automatic recovery without releasing
+        # funds. After investigation, only an audited manual attempt may resume.
+        with pytest.raises(ChatTypes.AnswerStorageError):
+            await orchestrator.generate_answer(command)
+        assert run.answer_recovery_quarantined_at is not None
+        async with db.begin():
+            await db.execute(update(ProductGeneration).values(
+                answer_recovery_next_at=datetime.now(UTC) - timedelta(seconds=1)
+            ))
+        assert (await orchestrator.recover_answer(ChatTypes.ClaimAnswerRecoveryCommand(
+            generation_id=run.id, user_id=command.user_id, now=datetime.now(UTC),
+            operator="ops-test", reason="Investigated and restored release backend.",
+        ))).status == "failed"
         assert (await orchestrator.generate_answer(command)).status == "failed"
     finally:
         release.set()

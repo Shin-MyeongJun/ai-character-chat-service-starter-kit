@@ -48,17 +48,17 @@
 | U14 | 발행 중 항목별 조회·flush | A-P1-11, B-14 | 정적 확인 | P2 |
 | U15 | 로어 v1 exact·정규식 옵션 의미 불일치 | A-P1-08, B-15 | 재현 확인 | P2 |
 | U16 | 세 도메인의 태그 정책 중복 | A-P2-05 일부, B-16 | 정적 확인 | P3 |
-| U17 | 종료된 답변 lease 잔류와 복구 인덱스 | A-P1-04 | 부분 확인 | P2·측정 |
-| U18 | 답변 예외 분류와 복구 진단의 한계 | A-P1-07 | 부분 확인 | P2 |
-| U19 | 이미지 기본값·감정 태그 중복의 DB 오류 노출 | A-P1-10 일부 | 정적 확인 | P2 |
-| U20 | 신고 그래프 변경의 전역 잠금 | A-P1-12 | 정적 확인 | P2·측정 |
-| U21 | billing→credit 중첩 SAVEPOINT·반복 잠금 | A-P1-13 | 정적 확인 | P2·측정 |
+| U17 | 종료된 답변 lease 잔류와 복구 인덱스 | A-P1-04 | 분포별 계획 측정·부분 인덱스·종료 lease 개선 및 PG 검증 완료 | P2·완료 |
+| U18 | 답변 예외 분류와 복구 진단의 한계 | A-P1-07 | 분류·진단 및 영속 복구 정책 구현·검증 / 운영 적용 별도 | P2 |
+| U19 | 이미지 기능 전반 구조 개편: 감정·상황별 이미지와 선택 정책 | A-P1-10 일부에서 범위 확대 | 정적 확인·재설계 필요 | P2·설계 과제 |
+| U20 | 신고 그래프 변경의 전역 잠금 | A-P1-12 | 개선·PG 검증 완료 | P2·완료 |
+| U21 | billing→credit 중첩 SAVEPOINT·반복 잠금 | A-P1-13 | 정리·PG 회귀·SQL 전후 측정 완료 | P2 |
 | U22 | SMTP 결과·지연을 통한 계정 구분 경로 | A-P1-14 | 정적 확인 | P2 |
 | U23 | test_local 저장소 키 캐시와 Windows 파일 충돌 | A-P1-15 | 재현 확인 | P3 |
-| U24 | 기본 관리자·모더레이터 인증 훅 미연결 | A-P2-02 | 정적 확인 | P2·기능 범위 결정 |
-| U25 | 통계 재예약·태그 해석의 단건 반복 | A-P2-03 | 정적 확인 | P2·규모 측정 |
-| U26 | 보고 타입·매퍼 중복과 불필요한 변환 비용 | A-P2-05 일부, A-P3-01 | 부분 확인 | P3 |
-| U27 | 빈 파일·legacy 모델·미사용 주장 | A-P3-02 | 부분 확인 | P3·삭제 보류 |
+| U24 | 기본 관리자·모더레이터 인증 훅 미연결 | A-P2-02 | 범위 확정·인증 연결·거절 검증 완료(2026-11-02) | P2·완료 |
+| U25 | 통계 재예약·태그 해석의 단건 반복 | A-P2-03 | 양쪽 배치화·실제 PG 경합·감사 통합 완료(2026-11-02) | P2·완료 |
+| U26 | 보고 타입·매퍼 중복과 불필요한 변환 비용 | A-P2-05 일부, A-P3-01 | 잔여 재점검·실익 범위 정리 완료(2026-11-02) | P3 |
+| U27 | 빈 파일·legacy 모델·미사용 주장 | A-P3-02 | 사용 조사·빈 파일 5개 정리 완료(2026-11-02) | P3·legacy 삭제 보류 |
 | U28 | 미디어 업로드 중 잠금과 동기 해싱 | A-P1-09 | 부분 확인 | P2·설계 검토 |
 | U29 | SDK 내부 오류 분류와 메모리 작업 기한 | A-P2-06 | 부분 확인 | P2 |
 
@@ -96,11 +96,25 @@
 
 ### U06. 재발행 문서·구현 불일치와 로어북 상위 정보 미갱신
 
+**2026-10-29 후속 상태:** 사용자 결정으로 발행 후 초안 편집/후속 발행을 공식 허용한다.
+초안 저장은 현재 상품의 공개/승인 상태·프로필·태그를 변경하지 않으며 명시적 발행에서
+반영한다. 기존 book_id 경로의 제목/설명/태그 동기화를 수정하고 기존 visibility/status를
+유지했다. 문서·이전 거절 기대 테스트를 확정 계약에 맞췄다. 관련 46 passed, 전체 API
+1059 passed/0 failed/288 skipped 및 앱 전체 품질 검사를 통과했다. 실제 PostgreSQL의
+잠금/rollback 영속성과 브라우저 통합은 미검증이다. 아래 항목은 최초 감사 당시 기록이다.
+
 - **정적 확인 / P2.** [ARCHITECTURE.md:9](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/use_cases/ARCHITECTURE.md:9)와 [ARCHITECTURE.md:20](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/ARCHITECTURE.md:20)은 변경 문서 재발행 거절을 설명한다. 실제 [studio_publication.py:133](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/use_cases/studio_publication.py:133) 이후는 기존 사본 갱신·재발행을 지원한다. 154행 기존 `book_id` 분기는 ID만 사용하고 생성 분기에 있는 제목·설명·태그를 갱신하지 않는다.
 - 캐릭터·로어 항목의 수정과 로어북 제목·설명·합산 태그가 달라질 수 있다. 태그를 지워도 이전 연결이 남는 경로다. 공식 재발행 계약 확정이 필요하다.
 - 문서에 맞춰 무조건 거절을 복원하기보다 현재 제품 의도를 먼저 결정한다. 재발행 지원이면 메타데이터 동기화·문서·테스트를 함께 맞추고, 미지원이면 허용 경로를 닫는다. 기존 ID·스냅샷 불변성·발행 영수증 멱등성을 보존한다.
 
 ### U07. 스튜디오의 중첩 JSON 검증이 소비 조건을 보장하지 않음
+
+**2026-10-29 후속 상태:** 공유 문서 구조 검증을 저장/업로드 준비/발행에 적용했다.
+asset id/mediaId/usage·알려진 필드 자료형·중복 ID·문서 내부 참조를 검사하고 로어/장면
+값 변환을 첫 도메인 쓰기 앞으로 옮겼다. 미완성 초안·확장 키·영수증 재시도는 유지한다.
+신규 오프라인 HTTP/직접 서비스 회귀 55건, 스튜디오 관련 94 passed, 전체 API
+1114 passed/0 failed/288 skipped 및 앱 전체 품질 검사를 통과했다. 실제 DB/브라우저
+통합과 손상 서버 매핑 전체 복구는 별도 범위다. 아래는 최초 감사 당시 재현 기록이다.
 
 - **재현 확인 / P2.** [studio.py:15](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service/command/studio.py:15)는 크기·버전·프로필 일부만 검사한다. [studio_publication.py:78](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/use_cases/studio_publication.py:78)의 asset 검사는 이후 145행의 id·mediaId·usage 사용 조건을 충분히 보장하지 않는다.
 - 유효한 mediaId를 갖되 `usage: 3`인 asset이 실제 `_publication_content`를 통과하고 `publish_studio`의 문자열 결합에서 TypeError를 발생시켰다. DB 쓰기는 대역이었다. KeyError는 공통 LookupError→404 변환에 섞일 수 있다.
@@ -108,11 +122,19 @@
 
 ### U08. 저장소 취소 후 예외·읽기 자원을 제대로 수거하지 못함
 
+**2026-10-29 후속 상태:** character의 공급자 대기에서 예외가 취소 우선순위를 우회하던
+경로를 수정했다. S3는 획득 태스크와 늦게 반환된 Body의 close를 소유해 반복 취소에도
+정리 종료를 기다린다. 신규 회귀 15건·관련 60 passed/30 skipped·전체 API 1129 passed/
+0 failed/288 skipped 및 앱 전체 품질 검사를 통과했다. 실제 PG 잠금·S3 네트워크·ASGI
+연결 종료는 미검증이며 close 자체 실패의 성공까지 보장하지 않는다. 아래는 최초 재현이다.
+
 - **재현 확인 / P2.** [media.py:12](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/workflow/media.py:12)에서 취소를 기억한 뒤 공급자 await가 일반 예외로 끝나면 CancelledError 복원 분기에 도달하지 않는다. 취소 후 공급자 실패 재현에서 최종 예외는 **ValueError**였다.
 - [adapter.py:245](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/asset_storage/adapters/s3_storage/adapter.py:245)의 get_object 스레드 대기 중 취소되면 나중에 반환된 Body를 닫을 소유자가 없다. 주입한 가짜 S3 클라이언트에서 늦게 반환된 Body의 close가 호출되지 않았다. 실제 S3 연결 누적 규모를 입증한 것은 아니다.
 - 공급자 작업 종료·결과/예외 회수 후 취소 우선순위를 적용하고, 획득 중 취소된 읽기 자원을 정리한다. 현재 shield 대기를 제거해 잠금을 조기 해제하는 처방은 피한다.
 
 ### U09. 정상 모델 경로도 공유 스냅샷을 배타적으로 잠금
+
+- **수정 상태 (2026-10-29):** 정상/미래 공지 경로는 스냅샷 일반 조회로 반환하고, 교체 검토 경로만 잠금 아래 스냅샷·만료·모델·공급자·후보를 재검사한다. ORM 캐시 갱신과 대기 후 현재 시각 평가를 추가했으며 명시적 now·기존 대체 이력/종료 정책은 유지한다. 신규 회귀 13건, 전체 API 1142 passed / 288 skipped 및 필수 품질 검사가 통과했다. 실제 PostgreSQL 경합/동시성·처리량은 미검증이다. 아래는 수정 전 감사 근거다.
 
 - **정적 확인 / P2.** [replacement.py:59](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/llm/service/command/replacement.py:59)는 모델 교체 필요 여부를 알기 전에 스냅샷을 `lock=True`로 읽는다. [publication.py:22](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/repository/publication.py:22)는 FOR UPDATE를 실행한다. 답변 준비 두 경로가 이를 호출한다.
 - 같은 스냅샷을 사용하는 여러 사용자의 준비 트랜잭션이 경합할 수 있다. LLM 호출 전체 동안 유지되는 잠금은 아니다. A의 정상 경로 비율 99.99% 및 다른 경로와의 deadlock은 입증되지 않았다. 특히 후자는 반대 순서의 실제 경로가 추가로 필요하다.
@@ -120,11 +142,15 @@
 
 ### U10. 일반 인증 잠금과 비밀번호 계산 동안의 사용자 잠금
 
+- **수정 상태 (2026-10-29):** 일반 access는 사용자·세션을 단일 비잠금 SELECT로 확인한다. 로그인은 읽기 세션을 닫은 뒤 검증/재해시하고, 새 트랜잭션에서 사용자 잠금 아래 해시·상태·이메일을 재확인하여 발급한다. refresh/폐기/reset 잠금과 기존 오류·쿠키 계약은 유지한다. 신규 오프라인 회귀 21건, 전체 API 1163 passed / 288 skipped 및 필수 품질 검사가 통과했다. 검증 중 다른 재해시가 저장돼도 현재 로그인은 거절될 수 있다. 실제 PostgreSQL 동시성/경합은 미검증이다. 아래는 수정 전 감사 근거다.
+
 - **정적 확인 / P2.** [authentication.py:223](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/identity/service/authentication.py:223)의 로그인은 FOR UPDATE 사용자 조회 후 Argon2 검증·재해시를 기다린다. 같은 파일의 `_require_session`과 `get_authenticated_user`도 사용자·세션 행을 잠근다. [repository.py:30](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/identity/repository.py:30) 및 121행이 실제 SQL 근거다.
 - 같은 사용자의 요청 간 경합은 존재하지만 인증 트랜잭션은 인증 함수 반환 시 끝난다. 모든 HTTP 업무 처리 내내 직렬화한다는 해석은 과장이다. 비밀번호 해싱은 to_thread이므로 이벤트 루프에서 직접 실행하는 것도 아니다.
 - 일반 access 검증과 refresh/폐기 경로를 구분하고, 비밀번호 검증은 잠금 밖에서 수행한 뒤 해시·상태를 재확인하는 방안을 검토한다. 재설정 직전 비밀번호로 폐기에서 빠진 새 세션이 만들어지지 않는다는 보안 계약을 보존한다.
 
 ### U11. 대화 한 페이지를 위해 전체 대화를 읽고 정렬
+
+- **수정 상태 (2026-10-29):** chat 저장소의 해당 목록에만 허용하는 읽기 projection을 규칙 C.2에 명시했다. 소유권·마지막 생존 메시지/빈 대화 fallback·활동 시각/UUID 커서·limit+1을 DB에서 처리하고 전체 개수는 공개 COUNT로 조합한다. SQL 2회/목록 최대 limit+1 반환을 소유 대화 353개에서 검증했다. 목록 계약 회귀 17건, 전체 API 1174 passed / 288 skipped 및 필수 품질 검사가 통과했다. DB 내부 전체 활동 평가·정렬/COUNT 비용과 live cursor 이동은 남으며 실제 PostgreSQL 성능/격리는 미검증이다. 아래는 수정 전 감사 근거다.
 
 - **정적 확인 / P2.** [conversation_directory.py:34](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/use_cases/conversation_directory.py:34)는 JOIN 금지를 이유로 명시하고, 44~58행에서 100개 배치 전체 수집→활동 조회→전체 정렬→슬라이싱을 수행한다.
 - 수집 O(N), 정렬 O(N log N). 기본 주요 조회 구조는 비어 있지 않은 배치마다 대화·활동 두 번이다. A의 2,000개/약 40회는 정적 예시로 타당하지만 운영 측정값이 아니다. 추가 인증 쿼리 등을 포함한 전체 HTTP SQL 수와 구분한다.
@@ -132,11 +158,15 @@
 
 ### U12. 웹이 페이지 API를 다시 전체 수집 API로 사용
 
+- **수정 상태 (2026-10-29):** 계정 개요의 불필요한 전체 상품 조회/상태를 제거했다. 메시지 API에 선택적 history_revision/sync_cursor를 추가해 정상 입력은 저장 응답을 ID로 반영하고 답변 완료·화면 복귀는 증분 조회한다. 수정/삭제·revision 불일치와 이전 서버는 전체 조회로 복구한다. 최초 진입의 전체 이력 조회는 유지한다. 웹 50 passed·타입/프로덕션 빌드·필수 품질 검사, 전체 API 1182 passed / 288 skipped가 통과했다. 실제 브라우저/외부 API/PG 통합과 고정 snapshot은 미검증/미보장이다. 아래는 수정 전 감사 근거다.
+
 - **정적 확인 / P2.** [api.ts:169](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/web/lib/api.ts:169)의 메시지 헬퍼는 커서가 끝날 때까지 순차 수집한다. [page.tsx:133](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/web/app/chats/[id]/page.tsx:133)과 141행은 입력 저장 후와 답변 종료 후 이를 다시 호출한다.
 - [account.ts:31](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/web/lib/account.ts:31)는 소유 상품 전체를 읽고 계정 개요의 Promise.allSettled에 포함한다. useAccount는 결과를 저장하지만 실제 비미리보기 작품 화면은 별도의 페이지 상태를 사용한다. 따라서 정상 계정 화면이 불필요한 전체 상품 수집 완료를 기다리는 구조다.
 - 정상 append는 ID 기반 반영, 수정·삭제·revision 불일치 때는 재동기화하도록 범위를 줄인다. 먼저 실제로 사용하지 않는 전체 상품 조회를 제거할 수 있다. 재시도·복구·메시지 중복 제거 의미는 보존한다.
 
 ### U13. 생성 완료 계층이 같은 상태를 반복 조회
+
+- **수정 상태 (2026-10-29):** 같은 모듈의 트랜잭션 수명 한정 잠금 범위와 완료 결과/실제 전이 여부를 재사용한다. 정상 완료의 해당 계층 generation SELECT 8→2회, conversation FOR UPDATE 요청 3→1회를 동일 SQLite 검증기(잠금 요청은 PG SQL 컴파일)에서 변경 전후 확인했다. 독립 공개 진입 검증·정산/메모리 호출·재전송 멱등성은 유지한다. 신규 30건, 전체 API 1212 passed / 288 skipped 및 필수 품질 검사가 통과했다. 실제 PG 잠금/동시성·외부 도메인 내부 SQL·운영 성능은 미검증이다. 아래는 수정 전 감사 근거다.
 
 - **정적 확인 / P2.** [answers.py:530](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/service/workflow/answers.py:530) → 같은 파일 775행 → [generation.py:151](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/service/command/generation.py:151)의 정상 pending 성공 경로에서 generation 상태 SELECT 8회, conversation 잠금 조회 3회를 정적으로 추적할 수 있다. 결제·통계·메모리의 다른 SQL은 제외한다.
 - [repository.py:181](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/repository.py:181)는 명시적인 select라 identity map이 있어도 조회를 생략하지 않는다. 반면 session.get을 사용하는 다른 호출까지 무조건 SQL로 세면 안 된다. 독립 공개 서비스의 진입 검사는 이유가 있다.
@@ -144,11 +174,15 @@
 
 ### U14. 발행 중 항목별 저장·flush·단건 조회
 
+- **수정 상태 (2026-10-29):** product 발행의 구성·모델·시작 항목 검증 결과를 재사용하고 슬롯 부모→대상/시작 자식을 add_all과 두 단계 flush로 저장한다. 마지막 snapshot 본문/latest 포인터 갱신도 한 flush로 합쳤다. 같은 SQLite FK 검증기에서 캐릭터 3·로어북 3·대상 3·시작 6의 첫 발행 SELECT 41→32회, 명시 flush 28→14회(실제 flush 이벤트 25→11회)를 확인했다. 모델 검증·공급자 조회만 대역이며 실제 character/lorebook freeze를 실행했다. 신규 17건, 관련 회귀 116 passed / 9 skipped, 전체 API 1229 passed / 0 failed / 288 skipped, 필수 품질 검사와 직접 Ruff/mypy가 통과했다. 공개 freeze의 독립 인가·필수 부모 flush·상위 rollback·U06 후속 발행/영수증을 유지한다. 스튜디오 준비/영수증 전체 SQL·실제 PG 경합/격리/운영 성능은 미검증이며 아래는 수정 전 감사 근거다.
+
 - **정적 확인 / P2.** [publication.py:125](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service/command/publication.py:125) 이후 연결마다 저장하고 시작 항목을 개별 조회한다. [publication.py:100](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/repository/publication.py:100) 이후 target/start 등은 즉시 flush한다. 스튜디오도 구성요소별 공개 서비스를 순차 호출한다.
 - 항목 수에 따라 DB 왕복과 잠금 구간이 늘어난다. 단, 모든 flush가 불필요한 것은 아니며 FK·스냅샷 ID 확보 단계는 필요하다. `await flush()`를 “동기식 DB 호출”이라고 부르는 A의 표현은 부정확하다.
 - 일괄 조회·add_all 및 단계별 flush를 사용하되 같은 AsyncSession을 병렬 태스크로 실행하지 않는다. UUID를 미리 만드는 것만으로 DB 제약과 삽입 순서가 모두 해결되지는 않는다.
 
 ### U15. 로어 v1의 정규식·exact 옵션 계약 불일치
+
+- **수정·통합 상태 (2026-10-29):** v1 exact를 기존 casefold 정책에 따른 전체 문자열 비교로 고치고 regex의 case_sensitive를 컴파일 정책과 캐시 키에 반영했다. 옵션 없는 legacy·라이브 query, 선형 시간 엔진, 기존 오류/HTTP 번역과 입력·스냅샷 격리를 유지한다. 스냅샷/도메인 초안 진단과 실제 studio contains 경로의 신규 회귀 75건을 포함해 U25 통계 변경과 통합한 전체 API가 **1337 passed / 0 failed / 288 skipped**, 필수 품질 검사가 Ruff 390파일·mypy 369소스·13 passed·기준선 0개로 통과했다. 실제 PostgreSQL 경합·격리는 미검증이다. [통합 기록](../2026-10-26-pattern-standardization/U15-U25-INTEGRATION.md)에 실행 결과와 한계를 남겼으며 아래는 수정 전 감사 근거다.
 
 - **재현 확인 / P2.** [activation.py:31](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/service/activation.py:31)와 [matching.py:12](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/service/util/matching.py:12)를 실제 호출했다. `case_sensitive=True`인 regex `ABC`가 `abc`에 일치했고, v1 `exact`가 `prefix ABC suffix`에 일치했다.
 - exact 문제는 v1 옵션이 있는 분기에 한정된다. 옵션 없는 legacy exact는 완전 일치 분기가 있다. 스튜디오 v1은 주로 contains를 생성하므로 모든 정상 스튜디오 로어가 exact 오류를 겪는 것은 아니다. 잘못된 regex에는 InvalidLorebookRegex가 발생하지만 모든 HTTP 경로가 500인지는 별도다. 스튜디오 진단의 공통 ValueError→422와 저장 시 검증을 고려해야 한다.
@@ -159,32 +193,68 @@
 - **정적 확인 / P3.** character/lorebook/product의 `service/tags.py`, `mapper/tags.py`, `mapper/tag_schema.py`, `tag_router.py`를 대조했다. 12개 파일은 맞지만 현재 물리적 줄 수는 **982줄**이다. A의 1,100줄·95~100% 중복률은 동일 기준으로 재현되지 않았다.
 - 순서·보존·비활성 태그·admin/system 보호 정책은 반복된다. 부모 테이블·인가 조건·공개 접근 정책은 도메인마다 정당한 차이가 있다. `/me` 경로 차이가 곧 결함이라는 증거도 없다.
 - 공유할 것은 태그 선택·보존·제거의 순수 정책과 계약 테스트다. 공통 repository 프레임워크·도메인 테이블 통합으로 확대하지 않는다. 근거: [tags.py:54](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/tags.py:54), [tags.py:54](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/lorebook/service/tags.py:54), [tags.py:56](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service/tags.py:56).
+- **수정 (2026-10-30):** content/tag의 공개 순수 policy 서비스로 순서·내부 선택/제거·관리자 보호를 공통화했다. 도메인별 인가·잠금·저장과 U25 해석은 유지한다. 검증과 한계는 [U16 작업 기록](../2026-10-26-pattern-standardization/U16-WORKLOG.md)을 따른다.
 
 ### U17. 종료 lease 잔류와 복구 인덱스 비용
 
 - **부분 확인 / P2·측정.** [repository.py:275](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/repository.py:275)는 종료 시 lease를 NULL로 만들지 않는다. 244행의 복구 쿼리는 status=pending과 lease 만료를 필터링한다. [0018_nonstream_answers.py:16](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/alembic/versions/0018_nonstream_answers.py:16)은 lease 단일 인덱스다.
 - 완료 행이 복구 결과에 포함되는 기능 오류는 아니다. 데이터가 누적되면 불필요한 인덱스 후보가 늘 가능성은 있지만 PostgreSQL이 언제나 전체 인덱스·힙을 선형 스캔한다는 A의 단정은 실행 계획 없이 확정할 수 없다.
 - pending partial index를 검토하고 분포별 EXPLAIN ANALYZE로 확인한다. 종료 lease의 이력적 의미를 확인한 뒤 정리한다. NULL 업데이트만으로 모든 인덱스 비용이 사라지는 것도 아니다.
+- **측정·개선 (2026-11-02):** 합성 10만 행의 네 분포에서 EXPLAIN ANALYZE/BUFFERS를
+  비교해 leased pending 부분 인덱스로 교체했다(0035 / 초기 SQL 025 / ORM). 바인딩된
+  status가 generic plan에서 부분 인덱스를 사용하지 못하는 경우도 확인해 복구의 고정
+  pending 조건을 SQL 상수로 표현했다. 신규 종료 전이는 같은 트랜잭션에서 lease를
+  NULL로 만들며 기존 종료 행은 재작성하지 않는다. 측정 수치·운영 적용 절차·검증 범위는
+  [U17-WORKLOG.md](../2026-10-26-pattern-standardization/U17-WORKLOG.md)를 따른다.
 
 ### U18. 답변 예외 분류·복구 진단의 한계
+
+- **분류·진단 보강 (2026-10-30):** 예약 전 내부/저장소 준비 오류는 request_key를 실패
+  receipt로 소진하지 않고 전파한다. 단계·생성 상관 ID·프로세스 내 복구 횟수·타입 기반
+  오류 분류와 민감정보 없는 코드 위치를 기록한다. billing 불변 조건은 기존 저장 복구
+  오류의 하위 타입으로 구별하며 일반 완료·같은 키 재생·background 복구의 commit 응답
+  유실은 새 세션 terminal 재조회로 확인한다. HTTP·과금·staging 보존과 공급자 재호출
+  금지는 유지한다. **2026-11-02에 영속 최대 5회·지수 대기·격리·감사된 수동 복구를
+  구현하고 전용 로컬 PostgreSQL 동시 선점/완료/migration을 검증했다.** 운영 적용과
+  실제 네트워크 장애·live 검증은 별도다. [U18 작업 기록](../2026-10-26-pattern-standardization/U18-WORKLOG.md)에
+  정책·검증 범위를 남겼다. 아래는 보강 전 감사 근거다.
 
 - **부분 확인 / P2.** [answers.py:265](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/chatting/chat/service/workflow/answers.py:265)는 예상 밖 준비 오류를 실패 metadata로 변환한다. 491행의 완료 조율은 넓은 예외를 저장 복구 대기로 변환하고, 669행의 복구 로그는 오류 종류만 기록한다. 결정론적 내부 결함이 반복 복구될 가능성은 있다.
 - 그러나 동일 request_key에 저장된 실패를 재생하는 것은 멱등성 설계 일부다. 모호한 commit 뒤 새 LLM 호출·중복 결제를 막기 위한 넓은 예외 경계도 필요하다. A의 “모든 except Exception 제거” 식 처방은 위험하다.
 - 단계별 오류 분류·상관 ID·반복 횟수·안전하게 정제된 stack 진단을 보강한다. 원문·공급자 메시지·자격증명이 포함될 수 있는 traceback을 무조건 운영 로그에 출력하지 않는다. 복구 재시도 상한·격리 정책은 미확정 commit의 처리 계약과 함께 정한다.
 
-### U19. 중복 이미지 제약 오류가 도메인 오류로 변환되지 않음
+### U19. 감정·상황별 이미지를 포함한 이미지 기능 전반 구조 개편
+
+- **범위 재정의 (2026-10-30, 사용자 요청):** U19는 단순 DB 오류 번역이나 감정 태그 중복 처리 개선 수준으로 완료할 과제가 아니다. 감정 외에도 상황·장면·대화 맥락에 맞는 이미지를 다룰 수 있도록 이미지 데이터 구조, 분류/연결, 선택·전환·기본값 정책, 스튜디오 관리와 채팅 표시, 발행 스냅샷·미디어 참조 및 기존 데이터 호환을 함께 검토하는 **전반적인 구조 개편**이 필요하다. 구체적인 모델과 선택 방식은 설계 과제로 남기며 이번에는 구현하지 않는다. [U19 개편 범위 기록](../2026-10-26-pattern-standardization/U19-REDESIGN-NOTE.md)을 기준으로 후속 작업을 구체화한다. 아래 제약 오류는 개편의 기존 감사 근거 중 하나이며 그것만 고쳐 U19를 완료로 처리하지 않는다.
 
 - **정적 확인 / P2.** [character.py:82](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/db/models/character.py:82)는 감정 태그 UNIQUE와 기본 이미지 partial UNIQUE를 갖는다. [media.py:260](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/media.py:260)의 신규 첨부는 기존 기본 이미지 해제·중복 감정 태그의 명시적 변환 없이 repository 삽입으로 간다. character router는 IntegrityError를 변환하지 않는다.
 - A의 “유니크 제약조건 누락”은 잘못된 설명이다. **제약은 있고 충돌 처리 계약이 부족한 것**이다. 두 번째 기본 이미지 신규 첨부 등의 조건에서 DB 오류가 노출될 정적 경로다. 실제 PostgreSQL HTTP 500 재현은 이번 범위에 없다.
-- 새 기본 이미지가 기존 것을 대체해야 하는지, 아니면 명시적 선택 API를 쓰게 해야 하는지 결정한다. 자동 기본값 해제를 곧바로 적용하지 않는다. 예상 제약 충돌만 업무 오류로 변환하고 동시 삽입도 검증한다.
+- 기본 이미지 대체/명시적 선택과 중복 허용 범위는 전반적인 이미지 선택·분류 구조를 정하면서 결정한다. 자동 기본값 해제나 제약 오류 번역만 먼저 적용해 개편을 대체하지 않는다. 기존 제약과 오류 경로는 설계 근거로 보존하고, 개편된 정책에 맞춰 제약·오류·동시 삽입 계약을 함께 검증한다.
 
 ### U20. 신고 그래프의 전역 잠금과 단건 탐색
 
+- **개선·검증 완료 (2026-11-01):** 접수 변경·평가를 기존 대상별 잠금으로 통합하고
+  잠금 후 대상/상태를 다시 검증한다. 같은 대상의 순환·접수/평가 충돌은 차단하고
+  다른 대상은 앞 요청 commit 전에 진행한다. 평가 근거는 같은 대상만 ID 순서로
+  일괄 잠그며 타 대상은 비잠금 조회해 FK 교착과 기존 오류 계약을 함께 보호한다.
+  실제 PG에서 근거 100건의 SELECT는 100→1회, 전체 SQL은 108→8회였다.
+  관련 회귀 **89 passed / 0 skipped**, 백엔드 품질 검사 통과다.
+  구·신 writer 혼용 배포는 지원하지 않으며 운영 지연/처리량은 미측정이다.
+  [U20 작업 기록](../2026-10-26-pattern-standardization/U20-WORKLOG.md)을 참조한다.
+  아래는 수정 전 감사 근거다.
 - **정적 확인 / P2·측정.** [reports.py:149](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/governance/moderation/service/command/reports.py:149)와 [assessments.py:96](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/governance/moderation/service/command/assessments.py:96)은 같은 graph advisory lock을 사용한다. 접수의 중복 체인과 평가 대상 신고를 단건 조회한다.
 - 서로 다른 대상까지 직렬화하는 것은 사실이지만, 그래프 순환·접수 상태 변경과 평가의 충돌을 막는 목적도 코드에 있다. 운영자 수·경합이 없는데 치명적 확장 장애라고 단정할 수 없다.
 - 중복 링크가 같은 target으로 제한되는 점을 활용한 target별 잠금은 후보가 된다. 모든 graph reader/writer가 동일 규칙을 사용하고 target 불변성·잠금 후 재검증을 확보해야 한다. 미리 ID를 아는 평가 목록은 배치 조회할 수 있지만 next_id를 따라가는 체인을 단순 IN 하나로 대체할 수는 없다.
 
 ### U21. billing→credit의 중첩 SAVEPOINT와 반복 잠금
+
+- **정리·검증 완료 (2026-10-30):** credit 공개 `use_credit_write_scope`로 billing과 하위
+  예약·확정·해제의 SAVEPOINT를 공유한다. 같은 유효 경계의 지갑 잠금·legacy 확인만
+  재사용하고 잔액은 새로 조회한다. 독립 호출, 잡힌 하위 실패의 rollback, binding 원자성,
+  기존 잠금 순서·만료·무료 우선 배분·멱등 계약은 유지했다. 실제 PG에서 신규 예약/
+  확정/해제 SQL은 22→17/20→15/18→13회, 관련 통합은 **152 passed / 0 skipped**다.
+  운영 지연·처리량 측정은 별도다. [U21 작업 기록](../2026-10-26-pattern-standardization/U21-WORKLOG.md)을
+  참조하며 아래는 수정 전 감사 근거다.
 
 - **정적 확인 / P2·측정.** [credits.py:95](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/commerce/billing/service/credits.py:95)와 [command.py:80](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/commerce/credit/service/command.py:80) 등에서 실제 begin_nested가 겹친다. billing이 신용 계정을 잠근 뒤 하위 credit 경로가 다시 잠그고 조회한다.
 - 공통 use_case_transaction 자체는 SAVEPOINT를 만들지 않지만 이 두 모듈은 별도로 만든다. 같은 트랜잭션이 같은 행을 다시 잠근다고 다른 트랜잭션처럼 자기 대기에 빠지는 것은 아니다. 주요 비용은 반복 SQL·savepoint 왕복이다.
@@ -192,11 +262,15 @@
 
 ### U22. 메일 발송 유무·실패를 통한 계정 구분 경로
 
+- **수정 상태 (2026-11-02):** 인증 요청에서 SMTP 호출을 제거하고 계정·증명과 원자적으로 저장되는 암호화 Outbox 및 별도 워커를 구현했다. 기존 202 접수 응답을 유지하며, 최대 5회 재시도·120초 lease/UUID fencing·만료/무효화 취소·안전한 상태 로그를 제공한다. 실제 PostgreSQL과 로컬 Mailpit을 포함한 관련 검증 **305 passed**, 필수 품질 검사 통과. 운영 적용에는 0034 migration과 별도 워커 배포가 필요하다. constant-time/SMTP exactly-once는 보장하지 않는다. [U22 작업 기록](../2026-10-26-pattern-standardization/U22-WORKLOG.md)에 설계·검증 한계를 기록했으며 아래는 수정 전 감사 근거다.
+
 - **정적 확인 / P2.** [mail.py:12](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/identity/service/workflow/mail.py:12)는 대상이 None이면 즉시 반환하고, 대상이 있으면 SMTP 완료를 기다린다. [adapters.py:32](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/identity/adapters.py:32)는 SMTP 오류를 mail_unavailable로 바꾸며 [http_security.py:30](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/identity/http_security.py:30)은 이를 503으로 노출한다. 정상 요청 응답은 202다.
 - 따라서 실패·응답 지연 차이의 정보 경로는 있다. A의 5ms/10초 실제 응답 수치와 “전수 판별” 성공률은 검증되지 않았다. SMTP는 asyncio.to_thread에서 실행하므로 이벤트 루프를 직접 막는다는 뜻도 아니다. identity 문서는 타이밍 동일성을 현재 보장하지 않는다고 명시한다.
 - 요구하는 계정 비공개 수준을 정하고 큐/Outbox 및 외부 응답 통일을 검토한다. 실패를 숨겨 메일 발송 성공으로 오인시키지 않도록 재시도·관측성을 함께 설계한다.
 
 ### U23. test_local의 키 캐시와 Windows 읽기/삭제 충돌
+
+- **수정 상태 (2026-10-29):** idle 키 락을 weak 참조로 회수하고 Windows reader의 삭제 공유와 파일 이름 교체를 적용했다. 열린 reader는 이전 본문/metadata를 유지하고 삭제 후 새 조회는 미존재, 같은 키 재저장과 덮어쓰기는 새 버전을 제공한다. 전체 파일 복사나 reader 수명 전체의 키 락은 없다. 취소된 스레드 I/O가 종료되기 전 키/reader 락을 풀지 않고 늦게 얻은 reader도 회수한다. 신규 22건, 관련 86 passed / 0 failed / 2 skipped, 전체 API **1359 passed / 0 failed / 288 skipped**, 필수 품질 검사와 Windows/Linux 대상 직접 타입 검사가 통과했다. 실제 Windows 파일로 검증했지만 Linux 런타임·다중 프로세스·중단 복구·장시간 RSS는 미검증이다. [U23 전용 기록](../2026-10-26-pattern-standardization/U23-WORKLOG.md)에 정책과 한계를 남겼으며 아래는 수정 전 감사 근거다.
 
 - **재현 확인 / P3.** [adapter.py:70](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/asset_storage/adapters/test_local_storage/adapter.py:70)의 키별 Lock 사전은 제거되지 않는다. read_asset은 파일을 연 뒤 락을 풀고 reader를 반환한다.
 - 실제 로컬 어댑터·임시 파일을 사용해 열린 reader가 있는 동안 삭제하면 Windows PermissionError가 access_denied AssetStorageError로 변환되는 것을 확인했다. 테스트의 21개 lock 키도 남았다. 장시간 메모리 증가율은 측정하지 않았다.
@@ -204,11 +278,15 @@
 
 ### U24. 기본 관리자·모더레이터 훅이 503으로 닫혀 있음
 
+- **수정 상태 (2026-11-02):** 현재 user/admin 역할을 유지하고 검수 권한도 활성 admin으로 제한했다. 기본 앱은 5개 관리자·검수 훅을 검증된 owner UUID와 identity의 최신 DB 인가에 연결하며, 독립 인가 세션을 닫은 뒤 업무를 호출한다. 전역 원본 조회와 기존 본인 소유 상태 변경만 제공하며 타인 원본 변경 권한은 추가하지 않았다. 일반 사용자·정지 관리자·미설정 환경의 거절 및 토큰/CSRF·외부 인증 주입을 검증했다. [U24 전용 기록](../2026-10-26-pattern-standardization/U24-WORKLOG.md)에 범위·검증·한계를 남겼으며 아래는 수정 전 감사 근거다.
+
 - **정적 확인 / P2·기능 범위 결정.** [main.py:224](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/main.py:224) 이후는 session과 owner만 override한다. [character_dependencies.py:37](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/http/character_dependencies.py:37), lorebook 및 product 관리자 훅은 기본적으로 503을 반환한다. 라우트가 이 훅을 사용하는 사실도 확인했다.
 - 문서화된 fail-closed 미연결 기능이다. 기대한 관리 기능이 제공되지 않는 문제와 인가 우회 취약점은 구분한다. content query가 HTTP 호출자의 인가를 전제로 한다고 해서 누구나 외부에서 호출할 수 있다는 뜻은 아니다.
 - 현재 제공해야 할 관리자 기능 범위를 확정한 뒤 실제 권한 검증을 연결한다. 서비스 경계의 신뢰 주체·역할 정책을 문서화하고 일반 사용자·정지 관리자·미설정 배포에서의 거절을 검증한다.
 
 ### U25. 통계 재예약·태그 해석의 단건 반복
+
+- **수정·PG 검증·통합 완료 (2026-11-02):** 통계는 최대 500키의 지연·순차 upsert, 태그는 정렬된 정확한 이름을 최대 500개 INSERT/공유 잠금 SELECT로 처리한다. 기존 SQLite 측정은 통계 16상품×32일 upsert 512→2회, 태그 1,001이름 INSERT/SELECT 각각 1,001→3회다. 기존 이름/ID·설명·활성·retained 정책, 날짜/DB now()·claim/complete와 상위 rollback·HTTP 계약을 유지한다. 신규 실제 PG 경합 **17건**은 관리자 create/rename/deactivate와 resolve의 양방향 실행·unique/공유 잠금 대기·이름 변경 시점별 결과·취소 rollback, 동시 repair와 worker 완료/rollback·단건 dirty 예약을 확인한다. 관련 15파일 **201 passed / 0 failed / 0 skipped**, 전체 API 오프라인 **1706 passed / 0 failed / 446 skipped**, 필수 품질 검사와 신규 파일 Ruff/mypy가 통과했다. PG 17.11·한 collation·READ COMMITTED의 지정 경합 검증이며 모든 교착 부재·운영 부하/처리량을 증명하지 않는다. 실행 조건·명령·로그·검증 한계는 [최종 U25 통합 기록](../2026-10-26-pattern-standardization/U25-PG-INTEGRATION.md)을 따른다. 아래는 수정 전 감사 근거다.
 
 - **정적 확인 / P2·규모 측정.** [statistics.py:36](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service/command/statistics.py:36)는 전체 발행 상품×(days+1)회 mark_statistics_dirty를 순차 호출한다. [statistics_queue.py:13](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/service/command/statistics_queue.py:13)는 건별 upsert다. [command.py:18](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/tag/service/command.py:18)도 정렬된 이름마다 resolve를 수행한다.
 - A의 16만 번은 실제 현재 데이터 건수가 아니다. 예를 들어 상품 5,000개×32일이면 160,000개 upsert가 되는 식이다. 통계 집계 저장 전체가 항상 단건 삽입인 것도 아니며 repository의 일부 사실/통계 삽입은 이미 배치화되어 있다.
@@ -216,11 +294,27 @@
 
 ### U26. 보고 매퍼 중복·deepcopy·형식적 전달 함수
 
+2026-11-02 재점검: 아래 근거는 최초 감사 시점의 기록이다. 현재 보고 매퍼는 명시적
+필드 선택으로 바뀌었고 product/moderation의 scalar 깊은 복사도 이미 제거됐다.
+남은 UUID 항등 매퍼 1개와 호출 4곳을 제거했다. 영역별 공개 타입·노출 허용 목록과
+가변 JSON 격리는 유지했다. 필수 품질 검사와 PostgreSQL을 포함한 관련 회귀
+177 passed / 0 skipped로 검증했다. 현재 판단·변경·명령·한계는
+[U26 작업 기록](../2026-10-26-pattern-standardization/U26-WORKLOG.md)에 기록한다.
+
 - **부분 확인 / P3.** [persistence.py:71](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/governance/moderation/mapper/persistence.py:71)에는 항등 scalar 매퍼가 있다. [persistence.py:120](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/product/mapper/persistence.py:120) 및 moderation의 필드 반영 매퍼는 scalar까지 deepcopy한다. JSON·가변 metadata의 깊은 복사는 격리에 의미가 있다.
 - creator/operations의 metrics·day 매퍼는 상당히 비슷하지만 현재 reporting 매퍼는 fields/getattr 방식이며 deepcopy를 사용하지 않는다. operations에는 추가 prompt 조회 타입도 있어 “타입·매퍼 전부 100% 동일”은 부정확하다. 별도 공개 타입은 노출 필드·역할 경계를 유지하는 이유가 있다.
 - 이번 정의에서 단일 return Call/await Call 함수는 307개였으나 생성자·매핑도 포함해 “무의미한 패스스루” 수가 아니다. A의 273개는 분류 기준·대상 스냅샷 없이 검증할 수 없다. 작은 함수/파일 개수만으로 계층 삭제를 권하지 않는다. 불필요한 scalar 복사·항등 변환부터 좁게 줄이고 실제 hotspot을 측정한다.
 
 ### U27. 빈 파일은 존재하나 legacy 모델의 안전한 삭제는 미입증
+
+**사용 조사·안전한 정리 완료 (2026-11-02):** import/문자열 로딩·라우터 등록·배포
+진입점에 참조가 없는 0바이트 파일 5개만 제거했다. OpenAPI 전체(84경로·114연산),
+ORM 76테이블의 PostgreSQL DDL/인덱스와 모델 export가 전후 동일하고, 필수 품질
+검사 및 관련 회귀 281건이 통과했다. 구독의 결제 FK, moderation_flags의 0027
+이관 입력, 실제 사용하는 호환 재노출과 가격 정책은 보존했다. 운영 DB 데이터와
+외부 소비자는 미조사이므로 legacy 삭제는 계속 보류한다.
+[U27 작업 기록](../2026-10-26-pattern-standardization/U27-WORKLOG.md)에 근거·명령·한계를
+기록했으며 아래는 수정 전 감사 스냅샷이다.
 
 - **부분 확인 / P3·삭제 보류.** 비-__init__ 0바이트 파일 5개는 재확인했다: chat/stream.py, memory/schemas.py, billing/router.py, billing/schemas.py, admin/router.py. 15줄 이하 Python 파일은 물리적 줄 수 기준 90개였으며 A의 99개와 다르다.
 - SubscriptionPlan/UserSubscription/ModerationFlag는 모델 등록·FK·기존 스키마와 문서에 남아 있다. 업무 서비스 사용이 적다는 사실만으로 과거 데이터·마이그레이션·외부 소비자까지 없는 dead code라고 볼 수 없다. 미구현 정책 스텁이 DB에 저장된다는 A-P3-01의 구체적 주장은 대상 식별이 부족하다.
@@ -228,11 +322,15 @@
 
 ### U28. 업로드 중 잠금과 동기 파일 fingerprint
 
+- **해싱 개선·회귀 검증 완료 (2026-11-02):** 검증·seek/read·SHA-256을 하나의 스레드 작업으로 옮겼다. 단일·반복 취소 후에도 실제 작업 종료와 결과/오류 회수까지 기다린 뒤 첫 취소를 전달하여 HTTP 임시 파일 수명을 보존한다. 신규 16건을 포함한 오프라인 47건, 실제 PostgreSQL 미디어/HTTP 32건과 필수 품질 검사가 통과했다. 외부 저장 중 DB 잠금·예약 commit·GC/재시도 정책은 유지하며 잠금 재설계와 전체 업로드 deadline은 별도 범위다. [U28 작업 기록](../2026-10-26-pattern-standardization/U28-WORKLOG.md)에 계약과 검증 한계를 기록했다. 아래는 수정 전 감사 근거다.
+
 - **부분 확인 / P2·설계 검토.** [media.py:48](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/workflow/media.py:48) 이후는 저장 종료까지 DB 잠금을 유지한다. [media.py:35](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/content/character/service/media.py:35)의 fingerprint는 동기 seek/read/SHA-256이며 이벤트 루프에서 실행될 경로다.
 - 긴 잠금·파일 처리 비용은 실재한다. 그러나 [adapter.py:79](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/asset_storage/adapters/s3_storage/adapter.py:79)에 connect/read timeout과 retry 설정이 있으며 실제 전송은 to_thread다. “S3 타임아웃 전무·전체 전송이 이벤트 루프를 정지”라는 해석은 맞지 않는다. 워크플로 전체 deadline이 없다는 별도 지적은 가능하다.
 - 잠금은 취소된 공급자 스레드와 재시도/GC의 경쟁을 막는 명시적 계약이다. 해싱 offload는 좁은 개선 후보지만 스레드가 끝나기 전에 업로드 스트림을 닫지 않아야 한다. 네트워크 I/O를 잠금 밖으로 옮기는 변경은 execution token·상태 소유권·정리 배제 같은 대체 보장을 설계한 뒤 수행한다.
 
 ### U29. SDK 내부 오류 분류와 메모리 작업 전체 기한
+
+- **수정·오프라인 검증 완료 (2026-10-30):** 상태 없는 SDK 내부/JSON 파싱 오류는 기존 PROVIDER 종류를 유지하되 retryable=False로 바꿨다. SDK timeout·connection·429·5xx의 재시도 분류는 유지한다. 기억 workflow는 한 시도 전체에 기본 240초의 단조 시계 기한을 공유하며 worker는 timeout<lease(기본 300초)를 초기화 전에 검증한다. 취소/DB 정리 뒤 기존 제한된 실패 큐에 기록하고 늦은 공급자 결과를 저장 전에 거절한다. 신규 34건, 관련 113 passed / 1 skipped, 전체 API **1418 passed / 0 failed / 288 skipped**, 필수 품질 검사가 통과했다. cleanup/실패 기록의 벽시계 상한이나 lease 갱신·claim fencing을 보장하지 않으며 U03은 별도 미완료다. 실제 PostgreSQL 경쟁·live 공급자는 미검증이다. [U29 작업 기록](../2026-10-26-pattern-standardization/U29-WORKLOG.md)에 계약과 한계를 기록했으며 아래는 수정 전 감사 근거다.
 
 - **부분 확인 / P2.** [openai.py:100](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/llm/adapters/openai.py:100)와 Anthropic의 catch-all은 [base.py:125](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/llm/adapters/base.py:125)에 status가 없는 TypeError도 전달해 retryable PROVIDER 오류로 만들 수 있다. 메모리 작업은 이 retryable을 보고 기본 최대 횟수 안에서 다시 예약한다.
 - 다만 Voyage의 catch-all은 retryable=False이므로 모든 SDK 오류가 5회 재시도되는 것은 아니다. [openai.py:46](C:/Users/smj/Desktop/CHAT_STARTER_KIT/chat_kit/apps/api/app/modules/llm/adapters/openai.py:46)와 Anthropic에는 기본 60초 timeout이 있고 embedding도 worker에서 설정한다. “타임아웃이 전혀 없다”는 주장은 과장이다.

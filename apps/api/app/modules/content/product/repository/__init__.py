@@ -24,10 +24,7 @@ from .core import (
 )
 from .publication import (
     SnapshotCompositionRow,
-    add_snapshot_character,
-    add_snapshot_lorebook,
-    add_snapshot_start,
-    add_snapshot_target,
+    add_snapshot_composition,
     create_product_snapshot,
     finish_product_snapshot,
     get_product_snapshot,
@@ -55,10 +52,7 @@ __all__ = [
     "list_catalog_tag_ids",
     "ProductCompositionRow",
     "SnapshotCompositionRow",
-    "add_snapshot_character",
-    "add_snapshot_lorebook",
-    "add_snapshot_start",
-    "add_snapshot_target",
+    "add_snapshot_composition",
     "correct_release_note",
     "create_product",
     "create_product_snapshot",

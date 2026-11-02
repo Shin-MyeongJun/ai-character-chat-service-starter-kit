@@ -1,5 +1,6 @@
 # 발행마다 구성 슬롯·시작 항목은 새 스냅샷 행으로 만든다. 원본 링크 ID와 버전 링크 ID는 다르다.
 # 버전 번호 MAX+1은 상위 상품 잠금을 전제로 한다. 만료 변경은 이전/신규 시각과 사유 이력을 남긴다.
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -84,74 +85,66 @@ async def create_product_snapshot(
     return snapshot
 
 
-async def add_snapshot_character(
+async def add_snapshot_composition(
     session: AsyncSession,
     snapshot_id: UUID,
-    component_id: UUID,
-    value: Types.ProductCharacterLinkInfo,
-) -> UUID:
-    row = ProductSnapshotCharacter(
-        id=uuid4(),
-        product_snapshot_id=snapshot_id,
-        character_snapshot_id=component_id,
-        role_order=value.role_order,
-        role_name=value.role_name,
-        is_primary=value.is_primary,
-    )
-    session.add(row)
-    await session.flush()
-    return row.id
-
-
-async def add_snapshot_lorebook(
-    session: AsyncSession,
-    snapshot_id: UUID,
-    component_id: UUID,
-    value: Types.ProductLorebookLinkInfo,
-) -> UUID:
-    row = ProductSnapshotLorebook(
-        id=uuid4(),
-        product_snapshot_id=snapshot_id,
-        lorebook_snapshot_id=component_id,
-        role=value.role,
-        priority=value.priority,
-        is_required=value.is_required,
-        scope=value.scope,
-    )
-    session.add(row)
-    await session.flush()
-    return row.id
-
-
-async def add_snapshot_target(
-    session: AsyncSession, snapshot_id: UUID, character_id: UUID, lorebook_id: UUID
+    composition: Types.ProductCompositionStateInfo,
+    character_snapshot_ids_by_source_id: Mapping[UUID, UUID],
+    lorebook_snapshot_ids_by_source_id: Mapping[UUID, UUID],
+    starts: Sequence[Types.ProductStartSetInfo],
+    entries_by_id: Mapping[UUID, LorebookTypes.LorebookEntryInfo],
 ) -> None:
-    session.add(
+    # Source snapshots and the product snapshot have already been flushed.
+    characters_by_link_id = {
+        value.id: ProductSnapshotCharacter(
+            id=uuid4(),
+            product_snapshot_id=snapshot_id,
+            character_snapshot_id=character_snapshot_ids_by_source_id[
+                value.character_id
+            ],
+            role_order=value.role_order,
+            role_name=value.role_name,
+            is_primary=value.is_primary,
+        )
+        for value in composition.characters
+    }
+    books_by_link_id = {
+        value.id: ProductSnapshotLorebook(
+            id=uuid4(),
+            product_snapshot_id=snapshot_id,
+            lorebook_snapshot_id=lorebook_snapshot_ids_by_source_id[value.lorebook_id],
+            role=value.role,
+            priority=value.priority,
+            is_required=value.is_required,
+            scope=value.scope,
+        )
+        for value in composition.books
+    }
+    session.add_all(characters_by_link_id.values())
+    session.add_all(books_by_link_id.values())
+    # Preassigned UUIDs do not satisfy child FKs until these parents exist in DB.
+    await session.flush()
+    session.add_all(
         ProductSnapshotLorebookCharacter(
             product_snapshot_id=snapshot_id,
-            product_character_id=character_id,
-            product_lorebook_id=lorebook_id,
+            product_character_id=characters_by_link_id[target.product_character_id].id,
+            product_lorebook_id=books_by_link_id[target.product_lorebook_id].id,
         )
+        for target in composition.targets
     )
-    await session.flush()
-
-
-async def add_snapshot_start(
-    session: AsyncSession,
-    snapshot_id: UUID,
-    lorebook_id: UUID,
-    entry: LorebookTypes.LorebookEntryInfo,
-    sort_order: int,
-) -> None:
-    session.add(
+    book_ids_by_source_id = {
+        value.lorebook_id: books_by_link_id[value.id].id for value in composition.books
+    }
+    session.add_all(
         ProductSnapshotStartSet(
             product_snapshot_id=snapshot_id,
-            product_lorebook_id=lorebook_id,
-            source_entry_id=entry.id,
-            title=entry.title,
-            content=entry.content,
-            sort_order=sort_order,
+            product_lorebook_id=book_ids_by_source_id[start.lorebook_id],
+            source_entry_id=start.entry_id,
+            title=entries_by_id[start.entry_id].title,
+            content=entries_by_id[start.entry_id].content,
+            sort_order=start.sort_order,
         )
+        for start in starts
     )
     await session.flush()
 
@@ -165,10 +158,10 @@ async def finish_product_snapshot(
     snapshot = await session.get(ProductSnapshot, snapshot_id)
     # Created in this publication transaction; its parent product stays locked.
     assert snapshot is not None, "Publication snapshot disappeared."
-    snapshot.snapshot_data = dict(data)
-    await session.flush()
     product = await session.get(Product, product_id)
     assert product is not None, "Locked product disappeared."
+    # Both FK parents exist already; loading before mutation avoids an autoflush.
+    snapshot.snapshot_data = dict(data)
     product.latest_snapshot_id = snapshot_id
     await session.flush()
     return snapshot

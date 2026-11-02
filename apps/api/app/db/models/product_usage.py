@@ -18,6 +18,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -42,9 +43,19 @@ class ProductGeneration(UuidPkMixin, Base):
             name="ck_generation_status",
         ),
         CheckConstraint("message_count >= 0", name="ck_generation_messages"),
+        CheckConstraint(
+            "answer_recovery_attempts >= 0", name="ck_answer_recovery_attempts"
+        ),
         Index("ix_generation_product_finished", "product_id", "finished_at"),
         Index("ix_generation_created_id", "created_at", "id"),
         Index("ix_generation_conversation_created", "conversation_id", "created_at"),
+        Index(
+            "ix_generation_pending_answer_lease",
+            "answer_lease_until",
+            postgresql_where=text(
+                "status = 'pending' AND answer_lease_until IS NOT NULL"
+            ),
+        ),
     )
     user_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
@@ -78,9 +89,43 @@ class ProductGeneration(UuidPkMixin, Base):
         DateTime(timezone=True)
     )
     answer_metadata: Mapped[JsonObject | None] = mapped_column(JSONB)
-    answer_lease_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), index=True
+    answer_lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    answer_recovery_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
     )
+    answer_recovery_next_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    answer_recovery_quarantined_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+
+class AnswerRecoveryAttempt(Base):
+    """Committed before finalization; an interrupted attempt still consumes budget."""
+
+    __tablename__ = "answer_recovery_attempts"
+    __table_args__ = (
+        CheckConstraint("attempt_count > 0", name="ck_recovery_attempt_number"),
+        CheckConstraint(
+            "(operator IS NULL AND reason IS NULL) OR "
+            "(operator IS NOT NULL AND reason IS NOT NULL AND "
+            "length(trim(operator)) BETWEEN 1 AND 120 AND length(trim(reason)) BETWEEN 1 AND 1000)",
+            name="ck_recovery_operator_reason",
+        ),
+    )
+    generation_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("product_generations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    operator: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    failure_class: Mapped[str | None] = mapped_column(Text)
 
 
 class ProductPaymentEvent(UuidPkMixin, Base):

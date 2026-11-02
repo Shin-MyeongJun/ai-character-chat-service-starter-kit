@@ -174,6 +174,8 @@ class MessageInfo:
 class MessagePageInfo:
     items: tuple[MessageInfo, ...]
     next_cursor: MessageCursor | None
+    history_revision: int | None = None
+    sync_cursor: MessageCursor | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +188,32 @@ class ListConversationPreviewsCommand:
 class ConversationActivityInfo:
     content: str
     created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ListRecentConversationsCommand:
+    user_id: UUID
+    limit: int = 30
+    cursor_activity_at: datetime | None = None
+    cursor_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RecentConversationView:
+    id: UUID
+    product_id: UUID
+    title: str | None
+    created_at: datetime
+    last_message: str | None
+    last_activity_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RecentConversationsPageView:
+    items: tuple[RecentConversationView, ...]
+    next_cursor_created_at: datetime | None
+    next_cursor_id: UUID | None
+    total: int = 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -201,6 +229,43 @@ class ListMemorySourceCommand:
 class MemorySourceInfo:
     messages: tuple[MessageInfo, ...]
     truncated: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GetHistoryVersionCommand:
+    conversation_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryVersionInfo:
+    version: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ListRecentMessagesCommand:
+    conversation_id: UUID
+    user_id: UUID
+    limit: int = 100
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReadMessageWindowCommand:
+    conversation_id: UUID
+    user_id: UUID
+    token_budget: int
+    after_position: int = 0
+    through_position: int | None = None
+    newest_first: bool = True
+    conservative_token_budget: bool = False
+    minimum_messages: int = 0
+    excluded_message_id: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MessageWindowInfo:
+    messages: tuple[MessageInfo, ...]
+    has_more: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,6 +338,9 @@ class GenerationStateInfo:
     history_invalidated_at: datetime | None
     answer_metadata: AnswerMetadata | None = None
     answer_lease_until: datetime | None = None
+    answer_recovery_attempts: int = 0
+    answer_recovery_next_at: datetime | None = None
+    answer_recovery_quarantined_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -330,6 +398,41 @@ class ListExpiredAnswersCommand:
     limit: int = 100
 
 
+ANSWER_RECOVERY_MAX_ATTEMPTS = 5
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClaimAnswerRecoveryCommand:
+    generation_id: UUID
+    user_id: UUID
+    now: datetime
+    operator: str | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerRecoveryClaimInfo:
+    run: GenerationStateInfo
+    attempt_count: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerRecoveryAttemptInfo:
+    attempt_count: int
+    started_at: datetime
+    failure_class: str | None
+    manual: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RecordAnswerRecoveryFailureCommand:
+    generation_id: UUID
+    user_id: UUID
+    attempt_count: int
+    failure_class: str
+    now: datetime
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GenerateAnswerCommand:
     conversation_id: UUID
@@ -379,6 +482,10 @@ class AnswerStorageError(RuntimeError):
     """The durable lease/recovery path must reconcile this run; do not call again."""
 
 
+class AnswerStateError(AnswerStorageError):
+    """Invalid durable answer state; recovery needs investigation, not a new call."""
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PrepareAnswerContextCommand:
     conversation_id: UUID
@@ -393,6 +500,7 @@ class PrepareAnswerContextCommand:
     current_message_id: UUID | None = None
     runtime: ConversationTypes.ConversationRuntimeView | None = None
     rendered_base_tokens: int | None = None
+    expected_history_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -420,6 +528,7 @@ class ProcessMemoryWorkCommand:
     work: MemoryTypes.MemoryWorkInfo
     policy: MemoryTypes.MemoryPolicy
     models: MemoryTypes.MemoryModelConfig
+    timeout_seconds: float = 240.0
 
 
 @dataclass(frozen=True, slots=True)

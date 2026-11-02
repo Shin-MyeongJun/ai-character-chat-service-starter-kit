@@ -65,6 +65,7 @@ references_document/  # 설계 및 개발 참고 문서
 - [모듈 아키텍처 및 명명 규칙](references_document/reference/module-architecture-and-naming.md)
 - [유스케이스 구성](apps/api/app/use_cases/ARCHITECTURE.md)
 - [채팅 모듈](apps/api/app/modules/chatting/chat/ARCHITECTURE.md)
+- [답변 복구 운영 정책·수동 복구 CLI](references_document/reference/answer-recovery-policy.md)
 - [대화 메모리 모듈](apps/api/app/modules/chatting/memory/ARCHITECTURE.md)
 - [프롬프트 모듈](apps/api/app/modules/chatting/prompt/ARCHITECTURE.md)
 - [상품 모듈](apps/api/app/modules/content/product/ARCHITECTURE.md)

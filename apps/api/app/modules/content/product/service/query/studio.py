@@ -2,6 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.idempotency import lock_key
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
@@ -27,6 +28,10 @@ async def get_studio_draft(
 async def get_studio_draft_for_publication(
     session: AsyncSession, command: Types.GetStudioDraftCommand
 ) -> Types.StudioDraftInfo:
+    """Lock advisory → product → draft within the caller's transaction scope."""
+    # Save may acquire this same lock later in the caller's transaction. Take it
+    # before row locks so revision saves cannot deadlock with direct retries.
+    await lock_key(session, "product-studio-draft", str(command.product_id))
     await QueryService.get_owned_product(
         session,
         Types.OwnedProductCommand(

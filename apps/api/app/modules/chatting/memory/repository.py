@@ -12,7 +12,7 @@ from typing import cast, get_args
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Select, case, delete, or_, select, update
+from sqlalchemy import ColumnElement, Select, case, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -327,7 +327,12 @@ async def search_memories(
 
 
 async def schedule_memory_work(
-    session: AsyncSession, *, conversation_id: UUID, owner_id: UUID, now: datetime
+    session: AsyncSession,
+    *,
+    conversation_id: UUID,
+    owner_id: UUID,
+    now: datetime,
+    summary_through_position: int | None = None,
 ) -> None:
     stmt = insert(MemoryJob).values(
         conversation_id=conversation_id,
@@ -336,6 +341,7 @@ async def schedule_memory_work(
         completed_generation=0,
         status="pending",
         next_attempt_at=now,
+        summary_through_position=summary_through_position,
     )
     await session.execute(
         stmt.on_conflict_do_update(
@@ -343,6 +349,10 @@ async def schedule_memory_work(
             set_={
                 "owner_id": owner_id,
                 "requested_generation": MemoryJob.requested_generation + 1,
+                "summary_through_position": func.greatest(
+                    MemoryJob.summary_through_position,
+                    stmt.excluded.summary_through_position,
+                ),
                 "status": case(
                     (MemoryJob.status == "running", "running"), else_="pending"
                 ),
@@ -362,7 +372,12 @@ async def schedule_memory_work(
 
 # 기한이 된 pending 또는 lease 만료 running 하나를 SKIP LOCKED로 잡는다. claim 자체는 외부 호출 중복 방지 보장이 아니다.
 async def claim_memory_work(
-    session: AsyncSession, *, worker_id: str, now: datetime, lease_seconds: int
+    session: AsyncSession,
+    *,
+    worker_id: str,
+    claim_token: UUID,
+    now: datetime,
+    lease_seconds: int,
 ) -> MemoryJob | None:
     eligible = or_(
         (MemoryJob.status == "pending") & (MemoryJob.next_attempt_at <= now),
@@ -376,12 +391,14 @@ async def claim_memory_work(
         )
         .with_for_update(skip_locked=True)
         .limit(1)
+        .execution_options(populate_existing=True)
     )
     if job is None:
         return None
     job.status = "running"
     job.scope_generation = job.requested_generation
     job.lease_owner = worker_id
+    job.claim_token = claim_token
     job.leased_until = now + timedelta(seconds=lease_seconds)
     job.attempt_count += 1
     job.updated_at = now
@@ -389,7 +406,34 @@ async def claim_memory_work(
     return job
 
 
-# 소유 워커와 scope가 같은 running만 완료한다. 처리 중 새 예약이 들어왔으면 pending으로 남긴다.
+def _claim_identity(work: Types.MemoryWorkInfo) -> tuple[ColumnElement[bool], ...]:
+    return (
+        MemoryJob.conversation_id == work.conversation_id,
+        MemoryJob.owner_id == work.owner_id,
+        MemoryJob.status == "running",
+        MemoryJob.lease_owner == work.lease_owner,
+        MemoryJob.scope_generation == work.scope_generation,
+        MemoryJob.claim_token == work.claim_token,
+        MemoryJob.claim_token.is_not(None),
+    )
+
+
+async def lock_memory_work(
+    session: AsyncSession, *, work: Types.MemoryWorkInfo
+) -> bool:
+    # Keep this row locked through the result write and outer commit. An unlocked
+    # check would let a reclaim replace the token between validation and save.
+    return (
+        await session.scalar(
+            select(MemoryJob.conversation_id)
+            .where(*_claim_identity(work))
+            .with_for_update()
+        )
+        is not None
+    )
+
+
+# 개별 claim 토큰까지 같은 running만 완료한다. 새 예약 세대는 다음 처리로 남긴다.
 async def complete_memory_work(
     session: AsyncSession,
     *,
@@ -410,20 +454,25 @@ async def complete_memory_work(
         "status": status,
         "attempt_count": 0,
         "lease_owner": None,
+        "claim_token": None,
         "leased_until": None,
         "scope_generation": None,
         "next_attempt_at": now,
         "last_error_kind": None,
+        # A request arriving during this claim owns the retained target. Clear
+        # only after this generation has finished all of its required batches.
+        "summary_through_position": case(
+            (
+                (MemoryJob.requested_generation > work.scope_generation) | more_work,
+                MemoryJob.summary_through_position,
+            ),
+            else_=None,
+        ),
         "updated_at": now,
     }
     return await session.scalar(
         update(MemoryJob)
-        .where(
-            MemoryJob.conversation_id == work.conversation_id,
-            MemoryJob.status == "running",
-            MemoryJob.lease_owner == work.lease_owner,
-            MemoryJob.scope_generation == work.scope_generation,
-        )
+        .where(*_claim_identity(work))
         .values(**values)
         .returning(MemoryJob)
     )
@@ -442,15 +491,11 @@ async def fail_memory_work(
     should_retry = retryable and work.attempt_count < max_attempts
     return await session.scalar(
         update(MemoryJob)
-        .where(
-            MemoryJob.conversation_id == work.conversation_id,
-            MemoryJob.status == "running",
-            MemoryJob.lease_owner == work.lease_owner,
-            MemoryJob.scope_generation == work.scope_generation,
-        )
+        .where(*_claim_identity(work))
         .values(
             status="pending" if should_retry else "failed",
             lease_owner=None,
+            claim_token=None,
             leased_until=None,
             scope_generation=None,
             next_attempt_at=now + timedelta(seconds=retry_seconds),

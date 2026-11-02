@@ -2,6 +2,7 @@
 # 직렬화한다.
 """Persistence boundary for the top-level nonstream answer use case."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,9 @@ from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper
+from app.modules.chatting.chat.service.command import (
+    generation as GenerationCommandService,
+)
 from app.modules.chatting.conversation import service as ConversationService
 from app.modules.chatting.conversation import types as ConversationTypes
 
@@ -65,26 +69,25 @@ async def get_answer_input(
 async def update_answer(
     session: AsyncSession, command: Types.UpdateAnswerCommand
 ) -> None:
-    async with use_case_transaction(session):
-        info = PersistenceMapper.generation_entity_to_state_info(
-            await Repository.get_owned_generation(
-                session, command.generation_id, command.user_id
-            )
-        )
-        if info is None:
-            raise LookupError("Generation not found.")
-        await ConversationService.get_owned_conversation(
-            session,
-            ConversationTypes.OwnedConversationCommand(
-                conversation_id=info.conversation_id, user_id=command.user_id, lock=True
-            ),
-        )
-        info = PersistenceMapper.generation_entity_to_state_info(
-            await Repository.get_owned_generation(
-                session, command.generation_id, command.user_id, lock=True
-            )
-        )
-        if info is None or info.status != "pending":
+    async with GenerationCommandService._locked_generation(
+        session,
+        Types.GetGenerationStateCommand(
+            generation_id=command.generation_id, user_id=command.user_id
+        ),
+    ) as locked:
+        await _update_locked_answer(locked, command)
+
+
+async def _update_locked_answer(
+    locked: GenerationCommandService._LockedGeneration,
+    command: Types.UpdateAnswerCommand,
+) -> None:
+    locked.require_active()
+    async with use_case_transaction(locked.session):
+        session, info = locked.session, locked.run
+        if info.id != command.generation_id or info.user_id != command.user_id:
+            raise ValueError("Locked generation does not match answer update.")
+        if info.status != "pending":
             raise Types.MessageConflictError("Generation is already terminal.")
         stored = info.answer_metadata or {}
         token = stored.get("execution_token")
@@ -122,6 +125,12 @@ async def update_answer(
                 return
         await Repository.update_answer(
             session, info.id, command.metadata, command.lease_until
+        )
+
+        locked.run = replace(
+            info,
+            answer_metadata=command.metadata,
+            answer_lease_until=command.lease_until,
         )
 
 

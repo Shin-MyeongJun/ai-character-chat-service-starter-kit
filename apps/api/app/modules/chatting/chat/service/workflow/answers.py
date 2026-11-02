@@ -14,12 +14,16 @@ from typing import Literal, TypeAlias, TypedDict, cast
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
 from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import prompt as PromptMapper
+from app.modules.chatting.chat.service.command import (
+    answer_recovery as AnswerRecoveryCommandService,
+)
 from app.modules.chatting.chat.service.command import answers as AnswersCommandService
 from app.modules.chatting.chat.service.command import (
     generation as GenerationCommandService,
@@ -27,6 +31,9 @@ from app.modules.chatting.chat.service.command import (
 from app.modules.chatting.chat.service.command import prompts as PromptsCommandService
 from app.modules.chatting.chat.service.query import generation as GenerationQueryService
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
+from app.modules.chatting.chat.service.util import (
+    answer_diagnostics as AnswerDiagnosticsServiceUtil,
+)
 from app.modules.chatting.chat.service.workflow.answer_preparation import (
     prepare_answer_context,
 )
@@ -54,9 +61,18 @@ _Preparation: TypeAlias = tuple[
     ConversationTypes.ConversationRuntimeView,
     LLMTypes.ModelInfo,
     ConversationTypes.ConversationInfo,
+    Types.HistoryVersionInfo,
     str,
 ]
 _Outcome: TypeAlias = Literal["succeeded", "failed", "cancelled"]
+
+
+class _InvalidAnswerResultError(ValueError):
+    def __init__(
+        self, code: Literal["empty_response", "invalid_result", "invalid_usage"]
+    ) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 class _StoredIdentity(TypedDict):
@@ -86,6 +102,7 @@ class _StoredAnswer(TypedDict, total=False):
     error_code: str | None
     retryable: bool
     uncertain: bool
+    summary_through_position: int
 
 
 class AnswerOrchestrator:
@@ -105,6 +122,32 @@ class AnswerOrchestrator:
         self.config = config or Types.AnswerConfig()
         self.template = template or PromptService.load_template()
         self.pricing = pricing
+
+    def _log_failure(
+        self,
+        event: str,
+        error: Exception,
+        *,
+        phase: str,
+        generation_id: UUID | None = None,
+        diagnostic_id: UUID | None = None,
+        attempt_count: int = 1,
+        storage_uncertain: bool = False,
+        error_code: str | None = None,
+    ) -> None:
+        details = AnswerDiagnosticsServiceUtil.error_details(error)
+        if isinstance(error, _InvalidAnswerResultError):
+            details["failure_class"] = "invalid_result"
+        logger.warning(
+            event,
+            phase=phase,
+            generation_id=str(generation_id) if generation_id else None,
+            diagnostic_id=str(diagnostic_id) if diagnostic_id else None,
+            attempt_count=attempt_count,
+            storage_uncertain=storage_uncertain,
+            error_code=error_code,
+            **details,
+        )
 
     async def _get_request(
         self,
@@ -158,14 +201,20 @@ class AnswerOrchestrator:
             c.product_character_id for c in participants
         }:
             raise ValueError("Select exactly one participating answer character.")
-        source = await MessagesQueryService.list_memory_source(
+        history_version = await MessagesQueryService.get_history_version(
             session,
-            Types.ListMemorySourceCommand(
+            Types.GetHistoryVersionCommand(
                 conversation_id=command.conversation_id, user_id=command.user_id
             ),
         )
-        if source.truncated:
-            raise ValueError("Conversation exceeds safe lore inspection limit.")
+        # Lore v1 scan_depth is at most 100; legacy lore uses current text only.
+        recent = await MessagesQueryService.list_recent_messages(
+            session,
+            Types.ListRecentMessagesCommand(
+                conversation_id=command.conversation_id,
+                user_id=command.user_id,
+            ),
+        )
         runtime = await ConversationService.prepare_runtime_context(
             session,
             ConversationTypes.PrepareRuntimeContextCommand(
@@ -173,7 +222,7 @@ class AnswerOrchestrator:
                 user_id=command.user_id,
                 activation_text=current.content,
                 activation_messages=tuple(
-                    (item.sender_type, item.content) for item in source.messages
+                    (item.sender_type, item.content) for item in recent
                 ),
                 manual_entry_ids=tuple(map(str, command.manual_entry_ids)),
             ),
@@ -189,10 +238,11 @@ class AnswerOrchestrator:
                 "participants": [asdict(item) for item in participants],
                 "runtime": asdict(runtime),
                 "model": asdict(model),
-                "source": asdict(source),
+                "history_version": asdict(history_version),
+                "current": asdict(current),
             }
         )
-        return current, runtime, model, conversation, snapshot
+        return current, runtime, model, conversation, history_version, snapshot
 
     async def _resume(self, run: Types.GenerationStateInfo) -> Types.AnswerInfo:
         metadata = run.answer_metadata or {}
@@ -203,12 +253,7 @@ class AnswerOrchestrator:
                 and run.answer_lease_until <= datetime.now(UTC)
             )
         ):
-            try:
-                return await self._finalize(run.id, run.user_id, recover=True)
-            except Exception as exc:
-                raise Types.AnswerStorageError(
-                    "Answer storage is pending recovery."
-                ) from exc
+            return await self._complete_staged(run.id, run.user_id, recover=True)
         return _answer_info(run)
 
     async def generate_answer(
@@ -230,18 +275,43 @@ class AnswerOrchestrator:
                 entry_id for entry_id in sorted(map(str, command.manual_entry_ids))
             ]
             identity["manual_entry_ids"] = manual_entry_ids
+        diagnostic_id = uuid4()
         # Existing requests precede configuration, preparation, prices and expiry.
-        async with self.sessions() as session, use_case_transaction(session):
-            existing = await self._get_request(session, command, identity)
-            if existing is None:
-                if self.pricing is None or self.pricing.price_book is None:
-                    raise BillingTypes.BillingPricingError(
-                        "Price book is not configured."
-                    )
-                prepared = await self._read_preparation(session, command)
+        try:
+            async with self.sessions() as session, use_case_transaction(session):
+                existing = await self._get_request(session, command, identity)
+                if existing is None:
+                    if self.pricing is None or self.pricing.price_book is None:
+                        raise BillingTypes.BillingPricingError(
+                            "Price book is not configured."
+                        )
+                    prepared = await self._read_preparation(session, command)
+        except SQLAlchemyError as exc:
+            self._log_failure(
+                "answer_preparation_failed",
+                exc,
+                phase="preparation_read",
+                diagnostic_id=diagnostic_id,
+            )
+            # This read boundary has not reserved a generation or called a provider.
+            raise Types.AnswerStorageError(
+                "Answer preparation storage failed; replay the same request key."
+            ) from exc
+        except (ValueError, LookupError, Types.MessageConflictError):
+            # Preserve input, ownership, configuration and request conflict contracts.
+            raise
+        except Exception as exc:
+            self._log_failure(
+                "answer_preparation_failed",
+                exc,
+                phase="preparation_read",
+                diagnostic_id=diagnostic_id,
+                error_code="internal_error",
+            )
+            raise RuntimeError("Answer preparation failed.") from exc
         if existing is not None:
             return await self._resume(existing)
-        current, runtime, model, conversation, snapshot = prepared
+        current, runtime, model, conversation, history_version, snapshot = prepared
         config, template, pricing = self.config, self.template, self.pricing
         if pricing is None:
             raise BillingTypes.BillingPricingError("Price book is not configured.")
@@ -287,6 +357,7 @@ class AnswerOrchestrator:
                         current_message_id=current.id,
                         runtime=runtime,
                         rendered_base_tokens=base.estimated_tokens,
+                        expected_history_version=history_version.version,
                         max_prompt_tokens=maximum,
                         response_tokens=config.response_tokens,
                         embedding_model=config.embedding_model,
@@ -318,11 +389,35 @@ class AnswerOrchestrator:
                     ).hexdigest(),
                     estimated_prompt_tokens=prompt.estimated_tokens,
                 )
+        except Types.MessageConflictError:
+            # A history change during the unlocked preparation interval consumes
+            # neither the request key nor a billing reservation.
+            raise
         except Exception as exc:
             code, retryable, uncertain = _classify_error(exc, "preparing")
+            self._log_failure(
+                "answer_preparation_failed",
+                exc,
+                phase="preparing",
+                diagnostic_id=diagnostic_id,
+                error_code=code,
+            )
+            # No generation, text call or credit reservation exists yet.
+            # Internal/storage failures must not consume the request key.
+            if isinstance(exc, SQLAlchemyError):
+                raise Types.AnswerStorageError(
+                    "Answer preparation storage failed; replay the same request key."
+                ) from exc
+            if code == "internal_error":
+                raise RuntimeError("Answer preparation failed.") from exc
             metadata = _failure(
                 metadata, code, usage, retryable=retryable, uncertain=uncertain
             )
+            if (
+                isinstance(exc, MemoryTypes.ContextBudgetExceededError)
+                and exc.summary_through_position is not None
+            ):
+                metadata["summary_through_position"] = exc.summary_through_position
             metadata["unbilled_reason"] = "preparation_failed"
             prompt = None
 
@@ -439,14 +534,33 @@ class AnswerOrchestrator:
         except (ValueError, LookupError, Types.MessageConflictError):
             raise
         except Exception as exc:
+            self._log_failure(
+                "answer_reservation_failed",
+                exc,
+                phase="reservation",
+                diagnostic_id=diagnostic_id,
+                storage_uncertain=True,
+            )
             # Reservation commit may have succeeded despite a lost acknowledgement.
             # A persisted request is never permission to execute this call again.
             try:
                 async with self.sessions() as session, use_case_transaction(session):
                     existing = await self._get_request(session, command, identity)
-            except Exception:
+            except Exception as read_error:
+                self._log_failure(
+                    "answer_reconciliation_failed",
+                    read_error,
+                    phase="reservation_read",
+                    diagnostic_id=diagnostic_id,
+                    storage_uncertain=True,
+                )
                 existing = None
             if existing is not None:
+                logger.info(
+                    "answer_reservation_reconciled",
+                    diagnostic_id=str(diagnostic_id),
+                    generation_id=str(existing.id),
+                )
                 return await self._resume(existing)
             raise Types.AnswerStorageError(
                 "Reservation storage is uncertain; replay the same request key."
@@ -454,6 +568,11 @@ class AnswerOrchestrator:
 
         if existing is not None:
             return await self._resume(existing)
+        logger.info(
+            "answer_reservation_committed",
+            diagnostic_id=str(diagnostic_id),
+            generation_id=str(run.id),
+        )
         if prompt is None:
             return await self._complete_staged(run.id, command.user_id)
 
@@ -463,7 +582,9 @@ class AnswerOrchestrator:
         try:
             await self._stage(run.id, command.user_id, metadata, lease)
         except Exception as exc:
-            return await self._reconcile_storage(run.id, command.user_id, exc)
+            return await self._reconcile_storage(
+                run.id, command.user_id, exc, phase="calling_stage"
+            )
         try:
             async with asyncio.timeout(config.timeout_seconds):
                 result = await self.text.generate_text(
@@ -478,16 +599,16 @@ class AnswerOrchestrator:
                     )
                 )
                 if not isinstance(result, LLMTypes.LLMResultInfo):
-                    raise TypeError("invalid_result")
+                    raise _InvalidAnswerResultError("invalid_result")
                 if not isinstance(result.usage, LLMTypes.TokenUsageInfo):
-                    raise TypeError("invalid_usage")
+                    raise _InvalidAnswerResultError("invalid_usage")
                 usage = result.usage
                 if (
                     result.provider != runtime.execution.provider
                     or not isinstance(result.model, str)
                     or not result.model.strip()
                 ):
-                    raise ValueError("invalid_result")
+                    raise _InvalidAnswerResultError("invalid_result")
                 _validate_result(result)
                 metadata = {
                     **metadata,
@@ -504,13 +625,24 @@ class AnswerOrchestrator:
             try:
                 await self._stage(run.id, command.user_id, metadata, lease)
                 await self._finalize(run.id, command.user_id)
-            except Exception:
-                logger.warning(
-                    "answer_cancel_recovery_required", generation_id=str(run.id)
+            except Exception as exc:
+                self._log_failure(
+                    "answer_cancel_recovery_required",
+                    exc,
+                    phase="cancel_cleanup",
+                    generation_id=run.id,
+                    storage_uncertain=True,
                 )
             raise
         except Exception as exc:
             code, retryable, uncertain = _classify_error(exc, metadata["phase"])
+            self._log_failure(
+                "answer_call_failed",
+                exc,
+                phase="calling",
+                generation_id=run.id,
+                error_code=code,
+            )
             if isinstance(exc, LLMTypes.LLMError) and exc.usage is not None:
                 usage = exc.usage
             metadata = _failure(
@@ -522,12 +654,26 @@ class AnswerOrchestrator:
             # recording even a timeout/cancellation as a terminal failure candidate.
             await self._stage(run.id, command.user_id, metadata, lease)
         except Exception as exc:
-            return await self._reconcile_storage(run.id, command.user_id, exc)
+            return await self._reconcile_storage(
+                run.id, command.user_id, exc, phase="result_stage"
+            )
         return await self._complete_staged(run.id, command.user_id)
 
     async def _reconcile_storage(
-        self, generation_id: UUID, user_id: UUID, error: Exception
+        self,
+        generation_id: UUID,
+        user_id: UUID,
+        error: Exception,
+        *,
+        phase: str = "staging",
     ) -> Types.AnswerInfo:
+        self._log_failure(
+            "answer_staging_failed",
+            error,
+            phase=phase,
+            generation_id=generation_id,
+            storage_uncertain=True,
+        )
         try:
             async with self.sessions() as session:
                 run = await GenerationQueryService.get_generation_state(
@@ -536,22 +682,75 @@ class AnswerOrchestrator:
                         generation_id=generation_id, user_id=user_id
                     ),
                 )
-            if run.status != "pending":
-                return _answer_info(run)
-            if (run.answer_metadata or {}).get("phase") == "result_ready":
-                return await self._complete_staged(generation_id, user_id)
         except Exception as exc:
-            error = exc
+            self._log_failure(
+                "answer_reconciliation_failed",
+                exc,
+                phase="staging_read",
+                generation_id=generation_id,
+                storage_uncertain=True,
+            )
+            raise Types.AnswerStorageError(
+                "Answer storage is pending recovery; replay the same request key."
+            ) from error
+        if run.status != "pending":
+            return _answer_info(run)
+        if (run.answer_metadata or {}).get("phase") == "result_ready":
+            return await self._complete_staged(generation_id, user_id)
         raise Types.AnswerStorageError(
             "Answer storage is pending recovery; replay the same request key."
         ) from error
 
     async def _complete_staged(
-        self, generation_id: UUID, user_id: UUID
+        self,
+        generation_id: UUID,
+        user_id: UUID,
+        *,
+        recover: bool = False,
+        recovery_command: Types.ClaimAnswerRecoveryCommand | None = None,
     ) -> Types.AnswerInfo:
+        attempt_count = 1
+        if recover:
+            try:
+                async with self.sessions() as session:
+                    claim = await AnswerRecoveryCommandService.claim_answer_recovery(
+                        session,
+                        recovery_command
+                        or Types.ClaimAnswerRecoveryCommand(
+                            generation_id=generation_id,
+                            user_id=user_id,
+                            now=datetime.now(UTC),
+                        ),
+                    )
+            except Exception as exc:
+                self._log_failure(
+                    "answer_recovery_claim_failed",
+                    exc,
+                    phase="recovery_claim",
+                    generation_id=generation_id,
+                    storage_uncertain=True,
+                )
+                raise Types.AnswerStorageError(
+                    "Recovery admission could not be confirmed."
+                ) from exc
+            if claim.run.status != "pending":
+                return _answer_info(claim.run)
+            if claim.attempt_count is None:
+                raise Types.AnswerStorageError(
+                    "Answer recovery is waiting or quarantined."
+                )
+            attempt_count = claim.attempt_count
         try:
-            return await self._finalize(generation_id, user_id)
+            answer = await self._finalize(generation_id, user_id, recover=recover)
         except Exception as exc:
+            self._log_failure(
+                "answer_recovery_failed" if recover else "answer_finalize_failed",
+                exc,
+                phase="recovery_finalize" if recover else "finalize",
+                generation_id=generation_id,
+                attempt_count=attempt_count,
+                storage_uncertain=True,
+            )
             # A commit acknowledgement can be lost after the whole operation won.
             # Only a fresh durable terminal state proves completion; otherwise leave
             # the staging and reservation untouched for replay/supervisor recovery.
@@ -564,12 +763,76 @@ class AnswerOrchestrator:
                         ),
                     )
                 if run.status != "pending":
-                    return _answer_info(run)
-            except Exception:
-                pass
+                    answer = _answer_info(run)
+                    logger.info(
+                        "answer_storage_reconciled",
+                        generation_id=str(generation_id),
+                        attempt_count=attempt_count,
+                        status=answer.status,
+                    )
+                    return answer
+            except Exception as read_error:
+                self._log_failure(
+                    "answer_reconciliation_failed",
+                    read_error,
+                    phase="finalize_read",
+                    generation_id=generation_id,
+                    attempt_count=attempt_count,
+                    storage_uncertain=True,
+                )
+            if recover:
+                try:
+                    async with self.sessions() as session:
+                        await AnswerRecoveryCommandService.record_answer_recovery_failure(
+                            session,
+                            Types.RecordAnswerRecoveryFailureCommand(
+                                generation_id=generation_id,
+                                user_id=user_id,
+                                attempt_count=attempt_count,
+                                failure_class=AnswerDiagnosticsServiceUtil.error_details(
+                                    exc
+                                )["failure_class"],
+                                now=datetime.now(UTC),
+                            ),
+                        )
+                except Exception as record_error:
+                    # The committed claim already bounds retries even if diagnostics cannot be saved.
+                    self._log_failure(
+                        "answer_recovery_record_failed",
+                        record_error,
+                        phase="recovery_record",
+                        generation_id=generation_id,
+                        attempt_count=attempt_count,
+                        storage_uncertain=True,
+                    )
             raise Types.AnswerStorageError(
                 "Answer storage is pending recovery; replay the same request key."
             ) from exc
+        if answer.status != "pending":
+            if recover:
+                logger.info(
+                    "answer_recovery_completed",
+                    generation_id=str(generation_id),
+                    attempt_count=attempt_count,
+                    status=answer.status,
+                )
+        return answer
+
+    async def recover_answer(
+        self, command: Types.ClaimAnswerRecoveryCommand
+    ) -> Types.AnswerInfo:
+        """Trusted operations entry point: one audited attempt, no provider call or budget reset."""
+        AnswerRecoveryCommandService.validate_recovery_command(command)
+        if command.operator is None or command.reason is None:
+            raise ValueError(
+                "Manual recovery requires an operator and investigation reason."
+            )
+        return await self._complete_staged(
+            command.generation_id,
+            command.user_id,
+            recover=True,
+            recovery_command=command,
+        )
 
     async def _stage(
         self,
@@ -598,25 +861,16 @@ class AnswerOrchestrator:
     async def _finalize(
         self, generation_id: UUID, user_id: UUID, *, recover: bool = False
     ) -> Types.AnswerInfo:
-        async with self.sessions() as session, use_case_transaction(session):
-            run = await GenerationQueryService.get_generation_state(
+        async with (
+            self.sessions() as session,
+            GenerationCommandService._locked_generation(
                 session,
                 Types.GetGenerationStateCommand(
                     generation_id=generation_id, user_id=user_id
                 ),
-            )
-            await ConversationService.get_owned_conversation(
-                session,
-                ConversationTypes.OwnedConversationCommand(
-                    conversation_id=run.conversation_id, user_id=user_id, lock=True
-                ),
-            )
-            run = await GenerationQueryService.get_generation_state(
-                session,
-                Types.GetGenerationStateCommand(
-                    generation_id=generation_id, user_id=user_id
-                ),
-            )
+            ) as locked,
+        ):
+            run = locked.run
             if run.status != "pending":
                 return _answer_info(run)
             metadata = run.answer_metadata or {}
@@ -633,7 +887,7 @@ class AnswerOrchestrator:
             # 실패와 불확실성을 기록한다.
             if metadata.get("phase") != "result_ready":
                 if not recover:
-                    raise Types.AnswerStorageError("No durable provider result.")
+                    raise Types.AnswerStateError("No durable provider result.")
                 metadata = _failure(
                     metadata,
                     "interrupted_uncertain"
@@ -642,8 +896,8 @@ class AnswerOrchestrator:
                     LLMTypes.TokenUsageInfo(),
                     uncertain=metadata.get("phase") == "calling",
                 )
-                await AnswersCommandService.update_answer(
-                    session,
+                await AnswersCommandService._update_locked_answer(
+                    locked,
                     Types.UpdateAnswerCommand(
                         generation_id=generation_id,
                         user_id=user_id,
@@ -669,7 +923,7 @@ class AnswerOrchestrator:
                     or metadata.get("outcome") == "succeeded"
                 )
             ):
-                raise Types.AnswerStorageError("Missing answer billing binding.")
+                raise Types.AnswerStateError("Missing answer billing binding.")
             value = Types.GenerationResult(
                 input_tokens=_usage_count(usage.get("input_tokens")),
                 output_tokens=_usage_count(usage.get("output_tokens")),
@@ -685,14 +939,11 @@ class AnswerOrchestrator:
                 outcome=stored["outcome"],
                 latency_ms=stored.get("latency_ms"),
             )
-            finished = await finish_generation_and_schedule_memory(
-                session,
-                Types.FinishGenerationCommand(
-                    generation_id=generation_id, user_id=user_id, value=value
-                ),
+            finished = await _finish_locked_generation_and_schedule_memory(
+                locked, value
             )
             if billing is not None:
-                if finished.status == "succeeded":
+                if finished.state.status == "succeeded":
                     settled = await BillingCreditService.commit_credit_reservation(
                         session,
                         BillingTypes.CommitCreditReservationCommand(
@@ -712,42 +963,44 @@ class AnswerOrchestrator:
                         ),
                     )
                 if settled.reserved_credit != billing["reserved_credit"]:
-                    raise Types.AnswerStorageError(
+                    raise Types.AnswerStateError(
                         "Answer charge differs from reservation."
                     )
             if metadata.get("error_code") == "summary_required":
+                summary_target = metadata.get("summary_through_position")
                 await MemoryService.schedule_memory_work(
                     session,
                     MemoryTypes.ScheduleMemoryWorkCommand(
-                        conversation_id=run.conversation_id, owner_id=user_id
+                        conversation_id=run.conversation_id,
+                        owner_id=user_id,
+                        summary_through_position=(
+                            summary_target
+                            if type(summary_target) is int and summary_target > 0
+                            else None
+                        ),
                     ),
                 )
-            run = await GenerationQueryService.get_generation_state(
-                session,
-                Types.GetGenerationStateCommand(
-                    generation_id=generation_id, user_id=user_id
-                ),
-            )
-            return _answer_info(run)
+            return _answer_info(finished.state)
 
     # 반환값은 조회한 만료 생성 수다. 개별 복구 실패도 포함하므로 성공 건수로 해석하지
     # 않는다.
     # lease가 만료된 답변만 순회한다. 결과가 없으면 중단 단계를 구분해 실패 처리하고
     # 저장된 결과는 완료를 재시도한다.
     async def recover_answers(self) -> int:
-        async with self.sessions() as session:
-            expired = await AnswersCommandService.list_expired_answers(
-                session, Types.ListExpiredAnswersCommand(now=datetime.now(UTC))
-            )
+        try:
+            async with self.sessions() as session:
+                expired = await AnswersCommandService.list_expired_answers(
+                    session, Types.ListExpiredAnswersCommand(now=datetime.now(UTC))
+                )
+        except Exception as exc:
+            self._log_failure("answer_recovery_scan_failed", exc, phase="recovery_scan")
+            raise
         for run in expired:
             try:
-                await self._finalize(run.id, run.user_id, recover=True)
-            except Exception as exc:  # noqa: BLE001 - isolate recovery of each conversation
-                logger.warning(
-                    "answer_recovery_failed",
-                    generation_id=str(run.id),
-                    error_kind=type(exc).__name__,
-                )
+                await self._complete_staged(run.id, run.user_id, recover=True)
+            except Types.AnswerStorageError:
+                # Already diagnosed; isolate each run without repeating its LLM call.
+                continue
         return len(expired)
 
 
@@ -769,17 +1022,17 @@ def _digest(value: object) -> str:
 
 def _validate_result(result: LLMTypes.LLMResultInfo) -> None:
     if not isinstance(result.content, str) or not result.content.strip():
-        raise ValueError("empty_response")
+        raise _InvalidAnswerResultError("empty_response")
     if (
         len(result.content) > 200000
         or result.status not in (None, "completed")
         or result.finish_reason
         not in (None, "completed", "end_turn", "stop_sequence", "mock")
     ):
-        raise ValueError("invalid_result")
+        raise _InvalidAnswerResultError("invalid_result")
     for value in (result.usage.input_tokens, result.usage.output_tokens):
         if type(value) is not int or not 0 <= value < 2**31:
-            raise ValueError("invalid_usage")
+            raise _InvalidAnswerResultError("invalid_usage")
 
 
 def _classify_error(
@@ -808,12 +1061,8 @@ def _classify_error(
         return "memory_" + exc.kind.value, exc.retryable, False
     if isinstance(exc, TimeoutError):
         return "timeout", phase != "calling", phase == "calling"
-    if isinstance(exc, (ValueError, TypeError)) and str(exc) in (
-        "empty_response",
-        "invalid_result",
-        "invalid_usage",
-    ):
-        return str(exc), False, False
+    if isinstance(exc, _InvalidAnswerResultError):
+        return exc.code, False, False
     return "internal_error", False, phase == "calling"
 
 
@@ -861,40 +1110,32 @@ async def finish_generation_and_schedule_memory(
     session: AsyncSession, command: Types.FinishGenerationCommand
 ) -> Types.GenerationInfo:
     """The successful response and queue generation commit atomically."""
-    async with use_case_transaction(session):
-        before = await GenerationQueryService.get_generation_state(
-            session,
-            Types.GetGenerationStateCommand(
-                generation_id=command.generation_id, user_id=command.user_id
-            ),
+    async with GenerationCommandService._locked_generation(
+        session,
+        Types.GetGenerationStateCommand(
+            generation_id=command.generation_id, user_id=command.user_id
+        ),
+    ) as locked:
+        completion = await _finish_locked_generation_and_schedule_memory(
+            locked, command.value
         )
-        await ConversationService.get_owned_conversation(
-            session,
-            ConversationTypes.OwnedConversationCommand(
-                conversation_id=before.conversation_id,
-                user_id=command.user_id,
-                lock=True,
-            ),
+        return completion.result
+
+
+async def _finish_locked_generation_and_schedule_memory(
+    locked: GenerationCommandService._LockedGeneration, value: Types.GenerationResult
+) -> GenerationCommandService._GenerationCompletion:
+    locked.require_active()
+    async with use_case_transaction(locked.session):
+        completion = await GenerationCommandService._finish_locked_generation(
+            locked, value, GenerationCommandService.result_digest(value)
         )
-        before = await GenerationQueryService.get_generation_state(
-            session,
-            Types.GetGenerationStateCommand(
-                generation_id=command.generation_id, user_id=command.user_id
-            ),
-        )
-        result = await GenerationCommandService.finish_generation(session, command)
-        if result.status == "succeeded" and before.status == "pending":
-            generation = await GenerationQueryService.get_generation_state(
-                session,
-                Types.GetGenerationStateCommand(
-                    generation_id=command.generation_id, user_id=command.user_id
-                ),
-            )
+        if completion.state.status == "succeeded" and completion.transitioned:
             await MemoryService.schedule_memory_work(
-                session,
+                locked.session,
                 MemoryTypes.ScheduleMemoryWorkCommand(
-                    conversation_id=generation.conversation_id,
-                    owner_id=command.user_id,
+                    conversation_id=completion.state.conversation_id,
+                    owner_id=completion.state.user_id,
                 ),
             )
-        return result
+        return completion

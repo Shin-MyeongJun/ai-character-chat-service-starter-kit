@@ -10,6 +10,9 @@ from app.db.transaction import use_case_transaction
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
+from app.modules.content.product.service.studio_validation import (
+    validate_studio_document_shape,
+)
 
 
 def _read_studio_tag_names(value: object) -> tuple[str, ...]:
@@ -35,13 +38,13 @@ async def save_studio_draft(
         raise ValueError("Invalid or oversized studio document.")
     if command.expected_revision is not None and command.expected_revision < 1:
         raise ValueError("Invalid studio revision.")
+    validate_studio_document_shape(command.document)
     work = command.document.get("work")
     if not isinstance(work, dict):
         raise ValueError("Studio work profile is required.")
     title = work.get("title")
     description = work.get("introduction")
-    # Lookup still receives the raw JSON value, preserving the existing handling
-    # of unknown labels and unhashable malformed inputs.
+    # Shape validation guarantees text before the label lookup.
     visibility_by_label: dict[object, Types.Visibility] = {
         "비공개": "private",
         "링크 공개": "unlisted",
@@ -133,6 +136,7 @@ async def mark_studio_publication(
 ) -> Types.ReleaseInfo:
     """Record the committed release receipt and stable component mapping in existing JSONB."""
     async with use_case_transaction(session):
+        await lock_key(session, "product-studio-draft", str(command.product_id))
         product = PersistenceMapper.product_entity_to_state_info(
             await Repository.get_product_for_update(session, command.product_id)
         )
@@ -167,10 +171,11 @@ async def set_studio_components(
 ) -> Types.StudioDraftInfo:
     """Persist server-owned component identities without changing document revision/digest.
 
-    The upper workflow owns the transaction and product-first lock order. Keeping
+    The upper workflow owns the transaction and advisory → product → draft order. Keeping
     upload preparation here makes response-loss retries reuse the same characters.
     """
     async with use_case_transaction(session):
+        await lock_key(session, "product-studio-draft", str(command.product_id))
         product = PersistenceMapper.product_entity_to_state_info(
             await Repository.get_product_for_update(session, command.product_id)
         )

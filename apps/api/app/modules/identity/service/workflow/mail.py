@@ -1,8 +1,9 @@
-"""Commit account/token state before sending mail; SMTP failure preserves it."""
+"""HTTP only commits intent. The separate worker claims, sends, then acknowledges."""
 
 from app.modules.identity import types as Types
 from app.modules.identity.adapters import MailSender
 from app.modules.identity.service.authentication import AuthenticationService
+from app.modules.identity.service.mail_delivery import MailDeliveryService
 
 
 class AuthenticationMailWorkflow:
@@ -11,30 +12,46 @@ class AuthenticationMailWorkflow:
     ) -> None:
         self.auth = authentication
         self.mailer = mailer
-
-    async def _send_action_mail(self, value: Types.ActionMailInfo | None) -> None:
-        if value is None:
-            return
-        page = "/verify-email" if value.purpose == "verify" else "/reset-password"
-        await self.mailer.send_mail(
-            value.email,
-            value.purpose,
-            self.auth.settings.public_origin + page + "#token=" + value.token,
+        self.delivery = MailDeliveryService(
+            authentication.sessions, authentication.settings
         )
 
+    async def deliver_next_mail(self) -> bool:
+        info = await self.delivery.claim_mail()
+        if info is None:
+            return False
+        if info.mail is None:
+            return True
+        mail = info.mail
+        page = "/verify-email" if mail.purpose == "verify" else "/reset-password"
+        outcome = Types.CompleteMailDeliveryCommand(info.id, info.claim_token, "sent")
+        try:
+            await self.mailer.send_mail(
+                mail.email,
+                mail.purpose,
+                self.auth.settings.public_origin + page + "#token=" + mail.token,
+            )
+        except Types.AuthError as exc:
+            if exc.code != "mail_unavailable":
+                raise
+            can_retry = not isinstance(exc, Types.MailDeliveryError) or exc.can_retry
+            outcome = Types.CompleteMailDeliveryCommand(
+                info.id, info.claim_token, "retry" if can_retry else "failed"
+            )
+        # Unexpected errors/cancellation leave the durable lease for recovery.
+        # SMTP acceptance and this commit cannot be made atomic (at-least-once).
+        await self.delivery.complete_mail(outcome)
+        return True
+
     async def register_user(self, command: Types.CredentialsCommand) -> None:
-        await self._send_action_mail(await self.auth.register_pending_user(command))
+        await self.auth.register_pending_user(command)
 
     async def resend_verification(self, command: Types.EmailCommand) -> None:
-        await self._send_action_mail(
-            await self.auth.prepare_action_mail(
-                Types.PrepareActionMailCommand(command.email, "verify")
-            )
+        await self.auth.prepare_action_mail(
+            Types.PrepareActionMailCommand(command.email, "verify")
         )
 
     async def request_password_reset(self, command: Types.EmailCommand) -> None:
-        await self._send_action_mail(
-            await self.auth.prepare_action_mail(
-                Types.PrepareActionMailCommand(command.email, "reset")
-            )
+        await self.auth.prepare_action_mail(
+            Types.PrepareActionMailCommand(command.email, "reset")
         )

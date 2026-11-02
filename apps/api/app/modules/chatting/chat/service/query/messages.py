@@ -8,6 +8,7 @@ from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service import get_owned_conversation
+from app.modules.chatting.memory import service as MemoryService
 
 
 async def list_messages(
@@ -21,7 +22,7 @@ async def list_messages(
         or not 0 < command.cursor.position < 2**63
     ):
         raise ValueError("Invalid message cursor.")
-    await get_owned_conversation(
+    conversation = await get_owned_conversation(
         session,
         ConversationTypes.OwnedConversationCommand(
             conversation_id=command.conversation_id, user_id=command.user_id
@@ -34,7 +35,11 @@ async def list_messages(
         command.limit,
     )
     return PersistenceMapper.messages_entities_to_page_info(
-        rows, command.conversation_id, command.limit
+        rows,
+        command.conversation_id,
+        command.limit,
+        history_revision=conversation.history_revision,
+        after_cursor=command.cursor,
     )
 
 
@@ -93,3 +98,115 @@ async def list_memory_source(
     return PersistenceMapper.messages_entities_to_memory_source_info(
         rows, command.limit
     )
+
+
+async def get_history_version(
+    session: AsyncSession, command: Types.GetHistoryVersionCommand
+) -> Types.HistoryVersionInfo:
+    await get_owned_conversation(
+        session,
+        ConversationTypes.OwnedConversationCommand(
+            conversation_id=command.conversation_id, user_id=command.user_id
+        ),
+    )
+    return PersistenceMapper.history_version_to_info(
+        await Repository.get_history_version(session, command.conversation_id)
+    )
+
+
+async def list_recent_messages(
+    session: AsyncSession, command: Types.ListRecentMessagesCommand
+) -> tuple[Types.MessageInfo, ...]:
+    if type(command.limit) is not int or not 1 <= command.limit <= 100:
+        raise ValueError("Recent message limit must be 1–100.")
+    await get_owned_conversation(
+        session,
+        ConversationTypes.OwnedConversationCommand(
+            conversation_id=command.conversation_id, user_id=command.user_id
+        ),
+    )
+    source = PersistenceMapper.messages_entities_to_memory_source_info(
+        await Repository.list_message_range(
+            session,
+            command.conversation_id,
+            0,
+            None,
+            command.limit,
+            newest_first=True,
+        ),
+        command.limit,
+    )
+    return tuple(reversed(source.messages))
+
+
+async def read_message_window(
+    session: AsyncSession, command: Types.ReadMessageWindowCommand
+) -> Types.MessageWindowInfo:
+    """Read a contiguous prefix/suffix through the first token-budget overflow.
+
+    Keep that whole overflow message as evidence for compaction. Page size bounds
+    transfer overshoot; total retained text depends on budget, not conversation age.
+    The caller owns a conversation lock when several reads must share one history.
+    """
+    if (
+        type(command.token_budget) is not int
+        or command.token_budget < 0
+        or type(command.after_position) is not int
+        or command.after_position < 0
+        or command.through_position is not None
+        and (
+            type(command.through_position) is not int
+            or command.through_position <= command.after_position
+        )
+        or type(command.minimum_messages) is not int
+        or not 0 <= command.minimum_messages <= 100
+    ):
+        raise ValueError("Invalid message window budget or range.")
+    await get_owned_conversation(
+        session,
+        ConversationTypes.OwnedConversationCommand(
+            conversation_id=command.conversation_id, user_id=command.user_id
+        ),
+    )
+    after, through = command.after_position, command.through_position
+    messages: list[Types.MessageInfo] = []
+    used_tokens = 0
+    has_more = False
+    while True:
+        page = PersistenceMapper.messages_entities_to_memory_source_info(
+            await Repository.list_message_range(
+                session,
+                command.conversation_id,
+                after,
+                through,
+                128,
+                newest_first=command.newest_first,
+            ),
+            128,
+        )
+        for index, item in enumerate(page.messages):
+            messages.append(item)
+            if item.id != command.excluded_message_id:
+                used_tokens += MemoryService.estimate_message_tokens(
+                    item.sender_type,
+                    item.content,
+                    conservative=command.conservative_token_budget,
+                )
+            if (
+                used_tokens > command.token_budget
+                and len(messages) >= command.minimum_messages
+            ):
+                has_more = page.truncated or index < len(page.messages) - 1
+                break
+        else:
+            if page.truncated:
+                if command.newest_first:
+                    through = page.messages[-1].position - 1
+                else:
+                    after = page.messages[-1].position
+                continue
+            break
+        break
+    if command.newest_first:
+        messages.reverse()
+    return Types.MessageWindowInfo(tuple(messages), has_more)

@@ -76,6 +76,7 @@ def workflow(monkeypatch):
         runtime,
         SimpleNamespace(context_window=8000),
         SimpleNamespace(product_id=uuid4()),
+        Types.HistoryVersionInfo(1),
         "snapshot",
     )
     command = Types.GenerateAnswerCommand(

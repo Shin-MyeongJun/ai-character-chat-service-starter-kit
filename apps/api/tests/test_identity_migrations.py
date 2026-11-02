@@ -42,6 +42,7 @@ async def test_auth_migration_matches_orm_and_preserves_legacy(identity_db):  # 
     async with engine.connect() as conn:
         original_schema = await conn.scalar(text("SELECT current_schema()"))
         expected = await conn.run_sync(signature, original_schema)
+        expected.pop("auth_mail_outbox")  # Added after 0020, covered by 0034 tests.
     schema = "auth_migration_" + uuid4().hex
     raw = await engine.raw_connection()
     connection = raw.driver_connection

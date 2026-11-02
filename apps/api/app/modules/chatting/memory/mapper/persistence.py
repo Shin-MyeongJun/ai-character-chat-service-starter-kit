@@ -94,10 +94,13 @@ def memory_job_entity_to_work(entity: MemoryJob | None) -> Types.MemoryWorkInfo 
         return None
     assert entity.scope_generation is not None
     assert entity.lease_owner is not None
+    assert entity.claim_token is not None
     return Types.MemoryWorkInfo(
         conversation_id=entity.conversation_id,
         owner_id=entity.owner_id,
         scope_generation=entity.scope_generation,
         attempt_count=entity.attempt_count,
         lease_owner=entity.lease_owner,
+        claim_token=entity.claim_token,
+        summary_through_position=entity.summary_through_position,
     )

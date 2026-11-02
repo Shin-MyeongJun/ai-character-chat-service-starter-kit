@@ -1,5 +1,14 @@
 # Billing 모듈
 
+## U27 빈 파일·legacy 조사 (2026-11-02)
+
+0바이트 `router.py`, `schemas.py`는 import·문자열 로딩·실행/배포 진입점 참조가 없어
+제거했다. billing은 계속 공개 service/types로 호출하며 전용 HTTP 결제 API는 없다.
+구독 모델은 모델 등록과 `payments.subscription_id → user_subscriptions.id`,
+`user_subscriptions.plan_id → subscription_plans.id` FK 및 기존 스키마를 유지한다.
+가격 무효과 정책도 실제 계산·견적 JSON 계약이므로 보존한다. 조사·검증과 데이터 확인이 남은 범위는
+[U27 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U27-WORKLOG.md)을 따른다.
+
 - 현재 구현에서 사용하는 소유 테이블: `payments`, `usage_logs`, `product_payment_events`, `billing_quotes`, `billing_credit_bindings`.
 - 구독용 `subscription_plans`, `user_subscriptions`는 이 도메인의 기존 미구현 데이터다. 잔액·원장·예약은 credit이 소유하며 billing은 credit의 공개 service/types만 참조한다. 현재 billing v1은 CREDIT 한 재화를 선택하며 무료/유료 합계만 기존 잔액 Info로 반환한다.
 - `service/command/attribution.py`: 검증된 결제의 상품 버전별 매출 배분·환불 귀속. 모든 요청은 Command, 결과는 저장된 PaymentEventInfo다. 원래 결제/매출 한도를 넘어서는 배분·환불과 멱등 키 재사용 충돌을 거절한다.
@@ -25,7 +34,7 @@ mapper의 기존 Decimal/UUID 문자열 직렬화와 저장 JSON 키·값은 바
 
 금액은 currency 단위 Decimal이며 cost_credit과 다르다. refund의 occurred_at은 실제 환불 시각, attributed_at은 원매출 귀속 시각이다. 통계 facts 조회는 [start, end), 사용량 created_at과 결제 attributed_at을 각각 사용한다.
 
-관련 테스트: `test_product_usage`, `test_product_statistics`, `test_use_case_transaction`. billing router/schemas는 HTTP 결제 구현이 아니다. billing/service/credits.py가 견적을 검증하고 credit 공개 서비스를 호출한다.
+관련 테스트: `test_product_usage`, `test_product_statistics`, `test_use_case_transaction`. billing/service/credits.py가 견적을 검증하고 credit 공개 서비스를 호출한다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
 
@@ -118,7 +127,8 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
   신규 예약은 지갑 잠금을 기다린 뒤 읽은 시각으로 견적 만료를 판단한다. 기존 예약 재전송은
   만료와 무관하게 전체 견적 요청과 저장된 ID·재화·금액·분류 상태를 확인하고 그대로 반환한다.
 - 확정/해제는 최초 배분을 사용한다. 현재 가격·정책·추가 무료 지급으로 배분을 다시 계산하지 않는다.
-  내부 호출과 연결 insert를 billing SAVEPOINT로 함께 묶어 연결 실패에도 부분 예약을 남기지 않는다.
+  내부 호출과 연결 insert를 credit 공개 use_credit_write_scope의 SAVEPOINT 하나로
+  함께 묶어 연결 실패에도 부분 예약을 남기지 않는다. 하위 예약·확정·해제는 같은 경계에 참여한다.
 - 명시적 session.begin() 또는 use_case_transaction에 참여하고 내부 commit하지 않는다.
   견적 생성까지 조합할 때에는 기존대로 use_case_transaction을 사용한다.
 - credit의 부족/미존재/충돌 오류는 기존 billing 오류 계열로 변환한다. 미분류 기존 사용자에 대한
@@ -131,6 +141,23 @@ ROUND_HALF_UP이며 정상가격 이상은 0이다. 정상가격 초과 하한�
   실제 chat/answers 연결은 아래 2026-09-22 계약으로 구현했다. 현금 결제/환불, 별도 billing HTTP/UI, billing_chat 분리는 범위 밖이다.
 
 원본 검증 결과: [완료 보고](../../../../../../docs/credit-billing-separation-handoff.md).
+
+### U21 반복 잠금·SAVEPOINT 정리 (2026-10-30)
+
+reserve/commit/release의 기존 외부 SAVEPOINT를 credit의 공개 실행 문맥
+`use_credit_write_scope(session)`로 연결했다. billing 요청 키 → credit 지갑 → binding →
+credit 예약의 잠금 순서는 같다. 지갑 잠금·legacy 검증의 재사용 여부는 credit만 판단한다.
+잔액은 최신 값으로 다시 읽으며 billing은 credit의 repository/mapper/내부 상태를 참조하지 않는다.
+
+binding 저장 실패, 부분 차감 뒤 DB 오류/취소는 공유 SAVEPOINT 전체를 되돌린다. 외부 호출자가
+예외를 잡고 상위 트랜잭션을 계속하거나 같은 키로 재시도하는 계약도 유지한다. 신규 예약의
+견적 만료 판단은 지갑 잠금을 기다린 이후이고, 기존 예약 재생은 만료와 무관하다.
+quote 검증·오류 번역·공개 Command/Info·저장 스키마·과금액/배분 정책은 변경하지 않았다.
+
+실제 PostgreSQL의 한 건 서비스 호출에서 SQL은 신규 예약 22→17, 확정 20→15, 해제
+18→13회였다. 각 경로의 SAVEPOINT와 지갑 FOR UPDATE는 2→1회이며 기존 예약 재생은
+SQL 10회로 같다. 이는 준비/외부 트랜잭션 commit을 제외한 계수이고 운영 지연·처리량
+개선율 측정은 아니다. 검증과 한계는 [U21 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U21-WORKLOG.md)에 남긴다.
 
 ## 과거 독립 통합 검증과 연결 경계 (2026-09-21)
 

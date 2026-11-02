@@ -4,7 +4,7 @@ from typing import overload
 from uuid import UUID
 
 from app.db.models.chat import Message, MessageRequest
-from app.db.models.product_usage import ProductGeneration
+from app.db.models.product_usage import AnswerRecoveryAttempt, ProductGeneration
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.types import GenerationInfo
@@ -39,7 +39,12 @@ def message_entity_to_info(entity: Message | None) -> Types.MessageInfo | None:
 
 
 def messages_entities_to_page_info(
-    entities: Sequence[Message], conversation_id: UUID, limit: int
+    entities: Sequence[Message],
+    conversation_id: UUID,
+    limit: int,
+    *,
+    history_revision: int | None = None,
+    after_cursor: Types.MessageCursor | None = None,
 ) -> Types.MessagePageInfo:
     items = tuple(message_entity_to_info(entity) for entity in entities[:limit])
     cursor = (
@@ -47,7 +52,12 @@ def messages_entities_to_page_info(
         if len(entities) > limit
         else None
     )
-    return Types.MessagePageInfo(items, cursor)
+    sync_cursor = (
+        Types.MessageCursor(conversation_id, items[-1].position)
+        if items
+        else after_cursor
+    )
+    return Types.MessagePageInfo(items, cursor, history_revision, sync_cursor)
 
 
 def conversation_preview_rows_to_info(
@@ -66,6 +76,19 @@ def conversation_activity_rows_to_info(
     }
 
 
+def recent_conversation_rows_to_page_view(
+    rows: Sequence[Repository.RecentConversationRow], limit: int, total: int
+) -> Types.RecentConversationsPageView:
+    items = tuple(Types.RecentConversationView(*row) for row in rows[:limit])
+    last = items[-1] if len(rows) > limit else None
+    return Types.RecentConversationsPageView(
+        items=items,
+        next_cursor_created_at=last.last_activity_at if last else None,
+        next_cursor_id=last.id if last else None,
+        total=total,
+    )
+
+
 def messages_entities_to_memory_source_info(
     entities: Sequence[Message], limit: int
 ) -> Types.MemorySourceInfo:
@@ -73,6 +96,10 @@ def messages_entities_to_memory_source_info(
         messages=tuple(message_entity_to_info(entity) for entity in entities[:limit]),
         truncated=len(entities) > limit,
     )
+
+
+def history_version_to_info(version: int) -> Types.HistoryVersionInfo:
+    return Types.HistoryVersionInfo(version=version)
 
 
 @overload
@@ -155,6 +182,20 @@ def generation_entity_to_state_info(
         history_invalidated_at=entity.history_invalidated_at,
         answer_metadata=entity.answer_metadata,
         answer_lease_until=entity.answer_lease_until,
+        answer_recovery_attempts=entity.answer_recovery_attempts,
+        answer_recovery_next_at=entity.answer_recovery_next_at,
+        answer_recovery_quarantined_at=entity.answer_recovery_quarantined_at,
+    )
+
+
+def answer_recovery_attempt_entity_to_info(
+    entity: AnswerRecoveryAttempt,
+) -> Types.AnswerRecoveryAttemptInfo:
+    return Types.AnswerRecoveryAttemptInfo(
+        attempt_count=entity.attempt_count,
+        started_at=entity.started_at,
+        failure_class=entity.failure_class,
+        manual=entity.operator is not None,
     )
 
 

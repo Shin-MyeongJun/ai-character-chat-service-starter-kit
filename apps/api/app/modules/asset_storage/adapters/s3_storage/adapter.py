@@ -273,6 +273,40 @@ class S3StorageAdapter:
         )
 
     async def read_asset(self, command: ReadAssetCommand) -> AssetReadInfo:
+        # get_object runs in a thread that cancellation cannot stop. Retain the
+        # acquisition task until its outcome (and any returned reader) is owned.
+        task = asyncio.create_task(self._open_asset(command))
+        cancellation: asyncio.CancelledError | None = None
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError as exc:
+                if cancellation is None:
+                    cancellation = exc
+            except Exception:
+                break  # Outcome is retrieved below, including after cancellation.
+        if cancellation is None:
+            return task.result()
+        try:
+            opened = task.result()
+        except (Exception, asyncio.CancelledError):
+            # Consume provider/metadata failure; caller cancellation stays primary.
+            raise cancellation from None
+        cleanup = asyncio.create_task(opened.aclose())
+        while not cleanup.done():
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                continue  # Repeated cancellation must not abandon Body.close().
+            except Exception:
+                break
+        try:
+            cleanup.result()
+        finally:
+            # Retrieve cleanup failure too; do not replace the pending cancellation.
+            raise cancellation
+
+    async def _open_asset(self, command: ReadAssetCommand) -> AssetReadInfo:
         try:
             provider_response = await asyncio.to_thread(
                 self._client.get_object,

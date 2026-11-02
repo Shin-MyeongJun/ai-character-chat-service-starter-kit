@@ -1,15 +1,81 @@
 """Server-only credit operations inside an explicit caller-owned transaction."""
 
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import SessionTransactionOrigin
+from sqlalchemy.orm import SessionTransaction, SessionTransactionOrigin
 
 from app.modules.commerce.credit import repository as Repository
 from app.modules.commerce.credit import types as Types
 from app.modules.commerce.credit.mapper import persistence as PersistenceMapper
+
+_WRITE_SCOPE_KEY = "credit_write_scope"
+
+
+@dataclass
+class _CreditWriteScope:
+    transaction: SessionTransaction
+    savepoint: SessionTransaction
+    locked_wallets: set[tuple[UUID, str]] = field(default_factory=set)
+    failed: bool = False
+
+
+def _get_credit_write_scope(session: AsyncSession) -> _CreditWriteScope | None:
+    scope = session.info.get(_WRITE_SCOPE_KEY)
+    if not isinstance(scope, _CreditWriteScope):
+        return None
+    if (
+        session.sync_session.get_transaction() is not scope.transaction
+        or not scope.transaction.is_active
+        or not scope.savepoint.is_active
+    ):
+        raise RuntimeError("Credit write scope is no longer active.")
+    if session.sync_session.get_nested_transaction() is not scope.savepoint:
+        # A caller's independent savepoint owns its own rollback and lock evidence.
+        return None
+    if scope.failed:
+        raise RuntimeError("A joined credit operation failed; scope must roll back.")
+    return scope
+
+
+@asynccontextmanager
+async def use_credit_write_scope(session: AsyncSession) -> AsyncIterator[None]:
+    """Share one SAVEPOINT for credit writes and caller-owned related persistence.
+
+    The caller still owns the outer transaction. Joined failures poison this scope
+    even when caught inside its body. Lock evidence lasts only in this savepoint;
+    balances are always read afresh, including after intervening credit writes.
+    """
+    _require_credit_transaction(session)
+    scope = _get_credit_write_scope(session)
+    if scope is not None:
+        try:
+            yield
+        except BaseException:
+            scope.failed = True
+            raise
+        return
+    previous_scope: object = session.info.get(_WRITE_SCOPE_KEY)
+    async with session.begin_nested():
+        transaction = session.sync_session.get_transaction()
+        savepoint = session.sync_session.get_nested_transaction()
+        assert transaction is not None and savepoint is not None
+        scope = _CreditWriteScope(transaction, savepoint)
+        session.info[_WRITE_SCOPE_KEY] = scope
+        try:
+            yield
+            if _get_credit_write_scope(session) is not scope:
+                raise RuntimeError("Credit write scope has an unfinished savepoint.")
+        finally:
+            if previous_scope is None:
+                session.info.pop(_WRITE_SCOPE_KEY, None)
+            else:
+                session.info[_WRITE_SCOPE_KEY] = previous_scope
 
 
 def _get_utc_now() -> datetime:
@@ -33,13 +99,18 @@ async def _get_credit_balance(
     session: AsyncSession, user_id: UUID, currency_code: str, *, for_update: bool
 ) -> Types.CreditBalanceInfo:
     _validate_currency(currency_code)
-    if for_update:
-        await Repository.lock_credit_wallet(session, user_id, currency_code)
-    await _reject_legacy_credit(session, user_id)
+    scope = _get_credit_write_scope(session) if for_update else None
+    wallet_key = (user_id, currency_code)
+    if scope is None or wallet_key not in scope.locked_wallets:
+        if for_update:
+            await Repository.lock_credit_wallet(session, user_id, currency_code)
+        await _reject_legacy_credit(session, user_id)
     row = await Repository.get_credit_account(session, user_id, currency_code)
     info = PersistenceMapper.credit_account_entity_to_info(row)
     if info is None:
         raise Types.CreditAccountNotFoundError("Credit account not found.")
+    if scope is not None:
+        scope.locked_wallets.add(wallet_key)
     return info
 
 
@@ -77,7 +148,7 @@ async def reserve_credit(
         raise Types.InvalidCreditCommandError(
             "Reservation time must be timezone-aware."
         )
-    async with session.begin_nested():
+    async with use_credit_write_scope(session):
         balance = await _get_credit_balance(
             session, command.user_id, command.currency_code, for_update=True
         )
@@ -180,7 +251,7 @@ async def commit_credit_reservation(
         command.user_id, command.request_key, command.reservation_id, command.result_id
     )
     _validate_metadata(command.namespace)
-    async with session.begin_nested():
+    async with use_credit_write_scope(session):
         info = await _get_owned_reservation(
             session,
             command.user_id,
@@ -242,7 +313,7 @@ async def release_credit_reservation(
     _require_credit_transaction(session)
     _validate_identifiers(command.user_id, command.request_key, command.reservation_id)
     _validate_metadata(command.namespace)
-    async with session.begin_nested():
+    async with use_credit_write_scope(session):
         info = await _get_owned_reservation(
             session,
             command.user_id,

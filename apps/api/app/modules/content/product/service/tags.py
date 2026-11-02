@@ -12,6 +12,7 @@ from app.modules.content.product.mapper import tags as TagsPersistenceMapper
 from app.modules.content.product.repository import tags as Repository
 from app.modules.content.tag import types as TagTypes
 from app.modules.content.tag.service import command as TagCommandService
+from app.modules.content.tag.service import policy as TagPolicyService
 from app.modules.content.tag.service import query as TagQueryService
 from app.modules.identity import types as IdentityTypes
 from app.modules.identity.service import query as IdentityQueryService
@@ -79,11 +80,12 @@ async def _write_public_tags(
                 names=command.names, retained_ids=retained_tag_ids
             ),
         )
-        requested_tag_ids = tuple(tag.id for tag in tags)
-        tag_ids = (
-            tuple(dict.fromkeys((*retained_tag_ids, *requested_tag_ids)))
-            if append
-            else requested_tag_ids
+        tag_ids = TagPolicyService.select_public_tag_ids(
+            TagTypes.SelectPublicTagIdsCommand(
+                retained_ids=retained_tag_ids,
+                requested_ids=tuple(tag.id for tag in tags),
+                append=append,
+            )
         )
         await Repository.replace_public_tag_links(
             session, command.target_id, tag_ids, command.user_id
@@ -173,23 +175,21 @@ async def _write_internal_tags(
                 names=command.names, retained_ids=tuple(link.tag_id for link in links)
             ),
         )
-        if replace:
-            requested_tag_ids = {tag.id for tag in tags}
-            await Repository.remove_internal_tag_links(
-                session,
-                command.target_id,
-                tuple(
-                    link.tag_id
-                    for link in links
-                    if link.tag_id not in requested_tag_ids
-                ),
+        changes = TagPolicyService.plan_internal_tag_changes(
+            TagTypes.PlanInternalTagChangesCommand(
+                links=links,
+                requested_ids=tuple(tag.id for tag in tags),
+                source=source,
+                replace=replace,
             )
-        protected_tag_ids = {link.tag_id for link in links if link.source == "admin"}
-        for tag in tags:
-            if source == "system" and tag.id in protected_tag_ids:
-                continue
+        )
+        if replace:
+            await Repository.remove_internal_tag_links(
+                session, command.target_id, changes.remove_ids
+            )
+        for tag_id in changes.set_ids:
             await Repository.set_internal_tag_link(
-                session, command.target_id, tag.id, source, actor_id
+                session, command.target_id, tag_id, source, actor_id
             )
         return await _get_internal_tags(session, command.target_id)
 
@@ -250,10 +250,11 @@ async def _remove_internal_tag(
         links = TagsPersistenceMapper.internal_tag_links_entities_to_info(
             await Repository.list_internal_tag_links(session, command.target_id)
         )
-        if source == "system" and any(
-            link.tag_id == command.tag_id and link.source == "admin" for link in links
-        ):
-            raise ValueError("System cannot remove an administrator-assigned tag.")
+        TagPolicyService.validate_internal_tag_removal(
+            TagTypes.ValidateInternalTagRemovalCommand(
+                links=links, tag_id=command.tag_id, source=source
+            )
+        )
         await Repository.remove_internal_tag_links(
             session, command.target_id, (command.tag_id,)
         )

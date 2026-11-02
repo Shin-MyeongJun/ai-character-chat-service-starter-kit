@@ -5,12 +5,23 @@ from datetime import datetime
 from typing import TypeAlias, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import CursorResult, Row, Select, delete, func, select, update
+from sqlalchemy import (
+    CursorResult,
+    Row,
+    Select,
+    delete,
+    func,
+    literal_column,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat import Conversation, Message, MessageRequest
 from app.db.models.generation_prompt import GenerationPrompt
-from app.db.models.product_usage import ProductGeneration
+from app.db.models.message_history import ChatHistoryVersion
+from app.db.models.product_usage import AnswerRecoveryAttempt, ProductGeneration
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.llm import types as LlmTypes
@@ -18,6 +29,12 @@ from app.modules.llm import types as LlmTypes
 ConversationPreviewRow: TypeAlias = Row[tuple[UUID, str]] | tuple[UUID, str]
 ConversationActivityRow: TypeAlias = (
     Row[tuple[UUID, str, datetime]] | tuple[UUID, str, datetime]
+)
+RecentConversationValues: TypeAlias = tuple[
+    UUID, UUID, str | None, datetime, str | None, datetime
+]
+RecentConversationRow: TypeAlias = (
+    Row[RecentConversationValues] | RecentConversationValues
 )
 GenerationCountRow: TypeAlias = (
     Row[tuple[UUID, str, int, int]] | tuple[UUID, str, int, int]
@@ -141,12 +158,75 @@ async def list_conversation_activity(
     )
 
 
+async def list_recent_conversations(
+    session: AsyncSession,
+    user_id: UUID,
+    *,
+    limit: int,
+    cursor_activity_at: datetime | None = None,
+    cursor_id: UUID | None = None,
+) -> list[Row[RecentConversationValues]]:
+    """Explicit read-projection exception; see architecture rule C.2.
+
+    Only page-sized metadata/previews cross the DB boundary. The database still
+    evaluates activity across the owner's scope to sort it; this is not O(limit).
+    """
+    latest_created_at = (
+        select(Message.created_at)
+        .where(Message.conversation_id == Conversation.id)
+        .order_by(Message.created_at.desc(), Message.position.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    activity_at = func.coalesce(latest_created_at, Conversation.created_at)
+    statement = select(
+        Conversation.id,
+        Conversation.product_id,
+        Conversation.title,
+        Conversation.created_at,
+        activity_at.label("last_activity_at"),
+    ).where(Conversation.user_id == user_id)
+    if cursor_activity_at is not None:
+        assert cursor_id is not None  # The service validates the cursor pair.
+        statement = statement.where(
+            (activity_at < cursor_activity_at)
+            | ((activity_at == cursor_activity_at) & (Conversation.id < cursor_id))
+        )
+    page = (
+        statement.order_by(activity_at.desc(), Conversation.id.desc())
+        .limit(limit + 1)
+        .subquery()
+    )
+    # Fetch content only for the selected page; use the same timestamp/position
+    # rule as activity selection, within this single statement's read snapshot.
+    preview = (
+        select(Message.content)
+        .where(Message.conversation_id == page.c.id)
+        .order_by(Message.created_at.desc(), Message.position.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    result = await session.execute(
+        select(
+            page.c.id,
+            page.c.product_id,
+            page.c.title,
+            page.c.created_at,
+            preview,
+            page.c.last_activity_at,
+        ).order_by(page.c.last_activity_at.desc(), page.c.id.desc())
+    )
+    return list(result)
+
+
 async def list_message_range(
     session: AsyncSession,
     conversation_id: UUID,
     after: int,
     through: int | None,
     limit: int,
+    *,
+    newest_first: bool = False,
 ) -> list[Message]:
     stmt = select(Message).where(
         Message.conversation_id == conversation_id, Message.position > after
@@ -155,11 +235,21 @@ async def list_message_range(
         stmt = stmt.where(Message.position <= through)
     return list(
         await session.scalars(
-            stmt.order_by(Message.position)
+            stmt.order_by(Message.position.desc() if newest_first else Message.position)
             .limit(limit + 1)
             .execution_options(populate_existing=True)
         )
     )
+
+
+async def get_history_version(session: AsyncSession, conversation_id: UUID) -> int:
+    version = await session.scalar(
+        select(ChatHistoryVersion.version).where(
+            ChatHistoryVersion.conversation_id == conversation_id
+        )
+    )
+    # New empty conversations have no stamp until the first message INSERT.
+    return version if version is not None else 0
 
 
 async def get_message_request(
@@ -340,12 +430,83 @@ async def list_expired_answers(
         await session.scalars(
             select(ProductGeneration)
             .where(
-                ProductGeneration.status == "pending",
+                # A fixed internal predicate lets PostgreSQL use the pending
+                # partial index even for a prepared statement's generic plan.
+                ProductGeneration.status == literal_column("'pending'"),
                 ProductGeneration.answer_lease_until <= now,
+                ProductGeneration.answer_recovery_quarantined_at.is_(None),
+                ProductGeneration.answer_recovery_attempts
+                < Types.ANSWER_RECOVERY_MAX_ATTEMPTS,
+                or_(
+                    ProductGeneration.answer_recovery_next_at.is_(None),
+                    ProductGeneration.answer_recovery_next_at <= now,
+                ),
             )
             .order_by(ProductGeneration.answer_lease_until)
             .limit(limit)
         )
+    )
+
+
+async def claim_answer_recovery(
+    session: AsyncSession,
+    command: Types.ClaimAnswerRecoveryCommand,
+    attempt_count: int,
+    next_at: datetime,
+    quarantined_at: datetime | None,
+) -> None:
+    await session.execute(
+        update(ProductGeneration)
+        .where(ProductGeneration.id == command.generation_id)
+        .values(
+            answer_recovery_attempts=attempt_count,
+            answer_recovery_next_at=next_at,
+            answer_recovery_quarantined_at=quarantined_at,
+        )
+    )
+    session.add(
+        AnswerRecoveryAttempt(
+            generation_id=command.generation_id,
+            attempt_count=attempt_count,
+            started_at=command.now,
+            operator=command.operator,
+            reason=command.reason,
+        )
+    )
+    await session.flush()
+
+
+async def list_answer_recovery_attempts(
+    session: AsyncSession, generation_id: UUID
+) -> list[AnswerRecoveryAttempt]:
+    return list(
+        await session.scalars(
+            select(AnswerRecoveryAttempt)
+            .where(AnswerRecoveryAttempt.generation_id == generation_id)
+            .order_by(AnswerRecoveryAttempt.attempt_count)
+        )
+    )
+
+
+async def record_answer_recovery_failure(
+    session: AsyncSession,
+    command: Types.RecordAnswerRecoveryFailureCommand,
+    quarantined_at: datetime | None,
+) -> None:
+    await session.execute(
+        update(AnswerRecoveryAttempt)
+        .where(
+            AnswerRecoveryAttempt.generation_id == command.generation_id,
+            AnswerRecoveryAttempt.attempt_count == command.attempt_count,
+        )
+        .values(failure_class=command.failure_class)
+    )
+    await session.execute(
+        update(ProductGeneration)
+        .where(
+            ProductGeneration.id == command.generation_id,
+        )
+        .values(answer_recovery_quarantined_at=quarantined_at)
     )
 
 
@@ -384,6 +545,9 @@ async def finish_generation(
     assert run is not None
     run.status, run.result_digest, run.finished_at = status, fingerprint, now
     run.message_count = message_count
+    # Lease is live execution ownership, not history. Clear it atomically with
+    # every terminal outcome; rollback must retain the pending execution lease.
+    run.answer_lease_until = None
     await session.flush()
     return run
 

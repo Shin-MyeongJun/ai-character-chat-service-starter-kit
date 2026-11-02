@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
+from app.db.transaction import use_case_transaction
 from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.service.query import messages as MessagesQueryService
@@ -51,24 +52,6 @@ async def prepare_answer_context(
                     activation_text=command.current_message,
                 ),
             )
-    async with session_factory() as session:
-        latest = await MemoryService.get_latest_summary(
-            session,
-            MemoryTypes.GetLatestSummaryCommand(
-                conversation_id=command.conversation_id, owner_id=command.owner_id
-            ),
-        )
-        source = await MessagesQueryService.list_memory_source(
-            session,
-            Types.ListMemorySourceCommand(
-                conversation_id=command.conversation_id, user_id=command.owner_id
-            ),
-        )
-    if source.truncated:
-        raise MemoryTypes.ContextBudgetExceededError(
-            "Conversation history exceeds the safe prompt inspection limit.",
-            summary_required=True,
-        )
     base_tokens = (
         command.rendered_base_tokens
         if command.rendered_base_tokens is not None
@@ -76,6 +59,47 @@ async def prepare_answer_context(
             json.dumps(asdict(runtime), ensure_ascii=False, default=str)
         )
     )
+    async with session_factory() as session, use_case_transaction(session):
+        await ConversationService.get_owned_conversation(
+            session,
+            ConversationTypes.OwnedConversationCommand(
+                conversation_id=command.conversation_id,
+                user_id=command.owner_id,
+                lock=True,
+            ),
+        )
+        if command.expected_history_version is not None:
+            version = await MessagesQueryService.get_history_version(
+                session,
+                Types.GetHistoryVersionCommand(
+                    conversation_id=command.conversation_id, user_id=command.owner_id
+                ),
+            )
+            if version.version != command.expected_history_version:
+                raise Types.MessageConflictError(
+                    "Answer history changed during preparation."
+                )
+        latest = await MemoryService.get_latest_summary(
+            session,
+            MemoryTypes.GetLatestSummaryCommand(
+                conversation_id=command.conversation_id, owner_id=command.owner_id
+            ),
+        )
+        source = await MessagesQueryService.read_message_window(
+            session,
+            Types.ReadMessageWindowCommand(
+                conversation_id=command.conversation_id,
+                user_id=command.owner_id,
+                token_budget=max(
+                    0, command.max_prompt_tokens - base_tokens - command.response_tokens
+                ),
+                conservative_token_budget=command.rendered_base_tokens is not None,
+                minimum_messages=7,
+                excluded_message_id=command.current_message_id
+                if command.rendered_base_tokens is not None
+                else None,
+            ),
+        )
     current_is_saved = bool(
         source.messages
         and source.messages[-1].sender_type == "user"
@@ -98,13 +122,13 @@ async def prepare_answer_context(
     # The current input is reserved in the rendered base for orchestration and
     # must never become optional summarized history.
     if command.rendered_base_tokens is not None:
-        source = Types.MemorySourceInfo(
+        source = Types.MessageWindowInfo(
             tuple(
                 item
                 for item in source.messages
                 if item.id != command.current_message_id
             ),
-            source.truncated,
+            source.has_more,
         )
     unprocessed = tuple(item for item in source.messages if item.position > summary_end)
     message_tokens = (
@@ -115,9 +139,27 @@ async def prepare_answer_context(
     unprocessed_tokens = sum(message_tokens(item) for item in unprocessed)
     available = command.max_prompt_tokens - fixed
     if unprocessed_tokens > available:
+        target = MemoryService.plan_context_compaction(
+            MemoryTypes.PlanContextCompactionCommand(
+                messages=tuple(
+                    MemoryTypes.SourceMessageInfo(
+                        id=item.id,
+                        sender_type=item.sender_type,
+                        content=item.content,
+                        position=item.position,
+                        revision=item.revision,
+                    )
+                    for item in unprocessed
+                ),
+                policy=command.policy,
+                available_tokens=available,
+                conservative_token_budget=command.rendered_base_tokens is not None,
+            )
+        )
         raise MemoryTypes.ContextBudgetExceededError(
             "Unsummarized messages do not fit; wait for memory summarization and retry.",
             summary_required=True,
+            summary_through_position=target,
         )
 
     processed = [item for item in source.messages if item.position <= summary_end]
@@ -237,8 +279,10 @@ async def prepare_answer_context(
 
 
 def _message_tokens(item: Types.MessageInfo) -> int:
-    return MemoryService.estimate_tokens(f"{item.sender_type}: {item.content}\n")
+    return MemoryService.estimate_message_tokens(item.sender_type, item.content)
 
 
 def _rendered_message_tokens(item: Types.MessageInfo) -> int:
-    return len(item.content.encode()) + 32
+    return MemoryService.estimate_message_tokens(
+        item.sender_type, item.content, conservative=True
+    )

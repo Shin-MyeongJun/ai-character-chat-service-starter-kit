@@ -1,6 +1,8 @@
 # 상품/날짜 집계를 삭제 후 다시 저장한다. 트랜잭션 종료는 상위 호출자 책임이다.
 # 작업은 requested_at 순 SKIP LOCKED로 하나를 고른다. 기간 사용자 수는 일별 합이 아니라 DISTINCT다.
+from collections.abc import Iterable
 from datetime import date, datetime
+from itertools import islice
 from typing import TypeAlias
 from uuid import UUID
 
@@ -23,6 +25,9 @@ from app.modules.content.product import types as Types
 StatisticsReportRow: TypeAlias = tuple[
     list[ProductDailyStats | ProductVersionDailyStats], int, list[date]
 ]
+
+# Two bound values per key; keep SQL/parameters and temporary key storage bounded.
+_STATISTICS_WORK_BATCH_SIZE = 500
 
 
 async def replace_statistics_day(
@@ -165,9 +170,20 @@ async def get_statistics_report(
 async def upsert_statistics_work(
     session: AsyncSession, product_id: UUID, day: date
 ) -> None:
-    statement = pg_insert(ProductStatsDirtyDay).values(product_id=product_id, day=day)
-    await session.execute(
-        statement.on_conflict_do_update(
-            index_elements=["product_id", "day"], set_={"requested_at": func.now()}
+    await upsert_statistics_work_batch(session, [(product_id, day)])
+
+
+async def upsert_statistics_work_batch(
+    session: AsyncSession, work: Iterable[tuple[UUID, date]]
+) -> None:
+    keys = iter(work)
+    while batch := list(dict.fromkeys(islice(keys, _STATISTICS_WORK_BATCH_SIZE))):
+        # PG cannot update the same conflict key twice within one INSERT.
+        statement = pg_insert(ProductStatsDirtyDay).values(
+            [{"product_id": product_id, "day": day} for product_id, day in batch]
         )
-    )
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=["product_id", "day"], set_={"requested_at": func.now()}
+            )
+        )

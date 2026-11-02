@@ -1,14 +1,11 @@
 """이미 받은 신고·평가·조치를 공개 값으로 변환한다. DB 조회는 없다."""
 
 from copy import deepcopy
-from typing import Literal, TypeVar, cast, overload
-from uuid import UUID
+from typing import Literal, cast, overload
 
 from app.db.models.moderation_review import ModerationAction, ModerationReport
 from app.modules.governance.moderation import types as Types
 from app.modules.governance.moderation.repository import review as ReviewRepository
-
-T = TypeVar("T", bound=UUID | None)
 
 
 @overload
@@ -150,11 +147,6 @@ def action_entity_to_info(entity: ModerationAction | None) -> Types.ActionInfo |
         applied_at=entity.applied_at,
         last_error_code=entity.last_error_code,
     )
-
-
-def scalar_row_to_value(value: T) -> T:
-    """저장소가 조회한 선택적 이력 UUID를 업무 계층의 값으로 전달한다."""
-    return value
 
 
 @overload

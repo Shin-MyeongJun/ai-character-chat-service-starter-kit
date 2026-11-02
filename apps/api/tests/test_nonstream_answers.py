@@ -205,10 +205,10 @@ async def test_result_storage_failure_recovers_without_provider_or_duplicate_usa
     db, monkeypatch
 ):
     orchestrator, command, text = await setup_answer(db)
-    original = Answers.finish_generation_and_schedule_memory
+    original = Answers._finish_locked_generation_and_schedule_memory
     monkeypatch.setattr(
         Answers,
-        "finish_generation_and_schedule_memory",
+        "_finish_locked_generation_and_schedule_memory",
         AsyncMock(side_effect=RuntimeError("storage down")),
     )
     with pytest.raises(ChatTypes.AnswerStorageError):
@@ -222,7 +222,7 @@ async def test_result_storage_failure_recovers_without_provider_or_duplicate_usa
                 answer_lease_until=datetime.now(UTC) - timedelta(seconds=1)
             )
         )
-    monkeypatch.setattr(Answers, "finish_generation_and_schedule_memory", original)
+    monkeypatch.setattr(Answers, "_finish_locked_generation_and_schedule_memory", original)
     assert await orchestrator.recover_answers() == 1
     assert await orchestrator.recover_answers() == 0
     assert (await orchestrator.generate_answer(command)).status == "succeeded"

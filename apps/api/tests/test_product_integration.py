@@ -4,6 +4,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models.character import Character
 from app.db.models.identity import User
 from app.db.models.lorebook import Lorebook, LorebookEntry
@@ -25,13 +29,11 @@ from app.modules.content.product.types import (
     ProductCompositionInfo,
     ProductProfileCommand,
 )
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 pytestmark = pytest.mark.asyncio
 
 
-async def seed(db):
+async def seed(db: AsyncSession) -> tuple[SimpleNamespace, Character, Lorebook]:
     async with use_case_transaction(db):
         owner = User(id=uuid4(), email=f"{uuid4()}@test.local")
         db.add(owner)
@@ -42,7 +44,7 @@ async def seed(db):
     return (SimpleNamespace(id=owner.id), c, b)
 
 
-async def test_composition_ownership_and_cross_product_fk(db):
+async def test_composition_ownership_and_cross_product_fk(db: AsyncSession) -> None:
     owner, c, b = await seed(db)
     p = await command.create_product(
         db,
@@ -84,6 +86,7 @@ async def test_composition_ownership_and_cross_product_fk(db):
         target = await db.scalar(
             select(ProductLorebook).where(ProductLorebook.product_id == p.id)
         )
+        assert target is not None
         with pytest.raises(IntegrityError):
             async with db.begin_nested():
                 db.add(
@@ -96,7 +99,7 @@ async def test_composition_ownership_and_cross_product_fk(db):
                 await db.flush()
 
 
-async def test_foreign_content_cannot_be_added(db):
+async def test_foreign_content_cannot_be_added(db: AsyncSession) -> None:
     _owner, c, _b = await seed(db)
     other, _, _ = await seed(db)
     p = await command.create_product(
@@ -116,7 +119,7 @@ async def test_foreign_content_cannot_be_added(db):
         )
 
 
-async def test_start_sets_do_not_activate_as_regular_lore(db):
+async def test_start_sets_do_not_activate_as_regular_lore(db: AsyncSession) -> None:
     from app.modules.content.lorebook import repository as lore_repo
     from app.modules.content.lorebook.service import query
 
@@ -146,7 +149,16 @@ async def test_start_sets_do_not_activate_as_regular_lore(db):
     assert len(await lore_repo.list_start_sets(db, b.id)) == 1
 
 
-async def ready_product(db):
+async def ready_product(
+    db: AsyncSession,
+) -> tuple[
+    SimpleNamespace,
+    Character,
+    Lorebook,
+    ProductTypes.ProductInfo,
+    SimpleNamespace,
+    LorebookEntry,
+]:
     from app.db.models.model_routing import Model, Provider
     from app.modules.content.product.service.command.settings import set_settings
     from app.modules.content.product.types import ProductSettingsInfo
@@ -200,7 +212,9 @@ async def ready_product(db):
     return (owner, c, b, p, SimpleNamespace(id=model.id), entry)
 
 
-async def test_settings_and_composition_preserve_start_selection(db):
+async def test_settings_and_composition_preserve_start_selection(
+    db: AsyncSession,
+) -> None:
     from app.db.models.product import ProductStartSet
     from app.modules.content.product.service.command.settings import (
         _validate_publication,
@@ -221,7 +235,20 @@ async def test_settings_and_composition_preserve_start_selection(db):
     )
     async with use_case_transaction(db):
         row = await db.get(Product, p.id)
-        await _validate_publication(db, row)
+        from app.modules.content.product import repository as ProductRepository
+        from app.modules.content.product.mapper import (
+            persistence as ProductPersistenceMapper,
+        )
+
+        product_info = ProductPersistenceMapper.product_entity_to_state_info(row)
+        assert product_info is not None
+        composition_row = await ProductRepository.get_product_composition(db, p.id)
+        composition_info = (
+            ProductPersistenceMapper.product_composition_row_to_state_info(
+                composition_row
+            )
+        )
+        await _validate_publication(db, product_info, composition_info)
         assert (
             len(
                 list(
@@ -254,7 +281,7 @@ async def test_settings_and_composition_preserve_start_selection(db):
         )
 
 
-async def test_snapshot_media_survives_source_deletion(db):
+async def test_snapshot_media_survives_source_deletion(db: AsyncSession) -> None:
     from app.db.models.character import CharacterAsset, CharacterImage
     from app.db.models.snapshot.character import (
         CharacterSnapshot,
@@ -292,6 +319,7 @@ async def test_snapshot_media_survives_source_deletion(db):
     async with use_case_transaction(db):
         db.expire_all()
         saved = await db.get(CharacterSnapshot, sid)
+        assert saved is not None
         assert saved.character_id is None
         assert saved.snapshot_data["persona_prompt"] == "P"
         assert (
@@ -299,16 +327,15 @@ async def test_snapshot_media_survives_source_deletion(db):
                 db, ProductTypes.MediaIsReferencedCommand(url="immutable/image/v1")
             )
         ).referenced
-        assert (
-            await db.scalar(
-                select(CharacterSnapshotImage).where(
-                    CharacterSnapshotImage.character_snapshot_id == sid
-                )
+        image = await db.scalar(
+            select(CharacterSnapshotImage).where(
+                CharacterSnapshotImage.character_snapshot_id == sid
             )
-        ).is_default
+        )
+        assert image is not None and image.is_default
 
 
-async def test_atomic_publication_and_original_edits(db):
+async def test_atomic_publication_and_original_edits(db: AsyncSession) -> None:
     from app.db.models.snapshot.character import CharacterSnapshot
     from app.db.models.snapshot.product import (
         ProductSnapshot,
@@ -339,6 +366,7 @@ async def test_atomic_publication_and_original_edits(db):
     async with use_case_transaction(db):
         db.expire_all()
         product = await db.get(Product, p.id)
+        assert product is not None
         assert product.latest_snapshot_id == first_id
         assert (
             len(
@@ -357,9 +385,10 @@ async def test_atomic_publication_and_original_edits(db):
                 ProductSnapshotCharacter.product_snapshot_id == first_id
             )
         )
-        assert (
-            await db.get(CharacterSnapshot, link.character_snapshot_id)
-        ).snapshot_data["persona_prompt"] == "P"
+        assert link is not None
+        character_snapshot = await db.get(CharacterSnapshot, link.character_snapshot_id)
+        assert character_snapshot is not None
+        assert character_snapshot.snapshot_data["persona_prompt"] == "P"
         second = await _build_publication(
             db,
             ProductTypes.BuildPublicationCommand(
@@ -367,9 +396,11 @@ async def test_atomic_publication_and_original_edits(db):
             ),
         )
         assert second.version == 2
+        first_snapshot = await db.get(ProductSnapshot, first_id)
+        assert first_snapshot is not None
         assert (
             second.snapshot_data["content_digest"]
-            != (await db.get(ProductSnapshot, first_id)).snapshot_data["content_digest"]
+            != first_snapshot.snapshot_data["content_digest"]
         )
         assert (
             len(
@@ -385,7 +416,7 @@ async def test_atomic_publication_and_original_edits(db):
         )
 
 
-async def test_release_policy_and_typo_correction(db):
+async def test_release_policy_and_typo_correction(db: AsyncSession) -> None:
     from app.db.models.product_release import ProductReleaseNoteRevision
     from app.modules.content.product.service.command.releases import (
         correct_note,
@@ -438,7 +469,7 @@ async def test_release_policy_and_typo_correction(db):
         assert len(list(await db.scalars(select(ProductReleaseNoteRevision)))) == 1
 
 
-async def test_conversation_keeps_published_context(db):
+async def test_conversation_keeps_published_context(db: AsyncSession) -> None:
     from app.modules.chatting.conversation.service import (
         prepare_runtime_context,
     )
@@ -479,7 +510,7 @@ async def test_conversation_keeps_published_context(db):
         )
         assert context.product_snapshot_id == str(first.snapshot_id)
         assert context.characters[0].data["persona_prompt"] == "P"
-        assert context.start.content == "Begin at home"
+        assert context.start is not None and context.start.content == "Begin at home"
         assert context.lorebooks[0].entries == []
     with pytest.raises(LookupError):
         await prepare_runtime_context(
@@ -490,7 +521,9 @@ async def test_conversation_keeps_published_context(db):
         )
 
 
-async def test_version_switch_requires_consent_and_preserves_initial_context(db):
+async def test_version_switch_requires_consent_and_preserves_initial_context(
+    db: AsyncSession,
+) -> None:
     from app.db.models.chat import Conversation, ConversationVersionChange, Message
     from app.modules.chatting.conversation.service.command import start_conversation
     from app.modules.chatting.conversation.service.command.versions import (
@@ -542,6 +575,7 @@ async def test_version_switch_requires_consent_and_preserves_initial_context(db)
         )
     async with use_case_transaction(db):
         product = await db.get(Product, p.id)
+        assert product is not None
         uid = product.owner_id
     await switch_version(
         db,
@@ -553,6 +587,7 @@ async def test_version_switch_requires_consent_and_preserves_initial_context(db)
     )
     async with use_case_transaction(db):
         saved = await db.get(Conversation, conversation.id)
+        assert saved is not None
         assert saved.initial_snapshot_id == first.snapshot_id
         assert saved.start_set_id == conversation.start_set_id
         assert (

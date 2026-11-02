@@ -8,7 +8,7 @@ credit은 재화별 무료/유료 보유·예약·사용 가능량, 지갑 준�
 원장 및 예약 조회를 소유한다. billing/chat, 모델·토큰·견적·상품 정책을 해석하지 않는다.
 타 모듈 repository/mapper/ORM을 참조하지 않으며 인가 JOIN 예외도 없다.
 
-- `service/command.py`: 검증, 무료 우선 배분, 요청 일치와 상태 전이, SAVEPOINT 경계.
+- `service/command.py`: 검증, 무료 우선 배분, 요청 일치와 상태 전이, 공유 가능한 SAVEPOINT 경계.
 - `service/query.py`: 사용자·재화별 잔액 및 원장/예약 필터·커서 검증.
 - `repository.py`: credit 소유 SQL과 잠금, Entity/Row 반환. commit/rollback 없음.
 - `mapper/persistence.py`: Entity/Row를 불변 Info로 변환. I/O와 외부 조회 없음.
@@ -54,6 +54,7 @@ HTTP contracts/mapper가 기간·내림차순 커서를 검증·변환하고 sig
 
 | 공개 함수 | Command → 반환 |
 | --- | --- |
+| command.use_credit_write_scope | session만 받는 실행 문맥. 예약·확정·해제와 호출자 저장을 하나의 SAVEPOINT로 조합하며 업무 결과/ORM은 반환하지 않음 |
 | command.prepare_credit_wallet | PrepareCreditWalletCommand(user_id, currency_code) → CreditBalanceInfo |
 | command.grant_credit | GrantCreditCommand(user_id, currency_code, bucket, amount, reason, reference_id, namespace, request_key) → CreditTransactionInfo |
 | command.lock_credit_account | LockCreditAccountCommand(user_id, currency_code) → CreditBalanceInfo. 지갑 잠금 공개 계약 |
@@ -116,9 +117,33 @@ credit_wallets FOR UPDATE → billing 연결(해당 경로만) → 예약 FOR UP
 명시적 session.begin() 또는 상위 use_case_transaction이 필수다. AUTOBEGIN/트랜잭션 부재는
 RuntimeError다. 내부 SAVEPOINT는 오류를 잡는 호출자에게도 부분 쓰기를 남기지 않는다.
 상위 commit/rollback을 수행하지 않고, 상위 rollback은 지급·예약·확정·해제 모두를 취소한다.
-billing SAVEPOINT가 연결 저장과 credit 변경을 함께 감싼다. begin_nested 진입 전의 호출자 pending
+billing이 credit의 공개 use_credit_write_scope로 연결 저장과 credit 변경을 함께 감싼다. begin_nested 진입 전의 호출자 pending
 flush 오류는 상위 트랜잭션이 처리한다. PostgreSQL READ COMMITTED 기준이며 deadlock/serialization
 failure는 상위 전체 트랜잭션을 같은 키로 재시도한다.
+
+## U21 billing 조합의 잠금·SAVEPOINT 재사용 (2026-10-30)
+
+`use_credit_write_scope(session)`은 명시적 상위 트랜잭션 아래 SAVEPOINT 하나를 소유한다.
+예약·확정·해제의 독립 공개 호출은 자체 scope를 열고, billing 또는 명시적 조합 scope
+안에서는 현재 scope에 참여한다. billing의 요청 키 잠금도 이 SAVEPOINT 안에 유지한다.
+지급·지갑 준비의 기존 SAVEPOINT는 이번 변경 대상이 아니다.
+
+scope는 service 내부 실행 상태로 session.info에만 보관한다. 상위 트랜잭션과 현재
+SAVEPOINT의 객체·활성 상태가 모두 맞을 때만 참여하며, 같은 `(user_id, currency_code)`의
+이미 검증한 지갑 잠금과 legacy 차단 확인을 재사용한다. 잔액은 매번 새로 읽어 중간 예약·
+지급을 반영한다. 다른 지갑, 다른 트랜잭션, 독립된 하위 SAVEPOINT에는 이 근거를 사용하지
+않는다. 하위 scope가 rollback되면 부모 상태를 복구하고, 종료 시 해당 scope 상태를 제거한다.
+
+참여한 예약·확정·해제에서 발생한 오류/취소를 scope 내부에서 잡더라도 실패 표식을 유지한다.
+실패한 scope는 추가 참여와 정상 종료를 거절하여 전체 SAVEPOINT를 rollback한다. 바깥의
+명시적 트랜잭션은 계속 사용할 수 있고 같은 키를 새 scope에서 재시도할 수 있다. 원래
+DB 오류/취소가 밖으로 전파되는 경우에는 그 오류를 그대로 보존한다. 호출자가 별도로
+연 SAVEPOINT의 실패·정리는 해당 경계가 소유한다.
+
+공개 Command/Info·독립 호출의 검증·잠금 순서·무료 우선 배분·최종 상태 멱등 계약은
+유지한다. ORM/Row나 잠금 상태를 billing에 전달하지 않으며 검증 생략 옵션은 추가하지 않는다.
+공유 경계는 같은 command 파일의 실행 책임으로 유지했다. SQL 전후 측정과 PostgreSQL
+회귀는 [U21 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U21-WORKLOG.md)을 따른다.
 
 ## 기존 데이터와 오류
 

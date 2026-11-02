@@ -1,8 +1,98 @@
 # Chat 모듈
 
+## U27 빈 파일 정리 (2026-11-02)
+
+0바이트 `stream.py`는 import·문자열 로딩·실행/배포 진입점 참조가 없어 제거했다.
+답변 HTTP는 `router/answers.py`, 실행은 `service/workflow/answers.py`가 계속 소유한다.
+스트리밍 기능이나 공개 API를 새로 구현하지 않는다. 조사·검증 범위는
+[U27 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U27-WORKLOG.md)을 따른다.
+
+## U18 영속 복구 상한·격리·수동 복구 (2026-11-02)
+
+- 기존 프로세스별 LRU 진단 횟수를 제거하고 `product_generations`의
+  answer_recovery_attempts/next_at/quarantined_at과 chat 소유의 `answer_recovery_attempts`
+  감사 테이블을 사용한다. mapper는 이를 GenerationStateInfo/AnswerRecoveryAttemptInfo로
+  변환하며 HTTP DTO는 변경하지 않는다. 기존 U18 아래의 프로세스 횟수 설명은 이 정책으로 대체한다.
+- `service/command/answer_recovery.py`는 conversation → generation 잠금 아래 자동
+  최대 5회, 30초 지수 대기(최대 900초), 격리·수동 요청 검증을 판단한다. workflow는
+  시도 선점 commit 후 기존 finalizer를 호출한다. commit 불확실성·취소도 예산을 소비한다.
+  invariant/internal/storage_constraint는 첫 실패에, 나머지는 상한에 격리한다.
+- 동일 키 `_resume`와 supervisor가 같은 admission을 사용한다. 스캔은 격리·상한·대기
+  항목을 LIMIT 전에 제외한다. metadata·과금 예약·실행 lease는 격리로 변경하지 않는다.
+  종료 생성 재생은 제어 필드/감사 행도 쓰지 않는다. 늦은 실패 기록은 현재 횟수와 pending을 재검사한다.
+- 공개 `AnswerOrchestrator.recover_answer(ClaimAnswerRecoveryCommand)`는 운영자/사유를
+  요구해 한 번만 재시도하고 횟수·격리를 초기화하지 않는다. 대기·실행 lease는 유지한다.
+  공급자를 호출하지 않고 기존 staging/중단 처리와 원자적 완료·terminal 재조회만 사용한다.
+- `service/query/answer_recovery.py`는 사용자 범위의 정제된 감사 이력을 반환한다.
+  `app.answer_recovery`는 읽기 전용 조회가 기본인 운영 CLI이며 `--retry`만 감사된 수동 복구를
+  실행한다. 정책 판단은 command, 완료 조율은 기존 workflow에 유지해 별도 범용 retry 계층을 만들지 않았다.
+- Alembic 0036/초기 SQL 026은 기존 생성 사실을 보존하고 감사/제어 기록이 있으면
+  downgrade를 거절한다. 운영 절차·배포 중지·격리 조회는
+  [답변 복구 운영 정책](../../../../../../references_document/reference/answer-recovery-policy.md)을 따른다.
+
+## U17 답변 복구 조회·종료 lease (2026-11-02)
+
+- 복구 조회는 `pending AND answer_lease_until <= now`, lease 오름차순, 최대 100건의
+  기존 계약을 유지한다. NULL lease인 legacy pending과 종료 행은 제외한다. 후보 조회는
+  실행권 선점이 아니며 완료 시 기존 conversation → generation 잠금/상태 재검사를 한다.
+- Alembic 0035 / 초기 SQL 025 / ORM은 `answer_lease_until`의 전체 인덱스를
+  `ix_generation_pending_answer_lease`로 교체한다. predicate는
+  `status = 'pending' AND answer_lease_until IS NOT NULL`이다. repository의 고정 pending
+  조건은 SQL 상수로 표현해 prepared statement의 generic plan에서도 predicate를
+  입증할 수 있게 한다. 사용자 입력을 SQL 상수로 삽입하지 않으며 시각·LIMIT은 바인딩한다.
+- `repository.finish_generation`은 succeeded/failed/cancelled/stale의 상태·완료 시각과
+  함께 lease를 NULL로 만든다. 외부 트랜잭션 실패 시 pending lease도 함께 복원된다.
+  lease는 실행권 만료이며 종료 이력이 아니다. metadata/실행 token/result digest/finished_at/
+  usage·과금 사실과 terminal 재생의 무쓰기 계약은 유지한다. 기존 종료 행은 일괄
+  재작성하지 않고 부분 인덱스에서 제외한다.
+- 새 공개 인터페이스나 계층은 추가하지 않았다. 인덱스 교체는 API/worker를 중지한
+  migration 절차로 적용하며 운영 DB에 자동 적용하지 않는다. 합성 10만 행의 분포별
+  custom/generic EXPLAIN과 회귀 검증은
+  [U17-WORKLOG.md](../../../../../../docs/audits/2026-10-26-pattern-standardization/U17-WORKLOG.md)를 따른다.
+
+## U18 답변 오류 분류·복구 진단 (2026-10-30)
+
+- 최초 세션 열기·기존 요청 조회·문맥 조회·읽기 트랜잭션 종료도 `preparation_read`로
+  진단한다. SQLAlchemy 오류는 AnswerStorageError로 번역해 기존 503/동일 키 재시도
+  응답을 사용한다. 이 경계에서 새 생성·과금 예약·공급자 호출은 없으므로
+  storage_uncertain=False다. SQLAlchemy의 LookupError 하위 타입도 저장소 오류로
+  먼저 분류한다. 기존 ValueError/LookupError/MessageConflictError의 입력·인가·설정
+  계약과 CancelledError 전파는 유지하며 나머지 내부 오류는 안전한 RuntimeError로
+  전달한다. diagnostic_id는 최초 조회 전에 생성하고 이후 준비·예약까지 공유한다.
+- `service/workflow/answers.py`는 예약 전 문맥 준비에서 예상한 예산·모델·공급자·timeout
+  실패만 기존 unbilled 실패 receipt로 저장한다. 예상 밖 내부 오류는 안전한 RuntimeError로
+  전파하고 SQLAlchemy 오류는 기존 AnswerStorageError로 번역한다. 이 시점에는 생성·과금
+  예약·텍스트 호출이 없으므로 request_key를 소진하지 않는다. 텍스트 호출 이후의 실패는
+  기존 실패/uncertain 기록과 같은 키 재생 계약을 유지한다.
+- 결과 검증은 내부 전용 예외의 code로 분류한다. 일반 ValueError/TypeError의 메시지가
+  `invalid_usage` 등과 같아도 검증 오류로 오인하지 않는다. 기존 HTTP 오류 코드·DTO와
+  provider 결과의 검증 기준은 유지한다.
+- `AnswerStateError`는 기존 AnswerStorageError의 하위 타입으로 billing binding/금액 등
+  완료 불변 조건 위반을 식별한다. HTTP는 기존 503/storage_pending_recovery 및
+  retry_same_key=True를 유지한다. 이 신호가 공급자 재호출을 허용하지 않는다.
+- 예약·calling staging·결과 staging·완료·취소 정리·복구 조회를 구분해 진단한다.
+  `service/util/answer_diagnostics.py`는 타입 기반 오류 분류와 정제한 코드 위치만 만든다.
+  메시지/SQL/매개변수/원문/locals/source/절대 경로/실행 token/request_key는 출력하지 않는다.
+  원인 체인은 최대 4개 타입, app 내부 stack_frames는 최대 24개 위치다. 이 보조 책임은
+  workflow 실행 순서와 분리하며 DB 접근이나 복구 정책을 소유하지 않는다.
+- 로그의 `failure_class`는 internal/invariant/storage_constraint/storage_unavailable/
+  storage_error/storage_uncertain/provider_retryable/provider_permanent/domain/timeout/
+  invalid_result를 구별한다. OperationalError라는 타입만으로 일시 장애를 단정하지 않는다.
+  `storage_uncertain`은 commit 확인 여부이며 failure_class와 독립이다. 공급자의 retryable
+  분류도 자동 재호출 허가가 아니다.
+- 준비·예약 전 로그는 임의 diagnostic_id, 생성 이후는 generation_id로 연결한다.
+  같은 키 재전송과 background 복구는 동일 완료·재조회 경계를 사용한다. 완료 예외 뒤
+  새 세션의 terminal 상태만 성공 증거로 삼고, 재조회도 실패하면 두 오류를 따로 기록하고
+  최초 예외 cause를 보존한다. staging·예약액은 임의로 해제하거나 덮어쓰지 않는다.
+- 복구 attempt_count는 orchestrator 인스턴스의 최근 1,024개 생성에 한정한 진단값이다.
+  재시작·인스턴스 교체·LRU 퇴출 시 초기화되며 전역/영속 횟수가 아니다. terminal 확인 시
+  제거한다. 개별 복구 실패는 다른 생성 복구를 막지 않고 CancelledError는 전파한다.
+  재시도 상한·backoff·격리·예약 해제의 새 정책은 도입하지 않았다. 미확정 commit의
+  운영 처리 계약과 함께 별도로 설계해야 한다.
+
 ## 소유 데이터와 호출 경계
 
-`messages`, `product_generations`, `chat_message_requests`, `generation_prompts`를 소유한다. 기존 테이블명은 유지한다. ORM 읽기·쓰기는 `repository.py`에만 있고, Entity 해석은 `mapper/persistence.py` 및 `mapper/prompts.py`를 거친다.
+`messages`, `product_generations`, `chat_message_requests`, `generation_prompts`, `chat_history_versions`를 소유한다. 기존 테이블명은 유지한다. ORM 읽기·쓰기는 `repository.py`에만 있고, Entity 해석은 `mapper/persistence.py` 및 `mapper/prompts.py`를 거친다.
 
 conversation의 공개 `get_owned_conversation(OwnedConversationCommand)`으로 소유권·현재 상품 버전을 확인하고, `list_conversation_characters`의 Info로 실제 참여 캐릭터를 확인한다. 별도 대화방 상태 컬럼은 없으며, 생성 시에는 기존 상품 버전 사용 가능 정책도 적용한다. Legacy 대화는 사용자 메시지 CRUD는 가능하고, 검증된 버전이 필요한 생성은 기존대로 거절한다.
 
@@ -10,8 +100,17 @@ chat → conversation / memory / product / billing / llm 방향으로 공개 ser
 
 ## 파일별 책임
 
+`service/workflow/memory.py`의 ProcessMemoryWorkCommand는 기존 work/policy/models
+위치 인자를 보존하고 timeout_seconds=240.0을 선택적으로 받는다. U29의 단일 단조 시계
+기한은 pending 색인부터 요약·저장·완료까지 공유한다. 취소/DB 정리를 기다린 뒤
+MemoryWorkDeadlineExceededError를 재시도 가능한 실패로 기록하며 shutdown 취소는
+그대로 전파한다. 늦게 반환된 공급자 결과는 저장 전에 기한을 재검사한다. worker의
+timeout<lease 설정과 정리 지연·U03의 남은 실행 소유권 한계는 memory/ARCHITECTURE.md의
+「U29 작업 전체 처리 기한」을 따른다. 모듈 의존 방향·소유 테이블은 바꾸지 않는다.
+
 - `service/command/messages.py`: 사용자 저장·마지막 메시지 교체·되돌리기, 내부 캐릭터 저장/교체, 인가·멱등성·충돌·메모리 무효화 조정.
 - `service/query/messages.py`: 소유권을 확인한 메시지 커서 페이지 조회.
+- `service/views.py`: 소유자 활동순 대화 페이지. 명시된 읽기 projection으로 페이지를 가져오고 conversation 공개 COUNT를 조합해 View를 반환한다.
 - `service/query/messages.py`의 내부 공개 `list_memory_source`는 인가된 현재 선형 이력의 정상 저장 메시지를 position 순으로 값 타입으로 제공한다. memory/use_cases는 message ORM을 직접 참조하지 않는다.
 - `service/query/generation.py`의 `get_generation_state`는 최상위 use_case가 응답 저장 뒤 같은 대화의 memory 작업을 예약할 수 있도록 생성의 대화 id를 공개 Info로 제공한다.
 - `service/command/generation.py`: 기존 생성 예약·완료·실패·취소·stale, 입력/결과 메시지 저장, usage 및 통계 갱신 요청. `BeginGenerationCommand`의 선택적 input_message_id/expected_revision은 마지막 사용자 메시지를 검증해 재저장하지 않는다. 미지정인 기존 호출은 종전대로 입력을 저장한다. execution은 신뢰된 최상위 호출자가 확정한 모델이다.
@@ -112,6 +211,12 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 
 - `service/workflow/answers.py`: 준비 재검증 → 생성·견적·credit 예약 확정 → LLM → result_ready staging → 메시지·usage·기억 예약·과금 확정/해제. 정상 완료와 lease 복구는 동일 `_finalize`와 완료 규칙을 사용한다. 불확실한 공급자 호출을 다시 실행하지 않는다.
 - `service/workflow/answer_preparation.py`: 공개 conversation/memory 서비스와 chat 원문 조회로 문맥을 수집하고 고정 예산과 미요약 원문을 확보한다. 초과 원문을 조용히 잘라내지 않는다.
+- U01: 원문 초과 시 memory의 공개 `plan_context_compaction`으로 필요한 접두 구간
+  끝 position을 계산하고 오류에 포함한다. workflow는 실패 metadata의
+  `summary_through_position`을 완료와 같은 트랜잭션에서 기억 작업에 전달한다.
+  최근 보호 원문이 예산을 넘거나 원문 검사 한도를 넘으면 무진행 요약 예약 대신
+  기존 `fixed_context_exceeded` 비재시도 결과를 반환한다. 같은 입력 재시도는
+  저장된 사용자 메시지 ID/revision을 재사용하고 새 답변 요청 키를 사용한다.
 - `service/workflow/memory.py`: `ProcessMemoryWorkCommand`로 받은 작업의 pending 색인 재개·요약·임베딩·저장 전 원문/revision 재검증·실패 기록. 요약 정책·검색·임베딩·저장·작업 전이는 memory 소유다.
 - `mapper/prompt.py`: MessageInfo → prompt 자체 PromptMessageInfo 순수 변환. prompt는 chat 타입/서비스를 참조하지 않는다.
 - command/query는 workflow를 호출하지 않는다. workflow는 구체적인 chat command/query 파일을 호출하며 repository를 직접 사용하지 않는다. `main`/`memory_worker`는 의존성과 반복 실행만 조립한다.
@@ -161,7 +266,7 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 API/검증 범위는 [프롬프트 조회 계약](../../../../../../docs/generation-prompts.md)을 따른다.
 
 새 대화의 고정 첫 대사는 conversation 시작 조회에서 받고 prompt의 고정 assistant 문맥으로 전달한다. 메시지 목록이나 요약 원문에는 들어가지 않는다. legacy_messages 대화의 기존 첫 메시지는 이력으로 보존하며 snapshot 첫 대사를 추가하지 않는다. 기존 이력 요약 의미를 소급 변경하거나 기존 기억을 일괄 재작성하지 않는다.
-`list_conversation_previews`는 소유 대화 목록 페이지에 대해 마지막 메시지 문구만 조회한다. chat repository의 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 상위 `use_cases/conversation_directory.py`가 두 모듈의 공개 결과를 조합한다.
+`list_conversation_previews`와 `list_conversation_activity`의 기존 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 최근 대화 목록의 현재 경로는 아래 U11 절의 제한된 읽기 projection이다. `use_cases/conversation_directory.py`는 기존 공개 호출과 View 이름을 유지하는 연결 지점이다.
 
 
 ## 본인 reporting 사실 조회 (2026-10-15)
@@ -257,3 +362,169 @@ staging token, 복구 token, 완료 결과, 응답 변환의 네 cast는 이 wor
 main이 설정한 앱 상태의 동적 값을 AnswerOrchestrator로 연결한다. cast는 조립 시
 할당 계약을 표현하며 None의 기존 503과 주입된 실행/테스트 대역을 유지한다.
 새 isinstance 제한·구성 기본값·인증 연결을 추가하지 않았다.
+
+
+## U11 최근 대화의 제한적 DB 읽기 projection (2026-10-29)
+
+아키텍처 규칙 C.2에 따라 repository.list_recent_conversations에만 conversation 소유
+conversations의 id/user_id/product_id/title/created_at 읽기를 허용한다. 자기 messages와
+상관 하위 조회로 조합하고 user_id 조건을 커서/정렬/LIMIT 전부터 적용한다. 해당 소유
+metadata 전체를 서비스로 가져오지 않는다. 타 모듈 repository/mapper 호출·쓰기·행 잠금·
+소유권 이전은 추가하지 않는다. 기존 인가용 JOIN 예외는 별도로 유지한다.
+
+활동은 마지막 생존 메시지의 created_at DESC/position DESC로 고르고, 메시지가 없을 때만
+대화 created_at으로 대체한다. 메시지가 대화 생성보다 오래됐더라도 GREATEST로 바꾸지
+않으며 빈 content도 실제 메시지다. 활동 시각/대화 UUID DESC, 엄격한 이전 커서 조건과
+limit+1을 DB에서 적용한 뒤 해당 페이지의 미리보기를 같은 SQL 안에서 읽는다.
+RecentConversationValues/Row의 6컬럼 순서는 id/product_id/title/created_at/last_message/
+last_activity_at이며 persistence mapper가 공개 RecentConversationsPageView로 변환한다.
+
+service/views.list_recent_conversations는 ListRecentConversationsCommand의 limit와
+활동 커서 쌍/시간대를 검사한다. 정확한 전체 개수는 conversation 공개 COUNT로 읽고
+repository 페이지와 조합한다. 빈 결과에도 COUNT는 커서와 독립적이다. 전체 SQL 호출은
+COUNT+페이지 2회이고 목록 반환은 최대 limit+1이다. DB는 소유 대화의 활동 평가·정렬과
+정확한 COUNT 작업을 계속 수행한다. O(limit) 또는 인덱스만으로 고정 시간이라는 보장은
+없으며 실제 PostgreSQL 실행 계획/처리량은 측정하지 않았다. 기존 메시지
+(conversation_id, created_at) 인덱스를 유지하고 migration은 추가하지 않았다.
+
+COUNT와 페이지는 READ COMMITTED에서 서로 다른 시점일 수 있다. 페이지 자체의 활동/
+미리보기는 한 SQL로 읽고 여러 요청을 고정 snapshot으로 만들지 않는다. 대화의 새 활동은
+이전 커서 앞으로 이동할 수 있고 새로고침으로 순회를 다시 시작한다. 삭제된 커서 행의
+존재는 요구하지 않는다. HTTP cursor_created_at 이름은 계속 활동 시각을 담는다.
+
+use_cases.conversation_directory의 공개 함수/입력과 두 View 이름은 유지한다. View 정의는
+chat types로 이동해 기존 이름으로 재노출하고 last_activity_at=None/total=0 기본값과
+DTO 필드/경로/오류는 같다. conversation의 metadata 목록 API와 쓰기·생성 잠금은 그대로다.
+
+test_read_composition_contracts의 17건은 실제 SQLite SELECT/COUNT의 소유권/시각·UUID
+동률/빈 대화/생존 메시지·position/삭제/시간 fallback/미리보기·HTTP DTO/잘못된 커서를
+확인한다. 소유 대화 353개와 limit 1/7/100에서 반환 limit+1과 SQL 2회를 검증한다.
+SQLite 반환 시각의 tzinfo만 UTC로 복구하며 정렬/커서/페이지는 테스트 대역이 수행하지
+않는다. PostgreSQL SQL도 컴파일하지만 실제 격리·플래너/인덱스 성능 검증은 아니다.
+
+
+## U12 메시지 증분 동기화 체크포인트 (2026-10-29)
+
+기존 GET messages의 items/next_cursor와 v1:conversation_id:position 형식·입력 검증은
+유지하고 선택적 history_revision/sync_cursor를 추가했다. 두 필드는 기본 None이라
+기존 MessagePageInfo 생성/메타데이터 없는 대역과 이전 클라이언트를 지원한다.
+query는 기존 공개 소유권 조회의 ConversationInfo.history_revision을 mapper에 전달한다.
+Entity/Row를 서비스에서 해석하거나 별도 SQL·잠금·쓰기·migration을 추가하지 않았다.
+
+next_cursor는 다음 페이지가 있을 때만 존재한다. sync_cursor는 반환한 마지막 메시지
+위치이며 마지막 페이지에도 존재하고, 추가 메시지가 없는 증분 페이지는 입력 커서를
+그대로 돌려준다. lookahead 한 행의 위치를 체크포인트로 쓰지 않는다. 최초 빈 이력은
+None이다. 필드가 없는 이전 서버에서는 프런트가 전체 조회로 돌아간다.
+
+기존 원문 history_revision은 수정/되돌리기 때 증가하고 일반 append에는 증가하지 않는다.
+프런트는 같은 revision이면 체크포인트 이후를 ID로 병합하고, 변경이 보이면 전체 이력을
+새로 읽어 교체한다. 원문 revision 조회와 메시지 SQL은 기존처럼 별도 READ COMMITTED
+읽기다. 둘 사이의 동시 변경이나 이후 변경까지 고정하는 snapshot 보장은 없다. 다음
+동기화에서 변경을 감지할 수 있으며 페이지 사이 revision 불일치는 프런트가 한 번만
+전체 재조회한 뒤 계속 바뀌면 오류로 멈춘다. 주기적 실시간 push/polling은 추가하지 않았다.
+
+새 test_message_sync_contracts의 8건은 소유권 거절, 최초/증분의 빈·마지막·lookahead
+페이지 6조합, nullable 기본값과 schema 왕복을 확인한다. 기존 router 테스트는 실제
+ASGI 응답에 두 필드가 반영되는지 확인한다. OpenAPI 고정 계약 검사는 두 선택 필드만
+추가로 허용하고 기존 필드·required·나머지 계약은 그대로 비교한다. SQL 락/격리의
+실제 PostgreSQL 통합 검증은 이번 오프라인 실행에서 하지 않았다.
+
+
+## U13 완료 잠금 범위와 상태 전이 결과 재사용 (2026-10-29)
+
+command/generation의 모듈 내부 _locked_generation은 사용자 범위 생성 조회로 대화 ID를
+확인하고 conversation→generation 순으로 잠근 뒤 최신 Info를 제공한다. 트랜잭션 범위에
+한정된 _LockedGeneration은 AsyncSession/해당 transaction/ConversationInfo/
+GenerationStateInfo만 보유하며 Entity를 밖으로 반환하지 않는다. 문맥을 벗어나거나
+transaction이 달라지면 내부 쓰기를 거절한다. ORM은 기존 repository/mapper에서만 쓴다.
+
+public finish_generation과 workflow의 finish_generation_and_schedule_memory는 여전히
+독립 진입점의 조회/인가/잠금·결과 digest 검증을 수행하고 기존 GenerationInfo를 반환한다.
+AnswerOrchestrator._finalize만 이미 획득한 같은 내부 범위를 재사용한다. 범용 검증 생략
+옵션·타 모듈에 넘길 잠금/ORM 객체·공개 types/API 변경은 추가하지 않았다.
+
+_finish_locked_generation은 현재 잠긴 상태로 pending 여부·같은 결과 재전송·버전/만료/
+출력 참여자 조건을 판단하고 기존 메시지/사용량/통계 쓰기를 수행한다. repository 완료의
+반환 Entity를 즉시 Info로 변환해 _GenerationCompletion(state, transitioned)을 반환한다.
+transitioned=True이면서 성공일 때만 memory 공개 서비스를 호출한다. 중복 성공 완료는
+원문·사용량·메모리 세대를 다시 쓰지 않는다. final response도 이 상태에서 조립하므로
+완료 뒤 get_generation_state를 다시 호출하지 않는다.
+
+answer metadata의 public update_answer도 동일 내부 잠금 범위를 얻고 token/lease/
+immutable snapshot/result_ready 조건을 기존처럼 검증한다. _finalize의 만료 lease 복구는
+이미 잠긴 Info로 _update_locked_answer를 실행하고 내부 run의 metadata/lease를 갱신한다.
+최종 저장 결과는 repository에서 변환한 최신 state다. 실패를 내부에서 잡더라도 바깥이
+rollback-only가 되도록 기존 use_case_transaction의 중첩 범위를 유지한다.
+
+동일 SQLite 검증기에서 정상 result_ready 성공 완료의 자기 계층 generation SELECT는
+8→2회, conversation FOR UPDATE 요청은 3→1회였다. 변경 전 b3c7af1의 두 완료 파일은
+별도 프로세스 메모리에서만 실행해 확인했고 작업 파일은 덮어쓰지 않았다. 실제 SQL
+이벤트로 generation SELECT 수를 세고, SQLite가 무시하는 FOR UPDATE는 PostgreSQL
+컴파일 문장으로 요청 수를 확인했다. repository.finish_generation의 session.get은 잠금
+scope가 유지하는 ORM identity map을 사용해 추가 SELECT를 하지 않는 것도 포함한다.
+참여자 조회의 별도 소유권 검사와 billing/memory/product 내부 SQL은 유지하며 이 비교에
+합산하지 않는다. 전체 HTTP SQL 수·운영 지연/처리량 측정이라는 뜻은 아니다.
+
+test_generation_completion_contracts의 30건은 정상/재전송·digest 충돌, 상태/버전/만료,
+사용량/통계/메모리/정산/금액 불일치의 rollback와 result_ready 복구, 준비/호출 중 만료
+lease, live/legacy lease 보류, 소유권·입력 검증, scope 수명/잡힌 오류의 rollback-only,
+실행 token/lease/immutable metadata와 과금 누락/요약 복구를 확인한다. 실제 AsyncSession
+트랜잭션 event를 별도 SQLite Session의 commit/rollback에 연결하고 자체 SQL/ORM을
+실행한다. 타 도메인은 같은 session의 검증용 효과 테이블로 대체했다. PostgreSQL의
+실제 행 잠금·격리·결제/기억 구현의 영속 원자성을 증명하지 않는다. 기존 DB opt-in
+실패 복구 테스트의 failpoint도 실제 호출되는 내부 완료 경계로 옮겨 의도를 유지했다.
+
+## U03 기억 workflow의 claim 전달 (2026-10-30)
+
+`service/workflow/memory.py`는 claim에서 받은 `MemoryWorkInfo`를 요약·임베딩 저장
+Command에 필수로 전달한다. 소유권 판단과 작업 행 잠금은 memory 공개 service의
+책임이다. workflow는 기존처럼 공급자 I/O 전 세션을 닫고, 결과 저장 트랜잭션에서
+conversation을 먼저 잠근 뒤 원문 revision/근거를 검사한다. memory의 작업 행 잠금은
+결과 저장·commit까지 유지되어 재claim과 직렬화된다. 상위 트랜잭션이나 공급자 호출을
+repository로 옮기지 않았다. 실패 기록도 같은 work의 토큰을 사용하므로 오래된 실행이
+새 claim을 실패시키지 못한다. lease 재획득 전에 발생한 외부 호출 중복은 막지 않는다.
+
+U29의 같은 전체 예산을 유지하며 각 단계에서 시각뿐 아니라 `asyncio.Timeout`의 만료
+상태도 확인한다. Windows 타이머 정밀도 안의 조기 취소를 공급자가 삼킨 경우에도 늦은
+결과를 저장하지 않는다. 메모리 큐·마이그레이션·PG 검증 계약은 memory/ARCHITECTURE.md와
+U03-WORKLOG.md에 기록한다.
+
+## U05 답변 이력의 범위 조회와 변경 검증 (2026-10-30)
+
+- `chat_history_versions`는 chat 소유의 대화별 BIGINT 변경 번호다. PostgreSQL의
+  messages INSERT/UPDATE/DELETE 트리거가 같은 트랜잭션에서 증가시킨다. 내용 외
+  metadata, FK SET NULL, 대화 이동의 양쪽, TRUNCATE도 반영한다. rollback은 번호도
+  되돌린다. 신규 빈 대화에는 행이 없어 0으로 읽으며, migration은 기존 대화를 0으로
+  초기화한다. conversation.history_revision의 수정/되돌리기 전용 의미는 유지한다.
+- 최초 준비와 예약 직전 재검증은 conversation 잠금 아래에서 전체 conversation,
+  participants, runtime, model, 현재 MessageInfo와 history version을 함께 digest한다.
+  runtime에는 선택된 lore, 스냅샷 내용, 실행 설정, 시작 문맥이 계속 포함된다. 원문
+  전체의 직렬화만 DB 변경 번호로 대체한다. 번호는 현재 입력 밖의 오래된 원문 변경도
+  감지하며, 같은 내용으로 되돌리는 변경이나 사용하지 않는 metadata 변경도 보수적으로
+  충돌시킨다. 기존 영속 답변의 재생·lease 복구에서는 준비 digest를 다시 계산하지 않는다.
+- `get_history_version(GetHistoryVersionCommand)`는 소유권을 확인한 변경 번호 Info다.
+  `list_recent_messages(ListRecentMessagesCommand)`는 소유자 범위의 최근 최대 100개를
+  position 오름차순으로 반환한다. lore v1 scan_depth의 최대 100과 legacy 현재 입력
+  전용 규칙을 유지한다. SQL은 공용 범위 함수의 lookahead를 포함해 최대 101행이다.
+- `read_message_window(ReadMessageWindowCommand)`는 128개씩 position 커서로 읽고
+  토큰 예산을 처음 넘는 메시지까지 보존한다. 결과는 항상 오름차순 MessageWindowInfo,
+  has_more는 선택 방향의 나머지 원문 존재다. 예산·최소 개수·범위·인가를 검사하며,
+  ORM 해석은 mapper에서 한다. 새 범위 조회는 기존 (conversation_id, position) 인덱스를
+  사용한다. 기존 list_memory_source의 10,000개 계약과 외부 메시지 페이지 API는 유지한다.
+- 답변 문맥은 짧은 conversation 잠금 안에서 기대 history version, 최신 요약과 토큰
+  예산에 따른 suffix를 읽는다. 미요약 원문이 모두 들어가면 그대로 쓰고, 넘으면 suffix의
+  넘친 메시지를 근거로 U01 목표를 계산한다. 그 position 이전의 생략된 원문도 연속
+  요약 목표에 포함되므로 조용히 버리지 않는다. 요약 이전 원문도 최대 가용 예산까지의
+  suffix만 읽는다. 검색 질의는 기존 최근 6개를 유지하도록 최소 7개(현재 입력 포함)를
+  확보한다. 현재 입력은 기존대로 고정 prompt에 한 번만 포함한다. 기억 검색/임베딩 전
+  세션을 닫고, 예약 직전 전체 준비 조건을 다시 검증한다.
+- memory workflow는 미요약 prefix를 max(임계치, 배치)+최근 원문 예산까지 읽고,
+  잘렸을 때만 실제 최근 보호 suffix를 추가한다. prefix가 배치보다 길어 선택한 요약
+  근거에는 중간 생략 구간이 들어가지 않는다. 생략된 원문은 more_work로 후속 claim에
+  남기고, 저장 직전에는 선택한 정확한 범위를 다시 읽어 revision/원문 digest를 검사한다.
+  원문 읽기도 짧은 conversation 잠금 아래 수행하며 공급자 호출 전에 해제한다.
+  U03 claim token, U29 전체 기한, 요약 저장·색인·과금 트랜잭션 계약은 유지한다.
+- 파일 분리는 기존 repository/mapper/query/workflow 책임을 유지했다. 별도 범용 캐시나
+  검증 생략 옵션은 없다. 새 DB 모델은 변경 번호/트리거의 독립된 저장 책임을 표현한다.
+  Alembic 0033 / 초기 SQL 023이 필요하며 API·worker를 중지하고 migration 후 함께
+  시작한다. DB에 자동 적용하지 않는다. 자세한 측정·검증은 U05-WORKLOG.md에 기록한다.

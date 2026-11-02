@@ -34,10 +34,14 @@ test("order filtering combines status and date without mixing unknown with paid"
 });
 test("account overview retains successful resources when credit lookup fails", async () => {
   const user = { id: "owner", email: "owner@example.test", email_verified: true };
-  const api = loadLibrary("account.ts", { "api.ts": { getMe: async () => user, getCreditBalance: async () => { throw new Error("unavailable"); }, listOwnedConversations: async () => ({ items: [{ id: "conversation" }] }), request: async () => [{ id: "product" }] } });
+  const calls = [];
+  const api = loadLibrary("account.ts", { "api.ts": { getMe: async () => user, getCreditBalance: async () => { throw new Error("unavailable"); }, listOwnedConversations: async () => ({ items: [{ id: "conversation" }] }), request: async path => { calls.push(path); assert.equal(path, "/account/overview-counts"); return { conversations: 101, products: 205 }; } } });
   const value = await api.readAccountOverview();
   assert.equal(value.user.id, "owner"); assert.equal(value.balance.status, "rejected");
-  assert.equal(value.conversations.value.items[0].id, "conversation"); assert.equal(value.products.value[0].id, "product");
+  assert.equal(value.conversations.value.items[0].id, "conversation");
+  assert.deepEqual(value.counts.value, { conversations: 101, products: 205 });
+  assert.deepEqual(calls, ["/account/overview-counts"]);
+  assert.ok(!("products" in value));
 });
 test("unauthenticated overview does not query private credit, conversation or product resources", async () => {
   const api = loadLibrary("account.ts", { "api.ts": { getMe: async () => { throw new Error("unauthenticated"); }, getCreditBalance: () => assert.fail(), listOwnedConversations: () => assert.fail(), request: () => assert.fail() } });

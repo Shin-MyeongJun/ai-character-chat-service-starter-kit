@@ -5,10 +5,12 @@
 
 import hashlib
 import json
-from dataclasses import asdict
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
 from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
@@ -149,19 +151,38 @@ async def begin_generation(
         return generation_record_to_info(generation_entity, created=True)
 
 
-# 생성 결과·사용량을 확정한다. 버전이 바뀐 결과는 stale로 남겨 출력 메시지를 추가하지
-# 않는다.
-# 이미 확정된 생성의 재전송은 결과 digest가 같아야 하며 사용량을 다시 쓰지 않는다.
-async def finish_generation(
-    session: AsyncSession, command: Types.FinishGenerationCommand
-) -> GenerationInfo:
-    generation_id = command.generation_id
-    user_id = command.user_id
-    value = command.value
-    fingerprint = result_digest(value)
+# 같은 모듈의 완료/metadata 쓰기가 공유하는 트랜잭션 수명 한정 잠금 범위다.
+@dataclass
+class _LockedGeneration:
+    session: AsyncSession
+    transaction: AsyncSessionTransaction
+    conversation: ConversationTypes.ConversationInfo
+    run: Types.GenerationStateInfo
+    active: bool = True
+
+    def require_active(self) -> None:
+        if not self.active or self.session.get_transaction() is not self.transaction:
+            raise RuntimeError("Generation lock scope is no longer active.")
+
+
+@dataclass(frozen=True)
+class _GenerationCompletion:
+    state: Types.GenerationStateInfo
+    transitioned: bool
+
+    @property
+    def result(self) -> GenerationInfo:
+        return generation_record_to_info(self.state)
+
+
+@asynccontextmanager
+async def _locked_generation(
+    session: AsyncSession, command: Types.GetGenerationStateCommand
+) -> AsyncIterator[_LockedGeneration]:
+    """Module-private scope: authenticate, lock conversation then generation once."""
     async with use_case_transaction(session):
         generation_entity = await Repository.get_owned_generation(
-            session, generation_id, user_id
+            session, command.generation_id, command.user_id
         )
         run = PersistenceMapper.generation_entity_to_state_info(generation_entity)
         if run is None:
@@ -169,19 +190,51 @@ async def finish_generation(
         conversation = await get_owned_conversation(
             session,
             ConversationTypes.OwnedConversationCommand(
-                conversation_id=run.conversation_id, user_id=user_id, lock=True
+                conversation_id=run.conversation_id, user_id=command.user_id, lock=True
             ),
         )
         # All history writers lock conversation first, then generation records.
         generation_entity = await Repository.get_owned_generation(
-            session, generation_id, user_id, lock=True
+            session, command.generation_id, command.user_id, lock=True
         )
         run = PersistenceMapper.generation_entity_to_state_info(generation_entity)
         assert run is not None
+        transaction = session.get_transaction()
+        assert transaction is not None
+        locked = _LockedGeneration(session, transaction, conversation, run)
+        try:
+            yield locked
+        finally:
+            locked.active = False
+
+
+# 버전이 바뀐 결과는 stale로 저장하고, 같은 digest의 완료 재전송에는 쓰기가 없다.
+async def finish_generation(
+    session: AsyncSession, command: Types.FinishGenerationCommand
+) -> GenerationInfo:
+    fingerprint = result_digest(command.value)
+    async with _locked_generation(
+        session,
+        Types.GetGenerationStateCommand(
+            generation_id=command.generation_id, user_id=command.user_id
+        ),
+    ) as locked:
+        completion = await _finish_locked_generation(locked, command.value, fingerprint)
+        return completion.result
+
+
+async def _finish_locked_generation(
+    locked: _LockedGeneration, value: Types.GenerationResult, fingerprint: str
+) -> _GenerationCompletion:
+    """Apply a validated result only within the module's active lock scope."""
+    locked.require_active()
+    async with use_case_transaction(locked.session):
+        session, run, conversation = locked.session, locked.run, locked.conversation
+        user_id = run.user_id
         if run.status != "pending":
             if run.result_digest != fingerprint:
                 raise ValueError("Generation already finished with different output.")
-            return generation_record_to_info(run)
+            return _GenerationCompletion(run, transitioned=False)
         # 성공 결과라도 사용 버전이 바뀌거나 만료되면 stale로 저장하고 출력 메시지는
         # 추가하지 않는다.
         # 아래 usage 기록은 stale·실패·취소에도 실행된다.
@@ -241,8 +294,10 @@ async def finish_generation(
             now,
             len(value.messages) if status == "succeeded" else 0,
         )
-        result = generation_record_to_info(generation_entity)
+        locked.run = PersistenceMapper.generation_entity_to_state_info(
+            generation_entity
+        )
         await mark_statistics_dirty(
             session, ProductTypes.MarkStatisticsDirtyCommand(run.product_id, now)
         )
-        return result
+        return _GenerationCompletion(locked.run, transitioned=True)

@@ -29,7 +29,7 @@ function setup(t) {
     Object.defineProperty(globalThis, key, { configurable: true, value });
   }
   t.after(() => { for (const [key, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } });
-  return { api: load("api.ts"), recent: load("recent-chats.ts"), studio: load("studio-server.ts"), workspace: load("studio-workspace.ts"), project: load("studio-project.ts"), data, newClient: () => { cache.clear(); return load("api.ts"); } };
+  return { api: load("api.ts"), history: load("chat-history.ts"), recent: load("recent-chats.ts"), studio: load("studio-server.ts"), workspace: load("studio-workspace.ts"), project: load("studio-project.ts"), data, newClient: () => { cache.clear(); return load("api.ts"); } };
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
 const expired = () => json({ error: { code: "invalid_token" } }, 401);
@@ -220,4 +220,206 @@ test("restored studio copy detaches browser-only source links and saves without 
   assert.equal(restored.project.lorebooks[0].sourceId, undefined);
   assert.deepEqual(await studio.saveServerWork(restored), { productId, revision: 3 });
   assert.equal(puts, 0);
+});
+
+
+const chatMessage = (position, fields = {}) => ({ id: `message-${position}`, conversation_id: "conversation", position, content: `message ${position}`, revision: 1, sender_type: "user", product_character_id: null, ...fields });
+const messagePage = (items, revision = 1, next = null, checkpoint = items.at(-1)?.position) => ({ items, next_cursor: next, history_revision: revision, sync_cursor: checkpoint ? `v1:conversation:${checkpoint}` : null });
+const cursorOf = url => new URL(url, "https://test").searchParams.get("cursor");
+const afterOf = url => Number(cursorOf(url)?.split(":").at(-1) ?? 0);
+const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return {promise, resolve, reject}; };
+
+test("205-message history appends a confirmed input without GET and reads only new answers", async t => {
+  const { api, history } = setup(t);
+  let total = 205;
+  const reads = [], saves = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url.endsWith("/auth/csrf")) return json({csrf_token: "csrf"});
+    if (options.method === "POST") { saves.push(JSON.parse(options.body)); return json(chatMessage(206)); }
+    reads.push(url);
+    const after = afterOf(url), end = Math.min(after + 100, total);
+    return json(messagePage(Array.from({length: Math.max(0, end - after)}, (_, i) => chatMessage(after + i + 1)), 1, end < total ? `v1:conversation:${end}` : null, end));
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  assert.equal((await scope.sync()).messages.length, 205);
+  assert.equal(reads.length, 3);
+  const saved = await api.createMessage("conversation", "hello", "same-message-key");
+  assert.equal(scope.append(saved).messages.length, 206);
+  assert.equal(scope.append(saved).messages.length, 206);
+  assert.equal(reads.length, 3);
+  total = 208;
+  const updated = await scope.sync();
+  assert.equal(updated.messages.length, 208);
+  assert.equal(new Set(updated.messages.map(item => item.id)).size, 208);
+  assert.equal(reads.length, 4);
+  assert.equal(cursorOf(reads[3]), "v1:conversation:205");
+  assert.equal(saves[0].request_key, "same-message-key");
+});
+
+test("empty incremental responses retain the checkpoint instead of restarting from page one", async t => {
+  const {history} = setup(t);
+  const cursors = [];
+  let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    cursors.push(cursorOf(url));
+    return json(++pass === 1 ? messagePage([chatMessage(10)]) : messagePage([], 1, null, 10));
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); await scope.sync(); await scope.sync();
+  assert.deepEqual(cursors, [null, "v1:conversation:10", "v1:conversation:10"]);
+});
+
+for (const change of ["edit", "rewind"]) test(`${change} revision discards stale cached history and reloads`, async t => {
+  const {history} = setup(t);
+  const paths = []; let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    paths.push(cursorOf(url)); pass++;
+    if (pass === 1) return json(messagePage([chatMessage(1), chatMessage(2)]));
+    if (pass === 2) return json(messagePage([], 2, null, 2));
+    return json(messagePage(change === "edit" ? [chatMessage(1, {revision: 2, content: "edited"}), chatMessage(2)] : [], 2));
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); const current = await scope.sync();
+  assert.deepEqual(paths, [null, "v1:conversation:2", null]);
+  assert.equal(current.historyRevision, 2);
+  assert.deepEqual(current.messages.map(item => item.content), change === "edit" ? ["edited", "message 2"] : []);
+});
+
+test("a revision change across full pages restarts once and publishes only the stable read", async t => {
+  const {history} = setup(t); let pass = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    pass++;
+    if (pass === 1) return json(messagePage([chatMessage(1)], 1, "v1:conversation:1"));
+    if (pass === 2) return json(messagePage([chatMessage(2)], 2));
+    return json(messagePage([chatMessage(1, {content: "stable", revision: 3})], 3));
+  });
+  const current = await history.readConversationHistory("conversation");
+  assert.equal(pass, 3); assert.deepEqual(current.messages.map(item => item.content), ["stable"]);
+});
+
+test("continuous revision changes stop after the one full-read recovery", async t => {
+  const {history} = setup(t); let pass = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    pass++; return json(messagePage([chatMessage(pass)], pass, pass % 2 ? `v1:conversation:${pass}` : null));
+  });
+  await assert.rejects(history.readConversationHistory("conversation"), /history changed/);
+  assert.equal(pass, 4);
+});
+
+test("a legacy response falls back to full reads while preserving cursor loop protection", async t => {
+  const {history} = setup(t); const cursors = []; let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    cursors.push(cursorOf(url)); pass++;
+    if (pass === 1) return json(messagePage([chatMessage(1)]));
+    return json({items: [chatMessage(1), chatMessage(2)], next_cursor: null});
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); assert.equal((await scope.sync()).messages.length, 2);
+  await scope.sync();
+  assert.deepEqual(cursors, [null, "v1:conversation:1", null, null]);
+});
+
+test("repeated incremental cursors fail without losing cached messages", async t => {
+  const {history} = setup(t); let pass = 0;
+  t.mock.method(globalThis, "fetch", async () => json(++pass === 1 ? messagePage([chatMessage(1)]) : messagePage([], 1, "v1:conversation:1", 1)));
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); await assert.rejects(scope.sync(), /did not advance/);
+});
+
+test("partial delta network failure leaves the old checkpoint for the next retry", async t => {
+  const {history} = setup(t); const cursors = []; let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => {
+    cursors.push(cursorOf(url)); pass++;
+    if (pass === 1) return json(messagePage([chatMessage(1)]));
+    if (pass === 2) return json(messagePage([chatMessage(2)], 1, "v1:conversation:2"));
+    if (pass === 3) throw new TypeError("read lost");
+    return json(messagePage([chatMessage(2), chatMessage(3)]));
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); await assert.rejects(scope.sync(), /read lost/);
+  assert.deepEqual((await scope.sync()).messages.map(item => item.position), [1, 2, 3]);
+  assert.deepEqual(cursors, [null, "v1:conversation:1", "v1:conversation:2", "v1:conversation:1"]);
+});
+
+test("same-ID revision conflicts force a full replacement and old save replays cannot downgrade", async t => {
+  const {history} = setup(t); const cursors = [];
+  t.mock.method(globalThis, "fetch", async url => { cursors.push(cursorOf(url)); return json(messagePage([chatMessage(1, {revision: 2, content: "edited"})], 2)); });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); assert.equal(scope.append(chatMessage(1)).messages[0].revision, 2);
+  await scope.sync(); assert.deepEqual(cursors, [null, null]);
+});
+
+test("same-ID changed data in a delta triggers recovery even if metadata revision was unchanged", async t => {
+  const {history} = setup(t); const cursors = []; let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => { cursors.push(cursorOf(url)); return json(messagePage([chatMessage(1, ++pass > 1 ? {revision: 2} : {})])); });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); assert.equal((await scope.sync()).messages[0].revision, 2);
+  assert.deepEqual(cursors, [null, "v1:conversation:1", null]);
+});
+
+test("explicit reset reloads rather than merging messages from the old history", async t => {
+  const {history} = setup(t); const cursors = []; let pass = 0;
+  t.mock.method(globalThis, "fetch", async url => { cursors.push(cursorOf(url)); return json(messagePage(++pass === 1 ? [chatMessage(1)] : [])); });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); assert.deepEqual((await scope.sync(true)).messages, []);
+  assert.deepEqual(cursors, [null, null]);
+});
+
+test("late old reads cannot overwrite newer reads or confirmed input saves", async t => {
+  const {history} = setup(t); let pass = 0; const old = deferred(), pending = deferred();
+  t.mock.method(globalThis, "fetch", async () => {
+    pass++;
+    if (pass === 2) return old.promise;
+    if (pass === 4) return pending.promise;
+    return json(messagePage([chatMessage(1)], 1));
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); const first = scope.sync(); const newer = await scope.sync();
+  old.resolve(json(messagePage([], 1, null, 1))); assert.equal(await first, null);
+  assert.equal(newer.messages.length, 1);
+  const stale = scope.sync(); assert.equal(scope.append(chatMessage(2)).messages.length, 2);
+  pending.resolve(json(messagePage([], 1, null, 1))); assert.equal(await stale, null);
+});
+
+for (const failed of [false, true]) test(`disposed account/room reads ignore late ${failed ? "errors" : "responses"}`, async t => {
+  const {history} = setup(t); const late = deferred(); let calls = 0, signal;
+  t.mock.method(globalThis, "fetch", async (_url, options) => { calls++; signal = options.signal; return late.promise; });
+  const scope = new history.ConversationHistorySession("conversation", "owner-a");
+  const pending = scope.sync(); scope.dispose();
+  assert.ok(signal.aborted);
+  if (failed) late.reject(new Error("old account response")); else late.resolve(json(messagePage([chatMessage(1)])));
+  assert.equal(await pending, null); assert.equal(await scope.sync(), null);
+  assert.equal(scope.append(chatMessage(2)), null); assert.equal(calls, 1);
+});
+
+test("another room's history or returned messages are never merged into this room", async t => {
+  const {history} = setup(t); const cursors = [];
+  t.mock.method(globalThis, "fetch", async url => { cursors.push(cursorOf(url)); return json(messagePage([chatMessage(1)])); });
+  const old = {conversationId: "other", messages: [chatMessage(9, {conversation_id: "other"})], historyRevision: 1, syncCursor: "old-other-cursor"};
+  const current = await history.readConversationHistory("conversation", old);
+  assert.deepEqual(current.messages.map(item => item.position), [1]); assert.deepEqual(cursors, [null]);
+  await assert.rejects(history.readConversationHistory("wrong"), /another conversation/);
+});
+
+test("aborted message sync keeps its saved checkpoint and forwards the signal", async t => {
+  const {history} = setup(t); const controller = new AbortController(); let pass = 0;
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    if (++pass === 1) return json(messagePage([chatMessage(1)]));
+    assert.ok(options.signal.aborted); throw new DOMException("cancelled", "AbortError");
+  });
+  const scope = new history.ConversationHistorySession("conversation", "owner");
+  await scope.sync(); controller.abort();
+  await assert.rejects(scope.sync(false, controller.signal), {name: "AbortError"});
+});
+
+
+test("UUID route aliases still accept canonical message IDs and checkpoints", async t => {
+  const {history} = setup(t);
+  const canonical = "abcdef12-3456-7890-abcd-ef1234567890";
+  t.mock.method(globalThis, "fetch", async () => json(messagePage([chatMessage(1, {conversation_id: canonical})])));
+  for (const id of [canonical.toUpperCase(), canonical.replaceAll("-", ""), `{${canonical}}`, `urn:uuid:${canonical}`]) {
+    const scope = new history.ConversationHistorySession(id, "owner");
+    assert.equal((await scope.sync()).messages.length, 1);
+    assert.equal(scope.append(chatMessage(2, {conversation_id: canonical})).messages.length, 2);
+  }
 });

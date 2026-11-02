@@ -123,6 +123,54 @@ async def get_report_by_key(
     ).first()
 
 
+async def list_reports_by_ids(
+    session: AsyncSession,
+    report_ids: Sequence[UUID],
+    *,
+    target_type: str,
+    target_id: UUID,
+) -> list[ModerationReport]:
+    """같은 대상 신고만 ID 순서로 잠그고 타 대상은 잠금 없이 조회한다."""
+    if not report_ids:
+        return []
+    reports = list(
+        (
+            await session.scalars(
+                select(ModerationReport)
+                .where(
+                    ModerationReport.id.in_(report_ids),
+                    ModerationReport.target_type == target_type,
+                    ModerationReport.target_id == target_id,
+                )
+                .order_by(ModerationReport.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+    )
+    found_ids = {report.id for report in reports}
+    missing_ids = [report_id for report_id in report_ids if report_id not in found_ids]
+    if missing_ids:
+        # 다른 대상 행을 잠그면 해당 대상의 중복 FK 갱신과 교착할 수 있다.
+        # 서비스가 미존재/대상 불일치를 구별하도록 남은 raw 행만 잠금 없이 돌려준다.
+        reports.extend(
+            (
+                await session.scalars(
+                    select(ModerationReport)
+                    .where(
+                        ModerationReport.id.in_(missing_ids),
+                        or_(
+                            ModerationReport.target_type != target_type,
+                            ModerationReport.target_id != target_id,
+                        ),
+                    )
+                    .execution_options(populate_existing=True)
+                )
+            ).all()
+        )
+    return reports
+
+
 async def create_report(
     session: AsyncSession, values: ReportCreateValues
 ) -> ModerationReport:

@@ -1,5 +1,7 @@
 # 인증 구현 검증 기록
 
+후속 U22의 Outbox·재시도 구현과 202 접수 계약 및 2026-11-02 검증은 [U22 작업 기록](audits/2026-10-26-pattern-standardization/U22-WORKLOG.md)을 따른다. 아래는 최초 인증 구현 당시 기록이다.
+
 실행일: 2026-09-18. Windows, Python 3.12, PostgreSQL 17.11, Mailpit 1.31.1에서 확인했다. 기존 미커밋 `references_document/` 내용과 실제 `.env`를 변경하지 않았다. 실제 비밀값은 추가하지 않았다.
 
 ## 최종 결과

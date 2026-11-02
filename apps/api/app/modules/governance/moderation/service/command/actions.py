@@ -79,10 +79,10 @@ async def request_action(
             "moderation.target",
             f"{assessment.target_type}:{assessment.target_id}",
         )
-        superseding_id_row = await ReviewRepository.get_superseding_assessment(
+        superseding_id = await ReviewRepository.get_superseding_assessment(
             session, assessment.id
         )
-        if PersistenceMapper.scalar_row_to_value(superseding_id_row) is not None:
+        if superseding_id is not None:
             raise Types.ModerationError("state_conflict")
         if command.action_type != "revoke" and assessment.outcome != "violation":
             raise Types.ModerationError("state_conflict")
@@ -112,10 +112,10 @@ async def request_action(
                 != (command.target_type, command.target_id, command.scope)
             ):
                 raise Types.ModerationError("invalid_link")
-            reversal_id_row = await ReviewRepository.get_active_reversal_id(
+            reversal_id = await ReviewRepository.get_active_reversal_id(
                 session, previous.id
             )
-            if PersistenceMapper.scalar_row_to_value(reversal_id_row) is not None:
+            if reversal_id is not None:
                 raise Types.ModerationError("state_conflict")
         created_action_entity = await ReviewRepository.create_action(
             session,

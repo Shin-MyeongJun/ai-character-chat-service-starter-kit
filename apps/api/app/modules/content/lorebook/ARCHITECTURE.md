@@ -1,8 +1,13 @@
 # Lorebook 모듈
 
+2026-10-29 U06: 스튜디오 후속 발행은 기존 서버 복사본 ID를 유지하면서 공개 서비스로
+제목·설명·항목 태그 합집합을 갱신한다. 공개 소유 조회(lock=True) 후 update_lorebook을
+호출해 기존 visibility/status를 유지하며, replace_public_tags의 빈 목록은 기존 태그를
+제거한다. 상위 발행 transaction에 참여하고 과거 lorebook snapshot은 변경하지 않는다.
+
 - 태그 연결 소유 테이블: `lorebook_tags`, `lorebook_internal_tags`. 사전 `tags`는 content/tag 영역 소유이며 ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 sort_order·assigned_by, 내부 연결은 source(admin/system)·assigned_by·갱신 시각을 기록한다. 같은 태그 ID를 양쪽에서 사용할 수 있다. 대상 삭제는 연결만 CASCADE, 연결된 사전 삭제는 RESTRICT, 부여 사용자 삭제는 SET NULL이다. 개수 제한·태그 snapshot은 없고 기존 API 응답/발행 snapshot 구조를 유지하며 태그 전용 서비스가 인가·활성 상태·관리자 지정 보호 정책을 검사한다.
 - 소유 테이블: `lorebooks`, `lorebook_entries`, `lorebook_snapshots`.
-- `service/query.py`: 소유자 조회, 시작 항목 조회, 활성 항목 선택, 발행용 소스 잠금·스냅샷 조회. 원본 키워드 업무 판단은 EntryInfo로 변환한 뒤 실행한다. `activate_snapshot_entries(ActivateSnapshotEntriesCommand)`는 전달된 LorebookSnapshotInfo와 text만 사용하는 동기 공개 서비스이며 ActivatedSnapshotEntriesInfo를 반환한다.
+- `service/query.py`: 소유자 조회, 시작 항목 조회, 활성 항목 선택, 발행용 소스 잠금·스냅샷 조회. 원본 키워드 업무 판단은 EntryInfo로 변환한 뒤 실행한다. `activate_snapshot_entries(ActivateSnapshotEntriesCommand)`는 전달된 LorebookSnapshotInfo와 text/messages/수동 ID를 사용하는 동기 공개 서비스이며 ActivatedSnapshotEntriesInfo를 반환한다.
 - `service/command.py`: 원본·항목 생성/수정/삭제, 상태 변경, `freeze_lorebook`. 입력은 Command, 생성·수정 결과는 Info, 삭제 결과는 None이다. 미존재 삭제는 기존 오류를 유지한다.
 - `service/util/matching.py`: 정규식 검증·매칭 보조 함수. 독립된 조회/쓰기 유스케이스를 담지 않는다.
 - `repository.py`: 원본과 스냅샷 저장, `LorebookPageRow` 및 `LorebookEntryPageRow` 구성. Entity 생성·필드 변경은 이곳에서 수행한다.
@@ -41,7 +46,32 @@ regex는 기존 안전한 정규식 매칭이다. semantic은 자동 선택하�
 배타 그룹을 적용한다. 반환 항목은 전체 필드를 보존한 깊은 복사본이다. 이 설명은 기존
 activation 구현을 반영한 문서 보완이며 이번 타입 정리에서 활성화 정책을 추가한 것이 아니다.
 
-원본과 스냅샷의 활성화는 같은 query에서 키워드 매칭 판단을 공유한다. 결과 복사는 persistence mapper에 두어 업무 선택과 구조 변환을 분리한다.
+원본 query 활성화는 legacy 매칭을 유지하고, 스냅샷 활성화와 초안 진단은
+`service/activation.py`의 선택기를 공유한다. 결과 복사는 persistence mapper에 두어
+업무 선택과 구조 변환을 분리한다.
+
+### v1 exact·regex 옵션 계약 (2026-10-29 U15)
+
+v1 exact는 case_sensitive=False일 때 기존 casefold만 적용한 뒤 전체 문자열을
+비교한다. 공백을 제거하거나 Unicode 정규화를 추가하지 않으며 partial_match와
+관계없이 접두·접미 문자열은 일치하지 않는다. contains만 partial_match에 따라
+부분 문자열 또는 Unicode 단어 경계를 검사한다. regex는 패턴의 검색 의미를 유지하고
+case_sensitive를 컴파일 정책과 캐시 키에 함께 반영한다. 패턴과 대소문자 옵션의
+조합별로 최대 512개의 pydantic-core Rust 선형 시간 validator를 캐시하며 Python
+역추적 정규식 엔진으로 전환하지 않는다. 옵션 없는 호출과 작성 시 패턴 검증은
+기존 대소문자 무시 정책이다.
+
+`query.activate_snapshot_entries`와 `query.diagnose_draft_entries`는 같은 v1 판단을
+사용한다. 실제 studio 진단·발행 변환은 `studio_content.lore_entry_value`가 contains를
+생성하므로 exact/regex를 새로 노출하지 않는다. 라이브 `activate_keyword_entries`는
+metadata에 v1 옵션이 있어도 기존 exact/contains/regex와 대소문자 무시를 유지한다.
+저장 순서와 v1 우선순위·order·ID 정렬, any/all·화자/깊이·예산·배타 그룹 및 깊은 복사
+책임은 유지한다. 입력·metadata·스냅샷을 수정하지 않는다.
+
+잘못된 패턴은 `InvalidLorebookRegex(ValueError)`와 기존 고정 문구를 유지한다.
+legacy 스냅샷/라이브 query는 이를 기존 Stored lorebook 오류로 번역하고, v1 선택기와
+초안의 작성 검증은 원래 예외를 전달한다. studio HTTP의 공통 ValueError→422와
+일반 lorebook HTTP의 고정 422 입력 오류 번역은 변경하지 않는다.
 
 스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 미연결 훅의 503 응답을 보존한다. `app.main`은 DB 세션과 일반 소유자의 실제 쿠키 인증을 연결한다. character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
 
@@ -102,3 +132,14 @@ dependency override 호환과 204 빈 본문을 유지한다. 일반 오류의 �
 test_lorebook_http는 태그 4개 경로의 응답, 신뢰된 owner/session 전달, OpenAPI의 204
 본문 부재, 404/422 오류 번역, 미설정 DB/owner 각각의 503 및 서비스 미호출을 확인한다.
 서비스 mock을 사용하는 HTTP 계약 검증이며 실제 DB·외부 서비스 연동 검증은 아니다.
+
+
+## U16 태그 순수 정책 공통화 (2026-10-30)
+
+`service/tags.py`는 content/tag의 공개 `service/policy.py`와 Command/Info를 사용하여
+공개 태그 추가/교체 순서와 내부 태그 선택/제거·관리자 지정 보호를 판단한다.
+부모 존재·인가·FOR UPDATE, 잠금 아래 기존 연결 ID 수집, resolve_tags 호출,
+연결 저장·응답 조합과 use_case_transaction 경계는 이 모듈이 계속 소유한다.
+공통 서비스는 세션·ORM·콜백을 받지 않는 순수 정책이다. 저장소·mapper·router는
+도메인별 책임과 접근 차이가 있어 유지하며 공통 repository를 추가하지 않는다.
+비활성 태그 유지/신규 거절과 U25 이름 해석·잠금은 기존 tag command 책임이다.

@@ -1,5 +1,5 @@
 # ASGI 조립: DB 세션·미디어 저장소·LLM·답변 복구 작업의 수명을 함께 관리한다.
-# 기본 owner 훅은 쿠키 인증에 연결하고 명시적인 authenticate 주입 계약은 보존한다.
+# owner 훅은 쿠키 인증, 관리자·검수 훅은 최신 DB 인가에 연결한다.
 """ASGI 조립과 인증·외부 어댑터의 수명 관리."""
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.db.types import SessionFactory
 from app.http import character_dependencies, dependencies, lorebook_dependencies
+from app.http.authorization import create_admin_dependency
 from app.http.routes import router
 from app.modules.asset_storage.service import (
     create_asset_storage_service,
@@ -79,7 +80,7 @@ def create_app(
     authenticate: Callable[..., object] | None = None,
     asset_read_settings: Iterable[AssetStorageSettings] = (),
 ) -> FastAPI:
-    """authenticate is a trusted FastAPI identity dependency, never an owner ID."""
+    """authenticate supplies trusted UUIDs; administrative roles are checked in DB."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -266,6 +267,29 @@ def create_app(
         app.dependency_overrides[auth_hook] = (
             authenticate if authenticate is not None else get_verified_user_id
         )
+    for owner_hook, admin_hooks in (
+        (
+            dependencies.get_current_owner_id,
+            (dependencies.require_product_admin,),
+        ),
+        (
+            character_dependencies.get_current_owner_id,
+            (
+                character_dependencies.require_character_admin,
+                character_dependencies.require_character_moderator,
+            ),
+        ),
+        (
+            lorebook_dependencies.get_current_owner_id,
+            (
+                lorebook_dependencies.require_lorebook_admin,
+                lorebook_dependencies.require_lorebook_moderator,
+            ),
+        ),
+    ):
+        admin_dependency = create_admin_dependency(owner_hook)
+        for admin_hook in admin_hooks:
+            app.dependency_overrides[admin_hook] = admin_dependency
     return app
 
 

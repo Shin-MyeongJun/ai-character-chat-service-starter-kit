@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 
@@ -95,3 +96,31 @@ class InternalTagInfo:
     assigned_by: UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class SelectPublicTagIdsCommand:
+    retained_ids: tuple[UUID, ...]
+    requested_ids: tuple[UUID, ...]
+    append: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PlanInternalTagChangesCommand:
+    links: tuple[InternalTagLinkInfo, ...]
+    requested_ids: tuple[UUID, ...]
+    source: Literal["admin", "system"]
+    replace: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class InternalTagChangesInfo:
+    remove_ids: tuple[UUID, ...]
+    set_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ValidateInternalTagRemovalCommand:
+    links: tuple[InternalTagLinkInfo, ...]
+    tag_id: UUID
+    source: Literal["admin", "system"]

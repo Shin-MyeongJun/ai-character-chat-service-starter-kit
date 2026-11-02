@@ -1,5 +1,38 @@
 # Character 모듈
 
+## U28 업로드 fingerprint offload와 파일 수명 (2026-11-02)
+
+service/media.py의 reserve_upload는 입력 검증·seek/read·SHA-256을 하나의 to_thread
+작업으로 실행한다. 내부 _read_upload_fingerprint가 작업을 소유하고 shield로 종료까지
+기다린다. 첫 CancelledError를 보존하며 반복 취소와 작업 오류가 겹쳐도 결과/오류를
+회수한 후 첫 취소를 전달한다. HTTP의 임시 파일 context는 그 이후에 종료하므로
+스레드가 파일을 읽거나 되감는 동안 파일을 닫지 않는다. 입력 stream은 호출자 소유이며
+서비스가 직접 닫지 않는다. 취소 반환은 실제 파일 작업 종료까지 지연될 수 있다.
+
+64 KiB 읽기·32 MiB 제한·SHA-256·성공 시 시작 위치로 되감기·기존 검증 오류와 멱등성은
+유지한다. 해싱은 기존과 같이 소유 캐릭터 조회/예약 쓰기 전에 끝나고 취소 후에는
+예약·저장·ready 확정으로 진행하지 않는다. 예약 선행 commit과 외부 저장 중 DB 잠금,
+공급자 종료 대기·GC/재시도 정책은 그대로다. 서비스 내부의 파일 처리 책임이므로
+별도 공통 실행 계층이나 workflow 역호출을 추가하지 않았다.
+
+test_media_fingerprint_contracts 16건은 메모리/디스크 spool의 지문·되감기·멱등성·검증,
+실제 스레드의 읽기/최종 되감기 중 단일·반복 취소와 I/O 실패, HTTP 파일 종료 순서를
+검증한다. 기존 PostgreSQL 미디어/HTTP 32건도 통과했다. 실제 S3 전송·브라우저 단절·
+프로세스 강제 종료와 전체 업로드 deadline은 검증/변경 범위에 포함하지 않는다.
+
+## U08 공급자 작업 취소 우선순위 (2026-10-29)
+
+workflow/media.py의 _settle_storage는 shield 대기에서 발생한 공급자 예외도 최종
+task.result에서 회수한다. 호출자 취소를 이미 받았다면 공급자 성공/실패와 무관하게
+CancelledError를 전달하며, 공급자가 끝나기 전에는 업로드/정리 트랜잭션을 종료하지
+않는다. 반복 취소도 공급자 태스크를 취소하지 않는다. 취소가 없으면 원래 결과/예외를
+그대로 전달한다. 예약/deleting의 선행 commit과 ready/deleted 확정·재시도 정책은 같다.
+
+test_media_cancellation_contracts는 연결 없는 AsyncSession event와 지연 공급자 대역으로
+upload/cleanup×성공/실패×단일/반복 취소의 8조합에서 선행 commit→공급자 종료→rollback,
+완료 확정 없음과 입력 스트림 수명을 확인한다. 실제 PostgreSQL 행 잠금·경합·프로세스
+강제 종료와 브라우저 연결 종료는 별도 통합 검증이 필요하다.
+
 캐릭터 원본과 이미지·에셋 및 이들의 발행 스냅샷을 소유한다.
 
 - 태그 연결 소유 테이블: `character_tags`, `character_internal_tags`. 사전 `tags`는 content/tag 영역 소유이며 ORM은 `app/db/models/tag.py`에 분리한다. 공개 연결은 sort_order·assigned_by, 내부 연결은 source(admin/system)·assigned_by·갱신 시각을 기록한다. 같은 태그 ID를 양쪽에서 사용할 수 있다. 대상 삭제는 연결만 CASCADE, 연결된 사전 삭제는 RESTRICT, 부여 사용자 삭제는 SET NULL이다. 개수 제한·태그 snapshot은 없고 기존 API 응답/발행 snapshot 구조를 유지하며 태그 전용 서비스가 인가·활성 상태·관리자 지정 보호 정책을 검사한다.
@@ -163,3 +196,14 @@ test_media_transport_contracts는 바이너리 spool의 정상·검증 실패·�
 초과에서 파일 종료, ASGI 정상·읽기 오류·취소에서 reader 종료, 캐릭터/상품 소유자
 전달·응답 헤더/빈 OpenAPI 스키마를 오프라인으로 확인한다. 실제 DB 인가·S3·네트워크
 단절·공급자 스레드 정리는 이 HTTP 전송 테스트의 검증 범위가 아니다.
+
+
+## U16 태그 순수 정책 공통화 (2026-10-30)
+
+`service/tags.py`는 content/tag의 공개 `service/policy.py`와 Command/Info를 사용하여
+공개 태그 추가/교체 순서와 내부 태그 선택/제거·관리자 지정 보호를 판단한다.
+부모 존재·인가·FOR UPDATE, 잠금 아래 기존 연결 ID 수집, resolve_tags 호출,
+연결 저장·응답 조합과 use_case_transaction 경계는 이 모듈이 계속 소유한다.
+공통 서비스는 세션·ORM·콜백을 받지 않는 순수 정책이다. 저장소·mapper·router는
+도메인별 책임과 접근 차이가 있어 유지하며 공통 repository를 추가하지 않는다.
+비활성 태그 유지/신규 거절과 U25 이름 해석·잠금은 기존 tag command 책임이다.

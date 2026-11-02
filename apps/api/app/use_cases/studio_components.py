@@ -17,6 +17,9 @@ from app.modules.content.product.service.query.composition import get_compositio
 from app.modules.content.product.service.query.studio import (
     get_studio_draft_for_publication,
 )
+from app.modules.content.product.service.studio_validation import (
+    validate_studio_document_shape,
+)
 from app.use_cases.studio_content import StudioDocument
 
 
@@ -126,9 +129,10 @@ async def save_studio(
 ) -> ProductTypes.StudioDraftInfo:
     """Preserve legacy copy identities before CAS-saving an edited document.
 
-    One transaction owns product → draft locks, adoption and the document write.
+    One transaction owns advisory → product → draft locks, adoption and the write.
     No files or external services are called; a conflict rolls back every write.
     """
+    validate_studio_document_shape(command.document)
     async with use_case_transaction(session):
         if command.expected_revision is not None:
             draft = await get_studio_draft_for_publication(
@@ -168,9 +172,17 @@ async def prepare_components(
             raise ProductTypes.StudioDraftConflictError(
                 "Studio draft changed before upload preparation."
             )
-        mapping = await component_mapping(session, draft, command.owner_id)
-        # Upload preparation uses the saved editor fields, without new validation.
+        validate_studio_document_shape(draft.document)
         document = cast(StudioDocument, draft.document)
+        # Validate every upload target before creating the first server copy.
+        for row in document.get("characters", []):
+            for key in ("name", "persona"):
+                value = row.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(
+                        "Upload preparation requires character name and persona."
+                    )
+        mapping = await component_mapping(session, draft, command.owner_id)
         for row in document.get("characters", []):
             if row["id"] not in mapping["characters"]:
                 info = await CharacterCommand.create_character(

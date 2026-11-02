@@ -11,6 +11,7 @@ from uuid import UUID
 import jwt
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError
+from cryptography.fernet import Fernet, InvalidToken
 from email_validator import EmailNotValidError, validate_email
 
 from app.modules.identity.settings import AuthSettings
@@ -21,6 +22,30 @@ PASSWORD_HASHER = PasswordHasher(
     time_cost=3, memory_cost=65536, parallelism=4, type=Type.ID
 )
 DUMMY_HASH = PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
+
+
+def encrypt_mail_token(token: str, settings: AuthSettings) -> str:
+    # An authenticated context marker prevents reuse as an OAuth flow payload.
+    return (
+        Fernet(settings.flow_key.encode())
+        .encrypt(("auth-mail-v1:" + token).encode("ascii"))
+        .decode("ascii")
+    )
+
+
+def decrypt_mail_token(
+    encrypted_token: str, token_digest: str, settings: AuthSettings
+) -> str:
+    payload = Fernet(settings.flow_key.encode()).decrypt(
+        encrypted_token.encode("ascii")
+    )
+    prefix = b"auth-mail-v1:"
+    if not payload.startswith(prefix):
+        raise InvalidToken
+    token = payload[len(prefix) :].decode("ascii")
+    if not hmac.compare_digest(token_hash(token), token_digest):
+        raise InvalidToken
+    return token
 
 
 def normalize_email(email: str) -> str:

@@ -163,14 +163,28 @@ async def change_report_intake(
         raise Types.ModerationError("invalid_input")
     async with use_case_transaction(session):
         await ValidationServiceUtil._require_actor(session, actor_id, admin=True)
-        # 모든 중복 그래프 편집을 직렬화해 서로를 동시에 연결하는 경쟁을 막는다.
-        await lock_key(session, "moderation.intake", "graph")
+        # 대상은 생성 후 불변이다. 잠금 키만 먼저 읽고 행 잠금은 대상 잠금 뒤에 잡는다.
+        initial_report_entity = await ReviewRepository.get_report(
+            session, command.report_id
+        )
+        initial = ValidationServiceUtil.require_info(
+            PersistenceMapper.report_entity_to_info(initial_report_entity)
+        )
+        await lock_key(
+            session, "moderation.target", f"{initial.target_type}:{initial.target_id}"
+        )
         report_entity = await ReviewRepository.get_report(
             session, command.report_id, lock=True
         )
         info = ValidationServiceUtil.require_info(
             PersistenceMapper.report_entity_to_info(report_entity)
         )
+        # 대기 전 상태는 업무 판단에 사용하지 않는다. 잠금 밖에서 대상이 바뀌어도 거절한다.
+        if (info.target_type, info.target_id) != (
+            initial.target_type,
+            initial.target_id,
+        ):
+            raise Types.ModerationError("state_conflict")
         if (info.intake_status, info.duplicate_of_report_id, info.intake_reason) == (
             command.intake_status,
             command.duplicate_of_report_id,
@@ -183,10 +197,10 @@ async def change_report_intake(
             in {"reviewed", "dismissed"}
         ):
             raise Types.ModerationError("state_conflict")
-        assessment_id_row = await ReviewRepository.get_report_assessment_id(
+        assessment_id = await ReviewRepository.get_report_assessment_id(
             session, info.id
         )
-        if PersistenceMapper.scalar_row_to_value(assessment_id_row) is not None:
+        if assessment_id is not None:
             raise Types.ModerationError("state_conflict")
         visited = {info.id}
         next_id = command.duplicate_of_report_id

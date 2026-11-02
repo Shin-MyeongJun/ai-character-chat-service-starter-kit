@@ -3,7 +3,7 @@
 from typing import overload
 from uuid import UUID
 
-from app.db.models.identity import AuthActionToken, AuthSession, User
+from app.db.models.identity import AuthActionToken, AuthMailOutbox, AuthSession, User
 from app.modules.identity import repository as Repository
 from app.modules.identity import types as Types
 
@@ -63,6 +63,14 @@ def session_entity_to_info(entity: AuthSession | None) -> Types.SessionInfo | No
     )
 
 
+def authenticated_session_row_to_infos(
+    row: Repository.AuthenticatedSessionRow | None,
+) -> tuple[Types.CredentialInfo, Types.SessionInfo] | None:
+    if row is None:
+        return None
+    return user_entity_to_credential_info(row.user), session_entity_to_info(row.session)
+
+
 @overload
 def action_entity_to_info(entity: AuthActionToken) -> Types.ActionTokenInfo: ...
 
@@ -91,3 +99,20 @@ def scalar_row_to_used(value: UUID | str | int | None) -> bool:
 
 def cleanup_row_to_info(value: Repository.CleanupRow) -> Types.CleanupInfo:
     return Types.CleanupInfo(*value)
+
+
+def mail_outbox_entity_to_info(
+    entity: AuthMailOutbox | None,
+) -> Types.MailOutboxInfo | None:
+    if entity is None:
+        return None
+    return Types.MailOutboxInfo(
+        id=entity.id,
+        token_hash=entity.token_hash,
+        encrypted_token=entity.encrypted_token,
+        status=entity.status,
+        attempt_count=entity.attempt_count,
+        available_at=entity.available_at,
+        claim_token=entity.claim_token,
+        lease_until=entity.lease_until,
+    )

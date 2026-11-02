@@ -90,12 +90,10 @@ async def _build_publication(
             lock=True,
         ),
     )
-    _, starts = await SettingsCommandService._validate_publication(session, product)
-    # _validate_publication above requires both fields while product stays locked.
-    assert product.default_model_id is not None and product.reasoning_effort is not None
-    model = await SettingsCommandService._validate_model(
-        session, product.default_model_id, product.reasoning_effort
+    settings = await SettingsCommandService._validate_publication(
+        session, product, composition
     )
+    starts, model = settings.starts, settings.model
     provider = await LlmQueryService.get_provider(
         session, LlmTypes.GetProviderCommand(model.provider_id)
     )
@@ -129,8 +127,8 @@ async def _build_publication(
         session, product_id, data
     )
     snapshot = PersistenceMapper.product_snapshot_entity_to_info(created_snapshot_row)
-    snapshot_character_ids_by_link_id: dict[UUID, UUID] = {}
-    snapshot_lorebook_ids_by_link_id: dict[UUID, UUID] = {}
+    character_snapshot_ids_by_source_id: dict[UUID, UUID] = {}
+    lorebook_snapshot_ids_by_source_id: dict[UUID, UUID] = {}
     canonical_characters: list[_CanonicalCharacterData] = []
     canonical_lorebooks: list[_CanonicalLorebookData] = []
     scene_options: Types.ProductJsonObject = {}
@@ -141,10 +139,8 @@ async def _build_publication(
                 character_id=character_link.character_id, owner_id=owner_id
             ),
         )
-        snapshot_character_ids_by_link_id[
-            character_link.id
-        ] = await Repository.add_snapshot_character(
-            session, snapshot.id, character_snapshot.id, character_link
+        character_snapshot_ids_by_source_id[character_link.character_id] = (
+            character_snapshot.id
         )
         canonical_characters.append(
             {
@@ -166,10 +162,8 @@ async def _build_publication(
                 lorebook_id=lorebook_link.lorebook_id, owner_id=owner_id
             ),
         )
-        snapshot_lorebook_ids_by_link_id[
-            lorebook_link.id
-        ] = await Repository.add_snapshot_lorebook(
-            session, snapshot.id, lorebook_snapshot.id, lorebook_link
+        lorebook_snapshot_ids_by_source_id[lorebook_link.lorebook_id] = (
+            lorebook_snapshot.id
         )
         canonical_lorebooks.append(
             {
@@ -186,34 +180,17 @@ async def _build_publication(
                 ),
             }
         )
-    for target in targets:
-        await Repository.add_snapshot_target(
-            session,
-            snapshot.id,
-            snapshot_character_ids_by_link_id[target.product_character_id],
-            snapshot_lorebook_ids_by_link_id[target.product_lorebook_id],
-        )
-    lorebook_link_ids_by_source_id = {
-        lorebook_link.lorebook_id: lorebook_link.id for lorebook_link in lorebook_links
-    }
+    await Repository.add_snapshot_composition(
+        session,
+        snapshot.id,
+        composition,
+        character_snapshot_ids_by_source_id,
+        lorebook_snapshot_ids_by_source_id,
+        starts,
+        settings.entries_by_id,
+    )
     for start in starts:
-        start_entry = await LorebookQueryService.get_lorebook_entry(
-            session,
-            LorebookTypes.GetLorebookEntryCommand(
-                lorebook_id=start.lorebook_id, entry_id=start.entry_id
-            ),
-        )
-        # Parent lorebooks remain locked; publication validation found this start.
-        assert start_entry is not None, "Validated start entry disappeared."
-        await Repository.add_snapshot_start(
-            session,
-            snapshot.id,
-            snapshot_lorebook_ids_by_link_id[
-                lorebook_link_ids_by_source_id[start.lorebook_id]
-            ],
-            start_entry,
-            start.sort_order,
-        )
+        start_entry = settings.entries_by_id[start.entry_id]
         if "studio_scene_v1" in start_entry.metadata:
             # Lorebook metadata came from JSONB. This open scene payload is JSON,
             # although the public metadata type also permits other objects.

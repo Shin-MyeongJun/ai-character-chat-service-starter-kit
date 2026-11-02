@@ -19,7 +19,7 @@
 ## 저장소·mapper·조회 타입 계약
 
 - `repository.py`와 `service/query.py`의 실행 의존성은 현재 세션인 `AsyncSession`이다. 세션 생성·종료나 commit/rollback을 맡지 않는다. 기존 위치/키워드 인자 이름과 호출 형태를 유지한다.
-- 공개 조회 입력은 `GetModelCommand(model_id: UUID)`, `GetProviderCommand(provider_id: UUID)`, `ValidateModelCommand(model_id: UUID, reasoning_effort: str)`이다. 요청 값이 없는 `list_candidate_models(session)`에는 빈 Command를 추가하지 않는다.
+- 공개 조회 입력은 `GetModelCommand(model_id: UUID, refresh: bool = False)`, `GetProviderCommand(provider_id: UUID, refresh: bool = False)`, `ValidateModelCommand(model_id: UUID, reasoning_effort: str)`이다. `list_candidate_models(session)`의 기존 호출은 유지하고, 캐시 갱신이 필요하면 선택적 `ListCandidateModelsCommand(refresh=True)`를 전달한다.
 - 저장소 단건 반환은 `Model | None`, `Provider | None`, `ModelReplacement | None`이며 후보 목록은 `list[Model]`이다. 현재 별도 Row 캐리어는 없다. service는 Entity를 임시 보유해 persistence mapper에 전달하며, 공개 반환은 `ModelInfo | None`, `ProviderInfo | None`, `list[ModelInfo]`로 한정한다.
 - 모델/공급자 단건 조회는 UUID 기본 키만 사용하고 비활성·종료 모델도 반환한다. 미존재는 mapper를 거쳐 그대로 `None`이다. 후보 조회는 `Provider.is_enabled IS TRUE`인 공급자와의 내부 JOIN만 적용한다. 모델 활성·종료·capability 조건이나 ORDER BY를 추가하지 않는다. DB 결과 순서는 보장하지 않으며 mapper는 전달된 순서와 빈 목록을 보존한다.
 - persistence mapper는 명시된 Entity 필드만 Info로 옮긴다. 모델/공급자 변환은 비-null 입력이면 비-null Info, `None`이면 `None`인 overload 계약이다. 모델의 nullable 종료 일정과 저장된 context window를 유지하며 capabilities만 깊게 복사해 중첩 가변 값까지 분리한다. 대체 이력 mapper는 `ModelReplacement | None`을 존재 여부 `bool`로 변환할 뿐 업무 판단·DB/공급자 호출을 하지 않는다.
@@ -108,3 +108,44 @@ test_llm_sdk_contracts는 dict 응답의 누락 usage/0/손상 bool 원본, 공�
 malformed Anthropic usage의 호출 후 TypeError, 선택적 close와 원래 종료 실패 전파를
 오프라인으로 확인한다. 기존 SDK 모델/오류 subclass·메시지/usage·Voyage 소유권 검증도
 유지한다. 실제 공급자 지원/네트워크/timeout/운영 SDK 업그레이드 검증은 아니다.
+
+
+## U09 정상 모델 선택과 교체 잠금 분리 (2026-10-29)
+
+resolve_execution은 먼저 product 공개 ensure_snapshot_available을 lock=False로 호출하고,
+모델/공급자를 refresh=True로 조회한다. 원본이 활성이고 종료 전이며 아직 종료 공지가
+시작되지 않았으면 스냅샷 FOR UPDATE 없이 반환한다. 후보/대체 이력 조회·삽입은 없다.
+일반 SELECT와 상위 트랜잭션은 유지하며 모든 업무 잠금이 없어졌다는 뜻은 아니다.
+
+교체 검토가 필요하면 같은 트랜잭션에서 snapshot을 lock=True로 다시 읽고 만료를
+재검사한다. 모델/공급자·후보는 populate_existing=True로 identity map을 갱신한다.
+이는 새 트랜잭션이나 별도 행 잠금을 만들지 않으며 DB 격리 수준을 바꾸지 않는다.
+잠금 대기 중 공지 철회·설정/정책 변경·미존재·버전 만료를 재판단하고, 명시적 now가
+없으면 데이터를 다시 읽은 뒤 현재 UTC로 종료/전환 경계를 평가한다. 명시적 now는
+두 단계 모두 같은 값을 사용한다. get_* 기본 refresh=False와 후보의 Command 생략
+호환은 유지한다. refresh는 조회 최신성 옵션이며 업무 검증을 생략하는 옵션이 아니다.
+
+교체 후보 선택·이력 존재 확인/삽입은 두 번째 잠금 획득 뒤에만 수행한다. 기존
+snapshot/from/to 단위 중복 방지, 상위 트랜잭션, 후보 순위·effort·계획 시각·원본 임시
+사용/중단 정책은 유지한다. 교체 경로에는 재조회 비용이 추가되며 정상 경로의 잠금
+경합 감소량이나 처리량은 운영에서 측정하지 않았다. 정상 조회 이후의 모든 관리자
+변경과 실행을 원자적으로 묶는 새 보장은 추가하지 않는다.
+
+추가 회귀 13건은 정상/미래 공지의 비잠금, 잠금 뒤 공지 철회·정책 변경·미존재,
+대기 중 만료/종료·전환 시각과 명시적 now, SQLite에서 캐시된 모델/공급자/후보의
+실제 갱신을 확인한다. PostgreSQL 실제 잠금 대기·격리·동시 삽입/유일 제약은 미검증이다.
+
+## U29 SDK 오류의 재시도 분류 (2026-10-30)
+
+OpenAI/Anthropic의 명시적 SDK timeout·connection·rate limit 분류는 유지한다.
+base의 상태 코드 fallback은 401/403·429·나머지 4xx·5xx의 기존 분류를 보존하지만,
+상태 코드가 없는 예외를 더 이상 일시 공급자 장애로 추정하지 않는다. TypeError,
+JSONDecodeError, 일반 RuntimeError와 미분류 SDK APIError는 기존 LLMError의
+PROVIDER/retryable=False로 전달하며 cause·provider·model·request/status metadata는
+유지한다. HTTP/Python 오류 종류나 SDK 재시도 설정은 바꾸지 않는다.
+
+SDK 응답 검증 오류(200 응답)는 같은 비재시도 envelope다. 호출 이후 응답 추출 중의
+TypeError는 기존대로 그대로 전파되어 memory workflow가 영구 실패로 기록한다.
+usage 값의 새로운 검증/정규화나 새로운 오류 enum은 추가하지 않았다. CancelledError는
+잡지 않는다. Voyage의 기존 비재시도 catch-all과 INVALID_RESPONSE 계약도 유지한다.
+test_llm_error_classification과 기존 SDK 모델/오류/추출 테스트로 이를 검증한다.

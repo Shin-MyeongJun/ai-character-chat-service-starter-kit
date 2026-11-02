@@ -19,6 +19,7 @@ from app.db.models.generation_prompt import GenerationPrompt
 from app.db.models.identity import User, UserOAuthAccount
 from app.db.models.lorebook import Lorebook, LorebookEntry
 from app.db.models.memory import ConversationMemory, MemoryJob
+from app.db.models.message_history import ChatHistoryVersion
 from app.db.models.model_routing import Model, Provider
 from app.db.models.moderation import AuditLog, ModerationFlag
 from app.db.models.moderation_review import (
@@ -36,7 +37,11 @@ from app.db.models.product_statistics import (
     ProductVersionDailyStats,
     ProductVersionUserDailyActivity,
 )
-from app.db.models.product_usage import ProductGeneration, ProductPaymentEvent
+from app.db.models.product_usage import (
+    AnswerRecoveryAttempt,
+    ProductGeneration,
+    ProductPaymentEvent,
+)
 from app.db.models.snapshot import (
     CharacterSnapshot,
     LorebookSnapshot,
@@ -55,6 +60,7 @@ from app.db.models.tag import (
 )
 
 __all__ = [
+    "AnswerRecoveryAttempt",
     "AuditLog",
     "BillingCreditBinding",
     "BillingQuote",
@@ -65,6 +71,7 @@ __all__ = [
     "CharacterMedia",
     "CharacterSnapshot",
     "CharacterTag",
+    "ChatHistoryVersion",
     "Conversation",
     "ConversationCharacter",
     "ConversationMemory",

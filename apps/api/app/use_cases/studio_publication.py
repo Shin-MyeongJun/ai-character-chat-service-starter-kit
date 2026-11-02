@@ -16,6 +16,8 @@ from app.modules.content.character.service import query as CharacterQuery
 from app.modules.content.character.service import tags as CharacterTags
 from app.modules.content.lorebook import types as LoreTypes
 from app.modules.content.lorebook.service import command as LoreCommand
+from app.modules.content.lorebook.service import query as LoreQuery
+from app.modules.content.lorebook.service import tags as LoreTags
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import command as ProductCommand
 from app.modules.content.product.service.command import (
@@ -28,6 +30,9 @@ from app.modules.content.product.service.command.studio import (
 )
 from app.modules.content.product.service.query.studio import (
     get_studio_draft_for_publication,
+)
+from app.modules.content.product.service.studio_validation import (
+    validate_studio_document_shape,
 )
 from app.use_cases.studio_components import StoredRelease, component_mapping
 from app.use_cases.studio_content import (
@@ -64,6 +69,7 @@ def _publication_content(
     document: Mapping[str, object],
 ) -> tuple[list[StudioCharacter], list[StudioLore], list[StudioScene], StudioWork]:
     """Validate publishable document structure; every declared image needs managed media."""
+    validate_studio_document_shape(document)
 
     def present_text(value: object) -> bool:
         """Reject empty authored text before domain writes begin."""
@@ -247,6 +253,28 @@ async def publish_studio(
             )
         characters, lorebooks, scenes, work = _publication_content(draft.document)
         ReleasesCommand.validate_note(command.summary, command.body)
+        # Prepare every lore/scene value before domain writes begin.
+        values: list[tuple[str, LoreTypes.LorebookEntryCommandFields]] = []
+        if work.get("worldRules", "").strip():
+            values.append(
+                (
+                    "world_rules",
+                    {
+                        "title": "세계 규칙",
+                        "content": work["worldRules"],
+                        "entry_type": "rule",
+                        "activation_type": "always",
+                        "priority": 100,
+                    },
+                )
+            )
+        values.extend(("lore:" + row["id"], lore_entry_value(row)) for row in lorebooks)
+        ordered_scenes = sorted(
+            scenes, key=lambda row: row["id"] != work["defaultSceneId"]
+        )
+        values.extend(
+            ("scene:" + row["id"], scene_entry_value(row)) for row in ordered_scenes
+        )
         # Update only work-specific copies. Retained IDs keep product slots stable.
         created_characters: dict[str, UUID] = {}
         for row in sorted(
@@ -327,6 +355,37 @@ async def publish_studio(
                     )
         if mapping.get("book_id"):
             book_id = UUID(mapping["book_id"])
+            # Preserve the existing visibility/status while refreshing the authored
+            # parent profile. Hold its owner-scoped lock through entry/tag writes.
+            book = (
+                await LoreQuery.get_owned_lorebooks(
+                    session,
+                    LoreTypes.GetOwnedLorebooksCommand(
+                        ids=(book_id,), owner_id=command.owner_id, lock=True
+                    ),
+                )
+            )[0]
+            await LoreCommand.update_lorebook(
+                session,
+                LoreTypes.UpdateLorebookCommand(
+                    lorebook_id=book_id,
+                    owner_id=command.owner_id,
+                    title=f"{work['title']} · 스튜디오",
+                    description=work.get("worldRules") or None,
+                    visibility=book.visibility,
+                ),
+            )
+            # An empty authored list deliberately removes previous public tags.
+            await LoreTags.replace_public_tags(
+                session,
+                LoreTypes.PublicTagsCommand(
+                    target_id=book_id,
+                    user_id=command.owner_id,
+                    names=tuple(
+                        name for lore in lorebooks for name in lore.get("tags", ())
+                    ),
+                ),
+            )
         else:
             book = await LoreCommand.create_lorebook(
                 session,
@@ -341,27 +400,6 @@ async def publish_studio(
             )
             book_id = book.id
             mapping["book_id"] = str(book_id)
-        values: list[tuple[str, LoreTypes.LorebookEntryCommandFields]] = []
-        if work.get("worldRules", "").strip():
-            values.append(
-                (
-                    "world_rules",
-                    {
-                        "title": "세계 규칙",
-                        "content": work["worldRules"],
-                        "entry_type": "rule",
-                        "activation_type": "always",
-                        "priority": 100,
-                    },
-                )
-            )
-        values.extend(("lore:" + row["id"], lore_entry_value(row)) for row in lorebooks)
-        ordered_scenes = sorted(
-            scenes, key=lambda row: row["id"] != work["defaultSceneId"]
-        )
-        values.extend(
-            ("scene:" + row["id"], scene_entry_value(row)) for row in ordered_scenes
-        )
         next_entries: dict[str, str] = {}
         for key, value in values:
             create_value = LoreTypes.CreateLorebookEntryCommand(

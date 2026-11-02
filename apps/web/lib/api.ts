@@ -31,6 +31,12 @@ export type ChatMessage = {
   revision: number;
   product_character_id: string | null;
 };
+export type MessagePage = {
+  items: ChatMessage[];
+  next_cursor: string | null;
+  history_revision?: number | null;
+  sync_cursor?: string | null;
+};
 export type Answer = {
   generation_id: string;
   status: string;
@@ -164,8 +170,8 @@ export const getCreditBalance = () => request<CreditBalance>("/account/credits")
 export const startConversation = (productId: string, startSetId: string | null) =>
   request<{ id: string }>("/conversations", { method: "POST", body: JSON.stringify({ product_id: productId, start_set_id: startSetId }) });
 export const getConversationStart = (id: string) => request<ConversationStart>(`/conversations/${encodeURIComponent(id)}/start`);
-export const listMessages = (id: string, cursor?: string) =>
-  request<{ items: ChatMessage[]; next_cursor: string | null }>(`/conversations/${encodeURIComponent(id)}/messages?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+export const listMessages = (id: string, cursor?: string, signal?: AbortSignal) =>
+  request<MessagePage>(`/conversations/${encodeURIComponent(id)}/messages?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { signal });
 export async function listConversationMessages(id: string): Promise<ChatMessage[]> {
   const messages = new Map<string, ChatMessage>();
   const seen = new Set<string>();

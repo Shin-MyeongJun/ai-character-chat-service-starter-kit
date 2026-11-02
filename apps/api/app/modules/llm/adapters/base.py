@@ -1,5 +1,5 @@
 # 외부 호출 전에 모델명·effort·출력 토큰 상한을 검사한다.
-# SDK 예외 분류는 하위 어댑터가 수행하며, 기본 오류 매핑은 상태 코드로 retryable을 정한다.
+# SDK 통신 예외는 하위 어댑터가 분류한다. 상태 없는 내부 오류는 재시도하지 않는다.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -143,7 +143,7 @@ class BaseTextGenerationAdapter(ABC):
                 kind, retryable = LLMErrorKind.INVALID_REQUEST, False
             else:
                 kind = LLMErrorKind.PROVIDER
-                retryable = status_code is None or status_code >= 500
+                retryable = status_code is not None and status_code >= 500
         return LLMError(
             str(exc),
             kind=kind,

@@ -142,6 +142,7 @@ async def first_answer_app(db, auth_settings, monkeypatch, tmp_path):  # noqa: F
     monkeypatch.setenv("BILLING_PRICING_CONFIG_PATH", str(pricing_path))
     app = main.create_app()
     async with app.router.lifespan_context(app):
+        mailer.workflow = app.state.authentication_mail
         async with app.state.session_factory() as session:
             assert await session.scalar(text("SELECT current_schema()")) == schema
         yield SimpleNamespace(
@@ -156,7 +157,7 @@ async def signup_and_login(client, mailer):
     assert not client.cookies.get("__Host-chatkit_access")
     rejected = await request(client, "POST", "/auth/login", 401, json=credentials)
     assert rejected["error"]["code"] == "invalid_credentials"
-    token = mailer.token("verify")
+    token = await mailer.token("verify")
     user = await request(client, "POST", "/auth/email/verify", json={"token": token})
     assert user["email_verified"] is True
     await request(client, "POST", "/auth/email/verify", 400, json={"token": token})

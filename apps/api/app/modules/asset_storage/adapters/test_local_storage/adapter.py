@@ -7,11 +7,18 @@ import asyncio
 import hashlib
 import json
 import os
+import sys
 from collections.abc import Callable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, TypeVar
 from uuid import uuid4
+from weakref import WeakValueDictionary
+
+if sys.platform == "win32":
+    import _winapi
+    import msvcrt
 
 from app.modules.asset_storage.types import (
     AssetMetadataInfo,
@@ -29,6 +36,75 @@ from app.modules.asset_storage.types import (
 )
 
 _COPY_CHUNK_SIZE = 1024 * 1024
+_T = TypeVar("_T")
+
+
+async def _settle_task(
+    task: asyncio.Task[_T],
+) -> tuple[_T, asyncio.CancelledError | None]:
+    """Own a worker until completion; cancellation cannot stop its file operation."""
+    cancellation: asyncio.CancelledError | None = None
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError as exc:
+            if cancellation is None:
+                cancellation = exc
+        except Exception:
+            break  # Retrieve the failure below, also when cancellation is pending.
+    try:
+        return task.result(), cancellation
+    except (Exception, asyncio.CancelledError):
+        if cancellation is not None:
+            raise cancellation from None
+        raise
+
+
+async def _run_io(operation: Callable[[], _T]) -> _T:
+    result, cancellation = await _settle_task(
+        asyncio.create_task(asyncio.to_thread(operation))
+    )
+    if cancellation is not None:
+        raise cancellation
+    return result
+
+
+def _open_binary(path: Path) -> BinaryIO:
+    if sys.platform == "win32":
+        # CPython's Windows wrapper supplies FILE_SHARE_READ | FILE_SHARE_DELETE.
+        # Readers keep their open file version while its logical key is removed.
+        handle = _winapi.CreateFile(
+            str(path), _winapi.GENERIC_READ, 0x1 | 0x4, 0, _winapi.OPEN_EXISTING, 0, 0
+        )
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        except BaseException:
+            _winapi.CloseHandle(handle)
+            raise
+        try:
+            return os.fdopen(descriptor, "rb")
+        except BaseException:
+            os.close(descriptor)  # The descriptor owns handle after open_osfhandle.
+            raise
+    return path.open("rb")
+
+
+def _replace_data(source: Path, destination: Path) -> None:
+    try:
+        os.replace(source, destination)
+    except PermissionError:
+        if sys.platform != "win32" or not destination.is_file():
+            raise
+        # Windows replacement can reject an open destination even with delete
+        # sharing. Retire its name, publish the new file, then unlink the old one.
+        retired = destination.with_name(f"{destination.name}.{uuid4().hex}.old")
+        os.replace(destination, retired)
+        try:
+            os.replace(source, destination)
+            retired.unlink()
+        except BaseException:
+            os.replace(retired, destination)
+            raise
 
 
 class _LocalAssetReader:
@@ -39,18 +115,26 @@ class _LocalAssetReader:
     ) -> None:
         self._file_object = file_object
         self._error_mapper = error_mapper
+        self._lock = asyncio.Lock()
 
     async def read(self, size: int = -1) -> bytes:
-        try:
-            return await asyncio.to_thread(self._file_object.read, size)
-        except OSError as exc:
-            raise self._error_mapper(exc) from exc
+        async with self._lock:
+            try:
+                return await _run_io(partial(self._file_object.read, size))
+            except OSError as exc:
+                raise self._error_mapper(exc) from exc
 
     async def aclose(self) -> None:
-        try:
-            await asyncio.to_thread(self._file_object.close)
-        except OSError as exc:
-            raise self._error_mapper(exc) from exc
+        _, cancellation = await _settle_task(asyncio.create_task(self._close()))
+        if cancellation is not None:
+            raise cancellation
+
+    async def _close(self) -> None:
+        async with self._lock:
+            try:
+                await asyncio.to_thread(self._file_object.close)
+            except OSError as exc:
+                raise self._error_mapper(exc) from exc
 
 
 class TestLocalStorageAdapter:
@@ -67,7 +151,8 @@ class TestLocalStorageAdapter:
         self.storage_id = settings.storage_id
         self._metadata_root = self._root / ".asset_storage" / "metadata"
         self._metadata_root.mkdir(parents=True, exist_ok=True)
-        self._locks: dict[str, asyncio.Lock] = {}
+        # Holders and waiters retain the lock. Idle keys do not accumulate here.
+        self._locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
     def _lock_for(self, object_key: str) -> asyncio.Lock:
         return self._locks.setdefault(object_key, asyncio.Lock())
@@ -157,7 +242,7 @@ class TestLocalStorageAdapter:
             os.replace(metadata_temp, metadata_path)
             replaced_metadata = True
             try:
-                os.replace(data_temp, data_path)
+                _replace_data(data_temp, data_path)
             except BaseException:
                 if previous_metadata is None:
                     metadata_path.unlink(missing_ok=True)
@@ -207,12 +292,12 @@ class TestLocalStorageAdapter:
 
     def _open_sync(self, object_key: str) -> tuple[AssetMetadataInfo, BinaryIO]:
         metadata = self._read_metadata_sync(object_key)
-        return metadata, self._data_path(object_key).open("rb")
+        return metadata, _open_binary(self._data_path(object_key))
 
     async def store_asset(self, command: StoreAssetCommand) -> StoredAssetInfo:
         async with self._lock_for(command.object_key):
             try:
-                return await asyncio.to_thread(self._store_sync, command)
+                return await _run_io(partial(self._store_sync, command))
             except AssetStorageError:
                 raise
             except OSError as exc:
@@ -221,6 +306,17 @@ class TestLocalStorageAdapter:
                 ) from exc
 
     async def read_asset(self, command: ReadAssetCommand) -> AssetReadInfo:
+        opened, cancellation = await _settle_task(
+            asyncio.create_task(self._open_asset(command))
+        )
+        if cancellation is not None:
+            try:
+                await _settle_task(asyncio.create_task(opened.aclose()))
+            finally:
+                raise cancellation
+        return opened
+
+    async def _open_asset(self, command: ReadAssetCommand) -> AssetReadInfo:
         async with self._lock_for(command.object_key):
             try:
                 metadata, file_object = await asyncio.to_thread(
@@ -252,7 +348,7 @@ class TestLocalStorageAdapter:
     async def delete_asset(self, command: DeleteAssetCommand) -> None:
         async with self._lock_for(command.object_key):
             try:
-                await asyncio.to_thread(self._delete_sync, command.object_key)
+                await _run_io(partial(self._delete_sync, command.object_key))
             except OSError as exc:
                 raise self._map_os_error(
                     exc, operation="delete", object_key=command.object_key
@@ -267,8 +363,8 @@ class TestLocalStorageAdapter:
     ) -> AssetMetadataInfo:
         async with self._lock_for(command.object_key):
             try:
-                return await asyncio.to_thread(
-                    self._read_metadata_sync, command.object_key
+                return await _run_io(
+                    partial(self._read_metadata_sync, command.object_key)
                 )
             except AssetStorageError:
                 raise

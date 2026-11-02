@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { demoWorkById } from "@/lib/works";
 import { AUTH_CHANGED_KEY, readRecentChats, RECENT_CHATS_EVENT, type RecentChat } from "@/lib/recent-chats";
@@ -19,28 +19,41 @@ export function ConversationAvatar({ chat }: { chat: RecentChat }) {
 export function useConversationDirectory() {
   const [local, setLocal] = useState<RecentChat[]>([]);
   const [server, setServer] = useState<OwnedConversation[]>([]);
-  const [cursor, setCursor] = useState<{ createdAt: string; id: string } | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Share the lifetime and synchronous request lock across refreshes and pages.
+  const requests = useRef<{
+    active: boolean;
+    sequence: number;
+    busy: boolean;
+    cursor: { createdAt: string; id: string } | null;
+  }>({ active: false, sequence: 0, busy: true, cursor: null });
   useEffect(() => {
-    let active = true;
-    let sequence = 0;
-    const refresh = () => { if (active) setLocal(readRecentChats()); };
+    const request = requests.current;
+    request.active = true;
+    const refresh = () => { if (request.active) setLocal(readRecentChats()); };
     const verify = async () => {
-      if (!active) return;
-      const current = ++sequence;
-      setLocal(readRecentChats(null)); setServer([]); setCursor(null); setLoading(true); setError("");
+      if (!request.active) return;
+      const current = ++request.sequence;
+      const isCurrent = () => request.active && current === request.sequence;
+      request.busy = true;
+      request.cursor = null;
+      setLocal(readRecentChats(null)); setServer([]); setHasMore(false); setLoading(true); setError("");
       try {
         await getMe();
+        if (!isCurrent()) return;
         const page = await listOwnedConversations();
-        if (active && current === sequence) {
+        if (isCurrent()) {
           setServer(page.items);
-          setCursor(page.next_cursor_id && page.next_cursor_created_at ? { createdAt: page.next_cursor_created_at, id: page.next_cursor_id } : null);
+          request.cursor = page.next_cursor_id && page.next_cursor_created_at ? { createdAt: page.next_cursor_created_at, id: page.next_cursor_id } : null;
+          setHasMore(!!request.cursor);
         }
       } catch (cause) {
-        if (active && current === sequence && !(cause instanceof Error && "status" in cause && cause.status === 401)) setError("대화 목록을 불러오지 못했어요.");
+        if (isCurrent() && !(cause instanceof Error && "status" in cause && cause.status === 401)) setError("대화 목록을 불러오지 못했어요.");
+      } finally {
+        if (isCurrent()) { request.busy = false; setLoading(false); refresh(); }
       }
-      if (active && current === sequence) { setLoading(false); refresh(); }
     };
     const storage = (event: StorageEvent) => {
       if (event.key === AUTH_CHANGED_KEY || event.key === null) void verify();
@@ -51,21 +64,27 @@ export function useConversationDirectory() {
     window.addEventListener(AUTH_CHANGED_KEY, verify);
     window.addEventListener("storage", storage);
     window.addEventListener("focus", verify);
-    return () => { active = false; sequence++; window.removeEventListener(RECENT_CHATS_EVENT, refresh); window.removeEventListener(AUTH_CHANGED_KEY, verify); window.removeEventListener("storage", storage); window.removeEventListener("focus", verify); };
+    return () => { request.active = false; request.sequence++; window.removeEventListener(RECENT_CHATS_EVENT, refresh); window.removeEventListener(AUTH_CHANGED_KEY, verify); window.removeEventListener("storage", storage); window.removeEventListener("focus", verify); };
   }, []);
   async function loadMore() {
-    if (!cursor || loading) return;
+    const request = requests.current;
+    if (!request.active || !request.cursor || request.busy) return;
+    const current = request.sequence;
+    const isCurrent = () => request.active && current === request.sequence;
+    request.busy = true;
     setLoading(true); setError("");
     try {
-      const page = await listOwnedConversations(cursor);
+      const page = await listOwnedConversations(request.cursor);
+      if (!isCurrent()) return;
       setServer(current => {
         const rows = new Map(current.map(row => [row.id, row]));
         for (const row of page.items) rows.set(row.id, row);
         return [...rows.values()];
       });
-      setCursor(page.next_cursor_id && page.next_cursor_created_at ? { createdAt: page.next_cursor_created_at, id: page.next_cursor_id } : null);
-    } catch { setError("다음 대화 목록을 불러오지 못했어요."); }
-    finally { setLoading(false); }
+      request.cursor = page.next_cursor_id && page.next_cursor_created_at ? { createdAt: page.next_cursor_created_at, id: page.next_cursor_id } : null;
+      setHasMore(!!request.cursor);
+    } catch { if (isCurrent()) setError("다음 대화 목록을 불러오지 못했어요."); }
+    finally { if (isCurrent()) { request.busy = false; setLoading(false); } }
   }
   const saved = new Map(local.map(item => [item.id, item]));
   const demos = local.filter(item => item.id.startsWith("demo-"));
@@ -73,7 +92,7 @@ export function useConversationDirectory() {
     const prior = saved.get(row.id);
     return { ...prior, id: row.id, title: row.title || "대화", lastMessage: row.last_message ?? prior?.lastMessage ?? "", updatedAt: Date.parse(row.last_activity_at ?? row.created_at) };
   }), ...demos];
-  return { recent, loadMore, hasMore: !!cursor, loading, error };
+  return { recent, loadMore, hasMore, loading, error };
 }
 
 export function useRecentConversations() { return useConversationDirectory().recent; }

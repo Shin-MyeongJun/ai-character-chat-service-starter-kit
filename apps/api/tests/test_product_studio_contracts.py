@@ -242,6 +242,7 @@ async def test_receipt_and_component_mapping_keep_revision_and_content_digest(sa
 async def test_studio_read_checks_owner_and_uses_matching_lock(
     saved, monkeypatch, publication_read
 ):
+    monkeypatch.setattr(StudioQuery, "lock_key", saved.lock)
     owned = AsyncMock()
     monkeypatch.setattr(StudioQuery.QueryService, "get_owned_product", owned)
     function = (

@@ -73,6 +73,12 @@ class MemoryIndexer:
 async def save_summary_embedding(
     session: AsyncSession, command: Types.SaveEmbeddingCommand
 ) -> Types.MemoryInfo:
+    if (
+        command.value.conversation_id != command.work.conversation_id
+        or command.value.owner_id != command.work.owner_id
+        or not await Repository.lock_memory_work(session, work=command.work)
+    ):
+        raise Types.StaleMemoryWorkError("Memory claim no longer owns this embedding.")
     current_row = await Repository.get_memory(
         session,
         memory_id=command.value.memory_id,

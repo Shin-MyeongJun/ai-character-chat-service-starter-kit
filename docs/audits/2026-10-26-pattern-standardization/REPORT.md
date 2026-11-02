@@ -1,7 +1,30 @@
 # 패턴 통일 1차: 기준·검사·대표 적용
 
+## U27 사용 조사·안전한 정리 (2026-11-02)
+
+import·동적 로딩·라우터 등록·배포 진입점 사용처가 없는 0바이트 파일 5개를 제거했다.
+chat/stream.py, memory/schemas.py, billing/router.py·schemas.py, admin/router.py가
+대상이며 관련 아키텍처 설명도 갱신했다. 구독 모델의 결제 FK와 모델 등록,
+moderation_flags의 0027 이관 입력, 실제 사용하는 호환 재노출과 무효과 가격 정책은
+보존했다. 운영 데이터·외부 소비자는 미조사이므로 legacy 스키마 삭제는 보류한다.
+
+OpenAPI 84경로·114연산 전체 JSON, ORM 76테이블의 PostgreSQL DDL/인덱스,
+58개 모델 export가 전후 동일했다. 실행 진입점 8개 import, 필수 품질 검사
+(기준선 0·Ruff 395파일·mypy 374소스·아키텍처/패턴 13건) 및 관련 회귀
+**281 passed / 0 failed / 0 skipped**가 통과했다. 실제 DB/외부 공급자는 실행하지
+않았다. 조사 범위·사용 근거·환경 제약과 재실행 명령은 [U27 작업 기록](U27-WORKLOG.md)에 있다.
+
 작업일: 2026-10-26, Asia/Seoul. 기준 HEAD: `f6d456c4f6b1767581261cbb45fb3430b9d56079`.
 시작 시 추적 파일 변경은 없었다. 기존 tmp 일부의 접근 권한 경고는 있었으며 해당 파일을 건드리지 않았다.
+
+## U24 관리자·검수 권한 연결 (2026-11-02)
+
+제공 기능·역할 정책을 [권한 문서](../../admin-authorization.md)로 확정하고 기본 앱의
+관리자·검수 훅 5개를 검증된 사용자 UUID와 최신 DB 활성 admin 인가에 연결했다.
+인가 조회는 별도 세션에서 종료해 상태 변경 트랜잭션과 충돌하지 않는다. 독립 라우터의
+미설정 503, 기존 owner 훅 정체성·경로·DTO 및 상태 변경의 소유자 제한을 유지한다.
+토큰/세션/CSRF와 일반 사용자·정지 관리자·미설정·외부 인증 주입의 거절을 검증했다.
+구현·실행 결과와 실제 DB 검증 한계는 [U24 작업 기록](U24-WORKLOG.md)에 기록한다.
 
 ## 완료 범위
 
@@ -2008,3 +2031,869 @@ Windows asyncio 로컬 소켓과 임시 파일을 허용하는 환경에서 실�
 **다음 범위:** 타입 정리 단계의 현재 목표는 완료했다. 기능 감사로 전환해 U06의
 재발행 허용/거절·공개 상태·로어북 메타데이터 동기화 계약을 문서/테스트/구현과
 대조하고 결정된 계약에 맞춰 수정·회귀 검증한다. GPT-6.1 Sol, 추론 High를 권장한다.
+
+## 기능 감사 수정 1차: U06 재발행 계약·로어북 동기화 (2026-10-29)
+
+사용자가 **후속 버전 발행 허용**을 선택했다. 발행 후 초안 편집을 허용하고 초안 저장은
+현재 상품 프로필·공개 범위·승인 상태·태그에 영향을 주지 않으며 명시적 발행에서 반영하는
+계약으로 확정했다. 첫 발행만 허용하던 과거 문서/테스트 기대를 이 결정에 맞춰 갱신했다.
+실패를 숨기기 위한 skip/xfail이나 반환 성공값은 추가하지 않았다.
+
+- use_cases/studio_publication.py의 기존 book_id 분기를 보완했다. 공개 소유 조회의
+  lock=True로 로어북 값을 읽고 update_lorebook으로 제목·worldRules 설명을 갱신한다.
+  기존 visibility를 전달하고 status는 변경하지 않는다. 소유 검증/잠금을 유지하면서
+  기존 공개 입력을 조합하므로 새 repository 접근·ORM 전달·도메인 역의존성은 없다.
+- 로어 항목 태그의 기존 입력 순서로 replace_public_tags를 호출한다. 항목/태그를 전부
+  제거한 경우에도 빈 tuple을 전달해 이전 연결이 남지 않게 한다. 사전/중복/비활성 태그
+  처리는 기존 하위 서비스가 맡는다. 현재 태그를 과거 snapshot에 복사하지 않는다.
+- 기존 character/book/entry ID와 과거 snapshot은 보존하고 동일 상위 트랜잭션에서
+  구성·상품 프로필·settings·새 release·영수증을 저장한다. 새 조회는 기존 부모 로어북
+  1개에 대한 소유 조회/잠금이며, update 서비스의 기존 잠금과 같은 세션에서 수행한다.
+  별도 commit·재시도·migration·새 컬럼은 없다. U04 잠금 순서 감사까지 해결한 것은 아니다.
+- revision 영수증 재시도는 제목/태그를 다시 쓰지 않는다. 더 최신 초안이 저장된 뒤에도
+  이전 revision의 동일 요청은 영수증을 반환하고 파라미터가 다른 요청은 409다. 기존
+  legacy receipt 복구·이전 snapshot 읽기/선택·승인 정책은 바꾸지 않았다.
+- use_cases/product/lorebook ARCHITECTURE와 서버 매핑 문서·web README의 오래된
+  후속 발행 미지원 설명을 수정했다. 최초 감사 원문은 남기고 U06 후속 상태를 덧붙였다.
+
+test_studio_draft_guard의 기존 거절 기대는 private/public/unlisted 3가지의 허용/보존
+검증으로 교체했다. title/introduction/opening/tags가 바뀐 초안은 revision을 갱신하지만
+현재 상품 프로필·visibility·approval·latest_snapshot_id·공개 태그는 그대로임을 확인한다.
+
+신규 test_studio_republication_contracts의 4건은 후속 발행의 부모 제목/설명/태그 갱신과
+기존 visibility/ID/과거 영수증 보존, 규칙/태그 제거, 태그 실패 시 rollback·발행/영수증
+차단, 응답 유실 뒤 최신 revision과 무관한 재시도/다른 요청 거절을 확인한다. 실제
+AsyncSession transaction event와 공개 서비스 대역을 사용한다. SQL 영속 rollback이나
+실제 PG 잠금 경쟁 검증을 대신하지 않는다. 과거 snapshot 보존은 기존 발행 회귀도 실행했다.
+
+| 검증 | 결과 |
+|---|---|
+| 초안·후속/최초 발행·studio JSON/HTTP·snapshot 관련 6파일 | 46 passed |
+| 수정 테스트 2파일 직접 Ruff format/check·mypy | 통과 |
+| 필수 앱 전체 품질 검사 | Ruff 388파일·mypy 367소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1059 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했으며 실제 PostgreSQL·외부 저장소·
+Google/SMTP/LLM 호출은 수행하지 않았다. 브라우저 발행 통합·PG 교차 잠금·rollback
+영속성은 미검증이다. skipped를 통과로 계산하지 않았다. Windows asyncio 로컬 소켓과
+임시 파일을 허용하는 환경에서 검증했다. Any·ignore·cast·기준선 예외는 추가하지 않았다.
+
+**다음 범위:** U07 스튜디오 중첩 JSON 검증을 정리한다. 미완성 초안 저장과 발행 필수
+조건을 구분하고 asset id/mediaId/usage 등 잘못된 형식·참조를 쓰기 전에 명시적 422로
+거절한다. 새로운 재발행 계약과 revision/영수증은 유지한다. GPT-6.1 Sol, 추론 High를
+권장한다.
+
+## 기능 감사 수정 2차: U07 스튜디오 중첩 JSON 검증 (2026-10-29)
+
+product/service/studio_validation.py를 공유 공개 검증 서비스로 추가했다. 기존 product
+소유의 편집 문서 구조를 검사하며 저장·준비·발행 사이에 같은 형식 계약을 적용한다.
+상위 use case를 하위 service에서 가져오거나 새 실행 계층/범용 검증 엔진을 만들지 않았다.
+
+- 배열과 구성 객체, 알려진 text/list/bool/int 필드, 빈/중복 로컬 ID와 비어 있지 않은
+  default scene/scene character 참조를 검사한다. character별 asset ID는 중복을 거절하고
+  usage는 portrait/expression/scene, 명시된 mediaId는 UUID 문자열이어야 한다.
+  usage 생략의 기존 expression 기본값은 유지한다. UUID 값은 변환해 재저장하지 않는다.
+- 누락된 선택 필드와 빈 캐릭터/로어 본문, 기본 장면 미선택, 업로드 전 이미지는 초안에
+  보존한다. 실제 저장의 기존 제목·프로필/버전·2 MiB 검사는 유지한다. 확장 키를 제거하거나
+  입력 dict를 수정하지 않는다. 타입이 잘못된 값/존재하지 않는 비빈 로컬 참조는 422다.
+- product의 직접 save_studio_draft와 상위 save_studio가 구조를 확인한다. 상위 검증은
+  legacy 구성 adoption 쓰기보다 먼저 실행하며 하위 직접 호출도 같은 검증을 거친다.
+  prepare_components는 저장 문서 및 모든 대상의 name/persona를 먼저 확인한 뒤 생성한다.
+- 발행 필수 조건(인물·장면·유효한 기본 장면·본문·업로드 완료)은 별도로 유지한다.
+  lore_entry_value/scene_entry_value의 순수 변환/옵션 검증을 기존 로어북 생성 뒤에서
+  첫 character 쓰기 앞으로 이동해 유효하지 않은 옵션 때문에 일부 쓰기부터 시작하지 않는다.
+- unsaved diagnostics의 category/priority/placement는 문자열인지 먼저 확인한다.
+  list/dict가 사전 lookup에 들어가 TypeError가 되는 경로를 닫았다. 광범위한 예외 catch나
+  기본값으로 오류를 숨기지 않으며 ValueError를 기존 HTTP 경계가 422로 번역한다.
+- 정상 형식 media UUID의 실제 소유권·캐릭터 연결·ready 상태/미존재는 기존 character
+  서비스가 계속 검사한다. 해당 인가/존재 오류를 무조건 422로 바꾸지 않았다. 서버가
+  기록한 _studio 매핑/영수증 손상 전체의 복구 정책은 이번 범위가 아니다.
+- U06의 후속 발행 허용·초안 비노출·기존 구성 ID/과거 snapshot·revision/digest/영수증을
+  유지한다. 이미 처리한 요청의 영수증 반환은 최신 초안 구조 검증보다 먼저 수행한다.
+
+신규 test_studio_validation_contracts의 55건은 실제 FastAPI/ASGITransport·DTO와 공개
+서비스 대역을 사용한다. 중첩 입력 20형태×저장/발행의 40건은 422와 도메인 쓰기 없음,
+미완성 초안/확장 원문 보존, 로어 옵션 preflight 3건, 모든 업로드 대상 선검증,
+diagnostics 2건, 구성 ID 중복 3건, 직접 저장 서비스 선검증, 업로드 전/정상 이미지와
+기본 usage·소유자 Command, 더 최신 손상 문서가 있어도 기존 영수증 재시도를 확인한다.
+실제 DB 영속성/이미지 소유권 조회와 브라우저 실행 검증을 대체하지 않는다.
+
+| 검증 | 결과 |
+|---|---|
+| 신규 테스트 직접 Ruff format/check·mypy | 통과 |
+| 신규/기존 studio 저장·진단·업로드 준비·후속 발행 관련 6파일 | 94 passed (신규 55건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 389파일·mypy 368소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1114 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했으며 실제 PostgreSQL·외부 저장소·
+Google/SMTP/LLM 요청은 수행하지 않았다. 실제 PG 잠금/rollback 영속성과 브라우저 통합은
+미검증이다. skipped를 통과로 계산하지 않았다. Windows asyncio 로컬 소켓과 임시 파일을
+허용하는 환경에서 검증했다. 새 Any·ignore·cast·기준선 예외는 추가하지 않았다.
+
+**다음 범위:** U08 미디어 공급자 취소 우선순위와 S3 get_object 취소 후 늦게 반환된
+Body 자원 회수를 수정한다. 공급자 작업 종료까지 잠금을 유지하고 결과/예외를 회수한
+뒤 취소를 복원한다. 실제 S3 요청 없이 지연/실패/반복 취소 대역으로 검증한다.
+GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+## 기능 감사 수정 3차: U08 취소 우선순위·S3 늦은 읽기 자원 회수 (2026-10-29)
+
+character workflow의 공급자 대기에서 ValueError가 CancelledError를 덮어쓰는 경로와
+S3 get_object 대기 중 취소되면 반환 Body의 소유자가 없어지는 경로를 수정했다.
+두 모듈의 기존 책임·트랜잭션/저장소 수명 경계 안에서 처리하고 공통 실행 계층을
+추가하지 않았다. SDK 작업을 조기에 버리거나 잠금을 먼저 푸는 변경도 하지 않았다.
+
+- _settle_storage는 shield에서 일반 공급자 예외가 발생해도 task.result를 거친다.
+  취소를 받은 경우 공급자 성공/실패를 회수한 뒤 CancelledError를 전달하며 작업이
+  종료되기 전에는 트랜잭션을 벗어나지 않는다. 취소가 없으면 원래 예외/값을 전달한다.
+- S3 read_asset는 기존 get_object·메타데이터 해석·reader 생성을 _open_asset로 옮기고
+  그 태스크를 소유한다. 취소 후에도 acquisition 결과를 기다려 reader가 생기면 aclose
+  태스크를 소유해 기다린 뒤 첫 취소 객체를 전달한다. 반복 취소가 get/close를 버리지 않는다.
+- 획득 실패와 손상 메타데이터/close 실패도 회수하며 이미 받은 취소가 최종 결과다.
+  close 실패를 재시도하거나 성공으로 단정하지 않는다. 취소는 SDK 작업과 cleanup이
+  끝날 때까지 지연된다. 중단할 수 없는 스레드에 새 강제 종료·timeout을 추가하지 않았다.
+- 정상 반환의 reader 소유권/idempotent close와 주입 client 소유권, 기존 오류 kind/cause,
+  SDK timeout/retry 설정·업로드/삭제 멱등성·키/메타데이터 변환을 유지했다. 정상 reader
+  반환 뒤의 모든 read/close 취소나 로컬 adapter 수명을 일괄 변경한 것은 아니다.
+- 업로드 예약/deleting 선행 commit, 공급자 실행 중 잠금, 취소 후 ready/deleted 확정
+  차단과 재시도 가능한 DB 상태는 기존 정책이다. 새로운 DB 쓰기·migration·외부 요청·
+  Any/ignore/cast/기준선 예외는 추가하지 않았다.
+
+신규 test_media_cancellation_contracts의 15건은 다음을 확인한다.
+
+- upload/cleanup×공급자 성공/실패×1/3회 취소의 8조합에서 연결 없는 실제 AsyncSession
+  event의 선행 commit→공급자 종료→rollback과 완료 확정 없음·caller 입력 stream 수명.
+- 취소가 없을 때 공급자의 원래 ValueError가 같은 객체로 전파됨.
+- 손상 metadata 유무×close 실패 유무 4조합에서 실제 get/close 테스트 스레드를 gate로
+  지연시켜 get 대기/close 중 반복 취소·Body close 1회·첫 취소 메시지 보존을 확인함.
+  정상 close 때만 closed를 보장하고 close 실패 때는 시도 종료/실패 회수를 확인함.
+- 취소 뒤 get 자체 실패도 소비하고 Body close가 불필요함, 정상 reader 반환·읽기와
+  기존 두 번 aclose 호출의 단일 실제 close를 확인함.
+
+| 검증 | 결과 |
+|---|---|
+| 수정 소스 2파일·신규 테스트 직접 Ruff format/check·mypy | 통과 |
+| 신규 취소·asset storage·미디어 전송/HTTP·character media 관련 7파일 | 60 passed, 30 skipped (신규 15건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 389파일·mypy 368소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1129 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했다. SQL event는 실제 PostgreSQL 행
+잠금·rollback 영속성/경합을 증명하지 않고, 테스트 스레드는 실제 S3/TLS·운영 ASGI의
+연결 종료/프로세스 강제 종료를 증명하지 않는다. 실제 DB/외부 공급자는 호출하지
+않았으며 skipped를 통과로 계산하지 않았다. Windows asyncio 로컬 소켓과 임시 파일을
+허용하는 환경에서 검증했다.
+
+**다음 범위:** U09 정상 모델 선택 경로의 불필요한 스냅샷 배타 잠금을 줄인다. 일반 읽기와
+모델 교체 쓰기를 분리하고, 교체가 필요할 때 잠금 아래 상태를 재확인해 버전 종료/대체
+정책을 보존한다. GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 4차: U09 정상 모델의 스냅샷 잠금 제거 (2026-10-29)
+
+정상 실행까지 공유 상품 스냅샷을 FOR UPDATE로 읽던 경로를 분리했다.
+
+- resolve_execution은 일반 조회와 교체 검토의 두 단계로 판단한다. 원본 모델/공급자가
+  활성이고 종료 전이며 공지 시작 전이면 lock=False 조회만으로 원본 실행 설정을
+  반환한다. 후보·대체 이력 읽기/쓰기는 수행하지 않는다.
+- 교체 검토가 필요할 때만 같은 트랜잭션에서 lock=True로 스냅샷을 재조회한다.
+  두 단계 모두 product의 공개 ensure_snapshot_available을 사용하여 만료를 확인하고,
+  잠금 대기 중 만료됐으면 기존 만료 오류로 중단한다. product 저장소/HTTP 계약은 같다.
+- GetModelCommand/GetProviderCommand에 기본 False인 refresh를 추가했다. 후보 조회는
+  선택적 ListCandidateModelsCommand(refresh=True)를 받으며 기존 인자 없는 호출도
+  지원한다. 저장소의 populate_existing으로 세션 캐시를 갱신하고 판단은 Info로 한다.
+- 모델 선택의 첫 조회와 잠금 후 조회, 후보 및 최종 공급자는 최신 DB 조회를 요청한다.
+  단순히 같은 session.get을 두 번 호출해 이전 Entity가 재사용되는 문제를 피했다.
+- 명시적 now가 없으면 각 단계의 읽기 뒤 현재 UTC를 평가한다. 잠금을 기다리다 종료/
+  전환 시각을 넘은 경우 이전 시각으로 원본을 계속 선택하지 않는다. 명시적 now는
+  두 단계 모두 동일하다. 공지가 철회되면 두 번째 판단에서도 원본으로 돌아갈 수 있다.
+- 후보 순위·effort·대체 계획 시각·일시 원본 사용/중단 정책 및 snapshot/from/to 이력
+  존재 확인/삽입은 유지한다. 교체 이력 접근은 잠금 획득 뒤이며 중첩 트랜잭션의
+  commit/rollback 소유자는 같다. 새 migration·외부 요청·Any/ignore/cast/기준선 예외는 없다.
+
+기존 두 계약 테스트 파일에 회귀 13건을 추가했다. 정상/미래 공지의 스냅샷 비잠금,
+공지 철회·정책 변경·스냅샷/모델/공급자 미존재의 재검사, 잠금 대기 중 버전 만료와
+모델 종료·전환, 명시적 now 보존을 검증한다. SQLite에서 ORM을 직접 거치지 않는
+갱신으로 캐시와 DB 값을 다르게 만든 후, 모델/공급자/후보가 실제 갱신되는지도 확인했다.
+기존 깊은 복사 테스트의 중첩 JSON 접근에는 isinstance 좁히기를 추가해 직접 mypy도
+통과시켰다. 테스트 fixture의 여러 mock은 역할별 키워드로 연결한다.
+
+| 검증 | 결과 |
+|---|---|
+| LLM 전체 및 수정 테스트 Ruff format/check·직접 mypy | 통과; mypy 27소스 |
+| 모델 대체/LLM 저장소/상품 수명/프롬프트 workflow/답변 회귀 6파일 | 49 passed, 19 skipped (신규 13건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 389파일·mypy 368소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1142 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했고 실제 DB/외부 공급자는 호출하지
+않았다. skipped는 통과로 계산하지 않았다. Windows 임시 파일 권한 때문에 첫 공용
+검사의 테스트가 실행되지 않아 허용 환경에서 다시 전체 공용 검사를 통과시켰다.
+신규 테스트 작성 중 드러난 fixture 연결과 Command 입력 계약도 바로잡았다.
+SQLite/순차 mock은 PostgreSQL 실제 FOR UPDATE 대기·격리·동시 삽입/유일 제약을
+증명하지 않는다. 정상 경로의 경합 감소량/운영 처리량도 측정하지 않았다. 교체 경로는
+재조회가 추가되며, 일반 조회 이후의 모든 관리자 변경과 실행을 원자적으로 묶는
+보장은 추가하지 않는다. LLM ARCHITECTURE와 원본 감사 U09 상태를 갱신했다.
+
+**다음 범위:** U10 일반 access 인증과 refresh/폐기 잠금을 구분하고, 비밀번호 검증을
+잠금 밖에서 수행한 뒤 최신 해시·계정 상태를 재확인하는 방안을 적용한다. 비밀번호
+재설정/비활성화와 로그인 경합에서 낡은 인증으로 새 세션이 생기지 않는 계약이 핵심이다.
+GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 5차: U10 access 비잠금·비밀번호 검증 구간 분리 (2026-10-29)
+
+일반 인증이 사용자/세션 행을 배타적으로 잠그고, 로그인에서 Argon2 검증·재해시 중에도
+사용자 잠금을 유지하던 경로를 분리했다. 기존 서비스/저장소/mapper 구조를 유지한다.
+
+- access 인증은 users/auth_sessions를 한 SQL로 JOIN하고 claim의 사용자 ID·세션 ID와
+  소유 관계를 제한한다. mapper가 내부 AuthenticatedSessionRow를 두 Info로 옮기고
+  서비스가 기존 활성/인증·소유자·폐기·절대 만료 조건을 판단한다. FOR UPDATE와 쓰기는
+  없으며 여러 시점의 SELECT 두 개를 별도로 조합하지 않는다.
+- 로그인은 lock=False 이메일 조회 후 읽기 트랜잭션과 세션을 종료한다. 이후 기존
+  to_thread에서 비밀번호 검증(미존재/Google-only의 더미 포함)과 필요한 재해시를 한다.
+  비밀번호 작업 중 DB 연결/세션·사용자 잠금을 보유하지 않는다.
+- 최종 쓰기 트랜잭션에서 사용자 행을 잠그고 최신 계정 상태·인증·이메일·검증에 사용한
+  해시의 정확한 일치를 확인한다. 일치할 때만 재해시 갱신과 세션 저장을 같은 범위에서
+  수행한다. 조회한 Entity를 서비스가 읽거나 새 실행 계층/범용 우회 옵션을 추가하지 않았다.
+- 재설정 commit이 먼저면 낡은 해시로 로그인/덮어쓰기를 하지 않는다. 로그인 발급이
+  먼저면 같은 사용자 잠금을 기다린 재설정이 새 세션까지 폐기한다. 세션 저장 실패는
+  재해시 갱신과 함께 rollback한다. 서명·쿠키/CSRF·암호 비용·요청 제한은 그대로다.
+- get_user_by_email은 기존 호출의 lock=True를 유지하고 로그인만 lock=False를 명시한다.
+  get_locked_user/get_session 및 access 조회에 populate_existing=True를 적용해 캐시된
+  상태로 판단하지 않는다. refresh 회전·재사용 폐기 commit 후 오류·로그아웃/reset의
+  사용자→세션/토큰 잠금과 절대 만료 검증을 유지한다.
+- 동시 정상 로그인에서 다른 요청이 같은 비밀번호를 재해시해도 저장 해시가 달라지면
+  현재 요청은 invalid_credentials로 거절될 수 있다. 최신 해시로 새 로그인을 요청해야
+  한다. 내부 자동 재시도·유예를 추가하지 않았다. 인증 시점 이후의 업무를 소급 취소하는
+  보장이나 격리 수준/처리량 보장은 추가하지 않았다.
+
+신규 test_identity_locking_contracts의 21건은 다음을 검증한다.
+
+- 정상/재해시 성공에서 검증/해시 작업 중 세션 없음, 사용자 잠금 후 세션 발급.
+- 실제 비밀번호 작업 스레드를 gate로 중단하고 reset을 실행한 두 순서(검증 중/재해시 중)에서
+  reset commit 후 낡은 로그인 실패·새 해시 미덮어쓰기·새 세션 없음.
+- asyncio 잠금으로 DB 잠금 수명을 모델링한 반대 순서에서 로그인 commit 후 기다리던
+  reset이 발급된 세션 ID까지 폐기함. 모델이 실제 PostgreSQL 동작을 증명하지는 않는다.
+- 최종 재검사 시 미존재/정지/미인증/이메일 변경/비밀번호 제거/다른 재해시의 거절 6조합,
+  초기 인증 실패 6조합의 기존 검증/더미 경로와 잠금/쓰기 없음.
+- 세션 저장 실패 시 같은 트랜잭션 rollback, access의 읽기 전용 경계와 logout-all의 잠금,
+  PostgreSQL SQL 컴파일의 JOIN/ID/잠금/캐시 옵션, SQLite에서 오래된 Entity의 실제 갱신.
+
+기존 test_identity_auth_contracts의 access 대역은 새 읽기 경계로 연결했고 기존 6개
+거절 조건 검증은 유지했다. 새 Any/ignore/cast/기준선 예외·migration은 없다.
+
+| 검증 | 결과 |
+|---|---|
+| identity 전체·수정/신규 테스트 Ruff format/check·직접 mypy | 통과; mypy 22소스 |
+| 인증/저장소/암호/쿠키/HTTP/Google/DB opt-in 회귀 8파일 | 172 passed, 17 skipped (신규 21건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 389파일·mypy 368소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1163 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했고 실제 PostgreSQL·SMTP·Google/외부
+공급자는 호출하지 않았다. skipped를 통과로 계산하지 않았다. SQLite/SQL 컴파일·스레드/
+asyncio 잠금 대역은 실제 PostgreSQL 경합·격리·폐기/rollback 영속성을 증명하지 않는다.
+테스트 Argon2 비용은 작게 설정했으며 운영 보안 파라미터/성능을 바꾸지 않았다.
+Identity ARCHITECTURE·인증 연동 문서·원본 감사 U10 상태를 갱신했다.
+
+**다음 범위:** U11 대화 목록의 전체 수집/정렬을 DB 페이지 조회로 줄인다. 소유권 스코프,
+빈 대화의 생성 시각 fallback, 활동 시각/ID 정렬·커서·총 개수 계약을 확인하고 제한적인
+읽기 projection의 모듈 경계를 먼저 정리한다. GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 6차: U11 최근 대화 DB 페이지 조회 (2026-10-29)
+
+최근 대화 한 페이지를 위해 모든 소유 metadata를 100개씩 순회하고 메시지 활동을
+수집한 뒤 Python에서 정렬/필터하던 경로를 DB 페이지로 바꿨다.
+
+- 규칙 module-architecture-and-naming.md의 C.2에 해당 목록만을 위한 읽기 projection
+  예외를 명시했다. chat.repository.list_recent_conversations가 conversations의 지정한
+  5컬럼과 자기 messages를 읽는다. 소유권은 커서/정렬/LIMIT 전에 user_id로 제한하고
+  타 모듈 repository/mapper 호출·쓰기·잠금·데이터 소유권 변경은 추가하지 않았다.
+- 마지막 생존 메시지는 created_at/position DESC로 선택한다. 메시지가 없을 때만 대화
+  생성 시각을 쓰고, 활동 시각/대화 UUID DESC·엄격한 이전 커서·limit+1을 SQL에 적용한다.
+  선택된 페이지의 미리보기도 같은 SQL에서 읽는다. 빈 문자열·nullable title·대화 생성보다
+  오래된 메시지 시각을 원래대로 유지하며 메시지 삭제 후 현재 생존 내용으로 재계산한다.
+- chat.service/views가 공개 Command의 limit·커서 쌍/시간대를 검증한다. COUNT는
+  conversation 공개 service로 같은 소유 범위를 정확히 계산하고 mapper가 raw 6컬럼
+  Row를 공개 View로 옮긴다. 전체 대화가 서비스 메모리로 넘어오지 않는다.
+- 기존 use_cases의 함수/Command/두 View 이름과 HTTP DTO/필드는 유지했다. 내부 새
+  Command는 cursor_activity_at을 사용하고 HTTP/Python의 cursor_created_at 이름을
+  어댑터에서 연결한다. last_activity_at=None/total=0 기본값도 유지한다. 전체 순회·정렬과
+  기존 cast 2개는 제거했다. 새 Any/ignore/cast/기준선 예외·migration은 없다.
+- SQL은 COUNT+페이지 2회, 목록 반환은 최대 limit+1이다. DB 내부에서는 소유 범위의
+  활동 평가/정렬과 정확한 COUNT 비용이 남는다. 전체 작업이 O(limit)라고 주장하지 않는다.
+  COUNT/페이지의 READ COMMITTED 시점 차이와 여러 요청 사이 새 활동이 기존 커서 앞으로
+  이동하는 live 조회 정책도 유지한다. 고정 snapshot이나 새 통계 컬럼은 추가하지 않았다.
+
+기존 test_read_composition_contracts의 6건을 실제 SQL 검증으로 바꾸고 11건을 추가해
+17건으로 보강했다. 최소 SQLite 테이블에서 전체 요청 경로의 SELECT/COUNT를 실행한다.
+SQLite가 반환에서 잃는 UTC tzinfo만 테스트 어댑터에서 복구하며 정렬·소유권·필터·LIMIT을
+대역이 처리하지 않는다. 원래 별도 공개 조회 두 개의 호출 배치를 단정하던 검증은
+행동·결과와 DB 반환량/호출 수 검증으로 교체했다.
+
+검증 대상은 소유권(더 최근인 타인 메시지 제외), 활동/UUID 동률·미리보기, 마지막 메시지의
+timestamp 우선/position 동률, 빈 content·삭제 후 생존 메시지/빈 방 fallback, 생성보다
+오래된 메시지, 빈 소유 범위/커서 끝 이후 총건수, 삭제된 커서 행, 요청 사이 활동 이동,
+기존 View/Command·HTTP DTO·잘못된 커서다. 소유 방 353개×limit 1/7/100에서 SQL 2회와
+최대 limit+1 반환을 확인했고 PostgreSQL SQL 컴파일로 조건/정렬/LIMIT/비잠금도 확인했다.
+
+| 검증 | 결과 |
+|---|---|
+| 수정 소스·chat 전체·목록 테스트 Ruff format/check·직접 mypy | 통과; mypy 34소스 |
+| 목록/대화 query/chat 메시지/repository workflow 회귀 4파일 | 61 passed, 3 skipped (목록 계약 17건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 390파일·mypy 369소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1174 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거하고 실제 PostgreSQL/외부 공급자를
+호출하지 않았다. skipped는 통과로 계산하지 않았다. 실제 PostgreSQL 실행 계획·인덱스
+선택·운영 처리량/지연·동시 갱신의 격리 검증은 남아 있다. 기존 messages의
+(conversation_id, created_at) 인덱스를 유지했다. chat/conversation/use_cases ARCHITECTURE와
+원본 감사 U11 상태를 갱신했으며 공용 검사 예외/기준선을 늘리지 않았다.
+
+**다음 범위:** U12 웹의 불필요한 전체 수집을 줄인다. 계정 개요의 사용하지 않는 전체
+상품 조회부터 제거하고, 대화 메시지는 정상 append의 ID 기반 반영과 수정/삭제·revision
+불일치 시 재동기화를 구분한다. 복구·재시도·중복 제거 계약을 보존한다.
+GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 7차: U12 웹 증분 메시지 조회·계정 개요 정리 (2026-10-29)
+
+계정 개요의 사용하지 않는 전체 상품 수집과 정상 메시지 추가마다 전체 이력을 다시 읽는
+동작을 줄였다. Next.js 16.3.3의 설치된 client/fetch 문서를 확인하고 기존 client 화면과
+service/repository/mapper 구조를 유지했다. 패키지/프레임워크를 교체하지 않았다.
+
+- readAccountOverview는 getMe 뒤 잔액·최근 대화 한 페이지·정확한 COUNT만 독립적으로
+  읽는다. 전체 products 조회와 useAccount의 해당 실데이터 state를 제거했다. 실제
+  작품 화면의 별도 페이지 hook, 부분 실패 처리·시연 상품과 기존 목록 helper는 유지한다.
+- 메시지 페이지 응답에 선택적 history_revision/sync_cursor만 추가했다. 기존 필드·커서
+  형식·최대 크기·인가/오류는 그대로다. 마지막 페이지에도 동기화 위치를 반환하고 빈 증분
+  페이지는 입력 위치를 보존한다. lookahead 행을 사용하지 않으므로 누락을 만들지 않는다.
+- MessagePageInfo의 기본 None으로 기존 생성/대역을 지원한다. query가 기존 공개 소유권
+  Info의 원문 revision을 mapper에 전달하며 별도 SQL·잠금·쓰기·migration은 없다.
+  OpenAPI 검사는 추가한 두 선택 필드만 예외로 비교하고 기존 구조는 계속 고정한다.
+- 새 chat-history 모듈은 페이지를 ID로 병합하고 위치순으로 정렬한다. 최초 진입은 전체
+  이력을 읽고, 정상 저장은 반환 메시지를 즉시 반영하며 답변 완료/포커스 복귀는 기존
+  sync_cursor 이후만 읽는다. 입력 저장 직후 전체 GET은 제거했다. 저장 응답으로 커서를
+  앞당기지 않아 다른 탭에서 그 사이 추가한 메시지를 건너뛰지 않는다.
+- 원문 revision 불일치나 같은 ID의 내용/revision 충돌은 기존 이력을 버리고 전체를 다시
+  읽는다. 여러 페이지 사이 변경도 한 번만 전체 재시도하고 반복되면 오류로 끝낸다.
+  메타데이터 없는 이전 서버는 기존 전체 읽기로 복구한다. 반복 커서 차단은 유지한다.
+- 부분 읽기 실패·취소에는 기존 캐시/체크포인트를 유지한다. 버전 번호로 오래된 읽기의
+  덮어쓰기를 막고 방/계정 전환·중복 읽기/저장 시 이전 조회를 취소한다. 늦은 성공/오류도
+  버리며 이력 캐시는 해당 방/계정 메모리에만 둔다. auth 변경 이벤트로 방을 다시 로드한다.
+- 답변 폴링 횟수/간격·request_key·실패 후 새 answerKey·수동 로어·입력 expected_revision·
+  401/402/429/CSRF/불확실한 결과·사용자별 pending 복구는 유지했다. 확정 4xx 충돌은
+  원래처럼 전체 재동기화한다. 대기 중단/페이지 이동은 클라이언트 기다림만 중단하며
+  서버 생성 작업을 취소하거나 저장된 요청을 제거한다는 뜻이 아니다.
+
+신규 백엔드 8건은 최초/증분×빈/마지막/lookahead 6조합과 schema 왕복·소유권 거절·
+nullable 기본값을 확인한다. 기존 ASGI/DTO 회귀도 두 선택 필드를 검증한다.
+프런트 18건을 추가하고 계정 부분 실패 테스트를 강화했다. 실제 request/JSON 경계의
+fetch 대역으로 205개 이력 3페이지 후 입력 ID 반영은 추가 GET 없이, 다음 답변 동기화는
+기존 205번 이후 한 번의 GET으로 206~208번만 병합함을 확인한다. 더미 커서 루프,
+수정/되돌리기·동시 원문 변경의 제한 재시도, 이전 서버, 부분 읽기 실패, 옛 save 재전송,
+겹친 읽기, 방/계정 전환의 늦은 응답/오류, 취소 signal과 캐시 보존도 확인했다.
+UUID 경로의 대소문자·축약/brace/URN 표기와 API의 표준 UUID 문자열도 같은 방으로
+비교해 기존 경로 호환을 유지했다.
+
+| 검증 | 결과 |
+|---|---|
+| 웹 전체 Node 테스트 5파일 | 50 passed, 0 failed (신규 18건 포함) |
+| 웹 tsc --noEmit 및 격리된 Next.js production build | 통과 |
+| chat 전체·신규/수정 테스트 Ruff format/check·직접 mypy | 통과; mypy 34소스 |
+| 메시지 sync/query mapper/router/CRUD/HTTP 회귀 5파일 | 57 passed, 13 skipped (신규 8건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 390파일·mypy 369소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1182 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거하고 실제 PostgreSQL·외부 공급자를
+호출하지 않았다. skipped는 통과로 계산하지 않았다. Node fetch 대역/ASGI·빌드는 실제
+브라우저 렌더링/복수 탭·운영 proxy·PostgreSQL 격리를 증명하지 않는다. 초기 조회와
+변경 재동기화의 전체 이력/DOM·Map 메모리 비용은 남으며 최신 페이지만 시작하는 UI/
+가상화·실시간 push는 추가하지 않았다. 원문 revision과 메시지 SQL 사이/읽기 이후의
+동시 수정은 다음 동기화에서 관측될 수 있다. 고정 snapshot을 새로 보장하지 않는다.
+
+격리 빌드의 생성 폴더와 이번 빌드가 자동으로 추가한 Next 타입 설정만 정리했고 기존
+개발 빌드/사용자 소스 변경은 유지했다. chat ARCHITECTURE·웹 README·원본 감사 U12
+상태를 갱신했다. 새 Any/ignore/cast/타입 기준선 예외는 추가하지 않았다.
+
+**다음 범위:** U13 생성 완료 계층의 반복 조회를 줄인다. 같은 모듈 내부에서 이미 잠근
+상태와 상태 전이 결과를 재사용하되 독립 공개 서비스의 진입 검증·완료/크레딧/메모리
+예약 원자성·재전송 멱등성을 보존한다. SQL 호출 수와 회귀 계약을 함께 검증한다.
+GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 8차: U13 생성 완료 상태·잠금 재사용 (2026-10-29)
+
+정상 답변 완료가 _finalize→기억 예약 조립→public finish_generation으로 내려가면서 같은
+생성 상태와 대화 잠금을 반복 조회하던 경로를 정리했다. 기존 계층·테이블 소유권과
+외부 API/공개 Python 함수의 입력/반환은 유지한다.
+
+- command/generation의 내부 _locked_generation이 사용자 범위 생성의 대화 ID를 조회하고
+  conversation→generation 순서로 잠가 최신 Info를 만든다. 내부 scope는 세션·transaction·
+  대화/생성 Info를 보관하고 유효 수명 밖의 사용을 거절한다. workflow는 repository를
+  직접 호출하거나 Entity/Row를 해석하지 않는다. 공용 skip_validation 옵션은 없다.
+- 독립 public finish_generation은 결과 digest를 기존처럼 먼저 검사하고 같은 잠금 경계와
+  내부 저장 함수를 실행한다. public finish_generation_and_schedule_memory도 직접 호출 시
+  독립 인가/잠금을 유지한다. _finalize에서는 한 번 얻은 내부 scope를 재사용한다.
+- 내부 완료는 저장된 최신 state와 실제 pending→terminal 전이 여부를 반환한다.
+  성공으로 새로 전이한 경우만 메모리를 예약하고 terminal 재전송은 추가 메시지·사용량·
+  통계·메모리 예약 없이 기존 결과를 반환한다. 다른 digest는 기존 ValueError다.
+- metadata update의 공개 경계도 같은 잠금 기능으로 연결했다. 만료 lease 복구에서만
+  이미 잠긴 범위를 재사용하고 execution token·lease·snapshot 불변·result_ready 검증은
+  그대로 수행한다. metadata/lease 갱신은 scope의 Info에도 반영한다. 최종 응답은 완료
+  반환 Entity를 변환한 state로 만들어 완료 후 상태 SELECT를 제거했다.
+- 버전 전환/만료의 stale, 실패/취소 사용량과 0 비용, 참여자 확인, credit commit/release·
+  금액 일치·summary_required 예약과 legacy/v2 과금 검증은 유지했다. 같은 세션의 중첩
+  use_case_transaction도 유지해 내부 오류를 잡아도 바깥 범위가 rollback-only가 된다.
+
+정상 result_ready 성공 경로의 변경 전후를 같은 SQLite 검증기에서 측정했다.
+변경 전 파일이 작업 시작 시 깨끗했던 HEAD b3c7af1의 command/generation과 workflow/answers를
+별도 프로세스 메모리에서만 실행하고 같은 product/billing/memory 경계 대역을 유지했다.
+작업 트리 파일을 덮어쓰거나 checkout/reset하지 않았다.
+
+| 해당 완료 계층의 조회 | 변경 전 | 변경 후 |
+|---|---:|---:|
+| 실제 generation 상태 SELECT | 8 | 2 |
+| conversation FOR UPDATE 조회 요청(PG SQL 컴파일) | 3 | 1 |
+
+실제 SQLite SQL event로 SELECT를 세고 잠금 요청은 PG dialect 문장으로 확인했다.
+잠금 scope가 ORM reference를 수명 동안 유지하므로 repository.finish_generation의
+session.get도 추가 SQL을 만들지 않았다. 다른 도메인에서 독립적으로 수행하는 소유권/
+과금/기억/통계 SQL과 참여자 조회의 기존 소유권 확인은 제거하거나 전체 호출 수로
+포장하지 않았다. 운영 처리량·잠금 대기 시간은 측정하지 않았다.
+
+새 test_generation_completion_contracts 30건은 다음을 확인한다.
+
+- 정상 완료/재전송과 직접 public 완료·원자적 메모리 조립의 독립 호출, 다른 결과 충돌.
+- failed/cancelled·버전 전환/만료 stale의 사용량·0 비용·출력 없음과 예약 해제.
+- usage/statistics/memory/credit 실패와 reserved 금액 불일치에서 메시지·상태·대역 정산/
+  기억 쓰기 모두 rollback, result_ready 유지 후 복구의 단일 효과.
+- preparing/calling 만료 lease의 metadata 갱신/불확실성, live/lease 없는 legacy의 보류.
+- 소유권·사전 잘못된 usage·종료 scope 재사용 거절, 잡힌 내부 오류의 rollback-only.
+- execution token·lease·immutable metadata·이미 저장된 결과 보호, 잠금 전 terminal 변경
+  재조회, v2 과금 누락 거절과 unbilled summary_required 예약.
+
+실제 AsyncSession 트랜잭션 event를 SQLite store commit/rollback에 연결해 자체 ORM/SQL과
+효과 테이블의 되돌림을 검사했다. SQLite의 UUID/identity/UTC 표현만 테스트에서 보완한다.
+외부 도메인 서비스는 같은 session의 효과 테이블 대역이며 실제 credit/memory 구현의
+PostgreSQL 영속성·동시성·유일 제약을 증명하지 않는다. 기존 opt-in 복구 테스트 두 파일은
+실패를 주입하는 위치만 실제 내부 완료 함수로 옮겨 기존 검증 의도를 유지했다.
+
+| 검증 | 결과 |
+|---|---|
+| 수정 command/workflow·신규 테스트 Ruff format/check·직접 mypy | 통과; mypy 33소스 |
+| 완료/트랜잭션/메시지/답변/과금/프롬프트/사용량/통계 회귀 8파일 | 62 passed, 58 skipped (신규 30건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 390파일·mypy 369소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1212 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+TEST_DATABASE_URL/TEST_AUTH_DATABASE_URL을 제거했고 실제 DB/외부 공급자를 호출하지
+않았다. skipped를 통과로 계산하지 않았다. 실제 PostgreSQL 행 잠금 대기/경합·격리와
+기존 DB 통합 58건은 이번 지정 실행에서 미검증이다. 외부 LLM 호출·새 migration·
+Any/ignore/cast/기준선 예외·공개 API/DB 계약 변경은 추가하지 않았다.
+chat ARCHITECTURE와 원본 감사 U13 수정 상태를 갱신했다.
+
+**다음 범위:** U14 발행 과정의 항목별 조회·flush를 줄인다. 일괄 조회/저장과 단계별 flush로
+정리하되 FK·스냅샷 ID·소유권/잠금 순서·발행 실패 rollback 및 영수증 멱등성을 보존한다.
+같은 AsyncSession을 병렬 태스크로 실행하지 않는다. GPT-6.1 Sol, 추론 xHigh를 권장한다.
+
+
+## 기능 감사 수정 9차: U14 발행 조회 재사용·단계별 저장 (2026-10-29)
+
+상품 스냅샷의 슬롯/대상/시작 항목마다 flush하고, 일괄 검증한 시작 항목을 건별로
+다시 조회하던 부분을 정리했다. 기존 product/character/lorebook/use_cases의 책임과
+공개 HTTP/Python 입력·반환, DB 스키마·저장 JSON 계약은 유지한다.
+
+- builder가 상품 잠금 뒤 조회한 구성 Info를 내부 설정 검증에 전달한다. 내부 반환
+  _PublicationSettings가 모델 Info·시작 설정·ID별 시작 항목 Info를 보관한다.
+  같은 구성의 3 SELECT와 시작 항목별 재조회, 모델의 중복 검증을 제거했다.
+  시작 항목의 연결 로어북 범위·enabled/start_set·설정 부모를 확인하고 동일 잠금
+  범위에서 snapshot title/content와 studio_start_options에 재사용한다.
+- 원본 캐릭터/로어북 freeze는 순차 실행하고 독립 인가·버전 MAX+1·이미지/에셋/항목
+  복사 및 부모 flush를 유지한다. 새로운 공개 freeze API나 skip_validation은 없다.
+  상품→캐릭터→로어북 잠금과 정렬된 원본 ID 처리는 그대로다.
+- repository.add_snapshot_composition이 새 캐릭터/로어북 슬롯을 add_all 후 flush하고
+  그 부모를 참조하는 대상/시작 행을 add_all 후 flush한다. 슬롯 생성은 원본 링크 ID와
+  구별하며 역할·순서·primary·scope·target·nullable 시작 제목/본문을 그대로 복사한다.
+  UUID 선생성만으로 FK 순서를 보장한다고 가정하지 않는다.
+- 상품 snapshot 생성 flush도 유지한다. 마지막 snapshot 본문과 이미 존재하는 부모를
+  가리키는 latest_snapshot_id 갱신만 한 flush로 합친다. 두 Entity를 먼저 읽어 중간
+  autoflush를 막으며 service는 Entity를 해석하지 않고 mapper에 전달한다.
+- studio_publication의 원본/태그/미디어 준비·구성/설정·release·영수증 조립 순서와 U06의
+  발행 후 초안 편집·명시적 후속 발행·기존 snapshot/영수증 보존은 유지한다.
+  범용 공통 계층·새 transaction/commit·동일 AsyncSession 병렬 실행은 추가하지 않았다.
+
+### 변경 전후 측정
+
+작업 시작 시 깨끗했던 product 발행/설정/repository 파일을 tmp/u14-baseline에 보관하고,
+구현 변경 전 동일 test_publication_batch_contracts 검증기를 먼저 실행했다.
+당시 작업 트리를 checkout/reset하거나 다른 변경을 되돌리지 않았다. SQLite 메모리 DB의
+FK를 실제로 켜고 관계의 FK/복합 FK·유일 제약을 복제했다. 실제 공개 character/lorebook
+소유 조회·freeze와 product builder/release 저장 SQL을 사용한다. 모델 검증과 공급자 조회
+두 경계만 대역이다. AsyncSession의 SQL 메서드는 동기 SQLite Session 어댑터이고 실제
+AsyncSession transaction event를 store commit/rollback에 연결했다.
+
+캐릭터 3·로어북 3·대상 3·시작 6, 미디어 행 없는 첫 product release를 같은 조건으로 측정했다.
+
+| 측정 범위 | 변경 전 | 변경 후 |
+|---|---:|---:|
+| 실제 SQLite SELECT event | 41 | 32 |
+| 명시적 session.flush 호출 | 28 | 14 |
+| 실제 변경이 있는 before_flush event | 25 | 11 |
+| 상품의 슬롯/대상/시작 연결 저장 flush | 15 | 2 |
+| 마지막 snapshot 본문/latest 포인터 갱신 flush | 2 | 1 |
+| 모델 검증 호출(대역; SQL 수에 미포함) | 2 | 1 |
+
+SELECT 9회 감소는 구성 3회와 시작 재조회 6회다. INSERT/UPDATE SQL 수가 flush 수와
+같다는 뜻은 아니다. 원본 freeze의 항목별 버전·미디어·항목 조회와 studio 원본 준비/
+영수증 저장 SQL은 배치화하지 않았고 이 결과를 studio 전체 왕복/운영 성능으로 제시하지
+않는다. 실제 PostgreSQL 계획·잠금 대기 시간·동시 발행 격리·처리량은 측정하지 않았다.
+
+### 회귀와 검증
+
+신규 test_publication_batch_contracts 17건은 실제 SQLite SQL/FK로 다음을 확인한다.
+
+- 첫 발행의 SQL/flush 수, 슬롯 개수·원본/새 슬롯 ID 대응·시작 순서·nullable title,
+  PG dialect 컴파일로 상품→정렬된 캐릭터→정렬된 로어북 잠금 요청과 freeze의 독립 인가.
+- 동일 내용 후속 발행의 새 버전·동일 digest·media 분류, 원본 편집 후 content 분류,
+  이전 snapshot/소스별 1·2·3 버전 보존.
+- 슬롯 부모·대상/시작 자식·최신 포인터·릴리스 저장의 실제 flush 직후 실패 4조합에서
+  모든 새 snapshot/연결/릴리스와 최신 포인터 rollback, 재시도 버전 2의 정상 복구.
+- 상품/캐릭터/로어북 미소유 3조합, 독립 공개 서비스의 미존재 3조합,
+  비활성/일반 항목으로 변경된 시작·빈 시작 설정의 쓰기 전 거절, 부모 불일치 FK 거절,
+  상위 transaction 없는 builder 거절.
+
+기존 payload/digest 계약 테스트의 대역을 새 내부 검증 결과와 add_all에 맞췄다.
+PG opt-in의 private 검증 호출도 ORM 대신 mapper를 거친 Info/구성으로 연결하고 같은
+파일의 타입·존재 assertion을 보완했다. 해당 PG 테스트는 이번에 실행하지 않았다.
+기존 studio 회귀의 발행 성공/후속 발행·영수증 재시도·fingerprint 충돌·실패 rollback도
+함께 검증했으며 studio 상위 도메인 서비스 대역 검증임을 유지한다.
+
+| 검증 | 결과 |
+|---|---|
+| product 전체·신규/수정 3테스트 Ruff format/check·직접 mypy | 통과; mypy 47소스 |
+| 신규 배치/상품 발행/studio 발행·후속/상품 통합·구성/character·lorebook command 8파일 | 116 passed, 0 failed, 9 skipped (신규 17건 포함) |
+| 필수 앱 전체 품질 검사 | Ruff 390파일·mypy 369소스·계약/검사기 13 passed; 기준선 0개; 종료 코드 0 |
+| 전체 API 회귀 | 1229 passed, 0 failed, 288 skipped |
+| 변경 범위 git diff --check | 통과 |
+
+모든 검증은 프로젝트 .venv/Scripts/python.exe로 실행하고 TEST_DATABASE_URL 및
+TEST_AUTH_DATABASE_URL을 제거했다. Windows 샌드박스의 asyncio 로컬 소켓 대기와
+기본 임시 폴더 권한 오류는 승인된 오프라인 테스트 실행/프로젝트 전용 basetemp로
+해결했다. 최초 품질 실행의 임시 폴더 오류 2건은 최종 13 passed로 재검증했으며 실패를
+건너뛰어 통과로 세지 않았다. skipped 288건도 통과에 포함하지 않았다.
+실제 PostgreSQL·외부 DB migration/초기화/삭제·외부 공급자는 실행하지 않았다.
+SQLite 제약과 SQL 컴파일은 실제 PostgreSQL 행 잠금/경합·격리를 증명하지 않는다.
+새 Any/ignore/cast/기준선 예외·공개 API/DB 계약 변경은 없다. product/use_cases ARCHITECTURE와
+원본 감사 U14 수정 상태를 갱신했고 기존 staged/unstaged/untracked 변경을 보존했다.
+
+**다음 범위:** U15 로어 v1의 exact·regex 옵션 의미를 수정한다. legacy 정책을 유지하면서
+case_sensitive와 정규식 컴파일/캐시 키, exact의 전체 일치 및 studio 진단/발행본 활성화
+계약을 회귀로 고정한다. GPT-6.1 Sol, 추론 high를 권장한다. 범위가 정해진 규칙 수정과
+호환성 검증이라는 업무 판단이며 모델 간 성능 비교를 수행한 것은 아니다.
+OpenAI Docs의 [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol)과
+[추론 수준 안내](https://developers.openai.com/api/docs/guides/reasoning)를 확인했다.
+
+## 기능 감사 수정 10차: U15·U25 통계 범위 통합 점검 (2026-10-29)
+
+U15 로어 활성화와 U25 통계 재예약 배치 변경을 동일 작업 트리에서 대조하고 전체 API를
+검증했다. 추가 제품 코드 수정이나 별도 merge/commit/push는 하지 않았다. 기존
+staged/unstaged/untracked 변경과 두 모듈 ARCHITECTURE의 앞선 U06/U14 기록을 보존했다.
+병렬 구현 중 개별 작업은 공통 REPORT를 수정하지 않았고, 이번 통합 단계에서 상태와
+실행 결과를 반영한다. 상세 명령·로그·한계는 [U15-U25-INTEGRATION.md](U15-U25-INTEGRATION.md)에 있다.
+
+- **U15 완료:** exact는 기존 casefold 후 전체 문자열 비교이며 partial_match와 관계없이
+  접두/접미 문자열에 일치하지 않는다. regex의 case_sensitive를 컴파일 정책과 캐시 키에
+  반영했다. 옵션 없는 legacy·라이브 query의 대소문자 무시, pydantic-core 선형 시간
+  엔진과 기존 오류/HTTP 번역, 입력·metadata·스냅샷 비변경을 유지한다. 실제 studio 변환은
+  contains를 생성하며 도메인 exact/regex 진단과 구분해 검증했다. 신규 회귀 75건의
+  단독 작업 근거는 [U15-WORKLOG.md](U15-WORKLOG.md)에 남겼다.
+- **U25 통계 재예약 완료·태그 범위 미완료:** 상품×서울 날짜 키를 지연 생성하고 저장소가
+  최대 500개 입력 키씩 중복 제거 후 다중 VALUES upsert를 순차 실행한다. 기존 단건
+  API·날짜·DB now() 시각·상위 rollback·claim/complete 정책을 유지한다. 같은 SQLite
+  검증기에서 16상품×32일의 upsert 512→2회(상품 SELECT는 전후 각 1회)를 확인했다.
+  신규 회귀 33건의 근거는 [U25-STATISTICS-WORKLOG.md](U25-STATISTICS-WORKLOG.md)에 있다.
+  태그 이름 resolve 배치화는 남아 있으므로 U25 전체 완료가 아니다.
+
+| 통합 검증 | 결과 |
+|---|---|
+| U15/U25 변경 Python 7파일 직접 Ruff format/check·mypy | 통과, mypy 7소스 |
+| 필수 tools/check_backend_quality.py | Ruff 390파일·mypy 369소스·13 passed / 0 failed / 0 skipped·기준선 0개 |
+| 전체 API 오프라인 회귀 | **1337 passed / 0 failed / 288 skipped**, 기존 422 상수 경고 2개 |
+| 변경 범위 git diff --check | 통과 |
+
+전체 API의 1337 passed는 U14 기준 1229건에 U15 신규 75건과 U25 신규 33건이 더해진 수다.
+품질 검사 13건은 전체 API에도 포함되므로 전체 통과 수에 다시 더하지 않는다. skipped도
+passed에 포함하지 않는다. 모든 실행은 프로젝트 .venv/Scripts/python.exe를 사용했고
+TEST_DATABASE_URL과 TEST_AUTH_DATABASE_URL을 제거했다.
+
+첫 전체 실행은 긴 basetemp 아래 로컬 저장소의 269자 임시 파일 경로에서 3건이 실패했다
+(1334 passed / 3 failed / 288 skipped). 짧은 새 프로젝트 경로에서 실패 3건이 모두 통과했고,
+동일한 전체 API를 새 짧은 경로로 다시 실행해 위 최종 결과를 확인했다. 저장소 제품 코드나
+검사 설정을 바꾸거나 실패 테스트를 제외하지 않았다. 실제 PostgreSQL 행 잠금·경합·격리,
+동시 재예약/claim·실행 계획·운영 처리량은 미검증이며 DB migration/초기화/삭제와 외부
+공급자 요청은 실행하지 않았다. 다음 U25 범위는 태그 이름 resolve 배치화다.
+
+## 기능 감사 수정 11차: U23 로컬 reader·파일·락 수명 (2026-10-29)
+
+test_local의 누적 키 락을 WeakValueDictionary로 바꾸고, Windows에서 삭제 공유를 허용한
+파일 handle을 BinaryIO로 넘긴다. 열린 reader는 읽기 시작 시점의 본문·metadata를 유지한다.
+삭제 후 새 조회는 미존재이며 같은 키를 즉시 재사용할 수 있다. Windows의 열린 대상 교체
+거절은 기존 이름의 임시 .old 이동→새 본문 발행→이전 이름 unlink로 처리하고, 발행/정리
+실패 시 본문과 sidecar 복원을 시도한다. 영속 레이아웃·공개 API/키·metadata 필드·S3는
+변경하지 않았고 전체 파일 복사나 reader 수명 전체의 키 잠금도 추가하지 않았다.
+
+to_thread 작업은 첫 취소를 보존하면서 실제 I/O 종료까지 회수한다. store/delete/metadata의
+키 락과 reader의 read/close 락을 그 뒤 해제한다. 취소된 read 획득의 늦은 reader도 닫는다.
+취소된 쓰기는 이미 반영됐을 수 있고 취소 반환은 I/O 종료까지 지연될 수 있다. 호출자의
+입력 stream·반환 reader 종료 책임, 기존 오류와 cause·idempotent delete/close를 유지한다.
+
+수정 전 신규 회귀 10건이 모두 실패하는 것을 확인한 뒤, 최종 22건으로 확대했다.
+실제 Windows 파일과 제어된 worker thread로 삭제/재사용·열린 reader의 연속 덮어쓰기,
+복원·native handle 회수, 반복 취소·동일 키 대기·다른 키 진행·read/close 순서·락 회수를
+검증했다. Windows/Linux 대상 직접 Ruff/mypy, 필수 품질 검사(Ruff 390파일·mypy 369소스·
+13 passed·기준선 0개), 관련 7파일 **86 passed / 0 failed / 2 skipped**, 전체 API
+**1359 passed / 0 failed / 288 skipped**가 통과했다. 기존 422 경고 2개는 유지한다.
+전체 API는 U15/U25 통합 기준 1337건에 이번 신규 22건을 포함하며 skipped와 품질 검사
+13건을 다시 더하지 않는다. 프로젝트 .venv/Scripts/python.exe와 짧은 새 basetemp를 쓰고
+TEST_DATABASE_URL과 TEST_AUTH_DATABASE_URL을 제거했다.
+
+기존 U08 S3/아키텍처 변경과 다른 staged/unstaged/untracked 변경을 보존했다.
+Any/ignore/cast/기준선 예외·공통 검사 설정을 추가하지 않았고 commit/push는 하지 않았다.
+Linux 런타임·다중 프로세스·네트워크 파일시스템·중단/복원 자체 실패의 완전 복구·장시간
+RSS와 실제 DB/S3는 미검증이다. DB migration/초기화/삭제 및 외부 공급자 요청은 없었다.
+정책·출처·실행 명령과 로그는 [U23-WORKLOG.md](U23-WORKLOG.md)에 기록했다.
+
+## 후속 작업 범위 조정: U19 이미지 기능 전반 구조 개편 (2026-10-30)
+
+사용자 요청에 따라 U19를 오류 처리 보완에서 **이미지 기능 전반의 구조 개편 과제**로
+재정의한다. 감정 태그 중심의 현재 구조에 한정하지 않고 상황·장면·대화 맥락에 맞는
+이미지를 다루는 데이터 구조·분류/연결·선택/전환/기본값 정책, 스튜디오 관리·채팅 표시와
+발행 스냅샷·미디어 참조·기존 데이터 호환을 함께 검토한다. 구체적인 모델과 선택 방식은
+아직 결정하지 않았고 구현도 착수하지 않았다. 기본 이미지/감정 태그 제약 오류 번역만으로
+U19를 완료로 처리하지 않는다. 원본 감사의 제약 오류 근거는 보존했다.
+상세 범위는 [U19-REDESIGN-NOTE.md](U19-REDESIGN-NOTE.md)에 기록한다.
+
+U19 이외의 다음 작업 후보는 **U25의 남은 태그 이름 resolve 배치화**를 우선하고,
+그다음 **U29의 SDK 예외 분류·메모리 작업 기한**을 검토한다. 현재 tag.resolve_tags는
+정렬된 이름마다 단건 resolve를 호출하므로 U25 잔여 범위가 남아 있다. U29도 OpenAI/
+Anthropic의 catch-all과 상태 없는 예외의 재시도 분류가 남아 있어 별도 검증이 필요하다.
+U16 태그 공통화는 U25 태그 경계가 정리된 뒤 진행하고, U28의 이미지 업로드 수명 변경은
+U19 개편과 공유하는 책임을 확인한다. 이 순서는 현 코드·감사 범위에 따른 작업 제안이며
+이번에 해당 구현을 시작하거나 별도 대화를 생성한 것은 아니다.
+
+이번 변경은 문서만 수정했다. 앱 코드·DB·테스트·공통 검사 설정은 변경하지 않았고
+테스트를 재실행하지 않았다. 기존 U23의 전체 API 1359 passed / 288 skipped는 이전
+실행 결과로 보존하며 이번 문서 수정의 신규 검증 결과로 제시하지 않는다.
+
+## 기능 감사 수정: U29 SDK 오류 분류·메모리 작업 전체 기한 (2026-10-30)
+
+OpenAI/Anthropic의 상태 없는 TypeError·JSON 파싱·일반 RuntimeError·미분류 SDK
+APIError는 기존 PROVIDER 오류를 유지하면서 retryable=False로 전달한다. 명시적인
+SDK timeout·연결·rate limit, 상태 코드 기반 4xx/5xx와 cause/metadata, 호출 뒤 응답
+추출 오류·취소·클라이언트 소유권·Voyage의 기존 계약은 유지했다.
+
+ProcessMemoryWorkCommand에 호환 기본값 timeout_seconds=240.0을 추가했다. workflow는
+하나의 단조 시계 기한을 pending 색인·원문 읽기·새 요약·저장·임베딩·완료에 공유한다.
+기한 초과는 MemoryWorkDeadlineExceededError로 구분하고 같은 태스크의 취소/DB 정리를
+기다린 뒤 기존 5회·5~300초 backoff 큐에 기록한다. 늦은 공급자 결과는 다음 저장 전에
+기한을 재확인한다. worker는 MEMORY_WORK_TIMEOUT_SECONDS의 유한 양수와
+timeout<lease(기본 240<300), 기존 lease 1~3600초를 자원 생성 전에 검증한다.
+
+| 검증 | 결과 |
+|---|---|
+| 수정 전 분류식만 별도 프로세스 메모리에 복원 | 신규 SDK 회귀 8 failed / 4 passed로 결함 재현 |
+| 신규 회귀 | SDK 12건 + 메모리/worker 22건 = 34건 |
+| SDK·임베딩·memory·worker 관련 7파일 | **113 passed / 0 failed / 1 skipped** |
+| 필수 tools/check_backend_quality.py | Ruff 390파일·mypy 369소스·13 passed·기준선 0개 |
+| 전체 API 오프라인 회귀 | **1418 passed / 0 failed / 288 skipped**, 기존 422 경고 2개 |
+| 변경 파일 Ruff·git diff --check | 통과 |
+
+전체 API 결과는 기존 미커밋 변경을 포함한 현재 작업 트리의 통합 결과다. 신규 34건과
+품질 검사 13건은 전체 API에도 포함되므로 다시 더하지 않는다. PostgreSQL·live Voyage
+검사는 환경 변수를 제거해 건너뛰었고 skipped는 passed에 포함하지 않았다.
+
+기한은 workflow 진입부터 한 시도에 적용된다. claim DB 대기·모든 재시도 누적 SLA,
+취소를 무시하는 코드·동기 파싱·rollback/commit·실패 기록의 벽시계 상한은 보장하지
+않는다. lease 갱신/claim별 토큰은 추가하지 않았고 U03의 실행 소유권 과제는 남는다.
+실제 PostgreSQL 잠금·경합·격리와 live 공급자 동작은 미검증이다.
+
+기존 staged/unstaged/untracked 변경·외부 API/DB/저장 JSON을 보존했다. 기준선·공통 검사
+설정·SDK 버전 변경, migration/DB 초기화·삭제, 실제 공급자 요청, commit/push는 없다.
+샌드박스의 Windows asyncio socketpair 제한은 승인된 오프라인 실행으로, pytest 기본
+임시 경로 권한 오류는 프로젝트 내부 새 basetemp로 해결했다. 제품/검사 코드를 우회하지
+않았다. 실행 명령·정책·출처·한계는 [U29-WORKLOG.md](U29-WORKLOG.md)에 남겼다.
+
+
+## U16 태그 정책 공통화 (2026-10-30)
+
+세 콘텐츠의 태그 추가/교체 순서와 내부 선택/제거·관리자 지정 보호를
+content/tag/service/policy.py의 순수 공개 서비스로 모았다. 호출은 공개 Command/Info만
+사용하며 도메인별 인가·부모 잠금·저장·응답과 U25 이름 해석/배치 SQL은 유지한다.
+공통 repository나 router/mapper 프레임워크는 추가하지 않았다.
+
+품질 검사(Ruff/mypy/시그니처 및 아키텍처/패턴 13건) 통과, 태그 정책·서비스·U25·
+스키마 회귀 72 passed / 11 skipped, 콘텐츠 HTTP·스튜디오 회귀 63 passed.
+PG 11건은 TEST_DATABASE_URL 미설정으로 skip했으며 실제 잠금/경합 검증은 남아 있다.
+전체 변경과 명령·환경 우회·검증 한계는 [U16-WORKLOG.md](U16-WORKLOG.md)를 따른다.
+
+## U18 오류 분류·복구 진단 (2026-10-30)
+
+예약 전 문맥 준비의 내부/저장소 오류는 실패 receipt로 request_key를 소진하지 않는다.
+예상 예산·공급자·timeout 실패는 기존 unbilled receipt를 유지한다. 결과 검증은 전용
+예외의 code로 분류하고 임의 오류 메시지를 검증 실패로 해석하지 않는다. billing binding/
+예약액 불변 조건은 기존 AnswerStorageError의 하위 타입인 AnswerStateError로 식별한다.
+
+workflow 단계·diagnostic_id→generation_id 연결·복구 attempt_count·타입 기반 원인 분류와
+정제한 stack_frames를 기록한다. 예외 메시지·SQL·매개변수·원문·locals·source·절대 경로·
+실행 token/request_key·raw traceback은 기록하지 않는다. 코드 위치 정제는 내부 service util에
+분리하고 실행/DB 책임은 기존 workflow에 유지했다. chat/ARCHITECTURE.md를 갱신했다.
+
+일반 완료·동일 키 재생·background 복구는 같은 완료/재조회 경계를 사용한다. commit 응답이
+유실돼도 새 세션 terminal 확인으로 완료를 반환하고, 확인 실패 시 최초 cause와 재조회
+오류를 각각 보존한다. 과금·staging 보존과 공급자 재호출 금지, 기존 HTTP 계약은 유지한다.
+attempt_count는 인스턴스별 최근 1,024개 생성에 한정한 진단값이며 재시작/LRU 퇴출로
+초기화된다. 복구 상한·격리·강제 해제·영속 횟수 정책은 미확정 commit 처리 계약과 함께
+정할 별도 과제로 남겼다.
+
+신규 진단 23건, 관련 답변/HTTP **111 passed**, 진단·메모리 기한 단독 **45 passed**.
+필수 품질 검사(기준선 0·Ruff 393파일·mypy 372소스·아키텍처/패턴 13건)가 통과했다.
+최종 전체 API는 **1463 passed / 0 failed / 288 skipped**, 기존 경고 2개다. 현재 작업 트리의
+통합 결과이며 다른 미커밋 변경도 포함한다. PostgreSQL·live 공급자는 미검증이다.
+실행 명령·초기 실패 교정·검증 한계와 운영 진단은 [U18-WORKLOG.md](U18-WORKLOG.md)를 따른다.
+
+같은 날 재점검에서 최초 세션/요청/문맥 조회와 읽기 트랜잭션 종료에도 진단 경계를
+추가했다. `preparation_read`의 DB 오류는 기존 503/동일 키 재시도 응답으로 번역하고,
+생성·예약·공급자 호출 전이므로 storage_uncertain=False로 기록한다. SQLAlchemy의
+LookupError 하위 타입도 저장소로 분류하며 기존 입력·인가·설정 예외와 취소 전파는
+보존한다. 추가 16건을 포함한 관련 회귀는 **83 passed / 16 skipped**, 필수 품질 검사도
+통과했다. 이 재점검에서는 전체 API·실제 PostgreSQL·live 공급자 검증을 재실행하지 않았다.
+
+## U18 잔여 복구 정책 구현 (2026-11-02)
+
+앞선 프로세스별 진단 횟수를 영속 admission으로 대체했다. 자동 복구 최대 5회와
+30초 지수 대기(최대 900초), 결정론적 invariant/internal/storage_constraint 즉시 격리를
+동일 키 재전송과 supervisor에 공통 적용한다. conversation → generation 잠금 아래
+횟수/감사 행을 먼저 commit하고 기존 저장 결과의 완료만 재시도한다. 격리는 생성의
+pending·metadata·예약액을 유지하며 공급자를 호출하거나 임의 해제하지 않는다.
+
+운영자/사유를 요구하는 `app.answer_recovery --retry`는 한 번만 감사된 수동 복구를
+실행하고 예산·격리를 초기화하지 않는다. 기본 실행은 사용자 범위의 정제된 상태/감사
+조회다. Alembic 0036/초기 SQL 026을 추가하고 복구 기록이 있으면 downgrade를 거절한다.
+절차·배포 중지·운영 관측은 [답변 복구 운영 정책](../../../references_document/reference/answer-recovery-policy.md),
+검증과 남은 실제 네트워크/live 범위는 [U18-WORKLOG.md](U18-WORKLOG.md)를 따른다.
+
+## U21 billing→credit 반복 잠금·SAVEPOINT 정리 (2026-10-30)
+
+credit의 공개 `use_credit_write_scope(session)`로 billing 예약·확정·해제와 하위 credit
+쓰기를 하나의 SAVEPOINT에 조합했다. 독립 credit 호출은 자체 경계를 열고, 참여한
+하위 실패를 잡더라도 공유 scope 전체를 rollback한다. 상위 트랜잭션의 계속 실행과
+동일 키 재시도, binding/잔액/예약/원장 원자성을 유지한다.
+
+잠금 근거는 동일한 활성 상위 트랜잭션·SAVEPOINT·사용자/재화 범위에서만 재사용한다.
+잔액은 매번 새로 읽고 다른 지갑·독립 하위 SAVEPOINT·새 트랜잭션에는 근거를 넘기지
+않는다. billing 요청 키 → 지갑 → binding → 예약 순서, 지갑 대기 후 견적 만료 검사,
+무료 우선 배분·기존 최종 상태 재생은 보존했다. 검증 생략 옵션이나 ORM/Row의 모듈 간
+전달은 없고, 기존 command 실행 책임에 유지하며 두 모듈 아키텍처를 갱신했다.
+
+실제 PostgreSQL 단일 호출 SQL은 신규 예약 **22→17**, 확정 **20→15**, 해제 **18→13**회다.
+SAVEPOINT/지갑 FOR UPDATE/legacy 검사는 각각 2→1회, advisory lock은 3→2회로 줄었다.
+기존 동일 키 예약 재생은 SQL 10회 그대로다. 운영 지연/처리량 개선율은 측정하지 않았다.
+
+신규 scope·SQL 회귀 16건을 포함한 관련 PostgreSQL 8파일은 **152 passed / 0 failed /
+0 skipped**다. 확장 검증에서 발견한 commit 응답 유실 테스트의 주입 위치도 현재
+generation 잠금 경계에 맞춰 교정해 4단계의 실제 commit 후 응답 유실을 검증했다.
+필수 품질 검사(기준선 0, Ruff 393파일, mypy 372소스, 아키텍처/패턴 13건)와 변경 파일
+포맷·diff 검사가 통과했다. 전체 API/live 공급자/운영 부하 검증과는 구별한다.
+측정 조건·명령·초기 실패 교정은 [U21-WORKLOG.md](U21-WORKLOG.md)를 따른다.
+
+## U26 보고 매퍼·타입 중복 재점검 (2026-11-02)
+
+현재 reporting 매퍼는 명시적 필드 선택을 사용하며 product/moderation의 불필요한
+scalar 깊은 복사는 이미 제거돼 있었다. 작가·운영의 유사한 지표/일별/View는 영역별
+공개 타입과 노출 계약을 소유하므로 유지했다. 범용 매퍼·공통 기반 타입을 추가하거나
+다른 reporting 영역을 참조하지 않았다. JSON 깊은 복사도 격리 계약으로 보존했다.
+
+잔여 항등 `moderation.scalar_row_to_value`와 전용 TypeVar, 호출 4곳을 제거했다.
+저장소의 `UUID | None` 값을 service가 직접 판단하며 Row/Entity는 계속 mapper로
+변환한다. SQL·잠금·상태 충돌·인가·DTO·금액/날짜 계약은 유지하고 모듈 아키텍처를
+갱신했다. 현재 U26의 실익 범위 정리는 완료했다.
+
+필수 품질 검사(패턴 진단/예외 0건·Ruff 396파일·mypy 375소스·아키텍처/패턴
+13 passed)와 관련 11파일 **177 passed / 0 failed / 0 skipped**가 통과했다.
+실제 PostgreSQL 신고/잠금·보고 검증을 포함하며 전체 API·운영 성능 측정은 수행하지
+않았다. 초기 샌드박스 소켓 제한은 승인된 실행으로 해결했다. 기존 작업 트리 변경과
+검사 설정을 보존했다. 판단 근거·명령·검증 한계는 [U26-WORKLOG.md](U26-WORKLOG.md)에
+기록했다.
+
+
+## U17 답변 복구 실행 계획·부분 인덱스·종료 lease (2026-11-02)
+
+실제 repository SQL을 합성 10만 행의 네 분포에서 custom/generic 계획으로 비교했다.
+종료 99,000행 뒤의 pending 조회는 기존 전체 인덱스 custom 50.902ms에서 최종 부분
+인덱스 0.029ms, 복구 대상이 없는 경우는 32.789ms에서 0.009ms였다. pending 절반의
+backlog에서는 기존도 0.048ms로 빠르므로 분포에 따른 차이를 유지해 해석한다.
+바인딩된 status의 generic plan이 부분 인덱스를 쓰지 못하는 경우를 확인하고 복구의
+고정 pending 조건을 SQL 상수로 표현했다. 최종 generic도 네 분포 모두 부분 인덱스를
+선택했으며 0.012–0.042ms였다. 운영 지연·처리량 개선율을 측정한 결과는 아니다.
+
+0035 / 초기 SQL 025 / ORM을 leased pending 부분 인덱스로 맞췄다. 종료 전이는 같은
+트랜잭션에서 lease를 NULL로 만들고 상위 실패 시 원래 pending lease를 복원한다.
+metadata/token/완료 사실·과금·같은 키 재생은 유지하며 기존 종료 행은 대량 갱신하지
+않는다. 공개 API/계층을 추가하지 않았고 chat/DB 아키텍처를 갱신했다.
+
+최종 관련 10파일은 **146 passed / 0 failed / 0 skipped**이며 실제 PostgreSQL의
+4종 종료·rollback·generic 계획·migration 행 보존과 기존 복구/과금/HTTP 회귀를
+포함한다. 필수 품질 검사(기준선 0, Ruff 396파일, mypy 375소스, 아키텍처/패턴 13건)와
+신규 파일 lint/포맷·diff 검사도 통과했다. 운영에는 미적용이며 API/worker 중지 후
+인덱스 migration이 필요하다. 조건·계획 증거·재현 명령·검증 한계는
+[U17-WORKLOG.md](U17-WORKLOG.md), [측정 JSON](U17-RECOVERY-PLANS.json)을 따른다.
+
+## U28 업로드 해싱 offload·취소 시 파일 수명 (2026-11-02)
+
+character의 reserve_upload는 검증·seek/read·SHA-256 전체를 하나의 to_thread 태스크로
+실행한다. 내부 보조 함수가 shield로 태스크 종료와 결과/오류 회수를 소유하고 첫
+CancelledError를 보존하므로 반복 취소에도 HTTP 임시 파일을 조기 종료하지 않는다.
+취소 후 예약/저장으로 진행하지 않으며 입력 stream의 호출자 소유권, 지문·크기·검증·
+멱등성, 예약 선행 commit·외부 저장 중 잠금·GC/재시도 정책은 유지한다.
+
+신규 16건을 포함한 오프라인 미디어 계약 **47 passed**, 전용 로컬 PostgreSQL의
+기존 미디어/HTTP **32 passed**와 필수 품질 검사가 통과했다. 실제 worker thread의
+읽기/최종 되감기에서 반복 취소·I/O 실패·파일 종료 순서를 확인했다. 새 타입 검사
+예외는 없고 공개 API나 공통 실행 계층을 추가하지 않았다. 실제 S3 네트워크·브라우저
+단절·프로세스 중단·운영 지연은 미검증이며 전송 중 잠금 재설계와 전체 deadline은
+별도 범위다. [U28-WORKLOG.md](U28-WORKLOG.md)에 명령·결과·한계를 기록했다.
+
+## U25 실제 PostgreSQL 경합 검증·감사 통합 완료 (2026-11-02)
+
+통계 재예약과 태그 이름 resolve의 기존 500개 배치 구현을 함께 재점검했다. 통계
+16상품×32일 upsert 512→2회, 태그 1,001이름 INSERT/SELECT 각각 1,001→3회의 앞선
+SQLite 측정과 이번 실제 PG 검증을 모아 **U25 양쪽 범위를 완료**로 갱신한다.
+2026-10-29 통계 단독 통합 당시의 태그 미완료 표기는 당시 상태의 기록이다.
+
+신규 `test_u25_postgres_concurrency.py` **17건**은 독립 세션의 관리자 생성·이름 변경·
+비활성화와 겹치는 resolve, 500개 경계·취소 rollback, 동시 repair·worker claim/
+SKIP LOCKED/완료 및 rollback·단건 dirty 예약을 검증한다. 16건은 별도 관찰 연결의
+pg_blocking_pids로 실제 대기를 확인한 뒤 선행 작업을 해제한다. 나머지 1건은 실제
+INSERT/SELECT 사이에 관리자 rename을 commit하여 기존 재시도 오류와 전체 rollback을
+확인한다. INSERT 전에 이름이 바뀌면 옛 이름의 새 ID를 만들 수 있는 기존 동작도 구분한다.
+
+관련 태그·통계·HTTP·스튜디오 발행 15파일은 **201 passed / 0 failed / 0 skipped**,
+전체 API 오프라인은 **1706 passed / 0 failed / 446 skipped / 2 warnings**다.
+필수 품질 검사(진단·기준선 0, Ruff 395파일·mypy 374소스·아키텍처/패턴 13 passed),
+신규 테스트 직접 Ruff/mypy 및 변경 파일 diff 검사가 통과했다. 두 실행의 중복 회귀를
+합산하지 않으며 17건은 오프라인에서는 skip, PG 실행에서는 passed다. 경고는 기존
+lorebook HTTP 테스트의 Starlette 422 상수 deprecation이다.
+
+제품 코드·공개 API·스키마·잠금/격리/재시도 정책 및 검사 예외는 변경하지 않았다.
+PG 17.11·en_US.utf8·READ COMMITTED에서 지정한 유한한 경합 검증이다. 모든 교착 부재·
+다른 격리 수준/운영 환경·부하/계획/처리량을 보장하지 않는다. requested_at은 DB
+트랜잭션 시작 시각이며 모든 실행에서 단조 증가한다는 보장도 추가하지 않았다.
+전용 로컬 DB의 테스트별 격리 스키마만 생성·정리했고 전체 migration/운영 적용·live
+외부 공급자는 검증하지 않았다. 조건·경합별 결과·재실행 명령·초기 테스트 교정·로그와
+한계는 [U25-PG-INTEGRATION.md](U25-PG-INTEGRATION.md)를 따른다.

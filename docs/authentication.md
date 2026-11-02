@@ -4,6 +4,10 @@
 
 가입 이후 상품 준비·첫 채팅 답변까지 이어지는 기본 앱의 쿠키 인증 통합 검증은 [첫 답변 재현 절차](first-answer-integration.md)를 참고한다. `create_app()`은 이미 실제 인증 의존성에 연결되므로 별도 `authenticate` 훅을 주입할 필요가 없다.
 
+관리자 전역 조회·검수 훅도 기본 앱에서 인증 및 최신 DB의 활성 admin 검사에 연결한다.
+역할별 제공 범위, 기존 소유자 제한, 외부 인증 주입과 미설정 환경의 거절은
+[관리자·검수 권한](admin-authorization.md)을 따른다.
+
 ## 설정과 로컬 실행
 
 1. `.env.example`을 `.env`로 복사한다. 실제 `.env`와 비밀값은 커밋하지 않는다.
@@ -15,7 +19,7 @@ python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-첫 결과는 `AUTH_JWT_KEY`(base64, 최소 32바이트 난수), 둘째는 `AUTH_FLOW_KEY`(Fernet)에 넣는다. 키 교체는 이전 JWT/CSRF/OIDC 흐름을 무효화하므로 계획된 재로그인이 필요하다. 기본 키나 운영 개발용 대체 동작은 없다.
+첫 결과는 `AUTH_JWT_KEY`(base64, 최소 32바이트 난수), 둘째는 `AUTH_FLOW_KEY`(Fernet)에 넣는다. 키 교체는 이전 JWT/CSRF/OIDC 흐름을 무효화하므로 계획된 재로그인이 필요하다. AUTH_FLOW_KEY는 인증 메일 Outbox 토큰 암호화에도 사용하므로 교체 전 대기 메일을 처리하거나 만료·정리한다. 기본 키나 운영 개발용 대체 동작은 없다.
 
 ```sh
 docker compose --profile auth-dev up -d postgres mailpit
@@ -25,7 +29,7 @@ Mailpit SMTP는 `localhost:1025`, 수신함은 `http://localhost:8025`다. 호�
 
 DB 초기화는 두 방식 중 하나만 선택한다.
 
-- 새 compose 볼륨은 `infra/postgres/init/*.sql`로 **0020 구조까지** 생성된다. 빈 DB에 Alembic을 다시 실행하지 않는다. 스키마를 확인한 후 기존 방식대로 Alembic `stamp head`를 명시적으로 실행하여 이력을 맞춘다.
+- 새 compose 볼륨은 `infra/postgres/init/*.sql`로 **0034 구조까지** 생성된다. 빈 DB에 Alembic을 다시 실행하지 않는다. 스키마를 확인한 후 기존 방식대로 Alembic `stamp head`를 명시적으로 실행하여 이력을 맞춘다.
 - Alembic 관리 DB는 기존 revision을 확인하고 `python -m alembic -c apps/api/alembic.ini upgrade head`를 실행한다. 빈 독립 DB는 `upgrade head`로 생성한다. 마이그레이션 실행 프로세스에도 `DATABASE_URL`과 `PYTHONPATH=apps/api`를 설정해야 한다. `.env` 자동 로드는 Uvicorn 옵션에만 적용된다.
 
 0020은 기존 이메일을 앞뒤 ASCII 공백 제거·소문자로 정규화하기 전에 충돌을 검사한다. 충돌 또는 기존 국제화 이메일이 있으면 중단한다. 계정을 자동 삭제/병합하지 않는다. 운영자는 백업 후 IDNA 변환·계정 충돌을 별도 해소해야 한다. 기존 `id/password_hash/display_name/role/status`는 보존한다. 기존 계정의 인증 상태를 추정하지 않아 `email_verified=false`, `pending_expires_at=NULL`이며 자동 정리 대상이 아니다. 기존 자격증명을 실제 인증에 이관할 경우 이메일 소유 증거 확인과 Argon2id 전환을 별도 계획해야 한다. 인증 데이터가 있으면 downgrade를 거절한다.
@@ -37,7 +41,7 @@ $env:PYTHONPATH='apps/api'
 python -m uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-기존 앱의 asset storage 설정도 유효해야 한다. `ENVIRONMENT=local`, `AUTH_SECURE_COOKIES=false`는 로컬 HTTP용이다. 운영은 `ENVIRONMENT=production`, HTTPS `AUTH_PUBLIC_ORIGIN`, `AUTH_SECURE_COOKIES=true`, 인증 가능한 SMTP(`SMTP_TLS=starttls` 또는 `ssl`, `SMTP_USER`, `SMTP_PASSWORD`)가 필요하다. SMTP 오류를 로그 메일로 대체하지 않는다. 메일 전송 실패는 503이며 재발송으로 복구한다.
+기존 앱의 asset storage 설정도 유효해야 한다. `ENVIRONMENT=local`, `AUTH_SECURE_COOKIES=false`는 로컬 HTTP용이다. 운영은 `ENVIRONMENT=production`, HTTPS `AUTH_PUBLIC_ORIGIN`, `AUTH_SECURE_COOKIES=true`, 인증 가능한 SMTP(`SMTP_TLS=starttls` 또는 `ssl`, `SMTP_USER`, `SMTP_PASSWORD`)가 필요하다. SMTP 오류를 로그 메일로 대체하지 않는다. 요청은 메일 작업 저장 후 202를 반환한다. SMTP는 별도 `python -m app.auth_mail_worker`가 처리하며 일시 장애를 제한 재시도한다. 워커에도 환경변수를 별도로 주입해야 한다. 배포 순서·상태·키 보존·복구는 [Outbox 운영 문서](auth-mail-outbox.md)를 따른다.
 
 운영 스케줄러에서 환경변수를 주입하고 매시간 `python -m app.auth_cleanup`을 실행한다. 신규 미인증 계정은 7일 후, 세션·토큰·OIDC·요청 제한 행은 각 만료 후 삭제한다. 출력은 건수뿐이다. 자동 스케줄러 자체는 이 저장소에서 등록하지 않는다.
 
@@ -62,6 +66,8 @@ python -m uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000 --no
 | GET `/auth/google/callback` | Google의 `code`, `state` | 303 안전한 상대 경로로 이동·세션 쿠키 |
 
 정상 가입·재발송·재설정 요청은 계정 존재/종류를 응답에서 구분하지 않는다. 로그인은 미존재·미인증·비밀번호 오류·정지·Google 전용 계정 모두 같은 `invalid_credentials`다. 비밀번호 12~128 Unicode 문자, 최대 UTF-8 512바이트를 허용한다. 공백/유니코드를 변환하거나 조용히 잘라내지 않는다. Argon2id 비용은 메모리 64MiB, 반복 3, 병렬도 4이며 검증 시 필요하면 재해시한다. 불명 계정도 더미 Argon2 검증을 수행한다.
+
+로그인은 읽기 트랜잭션을 닫은 뒤 Argon2 검증·재해시를 수행하고, 사용자 행을 잠가 이메일·인증/활성 상태와 저장 해시를 재확인한 뒤 세션을 발급한다. 검증 중 비밀번호 재설정 또는 다른 로그인의 재해시로 해시가 바뀌면 `invalid_credentials`로 거절하며 재시도 시 최신 해시로 다시 검증한다. 먼저 발급을 완료한 세션은 뒤이은 재설정의 전체 폐기 대상이다. 일반 Access 인증은 사용자·세션 상태를 한 SQL로 읽으며 행 배타 잠금을 요청하지 않는다. 인증 확인 이후 실행 중인 업무를 소급 취소하는 보장은 없다. refresh 회전·폐기와 일회용 토큰 소모의 잠금은 유지한다.
 
 이메일은 `email-validator`로 구문 검증하고 ASCII local-part, IDNA domain으로 변환한 뒤 앞뒤 공백 제거·전체 소문자를 적용한다. DNS로 수신 가능 여부를 추측하지 않고 인증 메일로 확인한다. Gmail의 점/플러스는 그대로 유지한다. 같은 정규화 규칙과 DB UNIQUE/CHECK를 적용한다.
 
@@ -100,11 +106,11 @@ await fetch('/auth/login', {
 | 409 | account_conflict: 기존 가입 방법으로 로그인, 계정 연결 미지원 |
 | 422 | invalid_input: JSON·필드·이메일·비밀번호 정책 위반 |
 | 429 | rate_limited, Retry-After: 900(보수적 재시도 시간) |
-| 503 | mail_unavailable, google_not_configured, auth_not_configured |
+| 503 | google_not_configured, auth_not_configured. mail_unavailable 변환은 내부 호환용으로 남지만 메일 접수 경로는 SMTP를 호출하지 않음 |
 
 DB의 고정 시간 버킷으로 전체 인증 IP 120회/분, 상태 변경 경로와 Google callback별 IP 20회/5분, 로그인 이메일 10회/5분, 가입 이메일 5회/15분, 인증 메일(가입+재발송 공유) 및 재설정 메일 이메일별 5회/15분을 제한한다. 경계 시점에는 인접 버킷의 한도를 연속 소비할 수 있다. IP/이메일 원문 대신 키 기반 HMAC를 저장하고 만료 버킷은 정리한다. PostgreSQL 장애 때 프로세스 메모리 제한으로 우회하지 않는다. 운영에서 body 크기 제한 및 엣지 제한도 적용한다.
 
-SMTP 통신은 커밋 후 실행하므로 정상 응답 문구는 같아도 전송 시간과 장애 여부에 따른 차이는 있을 수 있다. 완전한 시간 동일성은 보장하지 않는다. 실서비스에서 SMTP 상태 관측과 요청 제한을 함께 운영한다.
+가입·인증 재발송·재설정의 202는 접수 성공이며 SMTP 결과와 독립적이다. 대상 계정이 없거나 부적격이어도 같은 응답이다. 계정·증명과 Outbox 저장은 원자적이며 DB 실패는 숨기지 않는다. SMTP 지연은 HTTP 요청의 완료를 막지 않지만 DB 조회·쓰기·잠금·암호 작업의 시간 차이까지 같지는 않다. 워커 상태와 요청 제한을 함께 운영한다.
 
 ## Google 실제 연동 확인
 

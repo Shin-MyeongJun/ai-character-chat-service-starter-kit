@@ -33,7 +33,7 @@ def _assert_existing_schema(name, actual, baseline):
         assert "tags" in actual["properties"]
         assert "tags" not in actual.get("required", [])
         actual["properties"].pop("tags")
-    additions = {"ProductInfoResponseDto": {"has_publication"}, "ListProductsRequestDto": {"search"}, "GenerateAnswerRequestDto": {"manual_entry_ids"}}
+    additions = {"ProductInfoResponseDto": {"has_publication"}, "ListProductsRequestDto": {"search"}, "GenerateAnswerRequestDto": {"manual_entry_ids"}, "MessagePageResponseDto": {"history_revision", "sync_cursor"}}
     if name in additions:
         actual = {**actual, "properties": dict(actual["properties"])}
         for field in additions[name]:

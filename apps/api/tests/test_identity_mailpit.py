@@ -33,6 +33,8 @@ async def test_mailpit_real_smtp_verification_and_reset(auth_http):  # noqa: F81
     email = f"auth-{uuid4().hex}@example.com"
 
     async def read_token(subject):
+        while await app.state.authentication_mail.deliver_next_mail():
+            pass
         # 임의 메일함 삭제 없이 이번 테스트의 수신 주소만 검색한다.
         async with AsyncClient(base_url=url, timeout=10) as mailbox:
             response = await mailbox.get(

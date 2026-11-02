@@ -1,5 +1,6 @@
 # 요약 임계치·최근 원문 보존·pending 인덱싱 재사용·원문 초과 오류를 검증한다. 큐 세대 테스트만 PostgreSQL이 필요하다.
 from datetime import UTC, datetime, timedelta
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -46,6 +47,7 @@ async def test_public_memory_workflow_records_retryable_failure_before_raising(
         scope_generation=1,
         attempt_count=1,
         lease_owner="worker-a",
+        claim_token=uuid4(),
     )
     models = MemoryTypes.MemoryModelConfig(
         summary_provider="mock",
@@ -266,7 +268,7 @@ async def test_embedding_retry_reuses_pending_summary_without_regeneration(monke
     )
     index_summary = AsyncMock(side_effect=[embedding_failure, None])
     read_unsummarized = AsyncMock(
-        return_value=(SimpleNamespace(history_revision=1), messages(1, 1))
+        return_value=(SimpleNamespace(history_revision=1), messages(1, 1), False)
     )
     complete = AsyncMock()
     monkeypatch.setattr(
@@ -282,6 +284,7 @@ async def test_embedding_retry_reuses_pending_summary_without_regeneration(monke
         scope_generation=1,
         attempt_count=1,
         lease_owner="worker-a",
+        claim_token=uuid4(),
     )
     factory = SessionFactory()
     policy = MemoryTypes.MemoryPolicy()
@@ -386,10 +389,11 @@ async def test_durable_queue_coalesces_requests_arriving_during_a_lease(db):
 
 
 async def test_answer_context_never_drops_unsummarized_messages(monkeypatch):
+    stub_context_transaction(monkeypatch)
     conversation_id, owner_id = uuid4(), uuid4()
     runtime = runtime_view()
     source = SimpleNamespace(
-        truncated=False,
+        has_more=False,
         messages=(
             chat_message(1, "summarized"),
             chat_message(2, "new user fact"),
@@ -416,7 +420,7 @@ async def test_answer_context_never_drops_unsummarized_messages(monkeypatch):
         AsyncMock(return_value=latest),
     )
     monkeypatch.setattr(
-        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.list_memory_source",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.read_message_window",
         AsyncMock(return_value=source),
     )
     retriever = SimpleNamespace(retrieve_memories=AsyncMock(return_value=[]))
@@ -451,6 +455,7 @@ async def test_answer_context_never_drops_unsummarized_messages(monkeypatch):
 async def test_answer_context_fails_explicitly_when_unsummarized_text_cannot_fit(
     monkeypatch,
 ):
+    stub_context_transaction(monkeypatch)
     conversation_id, owner_id = uuid4(), uuid4()
     monkeypatch.setattr(
         "app.modules.chatting.chat.service.workflow.answer_preparation.ConversationService.prepare_runtime_context",
@@ -461,10 +466,10 @@ async def test_answer_context_fails_explicitly_when_unsummarized_text_cannot_fit
         AsyncMock(return_value=None),
     )
     monkeypatch.setattr(
-        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.list_memory_source",
+        "app.modules.chatting.chat.service.workflow.answer_preparation.MessagesQueryService.read_message_window",
         AsyncMock(
             return_value=SimpleNamespace(
-                truncated=False, messages=(chat_message(1, "x" * 4000),)
+                has_more=False, messages=(chat_message(1, "x" * 4000),)
             )
         ),
     )
@@ -482,5 +487,21 @@ async def test_answer_context_fails_explicitly_when_unsummarized_text_cannot_fit
             ),
             memory_retriever=retriever,
         )
-    assert caught.value.summary_required is True
+    assert isinstance(caught.value, MemoryTypes.ContextCompactionUnavailableError)
+    assert caught.value.summary_required is False
     retriever.retrieve_memories.assert_not_awaited()
+
+
+def stub_context_transaction(monkeypatch):
+    @asynccontextmanager
+    async def transaction(session):
+        yield
+
+    monkeypatch.setattr(
+        "app.modules.chatting.chat.service.workflow.answer_preparation.use_case_transaction",
+        transaction,
+    )
+    monkeypatch.setattr(
+        "app.modules.chatting.chat.service.workflow.answer_preparation.ConversationService.get_owned_conversation",
+        AsyncMock(),
+    )

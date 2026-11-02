@@ -58,7 +58,7 @@ docker stop chatkit-first-answer-test
 | 캐릭터·로어북·시작 항목·상품·발행본 | 직접 INSERT 없음. 소유자 공개 API로 생성 |
 | 대화·메시지·생성·usage·memory 작업 | 직접 INSERT 없음. 실제 유스케이스에서 저장 |
 
-메일은 기존 `SMTPMailSender.send_mail` 경계에서 `RecordingMailer`로 전달을 기록하고 인증 링크 fragment의 토큰을 가져온다. 토큰 생성/해시 저장/만료/일회 사용 검증은 실제 구현이다. 토큰 반환 API를 추가하지 않았다. 미인증 로그인 거절과 인증 토큰 재사용 거절도 확인한다.
+메일은 HTTP 접수 후 DB Outbox에 저장되며, 테스트 helper가 별도 발송 workflow를 실행한 뒤 `SMTPMailSender.send_mail` 경계의 `RecordingMailer`에서 인증 링크 fragment의 토큰을 가져온다. HTTP 응답을 기다리는 동안 SMTP를 호출하지 않는다. 토큰 생성/해시 저장/만료/일회 사용 검증은 실제 구현이다. 토큰 반환 API를 추가하지 않았다. 미인증 로그인 거절과 인증 토큰 재사용 거절도 확인한다.
 
 LLM은 `OpenAI AsyncResponses.create`만 결정적인 결과(한국어 답변, input=100/output=30 tokens)로 대체한다. 실제 OpenAI 어댑터의 입력 변환·결과 파싱, LLM 서비스, 프롬프트, 답변 예약/staging/완료, billing과 memory 저장을 통과한다. Voyage SDK의 `AsyncClient.embed`에도 결정적인 대역을 설치한다. 첫 대화에는 검색할 기억이 없으므로 실제 memory 조회가 임베딩을 생략하며 호출 0회를 검증한다. 이 테스트로 벡터 검색이나 memory worker 실행까지 검증했다고 해석하지 않는다.
 
@@ -66,7 +66,7 @@ LLM은 `OpenAI AsyncResponses.create`만 결정적인 결과(한국어 답변, i
 
 ## HTTP 단계별 재현
 
-실제 서버로 수동 실행할 경우 [인증 실행 설정](authentication.md)의 DB/SMTP/키/asset 설정을 먼저 준비하고 기본 `app.main:app`을 시작한다. 기존 마이그레이션 절차를 따르며 운영 DB를 초기화하지 않는다. 사용 가능한 서버 모델 ID는 운영자가 미리 설정해야 한다. 아래 `MODEL_ID`는 그 ID이며, 위 자동 테스트에서는 fixture의 임시 ID를 사용한다. 자동 테스트의 SDK mock은 테스트 프로세스에서만 적용된다. 서버에서 실제 모델을 선택하면 실제 공급자 호출이므로 이번 검증 결과와 별개다.
+실제 서버로 수동 실행할 경우 [인증 실행 설정](authentication.md)의 DB/SMTP/키/asset 설정을 먼저 준비하고 기본 `app.main:app`과 별도 `python -m app.auth_mail_worker`를 시작한다. 메일 워커에도 동일한 DB·인증·SMTP 환경변수를 주입한다. 기존 마이그레이션 절차를 따르며 운영 DB를 초기화하지 않는다. 사용 가능한 서버 모델 ID는 운영자가 미리 설정해야 한다. 아래 `MODEL_ID`는 그 ID이며, 위 자동 테스트에서는 fixture의 임시 ID를 사용한다. 자동 테스트의 SDK mock은 테스트 프로세스에서만 적용된다. 서버에서 실제 모델을 선택하면 실제 공급자 호출이므로 이번 검증 결과와 별개다.
 
 모든 요청은 같은 쿠키 저장소를 사용한다. POST/PUT/DELETE에는 `Origin: AUTH_PUBLIC_ORIGIN`, `X-CSRF-Token: GET /auth/csrf에서 받은 값`, `Content-Type: application/json`을 보낸다. GET에도 로그인 쿠키를 전송한다. Bearer나 임의 owner ID를 보내지 않는다.
 

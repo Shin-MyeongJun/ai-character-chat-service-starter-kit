@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TypedDict
+from typing import Literal, TypedDict
 from uuid import UUID
 
 
@@ -36,6 +36,12 @@ class AuthError(Exception):
     def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
+
+
+class MailDeliveryError(AuthError):
+    def __init__(self, *, can_retry: bool) -> None:
+        self.can_retry = can_retry
+        super().__init__("mail_unavailable")
 
 
 @dataclass(frozen=True)
@@ -156,7 +162,7 @@ class CleanupInfo:
 
 @dataclass(frozen=True, slots=True)
 class ActionMailInfo:
-    email: str
+    email: str = field(repr=False)
     purpose: str
     token: str = field(repr=False)
 
@@ -182,3 +188,30 @@ class GoogleStateCommand:
 class LinkGoogleAccountCommand:
     sub: str
     email: str
+
+
+@dataclass(frozen=True)
+class MailOutboxInfo:
+    id: UUID
+    token_hash: str = field(repr=False)
+    encrypted_token: str | None = field(repr=False)
+    status: str
+    attempt_count: int
+    available_at: datetime
+    claim_token: UUID | None
+    lease_until: datetime | None
+
+
+@dataclass(frozen=True)
+class MailDeliveryInfo:
+    id: UUID
+    claim_token: UUID
+    attempt_count: int
+    mail: ActionMailInfo | None = field(repr=False)
+
+
+@dataclass(frozen=True)
+class CompleteMailDeliveryCommand:
+    id: UUID
+    claim_token: UUID
+    outcome: Literal["sent", "retry", "failed"]

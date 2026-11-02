@@ -131,6 +131,10 @@ class MemoryJob(TimestampMixin, Base):
             name="ck_memory_jobs_generation",
         ),
         CheckConstraint("attempt_count >= 0", name="ck_memory_jobs_attempt_count"),
+        CheckConstraint(
+            "summary_through_position IS NULL OR summary_through_position > 0",
+            name="ck_memory_jobs_summary_target",
+        ),
         Index("ix_memory_jobs_claim", "status", "next_attempt_at", "updated_at"),
     )
 
@@ -156,8 +160,10 @@ class MemoryJob(TimestampMixin, Base):
         Integer, nullable=False, server_default=text("0")
     )
     lease_owner: Mapped[str | None] = mapped_column(Text)
+    claim_token: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     leased_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_attempt_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     last_error_kind: Mapped[str | None] = mapped_column(Text)
+    summary_through_position: Mapped[int | None] = mapped_column(BigInteger)

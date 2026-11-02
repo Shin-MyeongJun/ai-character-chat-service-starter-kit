@@ -44,7 +44,7 @@ runtime은 최초 snapshot의 시작 옵션을 조회한다. 현재 버전에서
 
 현재 클라이언트는 `.local_test/static/app.js`와 `apps/web`이다. 고정 내용을 별도 aside로 표시하고 답변 대상은 시작 조회의 primary_product_character_id로 정한다.
 
-소유 대화 목록 `GET /conversations/mine`은 사용자 ID로 제한하고 생성 시각·ID 내림차순 커서를 사용한다. 대화 제목은 생성 당시 상품 스냅샷의 고정 제목이다. 마지막 메시지 문구는 상위 use case가 chat 공개 서비스를 통해 결합한다. 이미지 정보는 현재 계약에 없다.
+소유 metadata의 `list_owned_conversations`는 사용자 ID로 제한하고 생성 시각·ID 내림차순 커서를 사용한다. HTTP `GET /conversations/mine`은 chat의 활동순 목록 View로 연결하며 마지막 생존 메시지 시각(없으면 대화 생성 시각)·대화 ID 내림차순 커서를 사용한다. 대화 제목은 생성 당시 상품 스냅샷의 고정 제목이다. 이미지 정보는 현재 계약에 없다.
 
 ## 저장소·조회·mapper 타입 정리 (2026-10-28)
 
@@ -113,3 +113,12 @@ test_conversation_http의 12건은 신뢰된 owner/session·경로/본문 ID, 20
 title=None은 기존 HTTP 모델이 여전히 거절하며 현재 errors 경계에서 422가 됨을 확인했다.
 nullable 제목 정책은 별도 결함 검토 대상이며 이 단계에서 문자열을 합성하거나 DTO를
 완화하지 않았다. 서비스 대역을 사용한 HTTP 계약 검사이며 실제 인가/DB 검증은 아니다.
+
+
+## U11 최근 대화 목록의 외부 읽기 예외 (2026-10-29)
+
+conversations 소유권과 metadata 목록/COUNT·쓰기 API는 그대로다. 아키텍처 규칙 C.2의
+chat.repository.list_recent_conversations에만 id/user_id/product_id/title/created_at의
+직접 읽기를 허용해 활동순 페이지를 DB에서 제한한다. messages의 읽기/쓰기를 이 모듈에
+추가하지 않고 chat→conversation 공개 COUNT 방향을 유지한다. 해당 View와 SQL의 책임은
+chat ARCHITECTURE의 U11 절에 기록했다. 일반 소유권 JOIN 예외와 구별한다.

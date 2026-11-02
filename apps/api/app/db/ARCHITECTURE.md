@@ -66,10 +66,22 @@ timezone-aware 입력 검증과 서울 날짜의 UTC [시작, 다음 날 시작)
 | 0018 | 답변 metadata/복구 lease |
 | 0019 | 관리 미디어 예약과 원본/발행 미디어 참조; 기존 URL 유지 |
 | 0020 | 이메일 정규화 사전 충돌 검사, 인증 상태·대기 만료, 인증 세션/증명/OIDC/제한 테이블. 초기 SQL 011과 대응 |
+| 0032 | memory_jobs의 선택적 양수 summary_through_position. 초기 SQL 022와 대응하며 기존 행은 NULL 보존. running 또는 목표가 남은 작업의 downgrade 거절 |
+| 0034 | auth_mail_outbox: 증명 FK/UNIQUE·암호화 토큰·발송 상태·lease/fencing. 초기 SQL 024와 대응. pending/processing이 있으면 downgrade 거절 |
+| 0033 | chat_history_versions와 messages 변경 트리거. 초기 SQL 023과 대응하며 기존 원문/답변을 보존. pending 답변이 있으면 downgrade 거절 |
+| 0035 | 답변 lease 전체 인덱스를 leased pending 부분 인덱스로 교체. 초기 SQL 025와 대응. 기존 행/metadata/lease 값은 변경하지 않으며 downgrade는 전체 인덱스만 복원 |
+| 0036 | product_generations에 영속 복구 횟수/다음 시각/격리 시각과 chat 소유 answer_recovery_attempts 감사 테이블 추가. 초기 SQL 026과 대응. 기존 생성은 횟수 0, 사실/metadata/lease는 보존하며 복구 기록이 있으면 downgrade 거절 |
 
 초기 SQL 004는 0002–0014의 누적 변경을 포함한다. 007/008/009/010은 각각 0015/0017/0018/0019 대응이다. SQL 원문과 Python의 SQL 문자열은 이번에 변경하지 않았다. 생성 형태의 고정 DDL 설명은 이 문서에 모았다.
 
 대부분 초기 revision의 downgrade는 명시적으로 오류를 낸다. 0015–0018은 추가 구조를 제거하는 코드가 있고, 0019는 관리 미디어 행이 존재하면 downgrade를 거절한다. 어느 경우도 이번 점검에서 운영 DB에 실행하지 않았다.
+
+0035는 일반 CREATE/DROP INDEX를 한 migration 트랜잭션에서 수행한다. 기존 전체
+인덱스를 제거하기 전에 부분 인덱스를 만들며 API/worker를 중지하고 적용한다. 대용량
+테이블의 인덱스 생성 시간·잠금 대기는 배포 전에 별도 산정한다. 기존 종료 lease를
+대량 NULL 갱신하지 않으며 새 완료의 lease 해제는 chat의 상태 전이 트랜잭션이 소유한다.
+lease 시각을 과거 기록으로 복원하지 않는 downgrade도 기존 종료 사실을 변경하지 않는다.
+실측/재현 명령은 [U17 작업 기록](../../../../docs/audits/2026-10-26-pattern-standardization/U17-WORKLOG.md)을 따른다.
 
 `test_product_migrations`는 열 이름/타입/nullable·FK·UNIQUE를 비교하고 legacy 대화/메시지를 확인한다. CHECK 전체·일반 인덱스·서버 기본값까지 완전히 동일함을 보장하는 비교는 아니다. `test_media_migrations`는 기존 URL과 downgrade 가드를 확인한다.
 
@@ -79,7 +91,8 @@ timezone-aware 입력 검증과 서울 날짜의 UTC [시작, 다음 날 시작)
 
 | 진입점 | 실행 단위 | 재개 경계 |
 | --- | --- | --- |
-| main의 답변 supervisor | 15초 주기로 만료 답변 조회 | 저장 결과가 있으면 완료 저장, 없으면 preparing/calling 단계별 중단 실패. legacy lease 없음은 제외 |
+| main의 답변 supervisor / app.answer_recovery | supervisor는 15초 주기, CLI는 명시적 생성 하나 | 자동 최대 5회와 영속 지수 대기·격리. 수동은 운영자/사유 감사 후 한 번 재시도. 저장 결과 완료/중단 처리만 사용하며 legacy NULL lease는 스캔 제외 |
+| app.auth_mail_worker | 인증 메일 한 건씩 선점·전송·확정 | 120초 lease 회수·UUID fencing·최대 5회 재시도. SMTP 동안 DB 세션/잠금 없음. auth_cleanup의 증명 삭제에 CASCADE |
 | app.memory_worker | 대화별 memory job; 제한된 동시성 | lease 만료 재claim, pending 색인 먼저, 오류별 backoff. 주기 lease 갱신은 없음 |
 | product.statistics_job | limit만큼 dirty day 처리 후 종료 | 집계/저장 실패 시 트랜잭션 롤백으로 큐 유지. --repair-recent는 최근 날짜 재요청 |
 | app.media_cleanup | 사용자가 지정한 media ID별 처리 | deleting을 먼저 저장하고 외부 삭제 후 deleted. 참조 또는 보존 기간 안이면 삭제하지 않음 |

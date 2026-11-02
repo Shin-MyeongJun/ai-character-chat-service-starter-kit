@@ -25,6 +25,10 @@ async def _settle_storage(
             await asyncio.shield(task)
         except asyncio.CancelledError:
             cancelled = True
+        except Exception:
+            # shield reports a settled provider failure here. Retrieve it below
+            # so it cannot bypass the caller-cancellation priority.
+            break
     if cancelled:
         # Retrieve any provider exception while preserving caller cancellation.
         try:

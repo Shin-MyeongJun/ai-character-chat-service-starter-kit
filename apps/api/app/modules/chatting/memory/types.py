@@ -16,13 +16,29 @@ MemoryIndexStatus: TypeAlias = Literal["pending", "ready", "failed"]
 
 
 class StaleMemoryWorkError(RuntimeError):
-    """A destructive history change made an in-flight result obsolete."""
+    """History or claim ownership changed while work was in flight."""
+
+
+class MemoryWorkDeadlineExceededError(TimeoutError):
+    """The total processing budget for one claimed attempt was exhausted."""
 
 
 class ContextBudgetExceededError(RuntimeError):
-    def __init__(self, message: str, *, summary_required: bool) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        summary_required: bool,
+        summary_through_position: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.summary_required = summary_required
+        self.summary_through_position = summary_through_position
+
+
+class ContextCompactionUnavailableError(ContextBudgetExceededError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, summary_required=False)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -72,6 +88,15 @@ class PlanSummarizationCommand:
     conversation_revision: int
     messages: tuple[SourceMessageInfo, ...]
     policy: MemoryPolicy
+    summary_through_position: int | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PlanContextCompactionCommand:
+    messages: tuple[SourceMessageInfo, ...]
+    policy: MemoryPolicy
+    available_tokens: int
+    conservative_token_budget: bool = False
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -95,6 +120,7 @@ class GeneratedSummaryInfo:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SaveSummaryCommand:
     generated: GeneratedSummaryInfo
+    work: MemoryWorkInfo
     importance: float = 0.5
 
 
@@ -146,6 +172,7 @@ class EmbeddedSummaryInfo:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SaveEmbeddingCommand:
     value: EmbeddedSummaryInfo
+    work: MemoryWorkInfo
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -286,6 +313,7 @@ class InvalidateConversationMemoriesCommand:
 class ScheduleMemoryWorkCommand:
     conversation_id: UUID
     owner_id: UUID
+    summary_through_position: int | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -301,6 +329,8 @@ class MemoryWorkInfo:
     scope_generation: int
     attempt_count: int
     lease_owner: str
+    claim_token: UUID = field(kw_only=True)
+    summary_through_position: int | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

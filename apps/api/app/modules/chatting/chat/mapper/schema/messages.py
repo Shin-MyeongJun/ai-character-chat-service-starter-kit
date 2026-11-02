@@ -75,6 +75,10 @@ def message_page_info_to_response(
         next_cursor=f"v1:{cursor.conversation_id}:{cursor.position}"
         if cursor
         else None,
+        history_revision=info.history_revision,
+        sync_cursor=f"v1:{info.sync_cursor.conversation_id}:{info.sync_cursor.position}"
+        if info.sync_cursor
+        else None,
     )
 
 

@@ -18,9 +18,21 @@
 
 읽는 순서: character/lorebook_router → HTTP moderator dependency → mapper → content change_*_status → content repository. owner_id 이름은 이 경로에서 요청 행위자이며 상태 변경 서비스가 대상 소유자 조회와 동일한 정책을 적용한다고 가정하지 않는다.
 
-현재 두 moderator dependency는 기본 503이며 main의 일반 authenticate 주입과 별도 연결이 필요하다. `test_content_actor_routes`는 거절된 가드가 변경 호출을 막는지 확인하고 실제 운영 인증 제공자는 검증하지 않는다.
+U24 이후 main은 두 moderator dependency를 쿠키 인증과 최신 DB 활성 admin 검사에 연결한다. 독립 라우터의 미설정 가드는 503이다. 기존 상태 변경 서비스의 소유자 조건은 유지하므로 관리자도 본인 소유 원본만 변경한다. `test_admin_authorization_http`가 기본 앱 연결·거절·소유자 제한을 검증한다.
 
 전체 파일 상태·발견 사항·검증은 [백엔드 점검 안내](../../../../../../references_document/backend_review/README.md)에 모았다.
+
+## U24 검수 권한 제공 범위 (2026-11-02)
+
+이 절은 아래 과거 기록의 HTTP 인증 미연결 설명을 대체한다. 별도 moderator DB role은
+추가하지 않고 active admin만 검수 가드를 통과한다. `app/http/authorization.py`는
+검증된 원본 owner 의존성을 재사용하고 identity 공개 require_admin으로 DB를 재조회한다.
+별도 인가 세션을 먼저 닫으므로 content command의 트랜잭션과 충돌하지 않는다.
+
+PATCH의 owner_id는 검증된 요청자이며 기존 content 소유자 검사·허용 상태·응답·404를
+유지한다. 타인 원본 변경·새 신고 HTTP·실제 조치 적용 기능은 추가하지 않았다.
+공개 content query/command를 직접 부르는 내부 호출자는 인증·검수 인가를 책임진다.
+정책과 거절 상태는 [권한 문서](../../../../../../docs/admin-authorization.md)를 따른다.
 
 ## 신고·평가·조치 DB (2026-10-14)
 
@@ -94,6 +106,10 @@ import와 HTTP 계약은 변경하지 않았다. 신고·평가·조치의 변�
 
 ### 권한·접수·조회
 
+- U26 재점검(2026-11-02): 저장소의 이력 ID 조회는 `UUID | None` 값 계약이므로
+  service가 직접 미존재/상태 충돌을 판단한다. 항등 `scalar_row_to_value`와 호출 4곳을
+  제거했다. Row/Entity는 계속 mapper로 변환하며 증거·첨부·평가 JSON 깊은 복사를 유지한다.
+
 - `actor=ActorCommand(user_id)`는 인증 경계가 검증된 사용자 ID로 생성한다. 자체 토큰
   인증을 대체하지 않는다. 매 호출에서 identity 공개 서비스로 최신 활성 상태를,
   관리 기능에서는 활성 admin 역할을 확인한다. moderator 별도 role은 현재 지원하지 않는다.
@@ -146,8 +162,8 @@ import와 HTTP 계약은 변경하지 않았다. 신고·평가·조치의 변�
 
 - 모든 쓰기는 use_case_transaction을 소유/참여한다. 조회로 autobegin된 세션에서
   단독 쓰기를 이어가기 전에 호출자가 트랜잭션을 정리하거나 상위 유스케이스 범위를 열어야 한다.
-- 멱등 키별 advisory lock을 사용한다. 접수 상태 그래프 편집과 평가 근거 확인은 공통
-  intake graph 잠금, 재평가·조치는 대상별 잠금으로 직렬화한다. 커서는 실제 received_at/
+- 멱등 키별 advisory lock을 사용한다. 접수 상태 그래프 편집·평가 근거 확인·재평가·조치는
+  공통 `moderation.target`의 `target_type:target_id` 잠금으로 직렬화한다. 커서는 실제 received_at/
   evaluated_at/created_at과 ID를 사용하며 페이지 크기는 1..100이다.
 - 수동 관리자 변경의 audit_logs는 같은 트랜잭션에 기록한다. 증거·자유 서술을 audit에
   복제하지 않는다. 감사 기록 실패도 전체 쓰기를 롤백한다. 기존 감사 스키마의 관리자
@@ -159,6 +175,34 @@ import와 HTTP 계약은 변경하지 않았다. 신고·평가·조치의 변�
   domain_action_id·applied_at·실패 코드를 기록해야 한다. 외부 적용 후 결과 저장 실패 시
   대상 도메인 대사·재시도로 복구한다. 현재는 실제 제재·실행자·자동 정책·HTTP 연결이 없다.
 - 전적의 종합 조회, 증거 보존기간/파기, 감사 로그 열람, 이의신청, 확정 통계도 후속 범위다.
+
+### U20 대상별 그래프 잠금 (2026-11-01)
+
+- `moderation.intake/graph` 전역 잠금을 제거했다. `change_report_intake`는 먼저
+  신고를 잠금 없이 읽어 대상 키를 얻고, 대상 잠금 → 신고 행 잠금/새로 조회 순으로
+  진행한다. 대기 전 상태로 판단하지 않으며 대상이 바뀌면 `state_conflict`, 삭제되면
+  `not_found`다. 기존 접수 결과의 멱등 재사용도 최신 값으로 판단한다.
+- 신고의 `target_type/target_id`는 생성 후 불변인 서비스 계약이다. 생성 이후 쓰기는
+  접수 상태·중복 연결·사유만 변경한다. DB 불변 트리거를 추가한 것은 아니므로 직접 SQL로
+  대상을 이관하는 유지보수는 업무 쓰기를 중단한 상태에서 수행해야 한다.
+- `record_manual_assessment`의 순서는 평가 멱등 키 → 대상 잠금 → 이전 평가 행 →
+  근거 신고 행이다. `list_reports_by_ids`는 같은 대상의 근거를 ID 오름차순으로 한 번에
+  잠그고 `populate_existing`으로 갱신한다. 빠진 ID는 타 대상 행만 추가로 잠금 없이
+  읽어 `invalid_link`와 `not_found`의 기존 구분을 보존한다. 타 대상 행까지 잠그면
+  해당 대상의 중복 FK 갱신과 교착할 수 있으므로 잠그지 않는다.
+- 정상 근거 1..100건은 SELECT 1회다. 다음 ID를 알아야 하는 중복 체인과 이전 평가
+  체인은 순차 검증을 유지한다. 같은 대상의 모든 그래프 변경이 같은 잠금을 사용하므로
+  중복 체인의 순환 확인과 접수/평가 충돌 확인이 최외곽 commit/rollback까지 보호된다.
+  PostgreSQL의 기본 READ COMMITTED에서 잠금 후 최신 commit을 읽는 계약이다.
+- `submit_report`는 연결 없는 received 신고만 생성하므로 그래프 잠금이 필요 없다.
+  `request_action`은 기존 평가 대상 잠금으로 재평가와 직렬화한다. 목록/상세 조회는
+  상태를 변경하지 않으므로 그래프 잠금을 획득하지 않는다. 자동 평가는 계속 비활성이다.
+- 구버전 접수 변경은 대상 잠금을 획득하지 않는다. 배포 시 기존 접수/평가 요청을
+  drain하고 모든 writer를 함께 전환해야 한다. 구·신 잠금 규약을 혼용하는 롤링 실행은
+  지원하지 않는다. DB 스키마·공개 Command/Info·오류 코드·HTTP 계약 변경은 없다.
+- 실제 PostgreSQL 경쟁·rollback·취소·SQL 수 검증은 `test_moderation_graph_db.py`,
+  대상 재확인 대역 검증은 `test_moderation_services.py`에 추가했다. 결과와 전후 측정은
+  [U20 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U20-WORKLOG.md)에 기록한다.
 
 검증 파일: test_moderation_services(대역 업무·권한·멱등·연결·커서 SQL·주석),
 test_moderation_services_db(실제 DB 저장·동시 접수/재평가·작품 접근·legacy 목록),

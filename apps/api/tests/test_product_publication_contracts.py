@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -10,6 +11,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import Column, MetaData, Table, Uuid, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from test_product_composition_contracts import start_entry
 from test_product_core_contracts import database as core_database_fixture
 
@@ -39,7 +41,9 @@ core_database = core_database_fixture
 
 
 @pytest.fixture
-def publication_database(core_database):
+def publication_database(
+    core_database: tuple[Session, AsyncMock],
+) -> Iterator[tuple[Session, AsyncMock]]:
     sync_session, session = core_database
     metadata = MetaData()
     for model in (
@@ -71,13 +75,14 @@ def publication_database(core_database):
         Table(model.__tablename__, metadata, *columns)
     metadata.create_all(sync_session.get_bind())
     session.get.side_effect = sync_session.get
+    session.add_all.side_effect = sync_session.add_all
     yield sync_session, session
 
 
 @pytest.mark.asyncio
 async def test_builder_keeps_digest_payload_and_snapshot_slot_identities(
-    publication_database, monkeypatch
-):
+    publication_database: tuple[Session, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
     sync_session, session = publication_database
     owner_id, product_id, model_id, provider_id = uuid4(), uuid4(), uuid4(), uuid4()
     product = Product(
@@ -144,22 +149,25 @@ async def test_builder_keeps_digest_payload_and_snapshot_slot_identities(
     monkeypatch.setattr(
         publication.LorebookQueryService, "get_owned_lorebooks", AsyncMock()
     )
+    model = SimpleNamespace(
+        id=model_id,
+        provider_id=provider_id,
+        model_name="test-model",
+        capabilities={"model_family": "test"},
+    )
     monkeypatch.setattr(
         publication.SettingsCommandService,
         "_validate_publication",
-        AsyncMock(return_value=((), [start])),
+        AsyncMock(
+            return_value=SimpleNamespace(
+                model=model, starts=[start], entries_by_id={entry.id: entry}
+            )
+        ),
     )
     monkeypatch.setattr(
         publication.SettingsCommandService,
         "_validate_model",
-        AsyncMock(
-            return_value=SimpleNamespace(
-                id=model_id,
-                provider_id=provider_id,
-                model_name="test-model",
-                capabilities={"model_family": "test"},
-            )
-        ),
+        AsyncMock(return_value=model),
     )
     monkeypatch.setattr(
         publication.LlmQueryService,
@@ -247,8 +255,8 @@ async def test_builder_keeps_digest_payload_and_snapshot_slot_identities(
 
 @pytest.mark.asyncio
 async def test_release_rows_keep_missing_notes_and_corrections_keep_history(
-    publication_database,
-):
+    publication_database: tuple[Session, AsyncMock],
+) -> None:
     sync_session, session = publication_database
     product_id, owner_id = uuid4(), uuid4()
     first = await PublicationRepository.create_product_snapshot(
@@ -297,8 +305,14 @@ async def test_release_rows_keep_missing_notes_and_corrections_keep_history(
     ],
 )
 async def test_publish_keeps_content_and_media_policy(
-    monkeypatch, prior, changed, removed, auto_apply, kind, policy
-):
+    monkeypatch: pytest.MonkeyPatch,
+    prior: bool,
+    changed: bool,
+    removed: bool,
+    auto_apply: bool,
+    kind: str,
+    policy: str,
+) -> None:
     product_id, owner_id = uuid4(), uuid4()
     previous = types.ProductSnapshotInfo(
         uuid4(), product_id, 1, {"title": "Old", "content_digest": "same"}, None, None

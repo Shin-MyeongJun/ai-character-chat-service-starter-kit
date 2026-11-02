@@ -1,4 +1,4 @@
-# 개별 라우터의 기본 훅은 503으로 거절한다. main은 session과 검증된 쿠키 owner 인증을 연결한다.
+# 개별 훅은 미설정 시 503이다. main은 DB·쿠키 인증·최신 DB 관리자 인가를 연결한다.
 # 배포에서 authenticate를 명시하면 기존 주입 계약에 따라 owner 의존성을 교체한다.
 # errors는 LookupError→404, ValueError→422만 변환하며 다른 오류는 전달한다.
 """Override with shared identity/DB dependencies at application composition time."""

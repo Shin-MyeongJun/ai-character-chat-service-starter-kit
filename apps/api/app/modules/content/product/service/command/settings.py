@@ -1,5 +1,6 @@
 # 실행 모델·reasoning effort·시작 원본 항목·대체 정책을 초안에 저장한다.
 # 시작 항목은 구성에 포함된 로어북의 enabled start_set이어야 한다. 발행 직전에도 별도 재검증한다.
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,24 +87,32 @@ async def set_settings(
         return value
 
 
+@dataclass(frozen=True)
+class _PublicationSettings:
+    model: LlmTypes.ModelInfo
+    starts: list[Types.ProductStartSetInfo]
+    entries_by_id: dict[UUID, LorebookTypes.LorebookEntryInfo]
+
+
 async def _validate_publication(
     session: AsyncSession,
     product: Types.ProductStateInfo,
-) -> tuple[tuple[Types.CharacterSelection, ...], list[Types.ProductStartSetInfo]]:
+    composition: Types.ProductCompositionStateInfo,
+) -> _PublicationSettings:
     if (
         not product.title.strip()
         or not product.opening_message
         or (not product.opening_message.strip())
     ):
         raise ValueError("Title and opening message are required.")
-    row = await Repository.get_product_composition(session, product.id)
-    composition = PersistenceMapper.product_composition_row_to_info(row)
     chars = composition.characters
     if not chars or sum(c.is_primary for c in chars) != 1:
         raise ValueError("Publication requires characters and exactly one primary.")
     if not product.default_model_id or product.reasoning_effort is None:
         raise ValueError("Model and reasoning settings are required.")
-    await _validate_model(session, product.default_model_id, product.reasoning_effort)
+    model = await _validate_model(
+        session, product.default_model_id, product.reasoning_effort
+    )
     rows = await Repository.list_product_start_sets(session, product.id)
     starts = PersistenceMapper.product_start_sets_entities_to_info(rows)
     if not starts:
@@ -111,9 +120,14 @@ async def _validate_publication(
     valid = await LorebookQueryService.get_start_entries(
         session,
         LorebookTypes.GetStartEntriesCommand(
-            ids=tuple(start.entry_id for start in starts)
+            ids=tuple(start.entry_id for start in starts),
+            lorebook_ids=tuple(book.lorebook_id for book in composition.books),
         ),
     )
-    if len(valid) != len(starts):
+    entries_by_id = {entry.id: entry for entry in valid}
+    if len(valid) != len(starts) or any(
+        entries_by_id[start.entry_id].lorebook_id != start.lorebook_id
+        for start in starts
+    ):
         raise ValueError("Start options changed; configure them again.")
-    return (chars, starts)
+    return _PublicationSettings(model, starts, entries_by_id)

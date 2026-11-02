@@ -50,54 +50,62 @@ async def announce_retirement(
 async def resolve_execution(
     session: AsyncSession, command: Types.ResolveExecutionCommand
 ) -> ExecutionView:
-    """Caller transaction; locks version to make replacement selection idempotent.
+    """Caller transaction; locks the version only when replacement may be needed.
 
     Can run at announcement time to prepare a plan, and on every generation. An
     external job may call this for affected versions; alarm delivery is separate.
     """
     async with use_case_transaction(session):
         snapshot_id = command.snapshot_id
-        now = command.now
-        now = now or datetime.now(UTC)
-        snapshot = await ProductQueryService.get_product_snapshot(
-            session, ProductTypes.ProductSnapshotCommand(snapshot_id, lock=True)
-        )
-        if snapshot is None:
-            raise LookupError("Version not found.")
-        # Product snapshots record these strings. A view preserves legacy missing
-        # keys and invalid UUID errors; it does not validate or rewrite stored JSON.
-        configuration = cast(
-            Types.SnapshotModelSettings, snapshot.snapshot_data["model"]
-        )
-        model = await QueryService.get_model(
-            session, Types.GetModelCommand(UUID(configuration["id"]))
-        )
-        if model is None:
-            raise ValueError("Configured model is missing.")
-        provider = await QueryService.get_provider(
-            session, Types.GetProviderCommand(model.provider_id)
-        )
-        effort = configuration["reasoning_effort"]
-        if provider is None:
-            raise ValueError("Configured provider is missing.")
-        original_available = (
-            model.is_enabled
-            and provider.is_enabled
-            and (model.shutdown_at is None or now < model.shutdown_at)
-        )
-        announced = (
-            model.retirement_announced_at is not None
-            and now >= model.retirement_announced_at
-        )
-        if not announced and original_available:
-            return ExecutionView(
-                model_id=model.id,
-                provider=provider.name,
-                model=model.model_name,
-                reasoning_effort=effort,
-                replacement=False,
-                scheduled_at=None,
+        # Read normally first. Only a possible replacement repeats the full
+        # decision under the snapshot lock, refreshing the session identity map.
+        for lock in (False, True):
+            snapshot = await ProductQueryService.ensure_snapshot_available(
+                session,
+                ProductTypes.ProductSnapshotCommand(snapshot_id=snapshot_id, lock=lock),
+                now=command.now,
             )
+            if snapshot is None:
+                raise LookupError("Version not found.")
+            # Product snapshots record these strings. A view preserves legacy missing
+            # keys and invalid UUID errors; it does not validate or rewrite stored JSON.
+            configuration = cast(
+                Types.SnapshotModelSettings, snapshot.snapshot_data["model"]
+            )
+            model_info = await QueryService.get_model(
+                session,
+                Types.GetModelCommand(model_id=UUID(configuration["id"]), refresh=True),
+            )
+            if model_info is None:
+                raise ValueError("Configured model is missing.")
+            model = model_info
+            provider_info = await QueryService.get_provider(
+                session,
+                Types.GetProviderCommand(provider_id=model.provider_id, refresh=True),
+            )
+            effort = configuration["reasoning_effort"]
+            if provider_info is None:
+                raise ValueError("Configured provider is missing.")
+            provider = provider_info
+            now = command.now or datetime.now(UTC)
+            original_available = (
+                model.is_enabled
+                and provider.is_enabled
+                and (model.shutdown_at is None or now < model.shutdown_at)
+            )
+            announced = (
+                model.retirement_announced_at is not None
+                and now >= model.retirement_announced_at
+            )
+            if not announced and original_available:
+                return ExecutionView(
+                    model_id=model.id,
+                    provider=provider.name,
+                    model=model.model_name,
+                    reasoning_effort=effort,
+                    replacement=False,
+                    scheduled_at=None,
+                )
         deadline = (
             max(model.retirement_announced_at, model.shutdown_at - timedelta(days=1))
             if announced
@@ -106,7 +114,9 @@ async def resolve_execution(
             else now
         )
         effective_at = max(now, deadline) if original_available else now
-        candidates = await QueryService.list_candidate_models(session)
+        candidates = await QueryService.list_candidate_models(
+            session, Types.ListCandidateModelsCommand(refresh=True)
+        )
         choice = choose_replacement(
             model,
             candidates,
@@ -156,7 +166,8 @@ async def resolve_execution(
                 planned_model_id=target.id,
             )
         target_provider = await QueryService.get_provider(
-            session, Types.GetProviderCommand(target.provider_id)
+            session,
+            Types.GetProviderCommand(provider_id=target.provider_id, refresh=True),
         )
         if target_provider is None:
             raise ValueError("Replacement provider is missing.")

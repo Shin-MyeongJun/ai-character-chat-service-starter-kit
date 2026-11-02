@@ -2,6 +2,7 @@
 # 객체 저장과 DB는 원자적이지 않으므로 모호한 커밋 실패에 즉시 파일을 보상 삭제하지 않는다.
 """Durable upload intents, immutable objects, authorized reads and explicit GC."""
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
@@ -63,6 +64,30 @@ def _fingerprint_upload(command: Types.UploadCharacterMediaCommand) -> tuple[int
     return size, digest.hexdigest()
 
 
+async def _read_upload_fingerprint(
+    command: Types.UploadCharacterMediaCommand,
+) -> tuple[int, str]:
+    task = asyncio.create_task(asyncio.to_thread(_fingerprint_upload, command))
+    cancellation: asyncio.CancelledError | None = None
+    # The caller owns the stream. Do not let its context close the file while
+    # the worker still reads/seeks, even when cancellation is requested again.
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError as exc:
+            if cancellation is None:
+                cancellation = exc
+        except Exception:
+            # Retrieve the worker failure below, preserving any earlier cancel.
+            break
+    if cancellation is not None:
+        try:
+            task.result()
+        finally:
+            raise cancellation
+    return task.result()
+
+
 class CharacterMediaService:
     def __init__(
         self,
@@ -91,7 +116,7 @@ class CharacterMediaService:
     async def reserve_upload(
         self, session: AsyncSession, command: Types.UploadCharacterMediaCommand
     ) -> Types.CharacterMediaInfo:
-        size, digest = _fingerprint_upload(command)
+        size, digest = await _read_upload_fingerprint(command)
         await _get_owned_character(session, command.character_id, command.owner_id)
         row = await MediaRepository.get_media_request(session, command)
         info = MediaPersistenceMapper.media_entity_to_info(row)

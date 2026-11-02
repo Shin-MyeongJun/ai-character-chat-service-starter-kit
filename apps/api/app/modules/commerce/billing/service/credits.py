@@ -92,7 +92,7 @@ async def reserve_credit(
             "Reservation and execution identity differ."
         )
     with _translate_credit_errors():
-        async with session.begin_nested():
+        async with CreditCommandService.use_credit_write_scope(session):
             await _lock_credit_account(session, command.user_id, command.request_key)
             now = QuoteService._get_quote_time(clock)
             row = await Repository.get_credit_binding(
@@ -197,7 +197,7 @@ async def commit_credit_reservation(
         command.user_id, command.request_key, command.reservation_id, command.result_id
     )
     with _translate_credit_errors():
-        async with session.begin_nested():
+        async with CreditCommandService.use_credit_write_scope(session):
             binding = await _get_owned_binding(
                 session, command.user_id, command.request_key, command.reservation_id
             )
@@ -223,7 +223,7 @@ async def release_credit_reservation(
     _require_credit_transaction(session)
     _validate_identifiers(command.user_id, command.request_key, command.reservation_id)
     with _translate_credit_errors():
-        async with session.begin_nested():
+        async with CreditCommandService.use_credit_write_scope(session):
             binding = await _get_owned_binding(
                 session, command.user_id, command.request_key, command.reservation_id
             )

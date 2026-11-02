@@ -1,5 +1,5 @@
 # 인증 소유 모델: 최소 식별정보, 자격증명, 일회용 증명과 폐기 가능한 세션을 저장한다.
-# 원본 토큰은 저장하지 않으며 기존 display_name은 호환성만 유지하고 인증에서 수집하지 않는다.
+# 토큰 평문은 저장하지 않는다. Outbox의 재전송용 토큰은 암호화해 단기 보관한다.
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Text,
     UniqueConstraint,
@@ -110,6 +111,49 @@ class AuthActionToken(UuidPkMixin, Base):
         DateTime(timezone=True), nullable=False, index=True
     )
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthMailOutbox(UuidPkMixin, Base):
+    __tablename__ = "auth_mail_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'processing', 'sent', 'cancelled', 'failed')",
+            name="ck_auth_mail_status",
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_auth_mail_attempt_count"),
+        CheckConstraint(
+            "(status = 'processing' AND claim_token IS NOT NULL AND lease_until IS NOT NULL) "
+            "OR (status <> 'processing' AND claim_token IS NULL AND lease_until IS NULL)",
+            name="ck_auth_mail_claim",
+        ),
+        CheckConstraint(
+            "(status IN ('pending', 'processing') AND encrypted_token IS NOT NULL) "
+            "OR (status IN ('sent', 'cancelled', 'failed') AND encrypted_token IS NULL)",
+            name="ck_auth_mail_payload",
+        ),
+        Index("ix_auth_mail_due", "status", "available_at", "id"),
+        Index("ix_auth_mail_lease", "status", "lease_until", "id"),
+    )
+    token_hash: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("auth_action_tokens.token_hash", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    encrypted_token: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    claim_token: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
 
 
 class AuthOAuthAttempt(Base):

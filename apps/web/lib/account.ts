@@ -40,6 +40,6 @@ export async function readAccountOverview() {
   // Totals are independently aggregated by each owning module.
   const user = await getMe();
   // Keep a failed balance separate from a zero balance, and preserve partial results.
-  const [balance, conversations, products, counts] = await Promise.allSettled([getCreditBalance(), listOwnedConversations(), listOwnedProducts(), request<{conversations: number; products: number}>("/account/overview-counts")]);
-  return { user, balance, conversations, products, counts };
+  const [balance, conversations, counts] = await Promise.allSettled([getCreditBalance(), listOwnedConversations(), request<{conversations: number; products: number}>("/account/overview-counts")]);
+  return { user, balance, conversations, counts };
 }
