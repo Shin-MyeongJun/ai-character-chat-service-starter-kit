@@ -215,6 +215,62 @@ async def test_existing_inactive_ids_are_only_allowed_when_retained(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("retained", [False, True])
+async def test_composition_acquisition_does_not_authorize_inactive_connections(
+    backend: Backend, retained: bool
+) -> None:
+    entity = backend.seed("B", active=False)
+    names = (" Z ", "B", "Z", "a", "é", "e\u0301")
+
+    async def assign_tags() -> tuple[Types.TagInfo, ...]:
+        async with use_case_transaction(backend.session):
+            await Service.acquire_tag_names(
+                backend.session, Types.AcquireTagNamesCommand(names=names)
+            )
+            assert backend.transactions == []
+            return await Service.resolve_tags(
+                backend.session,
+                Types.ResolveTagsCommand(
+                    names=names, retained_ids=(entity.id,) if retained else ()
+                ),
+            )
+
+    if retained:
+        tags = await assign_tags()
+        assert tuple(tag.name for tag in tags) == ("Z", "B", "a", "é", "e\u0301")
+        assert tags[1].id == entity.id and not tags[1].is_active
+        assert backend.transactions == ["commit"]
+    else:
+        with pytest.raises(ValueError, match="Inactive tags"):
+            await assign_tags()
+        assert list(backend.store.scalars(select(Tag.name))) == ["B"]
+        assert backend.transactions == ["rollback"]
+    first_insert = next(
+        params for sql, params in backend.requests if sql.startswith("INSERT")
+    )
+    assert list(first_insert.values()) == sorted({name.strip() for name in names})
+
+
+@pytest.mark.asyncio
+async def test_composition_acquisition_rejects_missing_name_and_rolls_back(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = Repository.resolve_tags
+
+    async def omit_tag(session: AsyncSession, names: tuple[str, ...]) -> list[Tag]:
+        tags = await original(session, names)
+        return tags[:-1]
+
+    monkeypatch.setattr(Repository, "resolve_tags", omit_tag)
+    with pytest.raises(ValueError, match="Tag name changed concurrently"):
+        await Service.acquire_tag_names(
+            backend.session, Types.AcquireTagNamesCommand(names=("new",))
+        )
+    assert backend.store.scalar(select(func.count()).select_from(Tag)) == 0
+    assert backend.transactions == ["rollback"]
+
+
+@pytest.mark.asyncio
 async def test_shared_query_refreshes_identity_map_before_inactive_validation(
     backend: Backend,
 ) -> None:

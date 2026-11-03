@@ -9,12 +9,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.content.lorebook import schemas as Schemas
-from app.modules.content.lorebook import types as Types
-from app.modules.content.lorebook.dependencies import (
+from app.http.lorebook_dependencies import (
     get_current_owner_id,
     get_lorebook_session,
 )
+from app.modules.content.lorebook import schemas as Schemas
+from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.mapper.schema import (
     LorebookSchemaMapper as SchemaMapper,
 )

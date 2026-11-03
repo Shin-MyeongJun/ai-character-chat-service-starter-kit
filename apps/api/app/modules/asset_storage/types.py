@@ -3,6 +3,7 @@
 # 읽기 결과는 열린 reader를 보유하므로 async with 또는 aclose로 닫아야 한다. etag는 저장소별 값이다.
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -175,6 +176,9 @@ class AssetReadInfo:
     metadata: AssetMetadataInfo
     _reader: AsyncAssetReader = field(repr=False)
     _closed: bool = field(default=False, init=False, repr=False)
+    _close_task: asyncio.Task[None] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     async def read(self, size: int = -1) -> bytes:
         if self._closed:
@@ -182,9 +186,31 @@ class AssetReadInfo:
         return await self._reader.read(size)
 
     async def aclose(self) -> None:
-        if not self._closed:
+        # _closed closes read admission, not proof of successful physical close.
+        # All concurrent callers join one attempt, including through cancellation.
+        if self._close_task is None:
             self._closed = True
-            await self._reader.aclose()
+            self._close_task = asyncio.create_task(self._reader.aclose())
+        elif self._close_task.done():
+            return  # Completed attempts (including failures) are not retried.
+        task = self._close_task
+        cancellation: asyncio.CancelledError | None = None
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError as exc:
+                if cancellation is None:
+                    cancellation = exc
+            except Exception:
+                break  # Retrieve the failure even if cancellation is pending.
+        try:
+            task.result()
+        except (Exception, asyncio.CancelledError):
+            if cancellation is not None:
+                raise cancellation from None
+            raise
+        if cancellation is not None:
+            raise cancellation
 
     async def __aenter__(self) -> Self:
         return self
@@ -195,7 +221,13 @@ class AssetReadInfo:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        await self.aclose()
+        if exc is None:
+            await self.aclose()
+        else:
+            try:
+                await self.aclose()
+            except (Exception, asyncio.CancelledError):
+                pass  # The context's original error/cancellation stays primary.
 
 
 @runtime_checkable

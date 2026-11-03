@@ -10,28 +10,30 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+from app.http.dependencies import (
+    get_current_owner_id,
+    get_product_session,
+)
 from app.modules.chatting.conversation import types as conversation_types
 from app.modules.chatting.conversation.router import router as conversations
 from app.modules.chatting.conversation.service import command as conversation_service
 from app.modules.chatting.conversation.service.command import versions
 from app.modules.content.product import types
-from app.modules.content.product.dependencies import (
-    get_current_owner_id,
-    get_product_session,
-)
 from app.modules.content.product.router import router as products
-from app.modules.content.product.service import query, statistics
+from app.modules.content.product.service import query
 from app.modules.content.product.service.command import composition, releases, settings
+from app.modules.content.product.service.query import statistics
 from app.modules.content.product.service.views import notices
 from app.modules.governance.admin import types as admin_types
 from app.modules.governance.admin.model_router import router as model_admin
 from app.modules.governance.admin.product_router import router as product_admin
 from app.modules.governance.admin.service import command as product_policy
 from app.modules.llm.types import ModelNoticeView
-from fastapi import FastAPI
-from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
 
 
 @pytest.fixture

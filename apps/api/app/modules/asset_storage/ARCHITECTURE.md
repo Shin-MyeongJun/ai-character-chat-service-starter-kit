@@ -1,5 +1,47 @@
 # asset_storage 모듈
 
+## IEA-04 정상 반환 S3 reader의 취소·정리 수명 (2026-11-03)
+
+정상 반환된 reader는 호출자가 소유하며 HTTP에서는 MediaStreamingResponse가 종료를
+책임진다. S3 read는 shield한 작업을 reader의 집합에 보관한다. read await의 취소는
+호출자에게 전달되지만 실제 worker를 중단하지 않는다. 완료 callback이 결과/예외를
+회수하고 집합에서 제거한다. 취소된 read 뒤에도 호출자는 aclose 또는 async with로
+reader를 닫아야 한다. adapter.aclose는 반환 reader를 일괄 회수하지 않는다.
+
+S3 reader별 threading.Lock이 실제 Body.read와 Body.close를 직렬화한다. close 시작은
+별도 _closing 상태로 새 read 접수만 차단한다. 이미 접수한 read는 worker가 아직 시작하지
+않았어도 끝까지 처리한다. AssetReadInfo가 소유한 aclose는 이 read 태스크들의 실제 worker
+종료와 결과/예외를 이벤트 루프에서 먼저 회수하고 나서 Body.close를 실행기에 제출한다.
+따라서 진행 중 read의 잠금을 기다리기만 하는 close worker가 공용 풀을 추가 점유하지 않는다.
+물리적 close 시도 상태와 접수 차단을 혼용하지 않으며 별도 실행기·스레드·강제 I/O 중단은 없다.
+
+공유 AssetReadInfo는 하나의 close 태스크를 보유한다. _closed는 새 read 차단이며
+물리적 종료 성공을 뜻하지 않는다. 동시 aclose는 같은 작업을 끝까지 기다리고 반복
+취소에도 최초 취소를 보존한다. 취소가 없으면 close 오류를 전달하고 취소가 있으면
+close 오류를 회수한 뒤 최초 취소를 전달한다. 완료된 close 시도는 성공/실패 모두
+재시도하지 않는 기존 멱등 계약을 유지한다. close 태스크의 완료는 시도의 종료이고
+성공은 예외 없는 완료다. 실제 I/O가 진행 중일 때는 aclose가 완료되지 않는다.
+
+HTTP 전송과 AssetReadInfo의 async with 본문에 이미 오류/취소가 있으면 정리를 모두
+회수한 뒤 그 최초 예외를 전달한다. 정리 중 새 취소나 close 오류는 이를 덮지 않는다.
+기존 오류가 없을 때에는 aclose 자체의 첫 취소/close 오류가 결과다. local reader의
+물리적 직렬화는 그대로이며 공유 종료의 동시 대기와 context 예외 우선순위가 적용된다.
+U08의 늦은 reader 획득 회수, 주입 client 소유권, SDK timeout/retry와 청크 스트리밍은
+유지한다. 취소 반환은 read/close의 실제 종료까지 늦어질 수 있고 close 자체 실패는
+물리적 자원 종료 성공을 보장하지 않는다. 프로세스 강제 종료·영구 I/O 정지는 다루지 않는다.
+
+Gemini 검토 후 회귀는 worker 2개의 실제 실행기에서 read 정체 및 read 호출자 취소,
+동시 close·반복 취소 중에도 무관한 to_thread가 read 해제 전에 완료됨을 검증한다.
+실제 진행 중 read는 여전히 worker 하나를 사용하며 socket timeout은 전체 deadline이 아니다.
+메타데이터 오류 뒤 close 실패가 원래 오류를 덮는 경계 조건은 별도 개선 후보로 남긴다.
+
+test_s3_reader_lifecycle은 실제 worker·Event와 설치된 botocore StreamingBody로
+실행기 큐/진행 중 read/close의 취소, 동시 close와 오류 우선순위, ASGI 2.3 disconnect
+후 추가 Uvicorn 종료 취소 및 ASGI 2.4 취소를 검증한다. 정상 disconnect 대조군은 닫히며
+기존 서버 기본 명령에 유한 graceful shutdown timeout을 추가하지 않는다. 확인된 결함은
+추가 취소로 인한 명시적 회수 누락이고 운영의 영구 소켓 누수를 증명한 것은 아니다.
+상세 실행 결과와 한계는 docs/audits/2026-11-03-iea-s3-lifetime-fix/REPORT.md에 기록한다.
+
 ## U23 로컬 reader·파일·락 수명 (2026-10-29)
 
 test_local의 키별 락은 WeakValueDictionary에 보관한다. 실행자와 대기자가 같은 락을
@@ -22,7 +64,8 @@ close도 직렬화하며 read 취소 시 진행 중인 스레드 I/O가 끝난 �
 OS/metadata 오류와 cause를 전달하고, 취소가 있으면 작업/close 오류를 회수한 뒤 첫 취소가
 우선한다. 취소된 쓰기는 이미 반영됐을 수 있으며 취소 반환은 실제 I/O 종료까지 늦어질 수 있다.
 반환 reader의 종료와 입력 stream의 수명은 여전히 호출자 책임이고 adapter.aclose는 reader를
-일괄 종료하지 않는다. S3 어댑터와 공유 AssetReadInfo의 계약은 변경하지 않았다.
+일괄 종료하지 않는다. U23 당시 S3 어댑터와 공유 AssetReadInfo의 계약은 변경하지
+않았으며, 이후 IEA-04의 공유 종료 변경은 위 절을 따른다.
 
 test_local_storage_lifecycle의 22건은 실제 Windows 파일의 reader 중 삭제·키 재사용·다중
 덮어쓰기, .old 발행/정리 실패 복원, native handle/descriptor 회수와 제어된 스레드의 반복
@@ -41,7 +84,8 @@ read_asset는 _open_asset 태스크를 소유하고 shield로 get_object/메타�
 
 정상 반환한 reader의 수명·idempotent close, 주입 client 소유권, SDK timeout/retry·키·
 오류 번역은 그대로다. 취소는 즉시 반환하지 않고 SDK 작업/close 종료까지 지연될 수 있다.
-정상 반환 후의 개별 read/close 취소 정책 전체와 로컬 adapter를 이번에 재설계하지 않았다.
+U08 당시 정상 반환 후의 개별 read/close 취소 정책 전체와 로컬 adapter는 재설계하지
+않았다. 이후 정상 반환 reader의 변경은 위 IEA-04 절을 따른다.
 지연 get/close는 실제 테스트 스레드와 gate로 검증했지만 실제 S3 네트워크는 미검증이다.
 
 ## 어댑터·팩토리 타입 정리 (2026-10-28)

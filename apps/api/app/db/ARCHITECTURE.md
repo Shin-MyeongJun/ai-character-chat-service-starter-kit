@@ -1,5 +1,11 @@
 # DB와 작업 실행 코드 읽기
 
+## U27 호환 경로 정리 (2026-11-02)
+
+models/billing.py의 크레딧 모델 3개 재노출을 제거했다. 해당 모델/enum은
+models/credit.py에서 직접 참조하며 models/__init__.py의 공통 등록/export는 유지한다.
+구독·구형 신고 모델은 FK와 migration 입력에 연결되어 보존한다. DDL 변경은 없다.
+
 이 문서는 현재 SQLAlchemy 모델·repository·마이그레이션을 연결해서 읽기 위한 안내다. 테이블이나 실행 로직은 변경하지 않았다. [전체 점검 목록](../../../../references_document/backend_review/checklist.md)과 [발견 사항](../../../../references_document/backend_review/findings.md)을 함께 본다.
 
 ## 트랜잭션과 잠금

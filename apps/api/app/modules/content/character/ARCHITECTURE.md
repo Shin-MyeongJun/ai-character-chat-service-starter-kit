@@ -1,5 +1,12 @@
 # Character 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+dependencies.py 재노출을 제거하고 router/tag_router 및 테스트가
+app/http/character_dependencies.py의 원래 훅을 직접 참조한다. 동일한 함수 객체를
+사용하므로 FastAPI override·인증·세션 연결 계약은 유지한다. schemas.py는 공유 HTTP
+표현을 노출하는 현재 모듈 인터페이스로 유지한다.
+
 ## U28 업로드 fingerprint offload와 파일 수명 (2026-11-02)
 
 service/media.py의 reserve_upload는 입력 검증·seek/read·SHA-256을 하나의 to_thread
@@ -51,7 +58,7 @@ upload/cleanup×성공/실패×단일/반복 취소의 8조합에서 선행 comm
 
 타 모듈은 `service`와 `types`만 사용한다. product는 잠긴 CharacterInfo와 freeze 결과를 받아 자기 스냅샷에 연결한다. 스냅샷의 이미지·에셋 이력은 이 모듈만 조회한다. 인가 JOIN 예외는 없다.
 
-`schemas.py`와 `dependencies.py`는 기존 import 및 FastAPI dependency override 호환성을 위한 재노출이다. 여러 접근 주체가 공유하는 HTTP 표현은 `app/http/contracts/character.py`, 실행 의존성 훅은 `app/http/character_dependencies.py`에 있다. 기존 클래스명·응답 필드와 미설정 인증의 503 동작을 유지한다. 기존 이미지/에셋 추가의 501 스텁은 실제 DB 참조 추가로 구현했다. 기존 URL 요청은 복사·다운로드 없이 보관하고, 신규 업로드의 앱 내부 URL은 소유 캐릭터의 준비된 미디어만 연결한다.
+`schemas.py`는 공유 HTTP 표현의 재노출이며 dependency 훅은 app/http에서 직접 참조한다. 여러 접근 주체가 공유하는 HTTP 표현은 `app/http/contracts/character.py`, 실행 의존성 훅은 `app/http/character_dependencies.py`에 있다. 기존 클래스명·응답 필드와 미설정 인증의 503 동작을 유지한다. 기존 이미지/에셋 추가의 501 스텁은 실제 DB 참조 추가로 구현했다. 기존 URL 요청은 복사·다운로드 없이 보관하고, 신규 업로드의 앱 내부 URL은 소유 캐릭터의 준비된 미디어만 연결한다.
 
 원본 및 미디어 참조 저장은 기존 repository에 유지했다. `character_media`는 캐릭터/계정 삭제 시에도 복구·정리 기록을 보존하도록 cascade FK를 두지 않는다. 영구 객체의 `(storage_kind, storage_id, object_key)`와 콘텐츠 타입·크기·원본 파일명·용도·SHA-256을 보관한다. 원본 이미지/에셋과 각각의 스냅샷에 nullable `media_id` RESTRICT FK를 추가했다. 기존 URL 컬럼은 그대로 남으며 게시 시 FK를 복사한다.
 

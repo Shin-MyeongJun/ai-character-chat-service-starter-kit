@@ -7,7 +7,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.modules.content.character import dependencies, types
+from app.http import character_dependencies as dependencies
+from app.modules.content.character import types
 from app.modules.content.character.router import router
 from app.modules.content.character.service import tags as TagsService
 from app.modules.content.tag import types as TagTypes

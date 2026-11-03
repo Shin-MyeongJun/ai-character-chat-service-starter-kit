@@ -52,6 +52,19 @@ out/
 *.log
 logs/
 
+# Local evidence from the independent audits and their fixes.
+# Keep REPORT.md and reproducible Python scripts; retain generated evidence locally.
+/docs/audits/2026-11-02-independent-error-audit/*.json
+/docs/audits/2026-11-02-independent-error-audit/*.txt
+/docs/audits/2026-11-02-independent-error-audit/code-evidence.md
+/docs/audits/2026-11-02-independent-error-reaudit/*.json
+/docs/audits/2026-11-02-independent-error-reaudit/*.txt
+/docs/audits/2026-11-02-independent-error-reaudit/code-evidence.md
+/docs/audits/2026-11-03-iea-s3-lifetime-fix/*.json
+/docs/audits/2026-11-03-iea-s3-lifetime-fix/*.txt
+/docs/audits/2026-11-03-iea-s3-lifetime-fix/*.xml
+/docs/audits/2026-11-03-iea-studio-fix/*.json
+
 # docker/db
 postgres-data/
 redis-data/

@@ -299,7 +299,7 @@ async def statistics(
     session: Session,
     owner: Owner,
 ) -> Schemas.StatisticsInfoResponseDto:
-    from app.modules.content.product.service.statistics import get_statistics
+    from app.modules.content.product.service.query.statistics import get_statistics
 
     command = SchemaMapper.statistics_request_to_command(request)
     with errors():

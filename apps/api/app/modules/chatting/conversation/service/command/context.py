@@ -13,7 +13,7 @@ from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service import views as ProductViewsService
 from app.modules.llm import types as LlmTypes
-from app.modules.llm.service.replacement import resolve_execution
+from app.modules.llm.service.command.replacement import resolve_execution
 
 
 async def prepare_runtime_context(

@@ -1,5 +1,11 @@
 # Lorebook 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+dependencies.py와 constraints.py 재노출을 제거했다. router/tag_router와 테스트는
+app/http/lorebook_dependencies.py의 동일한 의존성 함수를 사용한다. command 검증과
+테스트는 types.py의 원래 제한 상수를 참조하며 값·검증 오류·HTTP 계약은 유지한다.
+
 2026-10-29 U06: 스튜디오 후속 발행은 기존 서버 복사본 ID를 유지하면서 공개 서비스로
 제목·설명·항목 태그 합집합을 갱신한다. 공개 소유 조회(lock=True) 후 update_lorebook을
 호출해 기존 visibility/status를 유지하며, replace_public_tags의 빈 목록은 기존 태그를
@@ -73,7 +79,7 @@ legacy 스냅샷/라이브 query는 이를 기존 Stored lorebook 오류로 번�
 초안의 작성 검증은 원래 예외를 전달한다. studio HTTP의 공통 ValueError→422와
 일반 lorebook HTTP의 고정 422 입력 오류 번역은 변경하지 않는다.
 
-스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`·`dependencies.py`는 `app/http`의 공유 계약/훅을 재노출한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 미연결 훅의 503 응답을 보존한다. `app.main`은 DB 세션과 일반 소유자의 실제 쿠키 인증을 연결한다. character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
+스냅샷과 원본의 수명 주기가 연결되므로 하나의 repository를 유지하고, 정규식 보조 함수만 util로 옮겼다. `schemas.py`는 `app/http`의 공유 계약을 재노출하고 의존성 훅은 `app/http/lorebook_dependencies.py`에서 직접 참조한다. DTO 클래스 이름, cursor 검증, HTTP 의존성 override와 미연결 훅의 503 응답을 보존한다. `app.main`은 DB 세션과 일반 소유자의 실제 쿠키 인증을 연결한다. character/lorebook 전용 관리자·검수 dependency는 기본 503 훅으로 남아 있다.
 
 ## 현재 구현 점검과 읽는 순서 (2026-09-17)
 

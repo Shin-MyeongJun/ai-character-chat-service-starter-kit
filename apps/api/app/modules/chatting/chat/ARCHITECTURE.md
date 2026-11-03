@@ -1,5 +1,12 @@
 # Chat 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+use_cases/conversation_directory.py 호환 연결을 제거했다. HTTP 목록은 chat 공개
+service/views.list_recent_conversations와 types를 직접 사용한다. HTTP cursor_created_at을
+Command.cursor_activity_at으로 연결하며 DTO·기본값·인가·COUNT/페이지 쿼리는 유지한다.
+LLM 실행 결정은 공개 service/command/replacement.py를 직접 호출한다.
+
 ## U27 빈 파일 정리 (2026-11-02)
 
 0바이트 `stream.py`는 import·문자열 로딩·실행/배포 진입점 참조가 없어 제거했다.
@@ -266,7 +273,7 @@ finish_generation은 후보 outcome을 실제 succeeded/stale로 판단한 뒤 u
 API/검증 범위는 [프롬프트 조회 계약](../../../../../../docs/generation-prompts.md)을 따른다.
 
 새 대화의 고정 첫 대사는 conversation 시작 조회에서 받고 prompt의 고정 assistant 문맥으로 전달한다. 메시지 목록이나 요약 원문에는 들어가지 않는다. legacy_messages 대화의 기존 첫 메시지는 이력으로 보존하며 snapshot 첫 대사를 추가하지 않는다. 기존 이력 요약 의미를 소급 변경하거나 기존 기억을 일괄 재작성하지 않는다.
-`list_conversation_previews`와 `list_conversation_activity`의 기존 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 최근 대화 목록의 현재 경로는 아래 U11 절의 제한된 읽기 projection이다. `use_cases/conversation_directory.py`는 기존 공개 호출과 View 이름을 유지하는 연결 지점이다.
+`list_conversation_previews`와 `list_conversation_activity`의 기존 Conversation JOIN은 `Conversation.user_id` 소유권 스코핑에만 쓰며 대화 컬럼은 반환하지 않는다. 최근 대화 목록의 현재 경로는 아래 U11 절의 제한된 읽기 projection이다. HTTP 목록은 chat 공개 views/types를 직접 참조한다.
 
 
 ## 본인 reporting 사실 조회 (2026-10-15)
@@ -392,9 +399,8 @@ COUNT와 페이지는 READ COMMITTED에서 서로 다른 시점일 수 있다. �
 이전 커서 앞으로 이동할 수 있고 새로고침으로 순회를 다시 시작한다. 삭제된 커서 행의
 존재는 요구하지 않는다. HTTP cursor_created_at 이름은 계속 활동 시각을 담는다.
 
-use_cases.conversation_directory의 공개 함수/입력과 두 View 이름은 유지한다. View 정의는
-chat types로 이동해 기존 이름으로 재노출하고 last_activity_at=None/total=0 기본값과
-DTO 필드/경로/오류는 같다. conversation의 metadata 목록 API와 쓰기·생성 잠금은 그대로다.
+View 정의는 chat types가 소유하며 HTTP가 직접 참조한다.
+last_activity_at=None/total=0 기본값과 DTO 필드/경로/오류는 같다. conversation의 metadata 목록 API와 쓰기·생성 잠금은 그대로다.
 
 test_read_composition_contracts의 17건은 실제 SQLite SELECT/COUNT의 소유권/시각·UUID
 동률/빈 대화/생존 메시지·position/삭제/시간 fallback/미리보기·HTTP DTO/잘못된 커서를
@@ -527,4 +533,5 @@ U03-WORKLOG.md에 기록한다.
 - 파일 분리는 기존 repository/mapper/query/workflow 책임을 유지했다. 별도 범용 캐시나
   검증 생략 옵션은 없다. 새 DB 모델은 변경 번호/트리거의 독립된 저장 책임을 표현한다.
   Alembic 0033 / 초기 SQL 023이 필요하며 API·worker를 중지하고 migration 후 함께
-  시작한다. DB에 자동 적용하지 않는다. 자세한 측정·검증은 U05-WORKLOG.md에 기록한다.
+  시작한다. DB에 자동 적용하지 않는다. 현재 구현·검증 근거는
+  [U05 작업 기록](../../../../../../docs/audits/2026-10-26-pattern-standardization/U05-WORKLOG.md)에 있다.

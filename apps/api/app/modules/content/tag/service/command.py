@@ -1,6 +1,6 @@
 from typing import cast
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
@@ -17,6 +17,33 @@ def _prepare_tag_names(names: tuple[str, ...]) -> tuple[str, ...]:
     ):
         raise ValueError("Tag names must be nonblank strings.")
     return tuple(dict.fromkeys(name.strip() for name in names))
+
+
+async def _lock_dictionary_for_update(session: AsyncSession) -> None:
+    try:
+        await Repository.lock_dictionary_for_update(session)
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "55P03":
+            raise ValueError("Tag dictionary is busy; retry the request.") from exc
+        raise
+
+
+async def acquire_tag_names(
+    session: AsyncSession, command: Types.AcquireTagNamesCommand
+) -> None:
+    """Acquire a composition's entire name set before its component tag writes.
+
+    This only creates/fences dictionary names in the caller's transaction. It
+    never authorizes connections: each content service must still resolve_tags
+    with retained IDs read under that specific parent's lock.
+    """
+    names = _prepare_tag_names(command.names)
+    async with use_case_transaction(session):
+        infos = PersistenceMapper.tags_entities_to_info(
+            await Repository.resolve_tags(session, names)
+        )
+        if {info.name for info in infos} != set(names):
+            raise ValueError("Tag name changed concurrently; retry the request.")
 
 
 async def resolve_tags(
@@ -63,6 +90,7 @@ async def update_tag(
         await IdentityQueryService.require_admin(
             session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
         )
+        await _lock_dictionary_for_update(session)
         info = PersistenceMapper.tag_entity_to_info(
             await Repository.get_tag(session, command.tag_id, exclusive=True)
         )
@@ -90,6 +118,7 @@ async def deactivate_tag(
         await IdentityQueryService.require_admin(
             session, IdentityTypes.GetUserCommand(user_id=command.actor_id)
         )
+        await _lock_dictionary_for_update(session)
         info = PersistenceMapper.tag_entity_to_info(
             await Repository.get_tag(session, command.tag_id, exclusive=True)
         )

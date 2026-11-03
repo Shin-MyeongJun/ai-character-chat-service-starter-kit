@@ -1,16 +1,18 @@
 """Follow-up studio publication contracts with public-service doubles."""
 
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from test_studio_publication_db import http_app, request
 
 from app.modules.content.lorebook import types as LoreTypes
 from app.modules.content.product import types as Types
@@ -108,9 +110,11 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> Backend:
         monkeypatch.setattr(module, name, operation)
 
     patch(Publication, "get_studio_draft_for_publication", draft)
+    patch(Publication.TagCommandService, "acquire_tag_names")
     patch(Publication.CharacterCommand, "update_character", MagicMock(id=character_id))
     patch(Publication.CharacterCommand, "create_character")
     patch(Publication.CharacterQuery, "list_character_assets", [])
+    patch(Publication.CharacterQuery, "get_owned_characters", [])
     patch(Publication.CharacterTags, "replace_public_tags")
     patch(Publication.LoreQuery, "get_owned_lorebooks", [book])
     patch(Publication.LoreCommand, "update_lorebook", book)
@@ -138,6 +142,18 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> Backend:
     patch(Publication, "mark_studio_publication")
     command = Publication.PublishStudioCommand(
         product_id, owner_id, 2, uuid4(), "low", "Second", "New release"
+    )
+    patch(
+        Publication.ProductQueryService,
+        "get_product_snapshot",
+        SimpleNamespace(
+            snapshot_data={
+                "model": {
+                    "id": str(command.model_id),
+                    "reasoning_effort": command.reasoning_effort,
+                }
+            }
+        ),
     )
     return Backend(draft, command, book, character_id, entries, release, operations)
 
@@ -293,3 +309,169 @@ async def test_lost_response_replays_receipt_after_newer_draft_without_domain_wr
             await Publication.publish_studio(
                 session, replace(item.command, body="Changed retry")
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("storage_failure", [False, True])
+async def test_reused_snapshot_records_current_revision_atomically(
+    backend: Backend, storage_failure: bool
+) -> None:
+    item = backend
+    prior = deepcopy(item.draft.publication_release)
+    assert prior is not None
+    prior.update({**asdict(item.release), "snapshot_id": str(item.release.snapshot_id)})
+    item.draft = replace(
+        item.draft,
+        publication_digest=item.draft.content_digest,
+        publication_release=prior,
+    )
+    item.operations["get_studio_draft_for_publication"].return_value = item.draft
+    if storage_failure:
+        item.operations["mark_studio_publication"].side_effect = ValueError(
+            "receipt write failed"
+        )
+    async with AsyncSession() as session:
+        events = track_transactions(session)
+        if storage_failure:
+            with pytest.raises(ValueError, match="receipt write failed"):
+                await Publication.publish_studio(session, item.command)
+            assert events == ["rollback"]
+        else:
+            assert (
+                await Publication.publish_studio(session, item.command) == item.release
+            )
+            assert events == ["commit"]
+    marked_call = item.operations["mark_studio_publication"].await_args
+    assert marked_call is not None
+    marked = marked_call.args[1]
+    assert marked.content_digest == item.draft.content_digest
+    assert marked.release == item.release
+    prior_mapping = prior["_studio"]
+    assert isinstance(prior_mapping, dict)
+    prior_receipts = prior_mapping["receipts"]
+    assert isinstance(prior_receipts, dict)
+    assert marked.mapping["receipts"]["1"] == prior_receipts["1"]
+    assert marked.mapping["characters"] == prior_mapping["characters"]
+    assert item.draft.publication_release == prior  # no mutation before persistence
+    item.operations["publish_product"].assert_not_awaited()
+    item.operations["update_character"].assert_not_awaited()
+    if storage_failure:
+        return
+    for operation in item.operations.values():
+        operation.reset_mock()
+    item.operations["get_studio_draft_for_publication"].return_value = replace(
+        item.draft,
+        revision=3,
+        content_digest="next-edit",
+        publication_release={**prior, "_studio": marked.mapping},
+    )
+    async with AsyncSession() as session:
+        assert await Publication.publish_studio(session, item.command) == item.release
+        with pytest.raises(Types.StudioDraftConflictError, match="different request"):
+            await Publication.publish_studio(
+                session, replace(item.command, summary="Other")
+            )
+    item.operations["mark_studio_publication"].assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_all_tag_names_are_acquired_after_parent_locks_before_component_writes(
+    backend: Backend,
+) -> None:
+    events: list[str] = []
+
+    def record(name: str) -> None:
+        events.append(name)
+
+    def lock_book(
+        session: AsyncSession, command: LoreTypes.GetOwnedLorebooksCommand
+    ) -> list[LoreTypes.LorebookInfo]:
+        record("book")
+        return [backend.book]
+
+    def update_character(session: AsyncSession, command: object) -> SimpleNamespace:
+        record("write")
+        return SimpleNamespace(id=backend.character_id)
+
+    backend.operations["get_owned_characters"].side_effect = lambda *_: record(
+        "characters"
+    )
+    backend.operations["get_owned_lorebooks"].side_effect = lock_book
+    backend.operations["acquire_tag_names"].side_effect = lambda *_: record("names")
+    backend.operations["update_character"].side_effect = update_character
+    async with AsyncSession() as session:
+        await Publication.publish_studio(session, backend.command)
+    assert events == ["characters", "book", "names", "write"]
+    acquired = backend.operations["acquire_tag_names"].await_args
+    assert acquired is not None and acquired.args[1].names == (
+        "work-tag",
+        "first",
+        "second",
+    )
+    locked = backend.operations["get_owned_characters"].await_args
+    assert locked is not None and locked.args[1].ids == (backend.character_id,)
+    assert locked.args[1].owner_id == backend.command.owner_id and locked.args[1].lock
+
+
+@pytest.mark.asyncio
+async def test_name_acquisition_failure_rolls_back_before_component_writes(
+    backend: Backend,
+) -> None:
+    backend.operations["acquire_tag_names"].side_effect = ValueError(
+        "name acquisition failed"
+    )
+    async with AsyncSession() as session:
+        events = track_transactions(session)
+        with pytest.raises(ValueError, match="name acquisition failed"):
+            await Publication.publish_studio(session, backend.command)
+    assert events == ["rollback"]
+    for name in (
+        "update_character",
+        "update_lorebook",
+        "publish_product",
+        "mark_studio_publication",
+    ):
+        backend.operations[name].assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_http_reused_snapshot_receipt_replays_after_next_revision(
+    backend: Backend,
+) -> None:
+    prior = deepcopy(backend.draft.publication_release)
+    assert prior is not None
+    prior.update(
+        {**asdict(backend.release), "snapshot_id": str(backend.release.snapshot_id)}
+    )
+    backend.operations["get_studio_draft_for_publication"].return_value = replace(
+        backend.draft,
+        publication_digest=backend.draft.content_digest,
+        publication_release=prior,
+    )
+    async with AsyncSession() as session:
+        app = http_app(session, backend.command.owner_id)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://studio.test"
+        ) as client:
+            url = f"/products/{backend.command.product_id}/studio-publication"
+            body = request(backend.command.expected_revision, backend.command.model_id)
+            accepted = await client.post(url, json=body)
+            assert accepted.status_code == 200
+            marked = backend.operations["mark_studio_publication"].await_args
+            assert marked is not None
+            backend.operations[
+                "get_studio_draft_for_publication"
+            ].return_value = replace(
+                backend.draft,
+                revision=3,
+                content_digest="later-draft",
+                publication_release={**prior, "_studio": marked.args[1].mapping},
+            )
+            backend.operations["mark_studio_publication"].reset_mock()
+            replay = await client.post(url, json=body)
+            assert replay.status_code == 200 and replay.json() == accepted.json()
+            conflict = await client.post(url, json={**body, "body": "Different"})
+            assert conflict.status_code == 409
+    backend.operations["mark_studio_publication"].assert_not_awaited()
+    backend.operations["publish_product"].assert_not_awaited()
+    backend.operations["acquire_tag_names"].assert_not_awaited()

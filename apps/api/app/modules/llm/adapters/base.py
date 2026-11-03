@@ -153,7 +153,3 @@ class BaseTextGenerationAdapter(ABC):
             request_id=request_id,
             status_code=status_code,
         )
-
-
-# Compatibility import for callers that imported the old implementation class.
-BaseLLMAdapter = BaseTextGenerationAdapter

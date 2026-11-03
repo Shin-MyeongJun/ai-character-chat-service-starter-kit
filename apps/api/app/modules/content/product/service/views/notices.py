@@ -8,7 +8,7 @@ from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
 from app.modules.content.product.service import query as QueryService
 from app.modules.llm import types as LlmTypes
-from app.modules.llm.service.replacement import execution_notice
+from app.modules.llm.service.views.replacement import execution_notice
 
 
 async def get_published_product(

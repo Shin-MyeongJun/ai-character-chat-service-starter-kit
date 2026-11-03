@@ -1,5 +1,12 @@
 # Product 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+미사용 dependencies.py와 통계 조회 재노출 service/statistics.py를 제거했다.
+HTTP 통계는 service/query/statistics.py를 직접 호출하며 테스트도 같은 경로를 참조한다.
+의존성 override는 app/http/dependencies.py의 기존 함수를 사용한다. 통계 요청/응답과
+권한·조회·배치 계약은 유지한다.
+
 ## U04 스튜디오 잠금 순서 통일 (2026-10-30)
 
 스튜디오 잠금 진입점은 `product-studio-draft` 상품 ID의 transaction advisory →
@@ -120,7 +127,7 @@ Command는 최상위 `use_case_transaction`을 시작하거나 명시적으로 �
 
 작성/설정/구성 변경은 Info를, 발행은 ReleaseInfo를 반환한다. 삭제는 None이며 발행 이력이 있으면 삭제를 거절한다. 배치 처리 결과는 ProcessedStatisticsInfo이다. 릴리스 목록의 `(ProductSnapshotInfo, ReleaseNoteInfo | None)`은 명시적인 값 조합 계약이며 ORM Row가 아니다.
 
-statistics의 조회와 일부 command 모듈의 명시적 재노출은 이전 Python import 호출부의 호환 진입점이다. 통계 rebuild_day/process_pending 호출부는 `app/use_cases/product_statistics.py`로 이동해 도메인 간 순환 호출을 추가하지 않았다. HTTP DTO 이름은 기존 OpenAPI와 생성 클라이언트 계약을 보존하기 위해 유지했다. 상품 구성, 발행, 통계는 변경 이유와 의존성이 달라 분리했으며 줄 수를 기준으로 자르지 않았다.
+통계 조회는 service/query/statistics.py가 공개하며 일부 command 모듈의 명시적 재노출은 유지한다. 통계 rebuild_day/process_pending 호출부는 `app/use_cases/product_statistics.py`로 이동해 도메인 간 순환 호출을 추가하지 않았다. HTTP DTO 이름은 기존 OpenAPI와 생성 클라이언트 계약을 보존하기 위해 유지했다. 상품 구성, 발행, 통계는 변경 이유와 의존성이 달라 분리했으며 줄 수를 기준으로 자르지 않았다.
 
 상품에 독립적인 파일 테이블/업로드 기능은 없다. 상품 미디어는 캐릭터 스냅샷을 통해 참조하므로 product 테이블에는 추가 컬럼이 필요하지 않다. character의 스냅샷 미디어 FK가 불변 저장소 객체를 보존하며, 초안 수정·삭제·다음 게시·버전 만료는 이전 파일을 삭제하지 않는다. 상품 미디어 접근은 인증된 소유자 또는 기존 approved + public/unlisted 접근 정책을 그대로 따른다. 공개 버킷/ACL, 서명 URL, 익명 파일 접근은 추가하지 않았다.
 

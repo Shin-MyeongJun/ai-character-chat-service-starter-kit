@@ -1,5 +1,12 @@
 # Conversation 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+최근 대화 HTTP 목록은 chat 공개 views/types를 직접 사용하며
+use_cases/conversation_directory.py 호환 연결을 제거했다. conversation의 metadata 조회와
+소유 건수 조회는 그대로다. 런타임 문맥의 모델 결정은 LLM 공개
+service/command/replacement.py를 직접 참조한다. HTTP·DB·트랜잭션 계약은 유지한다.
+
 - 소유 테이블: `conversations`, `conversation_characters`, `conversation_version_changes`. 메시지와 `product_generations`는 chat 소유이며 이 모듈에서 읽거나 쓰지 않는다. `conversations.history_revision`은 기존 원문 변경 세대이며 단순 후속 append에는 증가하지 않는다.
 - `service/query.py`: `get_owned_conversation(OwnedConversationCommand)`은 소유 방의 ConversationInfo를 반환하며 lock=true이면 FOR UPDATE를 획득한다. `list_conversation_characters`는 같은 소유권 조건의 실제 참여 캐릭터 Info를 반환한다. 통계 조회는 방 생성/버전 전환 사실만 제공한다.
 - `service/command/__init__.py`: `start_conversation(StartConversationCommand)`은 방·최초/현재 상품 버전·시작 옵션·참여자를 같은 트랜잭션으로 저장한다. chat 호출이나 첫 대사 메시지 저장은 없다.

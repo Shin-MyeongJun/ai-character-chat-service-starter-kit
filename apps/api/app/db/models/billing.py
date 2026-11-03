@@ -1,4 +1,4 @@
-# 사용량·결제·구독 스키마. 크레딧 모델은 기존 import 호환을 위해 재노출한다.
+# 사용량·결제·구독 스키마. 크레딧 모델은 credit.py가 소유한다.
 # 금액은 Decimal 통화 값, 크레딧은 정수다.
 # usage의 nullable 참조는 이전 데이터와 삭제된 대화를 허용한다.
 # generation별 사용량 UNIQUE는 중복 행을 막으며 잔액 차감까지 보장하지 않는다.
@@ -26,11 +26,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.db.models._mixins import TimestampMixin, UuidPkMixin
-from app.db.models.credit import (  # noqa: F401
-    CreditAccount,
-    CreditTransaction,
-    CreditTransactionReason,
-)
 
 
 class SubscriptionStatus(StrEnum):

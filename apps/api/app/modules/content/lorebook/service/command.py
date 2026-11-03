@@ -9,7 +9,6 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.transaction import use_case_transaction
-from app.modules.content.lorebook import constraints
 from app.modules.content.lorebook import repository as Repository
 from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.mapper import persistence as PersistenceMapper
@@ -21,11 +20,11 @@ def _validate_lorebook_profile(
 ) -> None:
     if not command.title.strip():
         raise ValueError("Lorebook title must not be blank.")
-    if len(command.title) > constraints.LOREBOOK_TITLE_MAX_LENGTH:
+    if len(command.title) > Types.LOREBOOK_TITLE_MAX_LENGTH:
         raise ValueError("Lorebook title is too long.")
     if (
         command.description is not None
-        and len(command.description) > constraints.LOREBOOK_DESCRIPTION_MAX_LENGTH
+        and len(command.description) > Types.LOREBOOK_DESCRIPTION_MAX_LENGTH
     ):
         raise ValueError("Lorebook description is too long.")
     if command.visibility not in get_args(Types.LorebookVisibilityValue):
@@ -46,14 +45,11 @@ def _validate_lorebook_entry(
     validate_options(command.metadata)
     if not command.content.strip():
         raise ValueError("Lorebook entry content must not be blank.")
-    if len(command.content) > constraints.ENTRY_CONTENT_MAX_LENGTH:
+    if len(command.content) > Types.ENTRY_CONTENT_MAX_LENGTH:
         raise ValueError("Lorebook entry content is too long.")
     if command.title is not None and not command.title.strip():
         raise ValueError("Lorebook entry title must not be blank when provided.")
-    if (
-        command.title is not None
-        and len(command.title) > constraints.ENTRY_TITLE_MAX_LENGTH
-    ):
+    if command.title is not None and len(command.title) > Types.ENTRY_TITLE_MAX_LENGTH:
         raise ValueError("Lorebook entry title is too long.")
     enum_values = (
         (command.entry_type, Types.LorebookEntryTypeValue, "entry type"),
@@ -69,13 +65,11 @@ def _validate_lorebook_entry(
         if value not in get_args(value_type):
             raise ValueError(f"Invalid lorebook entry {label}.")
     if not (
-        constraints.POSTGRES_INTEGER_MIN
-        <= command.priority
-        <= constraints.POSTGRES_INTEGER_MAX
+        Types.POSTGRES_INTEGER_MIN <= command.priority <= Types.POSTGRES_INTEGER_MAX
     ):
         raise ValueError("Lorebook entry priority is outside the database range.")
     if command.token_budget is not None and not (
-        0 <= command.token_budget <= constraints.POSTGRES_INTEGER_MAX
+        0 <= command.token_budget <= Types.POSTGRES_INTEGER_MAX
     ):
         raise ValueError("Lorebook entry token budget is outside the database range.")
     if (
@@ -85,12 +79,12 @@ def _validate_lorebook_entry(
     ):
         raise ValueError("Keyword entries require at least one trigger.")
     if command.key_triggers is not None:
-        if len(command.key_triggers) > constraints.ENTRY_TRIGGER_MAX_COUNT:
+        if len(command.key_triggers) > Types.ENTRY_TRIGGER_MAX_COUNT:
             raise ValueError("Lorebook entry has too many triggers.")
         for trigger in command.key_triggers:
             if not trigger.strip():
                 raise ValueError("Lorebook entry triggers must not be blank.")
-            if len(trigger) > constraints.ENTRY_TRIGGER_MAX_LENGTH:
+            if len(trigger) > Types.ENTRY_TRIGGER_MAX_LENGTH:
                 raise ValueError("Lorebook entry trigger is too long.")
             if command.match_mode == "regex":
                 MatchingServiceUtil.validate_regex(trigger)
@@ -101,10 +95,7 @@ def _validate_lorebook_entry(
             raise ValueError(
                 "Lorebook entry metadata must be JSON serializable."
             ) from exc
-        if (
-            len(serialized_metadata.encode("utf-8"))
-            > constraints.ENTRY_METADATA_MAX_BYTES
-        ):
+        if len(serialized_metadata.encode("utf-8")) > Types.ENTRY_METADATA_MAX_BYTES:
             raise ValueError("Lorebook entry metadata is too large.")
 
 

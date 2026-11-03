@@ -20,6 +20,7 @@ from app.modules.content.lorebook.service import query as LoreQuery
 from app.modules.content.lorebook.service import tags as LoreTags
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import command as ProductCommand
+from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service.command import (
     composition as CompositionCommand,
 )
@@ -34,7 +35,13 @@ from app.modules.content.product.service.query.studio import (
 from app.modules.content.product.service.studio_validation import (
     validate_studio_document_shape,
 )
-from app.use_cases.studio_components import StoredRelease, component_mapping
+from app.modules.content.tag import types as TagTypes
+from app.modules.content.tag.service import command as TagCommandService
+from app.use_cases.studio_components import (
+    StoredRelease,
+    StudioMapping,
+    component_mapping,
+)
 from app.use_cases.studio_content import (
     StudioCharacter,
     StudioLore,
@@ -179,6 +186,36 @@ def _publication_content(
     )
 
 
+async def _record_publication_receipt(
+    session: AsyncSession,
+    command: PublishStudioCommand,
+    draft: ProductTypes.StudioDraftInfo,
+    mapping: StudioMapping,
+    fingerprint: str,
+    release: ProductTypes.ReleaseInfo,
+) -> ProductTypes.ReleaseInfo:
+    # asdict(ReleaseInfo) supplies these fields; only the UUID becomes JSON text.
+    stored_release = cast(
+        StoredRelease, {**asdict(release), "snapshot_id": str(release.snapshot_id)}
+    )
+    mapping.setdefault("receipts", {})[str(command.expected_revision)] = {
+        "fingerprint": fingerprint,
+        "release": stored_release,
+    }
+    # The typed receipt/mapping is recursive JSON; retain the original object.
+    await mark_studio_publication(
+        session,
+        ProductTypes.MarkStudioPublicationCommand(
+            command.product_id,
+            command.owner_id,
+            draft.content_digest,
+            release,
+            cast(ProductTypes.ProductJsonObject, mapping),
+        ),
+    )
+    return release
+
+
 async def publish_studio(
     session: AsyncSession, command: PublishStudioCommand
 ) -> ProductTypes.ReleaseInfo:
@@ -195,23 +232,6 @@ async def publish_studio(
             session,
             ProductTypes.GetStudioDraftCommand(command.product_id, command.owner_id),
         )
-        publication_release = draft.publication_release or {}
-        if (
-            draft.revision == command.expected_revision
-            and draft.publication_digest == draft.content_digest
-            and publication_release.get("snapshot_id")
-            and "_studio" not in publication_release
-        ):
-            # Legacy receipts were written from the same ReleaseInfo fields.
-            prior = cast(StoredRelease, draft.publication_release)
-            return ProductTypes.ReleaseInfo(
-                UUID(prior["snapshot_id"]),
-                prior["version"],
-                prior["summary"],
-                prior["body"],
-                prior["change_kind"],
-                prior["update_policy"],
-            )
         mapping = await component_mapping(session, draft, command.owner_id)
         fingerprint = hashlib.sha256(
             json.dumps(
@@ -238,21 +258,38 @@ async def publish_studio(
             raise ProductTypes.StudioDraftConflictError(
                 "Studio draft changed before publication."
             )
+        # Only durable receipt replay may bypass validation. A new revision's
+        # no-op still accepts a new request and must validate its release note.
+        ReleasesCommand.validate_note(command.summary, command.body)
         if draft.publication_digest == draft.content_digest and (
             draft.publication_release or {}
         ).get("snapshot_id"):
             # The preceding snapshot_id check identifies a stored release receipt.
             prior = cast(StoredRelease, draft.publication_release)
-            return ProductTypes.ReleaseInfo(
-                UUID(prior["snapshot_id"]),
-                prior["version"],
-                prior["summary"],
-                prior["body"],
-                prior["change_kind"],
-                prior["update_policy"],
+            snapshot = await ProductQueryService.get_product_snapshot(
+                session, ProductTypes.ProductSnapshotCommand(UUID(prior["snapshot_id"]))
             )
+            # Compare immutable published settings, including for legacy receipts
+            # with no request metadata. Current mutable product settings cannot
+            # establish what this snapshot contains. Missing legacy model data
+            # conservatively requires publication through normal validation.
+            model = snapshot.snapshot_data.get("model", {})
+            if (
+                model.get("id") == str(command.model_id)
+                and model.get("reasoning_effort") == command.reasoning_effort
+            ):
+                release = ProductTypes.ReleaseInfo(
+                    UUID(prior["snapshot_id"]),
+                    prior["version"],
+                    prior["summary"],
+                    prior["body"],
+                    prior["change_kind"],
+                    prior["update_policy"],
+                )
+                return await _record_publication_receipt(
+                    session, command, draft, mapping, fingerprint, release
+                )
         characters, lorebooks, scenes, work = _publication_content(draft.document)
-        ReleasesCommand.validate_note(command.summary, command.body)
         # Prepare every lore/scene value before domain writes begin.
         values: list[tuple[str, LoreTypes.LorebookEntryCommandFields]] = []
         if work.get("worldRules", "").strip():
@@ -274,6 +311,45 @@ async def publish_studio(
         )
         values.extend(
             ("scene:" + row["id"], scene_entry_value(row)) for row in ordered_scenes
+        )
+        # Existing content parents precede dictionary locks, as in standalone
+        # tag writes. New copies are invisible to other transactions until commit.
+        character_ids = tuple(
+            UUID(mapping["characters"][row["id"]])
+            for row in characters
+            if row["id"] in mapping["characters"]
+        )
+        if character_ids:
+            await CharacterQuery.get_owned_characters(
+                session,
+                CharacterTypes.GetOwnedCharactersCommand(
+                    ids=character_ids, owner_id=command.owner_id, lock=True
+                ),
+            )
+        owned_book: LoreTypes.LorebookInfo | None = None
+        if mapping.get("book_id"):
+            owned_book = (
+                await LoreQuery.get_owned_lorebooks(
+                    session,
+                    LoreTypes.GetOwnedLorebooksCommand(
+                        ids=(UUID(mapping["book_id"]),),
+                        owner_id=command.owner_id,
+                        lock=True,
+                    ),
+                )
+            )[0]
+        # One order for all shared names, independent of component traversal.
+        # Do not use these acquisitions as retained IDs: component services still
+        # validate activity against their own locked, existing connections.
+        await TagCommandService.acquire_tag_names(
+            session,
+            TagTypes.AcquireTagNamesCommand(
+                names=tuple(
+                    name
+                    for component in (work, *characters, *lorebooks)
+                    for name in component.get("tags", ())
+                )
+            ),
         )
         # Update only work-specific copies. Retained IDs keep product slots stable.
         created_characters: dict[str, UUID] = {}
@@ -357,14 +433,8 @@ async def publish_studio(
             book_id = UUID(mapping["book_id"])
             # Preserve the existing visibility/status while refreshing the authored
             # parent profile. Hold its owner-scoped lock through entry/tag writes.
-            book = (
-                await LoreQuery.get_owned_lorebooks(
-                    session,
-                    LoreTypes.GetOwnedLorebooksCommand(
-                        ids=(book_id,), owner_id=command.owner_id, lock=True
-                    ),
-                )
-            )[0]
+            assert owned_book is not None, "Existing studio lorebook was locked."
+            book = owned_book
             await LoreCommand.update_lorebook(
                 session,
                 LoreTypes.UpdateLorebookCommand(
@@ -486,23 +556,6 @@ async def publish_studio(
                 value=ProductTypes.ReleaseNoteCommand(command.summary, command.body),
             ),
         )
-        # asdict(ReleaseInfo) supplies these fields; only the UUID becomes JSON text.
-        stored_release = cast(
-            StoredRelease, {**asdict(release), "snapshot_id": str(release.snapshot_id)}
+        return await _record_publication_receipt(
+            session, command, draft, mapping, fingerprint, release
         )
-        mapping.setdefault("receipts", {})[str(command.expected_revision)] = {
-            "fingerprint": fingerprint,
-            "release": stored_release,
-        }
-        # The typed receipt/mapping is recursive JSON; retain the original object.
-        await mark_studio_publication(
-            session,
-            ProductTypes.MarkStudioPublicationCommand(
-                command.product_id,
-                command.owner_id,
-                draft.content_digest,
-                release,
-                cast(ProductTypes.ProductJsonObject, mapping),
-            ),
-        )
-        return release

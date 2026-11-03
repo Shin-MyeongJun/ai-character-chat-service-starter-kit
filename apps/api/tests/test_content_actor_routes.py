@@ -4,14 +4,15 @@
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
-from app.http.routes import router
-from app.modules.content.character import dependencies as CharacterDependencies
-from app.modules.content.character.service import command as CharacterCommandService
-from app.modules.content.lorebook import dependencies as LorebookDependencies
-from app.modules.content.lorebook import types as LorebookTypes
-from app.modules.content.lorebook.service import query as LorebookQueryService
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+
+from app.http import character_dependencies as CharacterDependencies
+from app.http import lorebook_dependencies as LorebookDependencies
+from app.http.routes import router
+from app.modules.content.character.service import command as CharacterCommandService
+from app.modules.content.lorebook import types as LorebookTypes
+from app.modules.content.lorebook.service import query as LorebookQueryService
 
 
 def deny_access():

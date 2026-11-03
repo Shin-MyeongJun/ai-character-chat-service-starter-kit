@@ -1,10 +1,17 @@
 # LLM 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+service/replacement.py 재노출 파일을 제거했다. 실행 결정·종료 공지는
+service/command/replacement.py, 안내 조회는 service/views/replacement.py를 직접 호출한다.
+사용처 없는 BaseLLMAdapter 별칭도 제거하고 BaseTextGenerationAdapter로 통일했다.
+테스트에서 실제 사용하는 공개 LLMService 이름과 공급자 실행 계약은 유지한다.
+
 - 소유 테이블: `providers`, `models`, `model_replacements`.
 - `service/text_generation.py`: `TextGenerationService`가 `TextGenerationAdapter`만 등록·선택한다. 기존 공개 이름 `LLMService`, `generate_text(GenerateTextCommand)` → `LLMResultInfo`, `list_model_options()` 계약은 호환 별칭으로 보존한다. 현재 답변과 메모리 요약이 이 텍스트 생성 계약을 사용한다. 별도 프로필 추출 유스케이스는 현재 코드에 없다.
 - `service/embedding.py`: `EmbeddingService`가 `EmbeddingAdapter`만 별도로 등록·선택하고 `embed_texts(EmbedTextsCommand)` → `EmbeddingResultInfo`를 제공한다. 텍스트 생성 모델 목록과 등록소를 공유하지 않으므로 같은 공급자 이름의 두 기능이 충돌하지 않는다.
 - `adapters/protocols.py`: 서비스가 의존하는 공급자 중립 `TextGenerationAdapter`, `EmbeddingAdapter` Protocol. 모델 선택, 실행, 자원 종료 계약을 선언한다.
-- `adapters/base.py`: OpenAI·Anthropic·Mock이 공유하는 텍스트 생성 검증과 오류 envelope 구현인 `BaseTextGenerationAdapter`. 과거 `BaseLLMAdapter` import는 호환 별칭으로만 유지하며 서비스 타입으로 사용하지 않는다.
+- `adapters/base.py`: OpenAI·Anthropic·Mock이 공유하는 텍스트 생성 검증과 오류 envelope 구현인 `BaseTextGenerationAdapter`.
 - `adapters/voyage.py`: 텍스트 생성 base를 상속하지 않는 Voyage 비동기 임베딩 구현. 요청별 텍스트는 지역 값으로 복사하고, query/document·truncation·output dimension을 SDK에 그대로 전달하며 개수·동일 차원·유한 수치·사용량을 검증한다. memory 요약은 document, 답변 검색은 query로 호출한다.
 - `types.py`: 텍스트 생성과 분리된 임베딩 Command/Info, 공급자·용도·오류 타입을 공개한다.
 - `ModelInfo.context_window`는 기존 DB 모델의 창 크기를 공개해 요청별 예산 상한에 사용한다.
@@ -13,7 +20,6 @@
 - `service/command/replacement.py`: 모델 종료 공지, 실행 모델 결정 및 멱등적인 대체 이력 저장. 쓰기는 use_case_transaction에 참여한다.
 - `service/views/replacement.py`: 상품 스냅샷 설정과 모델 가용성을 조합한 읽기 전용 ModelNoticeView.
 - `service/util/replacement_policy.py`: 허용 대체 범위·effort 근접 선택 보조 함수. DB·공급자 호출을 하지 않는다.
-- `service/replacement.py`: 역할별 공개 함수의 호환 재노출.
 - `repository.py`, `mapper/persistence.py`: 모델/공급자/대체 이력 저장 및 순수 값 변환.
 
 ## 저장소·mapper·조회 타입 계약

@@ -68,8 +68,21 @@ async def test_same_revision_publication_retry_returns_saved_release(monkeypatch
     monkeypatch.setattr(publication, "use_case_transaction", transaction)
     monkeypatch.setattr(publication, "get_studio_draft_for_publication", AsyncMock(return_value=draft))
     monkeypatch.setattr(publication.CharacterCommand, "create_character", create)
-    assert await publication.publish_studio(object(), command()) == release
+    # Legacy publication now adopts its existing IDs and persists a replay receipt.
+    monkeypatch.setattr(publication, "component_mapping", AsyncMock(return_value={
+        "characters": {}, "entries": {}, "receipts": {},
+    }))
+    mark = AsyncMock()
+    monkeypatch.setattr(publication, "mark_studio_publication", mark)
+    value = command()
+    monkeypatch.setattr(publication.ProductQueryService, "get_product_snapshot", AsyncMock(
+        return_value=SimpleNamespace(snapshot_data={"model": {
+            "id": str(value.model_id), "reasoning_effort": value.reasoning_effort,
+        }}),
+    ))
+    assert await publication.publish_studio(object(), value) == release
     create.assert_not_awaited()
+    assert mark.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -93,6 +106,8 @@ async def test_initial_publication_uses_one_composed_transaction(monkeypatch):
     release = ProductTypes.ReleaseInfo(uuid4(), 1, "First release", "Ready to read", "initial", "choice")
     monkeypatch.setattr(publication, "use_case_transaction", transaction)
     monkeypatch.setattr(publication, "get_studio_draft_for_publication", AsyncMock(return_value=draft))
+    acquire = AsyncMock()
+    monkeypatch.setattr(publication.TagCommandService, "acquire_tag_names", acquire)
     monkeypatch.setattr(publication.CharacterCommand, "create_character", AsyncMock(return_value=SimpleNamespace(id=character_id)))
     monkeypatch.setattr(publication.LoreCommand, "create_lorebook", AsyncMock(return_value=SimpleNamespace(id=book_id)))
     monkeypatch.setattr(publication.LoreCommand, "create_lorebook_entry", AsyncMock(side_effect=[SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4()), SimpleNamespace(id=start_id)]))
@@ -110,6 +125,7 @@ async def test_initial_publication_uses_one_composed_transaction(monkeypatch):
     request = command()
     assert await publication.publish_studio(object(), request) == release
     assert active is False
+    assert acquire.await_args.args[1].names == ("work-tag", "character-tag", "lore-tag")
     assert compose.await_args.args[1].value.characters[0].character_id == character_id
     assert settings.await_args.args[1].value.start_entry_ids == (start_id,)
     assert mark.await_args.args[1].content_digest == "digest"

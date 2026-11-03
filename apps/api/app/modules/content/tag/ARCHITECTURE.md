@@ -1,5 +1,42 @@
 # Tag 사전 영역
 
+## Gemini 검토 후 관리자 변경 교착 방지 (2026-11-03)
+
+관리자 update/deactivate는 인가 후 행 잠금 전에 `LOCK TABLE tags IN EXCLUSIVE MODE NOWAIT`를
+획득해 최상위 트랜잭션 종료까지 유지한다. resolve/create의 INSERT가 보유하는 ROW EXCLUSIVE와
+FOR SHARE의 ROW SHARE 모두와 충돌하며 일반 SELECT는 허용한다. 기존 beta 잠금과 신규 alpha
+UNIQUE 대기가 순환하던 경로에서 관리자가 잠금을 기다리지 않고 업무 충돌로 전체 rollback한다.
+상위 트랜잭션이 이미 태그 행/쓰기 잠금을 가진 경우와 500개 경계도 같은 fencing에 포함된다.
+단순한 이름순 정렬, 대기하는 advisory/table lock 또는 실패한 트랜잭션 재시도로 해결하지 않는다.
+
+55P03만 기존 ValueError HTTP 경계의 `Tag dictionary is busy; retry the request.`(422)로
+변환한다. 상위가 이를 잡아도 use_case_transaction의 rollback-only로 전체 쓰기를 취소한다.
+자동 재시도·savepoint·내부 commit·외부 부작용은 없다. UNIQUE 23505는 기존 이름 충돌이다.
+관리자가 먼저 fence를 확보하면 resolve/create는 기존 DB 대기 후 변경 결과를 다시 읽는다.
+resolve/create끼리는 테이블 배타 잠금 없이 기존 INSERT/SHARE·정렬·500개 배치를 유지한다.
+trim/정확한 이름/반환 순서·기존 메타데이터·비활성/retained_ids 정책도 유지한다.
+
+이 선택은 드문 관리자 변경에 넓은 충돌 범위를 허용한다. 무관한 태그 writer가 있어도
+관리자 변경은 즉시 충돌할 수 있고, 관리자 최상위 트랜잭션이 길면 사전 writer가 기다린다.
+임의 순서로 상위에서 조합한 모든 잠금의 교착 부재를 보장하지는 않는다. 아래 날짜별
+전역 잠금 없음/관리자 대기 설명은 이전 구현 이력이며 현재 정책은 이 절을 따른다.
+test_tag_admin_locking_db는 독립 연결/장벽으로 이전 40P01 대조군과 새 업무 충돌,
+2/501개·단건 create 후 resolve·상위 선행 잠금/쓰기 및 caught-error 전체 rollback을 검증한다.
+
+## IEA-02 조합 전체 이름 선획득 (2026-11-03)
+
+공개 `service/command.acquire_tag_names(AcquireTagNamesCommand)`는 상위 조합이 필요로
+하는 전체 이름 집합을 기존 repository.resolve_tags의 정확한 이름순 INSERT/SHARE로
+획득한다. 호출자는 콘텐츠 인가와 상위 트랜잭션을 소유하며 구성요소별 사전 획득 전에
+한 번 호출한다. 반환은 None이며 연결·retained_ids·비활성 허용을 결정하지 않는다.
+비활성 이름도 fencing만 수행하고 실제 연결은 각 부모 잠금 아래 얻은 retained_ids로
+기존 resolve_tags를 반드시 통과한다. 다른 부모의 기존 연결 ID를 공유하지 않는다.
+
+trim/중복 제거·정확한 이름·500개 배치·관리자 변경 fencing은 기존 저장소를 재사용한다.
+누락 이름은 기존 동시 이름 변경 오류이며 실패·취소는 상위 전체 트랜잭션을 rollback한다.
+전역 배타 잠금·재시도·사전 결과 캐시나 검증 생략 옵션은 추가하지 않는다. 이 순서 보장은
+전체 이름을 선획득하는 studio 발행 조합의 범위이며 임의의 모든 writer 교착 부재 보장은 아니다.
+
 `tags`를 소유한다. 정확한 이름 UNIQUE이며 이름의 앞뒤 공백만 제거한다. 내부 공백·대소문자·유니코드 표기·동의어는 통합하지 않는다. normalized_name·kind·개수 제한·태그 snapshot은 없다.
 
 ## U25 태그 이름 resolve 배치화 (2026-10-30)

@@ -4,6 +4,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from test_product_usage import scenario
+
 from app.db.models.identity import User
 from app.db.models.memory import ConversationMemory
 from app.db.models.model_routing import Model, ModelReplacement
@@ -22,10 +26,10 @@ from app.modules.content.product.types import ReleaseNoteCommand
 from app.modules.governance.admin import types as AdminTypes
 from app.modules.governance.admin.service.command import set_expiry
 from app.modules.llm import types as LlmTypes
-from app.modules.llm.service.replacement import announce_retirement, resolve_execution
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from test_product_usage import scenario
+from app.modules.llm.service.command.replacement import (
+    announce_retirement,
+    resolve_execution,
+)
 
 pytestmark = pytest.mark.asyncio
 

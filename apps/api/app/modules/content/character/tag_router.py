@@ -6,13 +6,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.http.contracts import tags as Schemas
-from app.http.dependencies import errors
-from app.modules.content.character import types as Types
-from app.modules.content.character.dependencies import (
+from app.http.character_dependencies import (
     get_character_session,
     get_current_owner_id,
 )
+from app.http.contracts import tags as Schemas
+from app.http.dependencies import errors
+from app.modules.content.character import types as Types
 from app.modules.content.character.mapper import tag_schema as SchemaMapper
 from app.modules.content.character.service import tags as TagsService
 

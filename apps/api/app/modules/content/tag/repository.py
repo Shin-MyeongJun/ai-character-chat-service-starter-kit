@@ -3,13 +3,22 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import case, select, update
+from sqlalchemy import case, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tag import Tag
 
 _RESOLVE_BATCH_SIZE = 500
+
+
+async def lock_dictionary_for_update(session: AsyncSession) -> None:
+    # Resolvers retain ROW EXCLUSIVE (INSERT) and ROW SHARE (FOR SHARE)
+    # through the outer transaction, across every batch. EXCLUSIVE fences both
+    # before any admin row/UNIQUE wait. NOWAIT is essential: the caller may
+    # already hold rows needed by a resolver, so waiting here could deadlock.
+    # Ordinary SELECT remains compatible; concurrent resolvers are unchanged.
+    await session.execute(text("LOCK TABLE tags IN EXCLUSIVE MODE NOWAIT"))
 
 
 async def get_tag(

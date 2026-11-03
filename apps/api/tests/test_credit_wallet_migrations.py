@@ -10,11 +10,16 @@ from uuid import uuid4
 
 import asyncpg
 import pytest
+from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+
+from alembic import command
 
 ROOT = Path(__file__).resolve().parents[3]
 TABLES = (
@@ -84,59 +89,60 @@ def full_signature(connection, schema):
 
 @pytest.mark.asyncio
 async def test_full_online_alembic_initial_sql_and_orm_match_every_wallet_constraint(
-    db,
-):
+    db: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     url = make_url(os.environ["TEST_DATABASE_URL"])
-    # Dedicated child database, never an application's configured DATABASE_URL.
-    name = "credit_schema_test_" + uuid4().hex
+    # Keep online Alembic coverage without granting cluster-wide CREATEDB to the
+    # test role. Every table belongs to one of this run's disposable schemas.
+    names = ["credit_online_" + uuid4().hex, "credit_initial_" + uuid4().hex]
     admin = await asyncpg.connect(
         url.set(drivername="postgresql").render_as_string(hide_password=False)
     )
-    await admin.execute(f'CREATE DATABASE "{name}"')
-    connection = None
-    try:
-        env = dict(
-            os.environ,
-            DATABASE_URL=url.set(database=name).render_as_string(hide_password=False),
-        )
-        await asyncio.to_thread(
-            subprocess.check_output,
-            [
-                sys.executable,
-                "-m",
-                "alembic",
-                "-c",
-                str(ROOT / "apps/api/alembic.ini"),
-                "upgrade",
-                "head",
-            ],
-            cwd=ROOT,
-            env=env,
-            stderr=subprocess.STDOUT,
-        )
-        connection = await asyncpg.connect(
-            url.set(drivername="postgresql", database=name).render_as_string(
-                hide_password=False
-            )
-        )
-        assert (
-            await connection.fetchval("SELECT version_num FROM alembic_version")
-            == "0031"
-        )
-        await connection.execute("CREATE SCHEMA initial")
-        await connection.execute("SET search_path TO initial,public")
-        async with connection.transaction():
-            for path in sorted((ROOT / "infra/postgres/init").glob("*.sql")):
-                await connection.execute(path.read_text(encoding="utf-8-sig"))
-        from sqlalchemy.ext.asyncio import create_async_engine
 
-        engine = create_async_engine(url.set(database=name))
+    def isolated_engine(received_url: str, **kwargs: object) -> AsyncEngine:
+        assert make_url(received_url) == url
+        return create_async_engine(
+            received_url,
+            connect_args={"server_settings": {"search_path": f"{names[0]},public"}},
+            **kwargs,
+        )
+
+    try:
+        for name in names:
+            await admin.execute(f'CREATE SCHEMA "{name}"')
+        # Prevent Alembic's search_path visibility check from reusing a version
+        # table in public when the dedicated audit database already has one.
+        await admin.execute(
+            f'CREATE TABLE "{names[0]}".alembic_version '
+            "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+        )
+        config = Config(str(ROOT / "apps/api/alembic.ini"))
+        with monkeypatch.context() as migration_env:
+            migration_env.setenv(
+                "DATABASE_URL", url.render_as_string(hide_password=False)
+            )
+            migration_env.setattr(
+                "sqlalchemy.ext.asyncio.create_async_engine", isolated_engine
+            )
+            await asyncio.to_thread(command.upgrade, config, "head")
+        await admin.execute(f"SET search_path TO {names[0]},public")
+        assert (
+            await admin.fetchval("SELECT version_num FROM alembic_version")
+            == ScriptDirectory.from_config(config).get_current_head()
+        )
+        await admin.execute(f"SET search_path TO {names[1]},public")
+        async with admin.transaction():
+            for path in sorted((ROOT / "infra/postgres/init").glob("*.sql")):
+                await admin.execute(path.read_text(encoding="utf-8-sig"))
+
+        engine = create_async_engine(url)
         try:
             async with db.bind.connect() as conn:
                 source = await conn.scalar(text("SELECT current_schema()"))
                 expected = await conn.run_sync(full_signature, source)
             async with engine.connect() as conn:
-                for schema in ("public", "initial"):
+                for schema in names:
                     actual = await conn.run_sync(full_signature, schema)
                     assert actual == expected, {
                         t: (actual[t], expected[t])
@@ -144,14 +150,14 @@ async def test_full_online_alembic_initial_sql_and_orm_match_every_wallet_constr
                         if actual[t] != expected[t]
                     }
             # Exercise the final services on both migrated and initial SQL databases.
+            from test_credit_wallets import finalize, grant, reserve
+
             from app.db.models.identity import User
             from app.modules.commerce.credit import types as CreditTypes
             from app.modules.commerce.credit.service import command as CreditCommands
             from app.modules.commerce.credit.service import query as CreditQueries
-            from sqlalchemy.ext.asyncio import AsyncSession
-            from test_credit_wallets import finalize, grant, reserve
 
-            for schema in ("public", "initial"):
+            for schema in names:
                 async with engine.begin() as conn:
                     await conn.execute(
                         text(f"SET LOCAL search_path TO {schema},public")
@@ -190,10 +196,12 @@ async def test_full_online_alembic_initial_sql_and_orm_match_every_wallet_constr
         finally:
             await engine.dispose()
     finally:
-        if connection is not None:
-            await connection.close()
-        await admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
-        await admin.close()
+        try:
+            await admin.execute("SET search_path TO public")
+            for name in names:
+                await admin.execute(f'DROP SCHEMA IF EXISTS "{name}" CASCADE')
+        finally:
+            await admin.close()
 
 
 async def historical_schema(conn, revision="0023"):

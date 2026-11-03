@@ -36,6 +36,11 @@ class GetTagsCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class AcquireTagNamesCommand:
+    names: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ResolveTagsCommand:
     names: tuple[str, ...]
     retained_ids: tuple[UUID, ...] = ()

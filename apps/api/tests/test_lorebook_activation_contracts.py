@@ -10,7 +10,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.http import dependencies as HttpDependencies
-from app.modules.content.lorebook import dependencies, repository, types
+from app.http import lorebook_dependencies as dependencies
+from app.modules.content.lorebook import repository, types
 from app.modules.content.lorebook.router import router
 from app.modules.content.lorebook.service import query
 from app.modules.content.lorebook.service.util import matching

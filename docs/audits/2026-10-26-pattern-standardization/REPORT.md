@@ -1,17 +1,41 @@
 # 패턴 통일 1차: 기준·검사·대표 적용
 
+## 최신 통합 검증·배포 준비 점검 (2026-11-02)
+
+현재 미커밋 변경을 포함한 전체 API는 오프라인 **1706 passed / 446 skipped**,
+전용 실제 PostgreSQL·Mailpit 실행은 **2149 passed / 3 skipped / 0 failed**다.
+남은 skip은 실제 S3 2건·Voyage 1건이며 실행 간 중복 건수는 합산하지 않는다.
+필수 품질(타입 기준선 0·Ruff 388파일·mypy 367소스·13 passed), 웹/관리자 계약
+81건·양쪽 typecheck/build, 관리자 합성 API 브라우저 26건과 사용자 production 렌더
+20건이 통과했다. 전체 PG의 경고는 Alembic path_separator 20건·Starlette 422 2건이다.
+
+발견한 지갑 온라인 migration 테스트의 CREATEDB 의존·고정 0031 기대값을 격리 스키마와
+현재 head 확인으로 고쳤다. 기존 지갑 전체 제약/기본값·잔액 검증은 유지한다.
+온라인 head 0036·초기 SQL 026의 76테이블 비교, worker/정리 CLI 4개 빈 큐 실행도
+확인했다. payments UNIQUE 이름 1곳의 차이는 별도 기록하고 DDL은 변경하지 않았다.
+
+공통 감사 표의 후속 상태와 U27 추가 정리를 반영하고 누락된 U05 기록을 보완했다.
+아래 이전 단계별 수치·미완료 설명은 해당 시점 기록이다. U19 재설계와 U28 잔여
+잠금/deadline, 외부 공급자/S3·운영 HTTPS·실제 사용자 웹/API E2E는 여전히 별도다.
+운영 배포·앱 DB 변경·commit/push는 수행하지 않았다.
+[최신 통합 점검](../../deployment-readiness-2026-11-02.md)과
+[운영 절차](../../operations-runbook.md)에 명령·증거·한계를 연결했다.
+
 ## U27 사용 조사·안전한 정리 (2026-11-02)
 
-import·동적 로딩·라우터 등록·배포 진입점 사용처가 없는 0바이트 파일 5개를 제거했다.
-chat/stream.py, memory/schemas.py, billing/router.py·schemas.py, admin/router.py가
-대상이며 관련 아키텍처 설명도 갱신했다. 구독 모델의 결제 FK와 모델 등록,
-moderation_flags의 0027 이관 입력, 실제 사용하는 호환 재노출과 무효과 가격 정책은
-보존했다. 운영 데이터·외부 소비자는 미조사이므로 legacy 스키마 삭제는 보류한다.
+1차에서 미사용 0바이트 파일 5개를 제거했다. 비서비스 상태라는 사용자 지시에 따른
+후속 정리에서는 호출부를 현재 소유 경로로 옮기고 호환 파일 7개를 추가 제거했다.
+content 3개 dependency 파일, lorebook constraints, product 통계 조회 재노출,
+LLM replacement 재노출, use_cases conversation_directory가 대상이다.
+미사용 BaseLLMAdapter 별칭과 billing의 크레딧 모델 3개 재노출도 제거했다.
+FK·migration·실제 읽기/검증에 연결된 legacy 코드와 견적 JSON의 가격 정책은 유지한다.
+오래된 Python 호환 경로는 더 이상 제공하지 않으며 HTTP·DB·저장 JSON 계약은 유지한다.
 
 OpenAPI 84경로·114연산 전체 JSON, ORM 76테이블의 PostgreSQL DDL/인덱스,
-58개 모델 export가 전후 동일했다. 실행 진입점 8개 import, 필수 품질 검사
-(기준선 0·Ruff 395파일·mypy 374소스·아키텍처/패턴 13건) 및 관련 회귀
-**281 passed / 0 failed / 0 skipped**가 통과했다. 실제 DB/외부 공급자는 실행하지
+58개 모델 export가 전후 동일했다. 후속 실행 진입점 8개 import, 필수 품질 검사
+(기준선 0·Ruff 388파일·mypy 367소스·아키텍처/패턴 13건), 관련 회귀
+**364 passed / 0 failed / 0 skipped**, 전체 테스트 **2152건 수집**이 통과했다.
+삭제 후보의 AST 참조는 23곳에서 0건이 됐다. 실제 DB/외부 공급자는 실행하지
 않았다. 조사 범위·사용 근거·환경 제약과 재실행 명령은 [U27 작업 기록](U27-WORKLOG.md)에 있다.
 
 작업일: 2026-10-26, Asia/Seoul. 기준 HEAD: `f6d456c4f6b1767581261cbb45fb3430b9d56079`.
@@ -110,7 +134,7 @@ Remove-Item Env:TEST_DATABASE_URL -ErrorAction SilentlyContinue
 .venv/Scripts/python.exe -m pytest -p pytest_asyncio.plugin -p anyio.pytest_plugin -p no:cacheprovider apps/api/tests -q --tb=short
 ```
 
-## 남은 순서
+## 기반 도입 당시 남은 순서
 
 | 단계 | 상태/완료 기준 |
 |---|---|

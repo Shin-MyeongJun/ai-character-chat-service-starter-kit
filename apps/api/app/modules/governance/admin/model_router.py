@@ -7,7 +7,7 @@ from app.http.dependencies import Owner, Session, errors
 from app.modules.governance.admin import schemas as Schemas
 from app.modules.governance.admin.mapper.schema import AdminSchemaMapper as SchemaMapper
 from app.modules.llm import types as LlmTypes
-from app.modules.llm.service.replacement import announce_retirement
+from app.modules.llm.service.command.replacement import announce_retirement
 
 router = APIRouter(prefix="/admin/models", tags=["model administration"])
 

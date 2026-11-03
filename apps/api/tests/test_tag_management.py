@@ -456,6 +456,7 @@ async def test_dictionary_admin_crud_reuses_names_and_restricts_management(
         return row
 
     monkeypatch.setattr(TagCommandService.Repository, "get_tag", get_tag)
+    monkeypatch.setattr(TagCommandService.Repository, "lock_dictionary_for_update", AsyncMock())
     monkeypatch.setattr(TagCommandService.Repository, "get_tag_by_name", get_by_name)
     monkeypatch.setattr(TagCommandService.Repository, "update_tag", update_tag)
     monkeypatch.setattr(TagCommandService.Repository, "deactivate_tag", deactivate)

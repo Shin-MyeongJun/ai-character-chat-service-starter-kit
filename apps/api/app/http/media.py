@@ -3,6 +3,7 @@
 # 전송 시작 뒤 발생한 읽기 오류는 media_errors의 HTTP 변환 범위 밖이다.
 """Additive binary HTTP transport; existing JSON media DTOs remain unchanged."""
 
+import asyncio
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from tempfile import SpooledTemporaryFile
@@ -88,7 +89,13 @@ class MediaStreamingResponse(StreamingResponse):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
             await super().__call__(scope, receive, send)
-        finally:
+        except BaseException:
+            try:
+                await self.opened.aclose()
+            except (Exception, asyncio.CancelledError):
+                pass  # Cleanup is settled; preserve the original stream failure.
+            raise
+        else:
             await self.opened.aclose()
 
 

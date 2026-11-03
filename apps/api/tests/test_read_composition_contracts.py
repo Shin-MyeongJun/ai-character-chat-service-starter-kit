@@ -23,11 +23,11 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.http import conversation_directory as DirectoryHttp
 from app.http.mapper.conversation_directory import recent_conversations_page_to_response
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as ChatTypes
-from app.modules.chatting.conversation import types as ConversationTypes
-from app.use_cases import conversation_directory as Service
+from app.modules.chatting.chat.service import views as Service
 
 
 @dataclass
@@ -70,13 +70,13 @@ class DirectoryFixture:
         at: datetime | None = None,
         cursor: UUID | None = None,
         owner: UUID | None = None,
-    ) -> Service.RecentConversationsPageView:
+    ) -> ChatTypes.RecentConversationsPageView:
         return await Service.list_recent_conversations(
             self.session,
-            ConversationTypes.ListOwnedConversationsCommand(
+            ChatTypes.ListRecentConversationsCommand(
                 user_id=owner or self.owner,
                 limit=limit,
-                cursor_created_at=at,
+                cursor_activity_at=at,
                 cursor_id=cursor,
             ),
         )
@@ -348,25 +348,30 @@ async def test_live_activity_can_move_before_existing_cursor_until_refresh(
 
 
 @pytest.mark.asyncio
-async def test_compatibility_entry_point_preserves_command_and_view_defaults(
+async def test_http_activity_cursor_maps_to_chat_command_and_preserves_view_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    page = Service.RecentConversationsPageView(
+    page = ChatTypes.RecentConversationsPageView(
         items=(), next_cursor_created_at=None, next_cursor_id=None
     )
     assert page.total == 0
-    room = Service.RecentConversationView(
+    room = ChatTypes.RecentConversationView(
         UUID(int=1), UUID(int=2), None, datetime.now(UTC), None
     )
     assert room.last_activity_at is None
     reader = AsyncMock(return_value=page)
-    monkeypatch.setattr(Service.ChatViewsService, "list_recent_conversations", reader)
+    monkeypatch.setattr(Service, "list_recent_conversations", reader)
     at = datetime(2026, 10, 29, tzinfo=UTC) + timedelta(hours=1)
-    command = ConversationTypes.ListOwnedConversationsCommand(
-        UUID(int=99), 7, at, UUID(int=1)
-    )
+    command = ChatTypes.ListRecentConversationsCommand(UUID(int=99), 7, at, UUID(int=1))
     async with AsyncSession() as session:
-        assert await Service.list_recent_conversations(session, command) is page
+        response = await DirectoryHttp.list_mine(
+            session,
+            command.user_id,
+            limit=7,
+            cursor_created_at=at.isoformat(),
+            cursor_id=command.cursor_id,
+        )
+        assert response.total == 0 and response.items == []
         reader.assert_awaited_once_with(
             session,
             ChatTypes.ListRecentConversationsCommand(

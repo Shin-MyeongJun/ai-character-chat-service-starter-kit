@@ -1,4 +1,4 @@
-"""Owner's cross-module conversation directory HTTP boundary."""
+"""Owner's activity directory; the public cursor_created_at carries activity time."""
 
 from datetime import datetime
 from uuid import UUID
@@ -7,9 +7,9 @@ from fastapi import APIRouter, Query
 
 from app.http.dependencies import Owner, Session, errors
 from app.http.mapper.conversation_directory import recent_conversations_page_to_response
+from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service import views as ChatViewsService
 from app.modules.chatting.conversation import schemas as Schemas
-from app.modules.chatting.conversation import types as Types
-from app.use_cases.conversation_directory import list_recent_conversations
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -27,10 +27,13 @@ async def list_mine(
             datetime.fromisoformat(cursor_created_at) if cursor_created_at else None
         )
         return recent_conversations_page_to_response(
-            await list_recent_conversations(
+            await ChatViewsService.list_recent_conversations(
                 session,
-                Types.ListOwnedConversationsCommand(
-                    owner, limit, created_at, cursor_id
+                ChatTypes.ListRecentConversationsCommand(
+                    user_id=owner,
+                    limit=limit,
+                    cursor_activity_at=created_at,
+                    cursor_id=cursor_id,
                 ),
             )
         )

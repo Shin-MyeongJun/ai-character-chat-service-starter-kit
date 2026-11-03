@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import BinaryIO, Protocol, cast
@@ -74,16 +75,54 @@ class _S3AssetReader:
     ) -> None:
         self._body = body
         self._error_mapper = error_mapper
+        self._io_lock = threading.Lock()
+        self._closing = False
+        self._close_attempted = False
+        self._reads: set[asyncio.Task[bytes]] = set()
 
     async def read(self, size: int = -1) -> bytes:
+        if self._closing:
+            raise ValueError("The asset reader is closed.")
+        # Cancelling this await cannot stop the worker. The reader retains it;
+        # aclose joins outstanding reads before releasing cleanup ownership.
+        task = asyncio.create_task(self._read_chunk(size))
+        self._reads.add(task)
+        task.add_done_callback(self._finish_read)
+        return await asyncio.shield(task)
+
+    def _finish_read(self, task: asyncio.Task[bytes]) -> None:
+        self._reads.discard(task)
+        if not task.cancelled():
+            task.exception()  # Also retrieve failures after the read await cancelled.
+
+    def _read_body(self, size: int) -> bytes:
+        with self._io_lock:
+            if self._close_attempted:
+                raise ValueError("The asset reader is closed.")
+            return self._body.read(size)
+
+    async def _read_chunk(self, size: int) -> bytes:
         try:
-            return await asyncio.to_thread(self._body.read, size)
+            return await asyncio.to_thread(self._read_body, size)
         except BotoCoreError as exc:
             raise self._error_mapper(exc) from exc
 
+    def _close_body(self) -> None:
+        # Serialize physical I/O in the workers, not just the cancelled awaits.
+        with self._io_lock:
+            self._close_attempted = True
+            self._body.close()
+
     async def aclose(self) -> None:
+        # Stop admission separately from physical close. Admitted tasks may not
+        # have entered their worker yet and must still be allowed to read.
+        self._closing = True
+        # These shield-owned tasks finish only after their actual workers exit.
+        # Wait on the event loop; never spend a second worker waiting on the I/O
+        # lock while a cancelled caller's Body.read is still running.
+        await asyncio.gather(*tuple(self._reads), return_exceptions=True)
         try:
-            await asyncio.to_thread(self._body.close)
+            await asyncio.to_thread(self._close_body)
         except BotoCoreError as exc:
             raise self._error_mapper(exc) from exc
 

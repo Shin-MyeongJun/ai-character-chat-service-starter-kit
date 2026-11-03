@@ -1,5 +1,66 @@
 # U27 사용 조사·안전한 정리 (2026-11-02)
 
+## 후속 정리: 비서비스 상태에서 호환 경로 제거
+
+기존 빈 파일 5개 삭제 이후, 현재 서비스 중이 아니라는 사용자 지시에 따라
+호환 재노출의 내부 호출부를 현재 소유 경로로 옮기고 파일 7개를 추가 제거했다.
+이번 시작 시 작업 트리는 깨끗했다. HTTP·DB·저장 JSON 계약은 유지하며,
+아래의 오래된 Python import 경로 자체는 더 이상 제공하지 않는다.
+
+| 제거 대상 (`apps/api/app/` 기준) | 호출부의 현재 경로·판단 근거 |
+| --- | --- |
+| `modules/content/character/dependencies.py` | router/tag_router·테스트가 `http/character_dependencies.py`의 동일 함수 객체를 직접 사용 |
+| `modules/content/lorebook/dependencies.py` | router/tag_router·테스트가 `http/lorebook_dependencies.py`의 동일 함수 객체를 직접 사용 |
+| `modules/content/product/dependencies.py` | 앱 호출 없음. 테스트의 override를 `http/dependencies.py`로 연결 |
+| `modules/content/lorebook/constraints.py` | command·테스트가 이미 정의된 `types.py` 상수를 직접 사용. 값·검증 정책 불변 |
+| `modules/content/product/service/statistics.py` | HTTP·테스트가 공개 `service/query/statistics.py`를 직접 사용 |
+| `modules/llm/service/replacement.py` | 실행/종료 공지는 공개 `service/command/replacement.py`, 안내 조회는 `service/views/replacement.py`를 직접 사용 |
+| `use_cases/conversation_directory.py` | HTTP가 chat 공개 views/types에 직접 연결. 기존 `cursor_created_at`을 `cursor_activity_at`으로 변환 |
+
+추가로 실제 호출이 없는 `BaseLLMAdapter` 별칭과 adapters 패키지 export를 제거했다.
+`db/models/billing.py`의 `CreditAccount`, `CreditTransaction`,
+`CreditTransactionReason` 재노출도 제거했다. 유일한 호출 테스트는 소유 파일인
+`db/models/credit.py`로 옮겼으며 공통 `db.models` 등록/export는 그대로다.
+
+`__init__.py`를 제외한 0바이트 Python 파일은 앱에 더 이상 없다. 패키지 초기화 파일,
+공유 HTTP DTO를 제공하는 schemas, 현재 호출되는 공개 service/types는 유지했다.
+`LLMService`는 실제 테스트 호출이 있는 공개 서비스 이름이므로 유지한다.
+구독 모델은 Payment FK, 구형 신고 모델은 0027 이관 SQL에 연결되어 있다.
+credit/대화/신고/studio의 legacy 읽기·검증 분기도 실행 사용처가 있으므로 제거하지 않았다.
+가격 noop 정책은 견적 JSON에 결과를 기록하므로 유지한다. DB migration은 변경하지 않았다.
+
+### 후속 검증 결과
+
+프로젝트 `.venv/Scripts/python.exe`를 사용했다. 앱·테스트·Alembic·tools의 Python
+788개 → 781개를 AST로 조사했다. 상대 import/부모 패키지 import/모듈 문자열을 포함한
+후보 참조 23곳을 이전했고, 삭제 후 후보 참조는 0건이다. 파일명·점 경로 추가 검색에서도
+실행 참조는 없었다. 아래 계약 해시는 1차 기록의 값과도 동일하다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 실행 진입점 8개 import | 모두 성공. lifespan·CLI 업무·DB·외부 공급자 호출 없음 |
+| 전후 전체 OpenAPI JSON | 84경로·114연산, 해시 동일 |
+| 전후 PostgreSQL DDL/인덱스·FK 해석 | 76테이블, 해시 동일·모든 FK 대상 해석 성공 |
+| 공통 `app.db.models.__all__` | 58개, 이름·순서 해시 동일 |
+| `tools/check_backend_quality.py` | 통과: 기준선 0, Ruff format 388파일·lint 통과, mypy 367소스, 아키텍처/패턴 13 passed |
+| 관련 업무/HTTP 회귀 12파일 | **364 passed / 0 failed / 0 skipped**, 9.84초. 기존 Starlette 422 명칭 경고 2건 |
+| 전체 API 테스트 수집 | **2152 tests collected**, import/수집 오류 없음 |
+| `git diff --check` | 통과 |
+
+기존 대화 목록 호환 wrapper 테스트는 실제 HTTP handler의 cursor→chat Command 연결과
+DTO/View 기본값 검증으로 갱신했다. DB 페이지/정렬/인가·HTTP dependency override·
+모델 교체·통계·과금 관련 기존 계약 테스트를 사용했으며 검사 예외는 늘리지 않았다.
+실제 PostgreSQL 데이터/잠금·외부 공급자는 이번 후속 정리에서 실행하지 않았다.
+
+샌드박스에서는 `asyncio.run(asyncio.sleep(0))`도 8초 제한 안에 끝나지 않아 첫 회귀를
+중단하고, 같은 회귀를 승인된 일반 실행 환경에서 통과시켰다. 품질 검사는 샌드박스에서
+통과했다. 로그는 `tmp/u27-followup-quality.log`,
+`tmp/u27-followup-regression-approved.log`, `tmp/u27-followup-collection.log`에 있다.
+일회 조사·전후 기준은 `tmp/u27_followup_audit.py`,
+`tmp/u27-followup-contracts-before.json`에 로컬 보존했다. commit/push는 하지 않았다.
+
+## 1차 정리 기록: 빈 파일 5개 제거
+
 저장소 안에서 import·실행 진입점·사용처가 없는 것으로 확인한 0바이트 Python 파일
 5개만 제거했다. legacy 모델·테이블·재노출 API·가격 정책은 보존했다. 기존
 staged/unstaged/untracked 변경이 있는 작업 트리를 기준으로 조사·검증했다.

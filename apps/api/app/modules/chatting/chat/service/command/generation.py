@@ -35,7 +35,7 @@ from app.modules.content.product.service.command.statistics_queue import (
 )
 from app.modules.content.product.service.query import ensure_available
 from app.modules.llm import types as LlmTypes
-from app.modules.llm.service.replacement import resolve_execution
+from app.modules.llm.service.command.replacement import resolve_execution
 
 
 def result_digest(value: Types.GenerationResult) -> str:

@@ -7,12 +7,13 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from app.db.models.lorebook import Lorebook, LorebookEntry
-from app.modules.content.lorebook import constraints, repository, types
-from app.modules.content.lorebook.service import command as service
 from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models.lorebook import Lorebook, LorebookEntry
+from app.modules.content.lorebook import repository, types
+from app.modules.content.lorebook.service import command as service
 
 pytestmark = pytest.mark.asyncio
 
@@ -177,11 +178,11 @@ async def test_create_returns_result_with_db_defaults_after_commit(
     ("operation", "field", "value"),
     [
         ("create", "title", " \t"),
-        ("create", "title", "x" * (constraints.LOREBOOK_TITLE_MAX_LENGTH + 1)),
+        ("create", "title", "x" * (types.LOREBOOK_TITLE_MAX_LENGTH + 1)),
         (
             "create",
             "description",
-            "x" * (constraints.LOREBOOK_DESCRIPTION_MAX_LENGTH + 1),
+            "x" * (types.LOREBOOK_DESCRIPTION_MAX_LENGTH + 1),
         ),
         ("create", "visibility", "unknown"),
         ("update", "title", " \t"),
@@ -323,7 +324,9 @@ async def test_create_entry_returns_result_after_owned_parent_check(
         pytest.param("create_entry", {"content": "\n "}, id="blank-content"),
         pytest.param("create_entry", {"title": "\t"}, id="blank-title"),
         pytest.param("create_entry", {"entry_type": "unknown"}, id="entry-type"),
-        pytest.param("create_entry", {"activation_type": "unknown"}, id="activation-type"),
+        pytest.param(
+            "create_entry", {"activation_type": "unknown"}, id="activation-type"
+        ),
         pytest.param("create_entry", {"match_mode": "unknown"}, id="match-mode"),
         pytest.param("create_entry", {"placement": "unknown"}, id="placement"),
         pytest.param("create_entry", {"token_budget": -1}, id="negative-token-budget"),
@@ -338,34 +341,38 @@ async def test_create_entry_returns_result_after_owned_parent_check(
         ),
         pytest.param(
             "create_entry",
-            {"priority": constraints.POSTGRES_INTEGER_MAX + 1},
+            {"priority": types.POSTGRES_INTEGER_MAX + 1},
             id="priority-overflow",
         ),
         pytest.param(
             "create_entry",
-            {"token_budget": constraints.POSTGRES_INTEGER_MAX + 1},
+            {"token_budget": types.POSTGRES_INTEGER_MAX + 1},
             id="token-budget-overflow",
         ),
         pytest.param(
             "create_entry",
-            {"content": "x" * (constraints.ENTRY_CONTENT_MAX_LENGTH + 1)},
+            {"content": "x" * (types.ENTRY_CONTENT_MAX_LENGTH + 1)},
             id="content-too-long",
         ),
         pytest.param(
             "create_entry",
-            {"key_triggers": ["x" * (constraints.ENTRY_TRIGGER_MAX_LENGTH + 1)]},
+            {"key_triggers": ["x" * (types.ENTRY_TRIGGER_MAX_LENGTH + 1)]},
             id="trigger-too-long",
         ),
-        pytest.param("create_entry", {"key_triggers": ["moon", " "]}, id="blank-trigger"),
+        pytest.param(
+            "create_entry", {"key_triggers": ["moon", " "]}, id="blank-trigger"
+        ),
         pytest.param(
             "create_entry",
             {"match_mode": "regex", "key_triggers": ["["]},
             id="invalid-regex",
         ),
-        pytest.param("create_entry", {"metadata": {"bad": object()}}, id="non-json-metadata"),
+        pytest.param(
+            "create_entry", {"metadata": {"bad": object()}}, id="non-json-metadata"
+        ),
         pytest.param(
             "create_entry",
-            {"metadata": {"large": "x" * constraints.ENTRY_METADATA_MAX_BYTES}},
+            {"metadata": {"large": "x" * types.ENTRY_METADATA_MAX_BYTES}},
             id="metadata-too-large",
         ),
         pytest.param("update_entry", {"content": " "}, id="update-blank-content"),

@@ -330,7 +330,9 @@ def test_studio_save_keeps_json_values_and_uses_trusted_ids(api, monkeypatch):
 def test_statistics_query_passes_dates_and_version_and_keeps_exact_currency_strings(
     api, monkeypatch
 ):
-    from app.modules.content.product.service import statistics as StatisticsService
+    from app.modules.content.product.service.query import (
+        statistics as StatisticsService,
+    )
 
     client, _app, session, owner_id = api
     product_id, snapshot_id = uuid4(), uuid4()

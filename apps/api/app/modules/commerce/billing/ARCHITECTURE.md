@@ -1,5 +1,11 @@
 # Billing 모듈
 
+## U27 호환 경로 정리 (2026-11-02)
+
+db/models/billing.py의 CreditAccount/CreditTransaction/CreditTransactionReason
+재노출을 제거했다. 유일한 호출 테스트는 실제 소유 파일 db/models/credit.py로 옮겼다.
+공통 모델 등록·DB 스키마·credit 공개 service/types와 견적/정책 JSON은 유지한다.
+
 ## U27 빈 파일·legacy 조사 (2026-11-02)
 
 0바이트 `router.py`, `schemas.py`는 import·문자열 로딩·실행/배포 진입점 참조가 없어

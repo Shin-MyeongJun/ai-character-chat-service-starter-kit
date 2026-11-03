@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.http.contracts import tags as Schemas
 from app.http.dependencies import errors
-from app.modules.content.lorebook import types as Types
-from app.modules.content.lorebook.dependencies import (
+from app.http.lorebook_dependencies import (
     get_current_owner_id,
     get_lorebook_session,
 )
+from app.modules.content.lorebook import types as Types
 from app.modules.content.lorebook.mapper import tag_schema as SchemaMapper
 from app.modules.content.lorebook.service import tags as TagsService
 

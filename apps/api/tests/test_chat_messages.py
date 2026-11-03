@@ -8,7 +8,11 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from app.db.models.billing import CreditAccount, CreditTransaction, Payment, UsageLog
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from test_product_usage import scenario
+
+from app.db.models.billing import Payment, UsageLog
 from app.db.models.chat import (
     Conversation,
     ConversationCharacter,
@@ -16,6 +20,7 @@ from app.db.models.chat import (
     Message,
     MessageRequest,
 )
+from app.db.models.credit import CreditAccount, CreditTransaction
 from app.db.models.memory import ConversationMemory
 from app.db.models.product_usage import ProductGeneration, ProductPaymentEvent
 from app.db.transaction import use_case_transaction
@@ -33,9 +38,6 @@ from app.modules.commerce.billing import types as BillingTypes
 from app.modules.commerce.billing.service.command.attribution import record_sale
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service.command.releases import publish_product
-from sqlalchemy import func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from test_product_usage import scenario
 
 pytestmark = pytest.mark.asyncio
 

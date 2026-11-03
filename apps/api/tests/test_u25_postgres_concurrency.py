@@ -7,7 +7,7 @@ from typing import Literal, TypeVar
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import ScalarResult, Select, text
+from sqlalchemy import ScalarResult, Select, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tag import Tag
@@ -130,7 +130,7 @@ async def test_overlapping_resolves_cross_batch_boundary(db: AsyncSession) -> No
 
 
 @pytest.mark.parametrize("action", ["rename", "deactivate"])
-async def test_resolve_share_lock_delays_admin_change(
+async def test_resolve_share_lock_rejects_admin_change_without_waiting(
     db: AsyncSession, action: str
 ) -> None:
     actor = await seed_admin(db)
@@ -150,17 +150,18 @@ async def test_resolve_share_lock_delays_admin_change(
             session, TagTypes.DeactivateTagCommand(tag.id, actor)
         )
 
-    resolved, changed = await run_blocked(db, resolve, change)
+    async with AsyncSession(db.bind, expire_on_commit=False) as resolver:
+        async with use_case_transaction(resolver):
+            resolved = await resolve(resolver)
+            with pytest.raises(ValueError, match="Tag dictionary is busy"):
+                await asyncio.wait_for(change(db), 5)
     assert resolved[0] == tag
-    assert changed is not None and changed.id == tag.id
     row = (
         await db.execute(
             text("SELECT name,is_active FROM tags WHERE id=:id"), {"id": tag.id}
         )
     ).one()
-    assert (row.name, row.is_active) == (
-        ("renamed", True) if action == "rename" else ("old", False)
-    )
+    assert (row.name, row.is_active) == ("old", True)
 
 
 @pytest.mark.parametrize("retained", [False, True])
@@ -257,7 +258,7 @@ async def test_admin_rename_precedes_resolve_insert(
     )
 
 
-async def test_admin_rename_between_insert_and_share_rolls_back_resolve(
+async def test_admin_rename_between_insert_and_share_conflicts_without_aborting_resolve(
     db: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     actor = await seed_admin(db)
@@ -282,32 +283,34 @@ async def test_admin_rename_between_insert_and_share_rolls_back_resolve(
         try:
             async with asyncio.timeout(15):
                 await reached_select.wait()
-                changed = await TagCommand.update_tag(
-                    db, TagTypes.UpdateTagCommand(tag.id, actor, "renamed")
-                )
+                with pytest.raises(ValueError, match="Tag dictionary is busy"):
+                    await TagCommand.update_tag(
+                        db, TagTypes.UpdateTagCommand(tag.id, actor, "renamed")
+                    )
                 release_select.set()
-                with pytest.raises(ValueError, match="Tag name changed concurrently"):
-                    await task
-                assert changed.id == tag.id
+                resolved = await task
+                assert tuple(info.name for info in resolved) == ("a new", "old")
+                assert resolved[1].id == tag.id
         finally:
             release_select.set()
             if not task.done():
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-    assert (await db.execute(text("SELECT name FROM tags"))).scalars().all() == [
-        "renamed"
-    ]
+    assert set((await db.execute(text("SELECT name FROM tags"))).scalars()) == {
+        "a new",
+        "old",
+    }
 
 
 async def test_cancel_blocked_resolve_rolls_back_prior_batch(db: AsyncSession) -> None:
     # The follower inserts 500 names before its second batch reaches the lock.
-    actor = await seed_admin(db)
     tag = (await TagCommand.resolve_tags(db, TagTypes.ResolveTagsCommand(("z",))))[0]
 
     async def hold(session: AsyncSession) -> TagTypes.TagInfo:
-        return await TagCommand.deactivate_tag(
-            session, TagTypes.DeactivateTagCommand(tag.id, actor)
-        )
+        # Model an outer caller's existing row lock without the admin service's
+        # new table fence, so the resolver really completes its first 500 writes.
+        await session.execute(select(Tag).where(Tag.id == tag.id).with_for_update())
+        return tag
 
     async def resolve(session: AsyncSession) -> tuple[TagTypes.TagInfo, ...]:
         return await TagCommand.resolve_tags(
@@ -317,7 +320,7 @@ async def test_cancel_blocked_resolve_rolls_back_prior_batch(db: AsyncSession) -
 
     await run_blocked(db, hold, resolve, cancel_second=True)
     assert await db.scalar(text("SELECT count(*) FROM tags")) == 1
-    assert await db.scalar(text("SELECT is_active FROM tags WHERE name='z'")) is False
+    assert await db.scalar(text("SELECT is_active FROM tags WHERE name='z'")) is True
 
 
 async def seed_products(db: AsyncSession, count: int = 1) -> list[UUID]:

@@ -10,12 +10,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.content.character import schemas as Schemas
-from app.modules.content.character import types as Types
-from app.modules.content.character.dependencies import (
+from app.http.character_dependencies import (
     get_character_session,
     get_current_owner_id,
 )
+from app.modules.content.character import schemas as Schemas
+from app.modules.content.character import types as Types
 from app.modules.content.character.mapper.schema import (
     CharacterSchemaMapper as SchemaMapper,
 )

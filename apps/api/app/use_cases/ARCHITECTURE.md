@@ -1,5 +1,53 @@
 # 모듈 외부의 유스케이스 조립
 
+## Gemini 검토 후 발행 동일성 보완 (2026-11-03)
+
+기록된 revision/fingerprint 영수증은 기존 순서대로 먼저 재생하며 다른 요청은 409다.
+영수증이 없는 새 요청은 무변경 발행도 release note를 검증한다. 문서 digest가 같을 때
+product 공개 snapshot 조회로 이전 불변 snapshot의 model.id/reasoning_effort를 비교한다.
+현재 상품의 가변 설정이나 이전 요청 fingerprint로 발행 설정을 추정하지 않는다.
+설정이 다르거나 legacy snapshot에 비교할 모델 정보가 없으면 정상 발행 경로를 실행한다.
+모델·추론 설정의 하위 검증, 원본/설정/스냅샷/매핑/영수증의 단일 트랜잭션을 유지한다.
+기존 snapshot은 수정하지 않는다. 문서와 발행 설정이 같은 경우 유효한 메모만 바꿔도
+기존 무변경 생략 정책으로 이전 release를 반환하고 현재 revision 영수증을 저장한다.
+legacy 매핑 채택·영수증 복구도 같은 snapshot 비교를 통과한다. 저장 JSON은 바꾸지 않는다.
+
+태그 관리자 변경은 tag 모듈의 비대기 테이블 fencing을 따른다. 아래 이전 절의
+전역 배타 잠금 없음은 당시 구현 이력이며 관리자 변경의 새 충돌 정책은 tag 문서가 기준이다.
+
+## IEA-02/03 스튜디오 발행 (2026-11-03)
+
+`publish_studio`는 advisory → product → draft 잠금과 revision/영수증 검사를 유지한다.
+변경 발행은 문서·로어/장면 값을 검증하고 기존 character를 ID순으로, 기존 lorebook을
+공개 소유 조회로 먼저 잠근다. 단독 콘텐츠 태그 쓰기의 부모→사전 순서를 유지한다.
+이후 work·전체 character·lorebook의 태그 이름을 모아 tag 공개 `acquire_tag_names`로
+먼저 획득한다. 사전 전체가 아닌 요청 이름 집합만
+정확한 이름순 INSERT/SHARE로 확보한 뒤 기존 구성요소 쓰기를 순차 실행한다.
+여러 개별 resolve의 정렬만으로 신규 이름 UNIQUE 대기가 교차하던 순서를 제거한다.
+
+선획득은 연결 권한을 부여하지 않는다. 각 콘텐츠 서비스는 자기 부모 잠금 아래 읽은
+기존 연결 ID로 resolve_tags를 다시 호출해 비활성 유지/신규 거절을 검사한다. 관리자
+이름·활성 변경 fencing, 원래 입력 순서와 정규화, 소유권·원자적 rollback은 유지한다.
+전역 배타 잠금·예외 재시도·내부 commit·외부 공급자 호출은 추가하지 않는다.
+
+snapshot 재사용 성공도 `_record_publication_receipt`로 현재 revision/fingerprint와
+기존 release를 같은 트랜잭션에 저장한다. legacy receipt는 기존 component_mapping의
+서버 ID 채택 경로를 거쳐 기록한다. 이전 영수증·매핑·snapshot JSON과 문서 revision은
+보존하며 snapshot을 새로 만들지 않는다. 이미 기록된 요청의 재생은 쓰기 없이 반환하고,
+같은 revision의 다른 인자는 기존대로 충돌한다. 영수증 저장 실패는 성공으로 반환하지 않는다.
+
+회귀는 test_studio_publication_db의 독립 연결·실행 장벽·pg_blocking_pids 관찰과
+HTTP D→E→D→무변경 발행→다음 저장→재생, rollback/재시도·관리자 fencing·비활성
+연결 범위를 포함한다. 실행 여부와 환경 제한은 새 전용 감사 보고서에 구분해 기록한다.
+
+## U27 호환 경로 정리 (2026-11-02)
+
+conversation_directory.py 호환 연결을 제거했다. 조회/조합 책임이 이미 chat 공개
+service/views에 있으므로 HTTP와 HTTP mapper가 chat 공개 service/types를 직접 참조한다.
+HTTP cursor_created_at 이름과 활동 시각 의미, View 기본값·권한·페이지 계약은 유지한다.
+통계 및 스튜디오의 교차 모듈 유스케이스 조립 책임은 이 계층에 유지한다.
+아래 날짜별 conversation_directory 설명은 제거 전 이력이다.
+
 ## U04 스튜디오 저장 교차 잠금 (2026-10-30)
 
 revision 지정 `save_studio`, `prepare_components`, `publish_studio`의 공통 진입점인
@@ -76,7 +124,7 @@ HTTP의 진단 입력은 계속 자유 객체 목록이며 새 TypedDict 입력 
 
 ## 기존 조립 책임과 설계 이력
 
-현재 이 계층은 `product_statistics.py`, `conversation_directory.py`, `studio_publication.py`를 유지한다. 대화 시작은 conversation/service/command, 답변 생성·문맥 준비·완료·기억 실행은 chat/service/workflow가 소유한다. U11의 conversation_directory는 기존 HTTP/Python 진입점과 View 이름을 보존하는 얇은 연결이며 목록 조회 책임은 chat 공개 views에 있다.
+현재 이 계층은 `product_statistics.py`와 스튜디오 저장·구성·발행 조립부를 유지한다. 대화 시작은 conversation/service/command, 답변 생성·문맥 준비·완료·기억 실행은 chat/service/workflow가 소유한다. U11의 conversation_directory는 기존 HTTP/Python 진입점과 View 이름을 보존하는 얇은 연결이며 목록 조회 책임은 chat 공개 views에 있다.
 
 - `rebuild_day(RebuildDayCommand)`: conversation 방/버전 사실, chat 생성 사실, billing 사용량/매출 사실을 product 공개 통계 저장 Command로 조합한다.
 - `process_pending(ProcessPendingCommand)`: 날짜 작업 잠금·재집계·완료를 한 트랜잭션으로 처리한다. 실패하면 큐를 보존한다.
