@@ -18,6 +18,7 @@ from app.modules.content.product.mapper.file_versions import FileStorageInfo
 from app.modules.content.product.service.command import (
     file_versions as FileVersionsCommandService,
 )
+from app.modules.content.product.service.query import album as AlbumQueryService
 
 MAX_PRODUCT_FILE_BYTES = 32 * 1024 * 1024
 PRODUCT_IMAGE_CONTENT_TYPES = frozenset(
@@ -123,6 +124,19 @@ class ProductFileVersionWorkflow:
                 ),
                 source_media_id=command.media_id,
             )
+
+    async def read_product_album_file(
+        self, command: Types.ReadProductAlbumFileCommand
+    ) -> AssetStorageTypes.AssetReadInfo:
+        """Authorize the current album occurrence and return a caller-owned reader."""
+        async with self.session_factory() as session, use_case_transaction(session):
+            reference = await AlbumQueryService.authorize_product_album_file(
+                session, command
+            )
+            info = await FileVersionsCommandService._get_referenced_file_version(
+                session, reference
+            )
+        return await self._open_file_version(info)
 
     async def read_owned_product_file_version(
         self, command: Types.ReadOwnedProductFileVersionCommand

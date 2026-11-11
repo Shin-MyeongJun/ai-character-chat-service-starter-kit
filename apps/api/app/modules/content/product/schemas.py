@@ -20,6 +20,27 @@ class RequestDto(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class LockedProductAlbumItemResponseDto(ResponseDto):
+    image_item_id: UUID
+    status: Literal["locked"] = "locked"
+
+
+class UnlockedProductAlbumItemResponseDto(ResponseDto):
+    image_item_id: UUID
+    status: Literal["unlocked"] = "unlocked"
+    file_version_id: UUID
+    alt: str
+    unlocked_at: datetime
+    content_url: str
+
+
+class ProductAlbumResponseDto(ResponseDto):
+    product_id: UUID
+    product_snapshot_id: UUID | None
+    available: bool
+    items: list[LockedProductAlbumItemResponseDto | UnlockedProductAlbumItemResponseDto]
+
+
 class ImportProductFileVersionRequestDto(RequestDto):
     media_id: UUID
 

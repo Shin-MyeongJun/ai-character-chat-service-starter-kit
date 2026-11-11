@@ -37,6 +37,25 @@
 - `chat_image_digest`는 정규화한 카탈로그와 순서 있는 시작 블록을 비교한다. 파일·조건·배치만 바뀐 발행도 기존 릴리스 분류에서 콘텐츠 변경으로 처리한다. 발행 시 발급한 UUID는 이 해시에 포함하지 않는다.
 - 파일마다 `kind="snapshot"`과 스냅샷 UUID로 참조를 보존한다. 카탈로그·시작 블록·파일 참조·최신 포인터·릴리스·스튜디오 영수증은 한 트랜잭션에서 확정한다. 이전 발행본의 파일 참조는 초안 편집, 교체 발행과 버전 만료 후에도 유지한다.
 
+## U19 a5 작품 앨범과 해금
+
+- product가 `product_image_unlocks`를 소유한다. `repository/album.py`는
+  `(account_id, product_id, image_item_id)` 기본 키 충돌을 무시하고 최초 해금 시각을 보존한다.
+  계정/작품 삭제 시 기록을 정리하며 파일·스냅샷·대화에 대한 FK는 없다.
+- a6/a7은 `service/command/album.py::unlock_product_images(session, command) -> None`에
+  `UnlockProductImagesCommand(account_id=…, product_id=…, image_item_ids=(…))`를 전달한다.
+  호출자는 선택된 첫 장면 또는 확정 답변의 검증된 이미지 블록에서 수집 항목 ID를 꺼내고,
+  해당 기록을 저장하는 것과 같은 세션/트랜잭션을 사용한다. 서비스는 항목 ID를 중복 제거하고
+  정렬해 삽입하며 빈 입력은 그대로 반환한다. commit/rollback은 호출자가 소유한다.
+  과거 발행본에서 발생한 항목도 해금할 수 있으며 현재 앨범 노출은 최신 발행본으로 결정한다.
+- `service/query/album.py`는 작품 접근권 및 최신 발행본을 확인하고 발행 순서로 해금을 결합한다.
+  최신 발행본이 없거나 만료됐으면 스냅샷 ID가 null이며 이미지가 없는 발행본은 ID를 유지한다.
+  두 경우 모두 `available: false`와 빈 배열을 반환한다. 잠김 행에는 항목 ID와 상태만 있다.
+- 앨범 파일은 같은 접근 규칙과 최신 발행본의 정확한 항목·파일 버전 쌍, 계정 해금,
+  스냅샷 보존 참조를 검사한다. `ProductFileVersionWorkflow.read_product_album_file`은
+  인가가 끝난 뒤 기존 reader를 열며 `app/http/media.py`의 비공개 스트림이 이를 닫는다.
+  잠김·과거 URL·작품 접근 불가·미존재에는 동일한 404를 반환한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 미사용 dependencies.py와 통계 조회 재노출 service/statistics.py를 제거했다.

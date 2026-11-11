@@ -8,6 +8,9 @@ models/credit.py에서 직접 참조하며 models/__init__.py의 공통 등록/e
 
 이 문서는 현재 SQLAlchemy 모델·repository·마이그레이션을 연결해서 읽기 위한 안내다. 테이블이나 실행 로직은 변경하지 않았다. [전체 점검 목록](../../../../references_document/backend_review/checklist.md)과 [발견 사항](../../../../references_document/backend_review/findings.md)을 함께 본다.
 
+U19 a5의 `models/product_album.py`는 계정·작품·수집 항목별 최초 해금을 보존한다.
+Alembic 0038과 PostgreSQL 초기화 028이 같은 테이블을 만들며 계정/작품 삭제는 해금 기록에 전파된다.
+
 ## 트랜잭션과 잠금
 
 `types.SessionFactory`는 인자 없이 호출하면 `AsyncSession`의 비동기 컨텍스트를

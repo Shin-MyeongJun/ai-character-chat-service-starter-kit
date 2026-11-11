@@ -274,6 +274,28 @@ async def import_product_file_version(
     return ProductSchemaMapper.file_version_info_to_response(info)
 
 
+@router.get(
+    "/products/{product_id}/album/items/{image_item_id}/files/{file_version_id}/content"
+)
+async def read_product_album_file(
+    product_id: UUID,
+    image_item_id: UUID,
+    file_version_id: UUID,
+    owner: Owner,
+    service: ProductFileVersions,
+) -> MediaStreamingResponse:
+    with media_errors():
+        opened = await service.read_product_album_file(
+            ProductTypes.ReadProductAlbumFileCommand(
+                product_id=product_id,
+                account_id=owner,
+                image_item_id=image_item_id,
+                file_version_id=file_version_id,
+            )
+        )
+    return MediaStreamingResponse(opened)
+
+
 @router.get("/products/{product_id}/media/{file_version_id}/content")
 async def read_owned_product_file_version(
     product_id: UUID, file_version_id: UUID, owner: Owner, service: ProductFileVersions

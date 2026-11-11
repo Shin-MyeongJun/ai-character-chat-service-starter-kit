@@ -31,6 +31,52 @@ ProductJsonObject: TypeAlias = dict[str, ProductJsonValue]
 RETIRED_STUDIO_IMAGE_ITEMS = "_retiredChatImageItemIds"
 
 
+@dataclass(frozen=True, slots=True)
+class UnlockProductImagesCommand:
+    account_id: UUID
+    product_id: UUID
+    image_item_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GetProductAlbumCommand:
+    account_id: UUID
+    product_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ReadProductAlbumFileCommand:
+    account_id: UUID
+    product_id: UUID
+    image_item_id: UUID
+    file_version_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ProductAlbumImageInfo:
+    image_item_id: UUID
+    file_version_id: UUID
+    alt: str
+
+
+@dataclass(frozen=True, slots=True)
+class LockedProductAlbumItemInfo:
+    image_item_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class UnlockedProductAlbumItemInfo:
+    image: ProductAlbumImageInfo
+    unlocked_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProductAlbumInfo:
+    product_id: UUID
+    product_snapshot_id: UUID | None
+    items: tuple[LockedProductAlbumItemInfo | UnlockedProductAlbumItemInfo, ...]
+
+
 class ProductSnapshotData(TypedDict):
     """Published profile fields; legacy omissions and extension data are retained."""
 

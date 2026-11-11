@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.http.dependencies import Owner, Session, errors
 from app.modules.content.product import schemas as Schemas
@@ -22,11 +22,25 @@ from app.modules.content.product.service.command import (
 from app.modules.content.product.service.command import (
     settings as SettingsCommandService,
 )
+from app.modules.content.product.service.query import album as AlbumQueryService
 from app.modules.content.product.service.query.studio import get_studio_draft
 from app.modules.content.product.service.views import notices as NoticesViewsService
 from app.modules.content.product.tag_router import router as TagsRouter
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+@router.get("/{product_id}/album", response_model=Schemas.ProductAlbumResponseDto)
+async def read_product_album(
+    product_id: UUID, response: Response, session: Session, owner: Owner
+) -> Schemas.ProductAlbumResponseDto:
+    with errors():
+        album = await AlbumQueryService.get_product_album(
+            session,
+            Types.GetProductAlbumCommand(product_id=product_id, account_id=owner),
+        )
+    response.headers["Cache-Control"] = "private, no-store"
+    return SchemaMapper.album_info_to_response(album)
 
 
 @router.get("/{product_id}/studio-draft", response_model=Schemas.StudioDraftResponseDto)

@@ -307,6 +307,8 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         "/products/{product_id}/media/uploads",
         "/products/{product_id}/media/imports",
         "/products/{product_id}/media/{file_version_id}/content",
+        "/products/{product_id}/album",
+        "/products/{product_id}/album/items/{image_item_id}/files/{file_version_id}/content",
         "/auth/csrf",
         "/auth/register",
         "/auth/email/resend",

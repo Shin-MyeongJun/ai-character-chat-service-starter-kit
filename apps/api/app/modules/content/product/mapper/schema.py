@@ -11,6 +11,42 @@ class ProductSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
+    def album_info_to_response(
+        info: Types.ProductAlbumInfo,
+    ) -> Schemas.ProductAlbumResponseDto:
+        items: list[
+            Schemas.LockedProductAlbumItemResponseDto
+            | Schemas.UnlockedProductAlbumItemResponseDto
+        ] = []
+        for item in info.items:
+            if isinstance(item, Types.LockedProductAlbumItemInfo):
+                items.append(
+                    Schemas.LockedProductAlbumItemResponseDto(
+                        image_item_id=item.image_item_id
+                    )
+                )
+                continue
+            image = item.image
+            items.append(
+                Schemas.UnlockedProductAlbumItemResponseDto(
+                    image_item_id=image.image_item_id,
+                    file_version_id=image.file_version_id,
+                    alt=image.alt,
+                    unlocked_at=item.unlocked_at,
+                    content_url=(
+                        f"/products/{info.product_id}/album/items/{image.image_item_id}"
+                        f"/files/{image.file_version_id}/content"
+                    ),
+                )
+            )
+        return Schemas.ProductAlbumResponseDto(
+            product_id=info.product_id,
+            product_snapshot_id=info.product_snapshot_id,
+            available=bool(info.items),
+            items=items,
+        )
+
+    @staticmethod
     def file_version_info_to_response(
         info: Types.ProductFileVersionInfo,
     ) -> Schemas.ProductFileVersionResponseDto:
