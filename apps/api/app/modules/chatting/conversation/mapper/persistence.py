@@ -118,7 +118,14 @@ def conversation_snapshot_infos_to_runtime_view(
         settings={
             key: value
             for key, value in snapshot_data.items()
-            if key not in {"opening_message", "studio_start_options"}
+            if key
+            not in {
+                "opening_message",
+                "studio_start_options",
+                "chat_image_digest",
+                "chat_image_items",
+                "starts",
+            }
         },
         start=start_context.start,
         opening_message=start_context.opening_message,

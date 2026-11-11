@@ -61,7 +61,11 @@ async def publish_product(
         )
         snapshot = await _build_publication(
             session,
-            Types.BuildPublicationCommand(product_id=product_id, owner_id=owner_id),
+            Types.BuildPublicationCommand(
+                product_id=product_id,
+                owner_id=owner_id,
+                studio_images=command.studio_images,
+            ),
         )
         kind = "initial"
         if previous:

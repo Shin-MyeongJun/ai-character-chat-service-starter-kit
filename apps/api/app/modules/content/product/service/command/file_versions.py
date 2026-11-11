@@ -170,16 +170,37 @@ async def _complete_file_upload(
     return replace(info.file, state=State.READY)
 
 
+async def _lock_ready_file_version(
+    session: AsyncSession, command: Types.GetProductFileVersionCommand
+) -> FileStorageInfo:
+    info = await _get_file_version(
+        session, command.product_id, command.file_version_id, lock=True
+    )
+    if info is None or info.file.state != State.READY:
+        raise LookupError("File version not found.")
+    return info
+
+
+async def lock_ready_product_file_version(
+    session: AsyncSession, command: Types.GetProductFileVersionCommand
+) -> Types.ProductFileVersionInfo:
+    """Validate a file under lock after the caller has authorized the product."""
+    if not session.in_transaction():
+        raise RuntimeError("File validation requires a caller transaction.")
+    return (await _lock_ready_file_version(session, command)).file
+
+
 async def retain_product_file_version(
     session: AsyncSession, command: Types.ProductFileReferenceCommand
 ) -> Types.ProductFileVersionInfo:
     """Pin the ready file in the same transaction as the caller's reference."""
     async with use_case_transaction(session):
-        info = await _get_file_version(
-            session, command.product_id, command.file_version_id, lock=True
+        info = await _lock_ready_file_version(
+            session,
+            Types.GetProductFileVersionCommand(
+                product_id=command.product_id, file_version_id=command.file_version_id
+            ),
         )
-        if info is None or info.file.state != State.READY:
-            raise LookupError("File version not found.")
         if not await FileVersionsRepository.has_file_reference(session, command):
             await FileVersionsRepository.insert_file_reference(session, command)
             if info.unreferenced_since is not None or info.awaiting_attachment:

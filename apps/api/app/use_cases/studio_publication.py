@@ -24,6 +24,9 @@ from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service.command import (
     composition as CompositionCommand,
 )
+from app.modules.content.product.service.command import (
+    file_versions as ProductFileVersionsCommandService,
+)
 from app.modules.content.product.service.command import releases as ReleasesCommand
 from app.modules.content.product.service.command import settings as SettingsCommand
 from app.modules.content.product.service.command.studio import (
@@ -31,6 +34,9 @@ from app.modules.content.product.service.command.studio import (
 )
 from app.modules.content.product.service.query.studio import (
     get_studio_draft_for_publication,
+)
+from app.modules.content.product.service.studio_images import (
+    prepare_studio_image_publication,
 )
 from app.modules.content.product.service.studio_validation import (
     validate_studio_document_shape,
@@ -261,6 +267,15 @@ async def publish_studio(
         # Only durable receipt replay may bypass validation. A new revision's
         # no-op still accepts a new request and must validate its release note.
         ReleasesCommand.validate_note(command.summary, command.body)
+        images = prepare_studio_image_publication(draft.document)
+        if images is not None:
+            for file_version_id in images.file_version_ids:
+                await ProductFileVersionsCommandService.lock_ready_product_file_version(
+                    session,
+                    ProductTypes.GetProductFileVersionCommand(
+                        product_id=command.product_id, file_version_id=file_version_id
+                    ),
+                )
         if draft.publication_digest == draft.content_digest and (
             draft.publication_release or {}
         ).get("snapshot_id"):
@@ -277,6 +292,8 @@ async def publish_studio(
             if (
                 model.get("id") == str(command.model_id)
                 and model.get("reasoning_effort") == command.reasoning_effort
+                and snapshot.snapshot_data.get("chat_image_digest")
+                == (images.digest if images is not None else None)
             ):
                 release = ProductTypes.ReleaseInfo(
                     UUID(prior["snapshot_id"]),
@@ -289,8 +306,6 @@ async def publish_studio(
                 return await _record_publication_receipt(
                     session, command, draft, mapping, fingerprint, release
                 )
-        if draft.document.get("chatImageItems"):
-            raise ValueError("Studio chat image publication is not available yet.")
         characters, lorebooks, scenes, work = _publication_content(draft.document)
         # Prepare every lore/scene value before domain writes begin.
         values: list[tuple[str, LoreTypes.LorebookEntryCommandFields]] = []
@@ -556,6 +571,24 @@ async def publish_studio(
                 product_id=command.product_id,
                 owner_id=command.owner_id,
                 value=ProductTypes.ReleaseNoteCommand(command.summary, command.body),
+                studio_images=(
+                    ProductTypes.StudioPublicationImagesInfo(
+                        items=images.items,
+                        start_blocks_by_entry_id={
+                            UUID(next_entries["scene:" + local_id]): blocks
+                            for local_id, blocks in images.start_blocks_by_scene_id.items()
+                        },
+                        character_ids_by_local_id=created_characters,
+                        lore_entry_ids_by_local_id={
+                            row["id"]: UUID(next_entries["lore:" + row["id"]])
+                            for row in lorebooks
+                        },
+                        lorebook_id=book_id,
+                        digest=images.digest,
+                    )
+                    if images is not None
+                    else None
+                ),
             ),
         )
         return await _record_publication_receipt(

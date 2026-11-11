@@ -1,10 +1,10 @@
 # 상위 publish 트랜잭션에서 원본을 잠그고 캐릭터·로어북 복사본과 상품 버전을 만든다.
-# content_digest는 콘텐츠/구성 비교용이며 이미지·에셋 변경은 releases의 별도 manifest로 판정한다.
+# 신규 채팅 이미지는 콘텐츠 digest에 포함한다. 기존 캐릭터 미디어는 별도 manifest로 비교한다.
 "Internal atomic publication builder; public command adds required release notes."
 
 import hashlib
 import json
-from typing import TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,9 @@ from app.modules.content.product.mapper import persistence as PersistenceMapper
 from app.modules.content.product.service import query as QueryService
 from app.modules.content.product.service.command import (
     settings as SettingsCommandService,
+)
+from app.modules.content.product.service.command.publication_images import (
+    _freeze_studio_publication_images,
 )
 from app.modules.llm import types as LlmTypes
 from app.modules.llm.service import query as LlmQueryService
@@ -49,6 +52,7 @@ class _CanonicalPublicationData(TypedDict):
     characters: list[_CanonicalCharacterData]
     lorebooks: list[_CanonicalLorebookData]
     starts: list[str]
+    chat_image_digest: NotRequired[str]
 
 
 async def _build_publication(
@@ -180,7 +184,7 @@ async def _build_publication(
                 ),
             }
         )
-    await Repository.add_snapshot_composition(
+    snapshot_slot_ids = await Repository.add_snapshot_composition(
         session,
         snapshot.id,
         composition,
@@ -209,6 +213,21 @@ async def _build_publication(
     final_data = data.copy()
     if scene_options:
         final_data["studio_start_options"] = scene_options
+    if command.studio_images is not None:
+        character_slot_ids, start_set_ids = snapshot_slot_ids
+        image_items, opening_starts = await _freeze_studio_publication_images(
+            session,
+            product_id,
+            snapshot.id,
+            command.studio_images,
+            character_slot_ids,
+            start_set_ids,
+            lorebook_snapshot_ids_by_source_id[command.studio_images.lorebook_id],
+        )
+        final_data["chat_image_items"] = image_items
+        final_data["starts"] = opening_starts
+        final_data["chat_image_digest"] = command.studio_images.digest
+        canonical["chat_image_digest"] = command.studio_images.digest
     final_data["content_digest"] = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()

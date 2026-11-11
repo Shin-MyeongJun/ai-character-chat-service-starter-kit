@@ -93,7 +93,7 @@ async def add_snapshot_composition(
     lorebook_snapshot_ids_by_source_id: Mapping[UUID, UUID],
     starts: Sequence[Types.ProductStartSetInfo],
     entries_by_id: Mapping[UUID, LorebookTypes.LorebookEntryInfo],
-) -> None:
+) -> tuple[dict[UUID, UUID], dict[UUID, UUID]]:
     # Source snapshots and the product snapshot have already been flushed.
     characters_by_link_id = {
         value.id: ProductSnapshotCharacter(
@@ -135,8 +135,8 @@ async def add_snapshot_composition(
     book_ids_by_source_id = {
         value.lorebook_id: books_by_link_id[value.id].id for value in composition.books
     }
-    session.add_all(
-        ProductSnapshotStartSet(
+    starts_by_entry_id = {
+        start.entry_id: ProductSnapshotStartSet(
             product_snapshot_id=snapshot_id,
             product_lorebook_id=book_ids_by_source_id[start.lorebook_id],
             source_entry_id=start.entry_id,
@@ -145,8 +145,16 @@ async def add_snapshot_composition(
             sort_order=start.sort_order,
         )
         for start in starts
-    )
+    }
+    session.add_all(starts_by_entry_id.values())
     await session.flush()
+    return (
+        {
+            value.character_id: characters_by_link_id[value.id].id
+            for value in composition.characters
+        },
+        {entry_id: row.id for entry_id, row in starts_by_entry_id.items()},
+    )
 
 
 async def finish_product_snapshot(

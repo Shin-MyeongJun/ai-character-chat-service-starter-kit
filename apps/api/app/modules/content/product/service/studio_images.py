@@ -1,12 +1,23 @@
 """Validate and normalize U19 chat images at the Studio document boundary."""
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from uuid import UUID
 
 from app.modules.content.product import types as Types
 
 _PARAGRAPH_SEPARATOR = re.compile(r"\r?\n(?:[ \t]*\r?\n)+")
+
+
+@dataclass(frozen=True, slots=True)
+class StudioImagePublicationDraftInfo:
+    items: tuple[Types.ProductJsonObject, ...]
+    file_version_ids: tuple[UUID, ...]
+    start_blocks_by_scene_id: dict[str, list[Types.ProductJsonValue]]
+    digest: str
 
 
 def _read_uuid(value: object, field: str) -> UUID:
@@ -149,3 +160,84 @@ def get_retired_studio_image_ids(
     value = document.get(Types.RETIRED_STUDIO_IMAGE_ITEMS, [])
     assert isinstance(value, list), "Retired studio image IDs are server-managed."
     return {_read_uuid(item, Types.RETIRED_STUDIO_IMAGE_ITEMS) for item in value}
+
+
+def _opening_paragraphs(opening: str) -> list[str]:
+    paragraphs: list[str] = []
+    offset = 0
+    prefix = ""
+    for separator in _PARAGRAPH_SEPARATOR.finditer(opening):
+        part = opening[offset : separator.end()]
+        if opening[offset : separator.start()].strip():
+            paragraphs.append(prefix + part)
+            prefix = ""
+        else:
+            prefix += part
+        offset = separator.end()
+    tail = prefix + opening[offset:]
+    if tail.strip():
+        paragraphs.append(tail)
+    elif paragraphs:
+        paragraphs[-1] += tail
+    return paragraphs
+
+
+def prepare_studio_image_publication(
+    document: Types.ProductJsonObject,
+) -> StudioImagePublicationDraftInfo | None:
+    scenes = document.get("scenes", [])
+    if "chatImageItems" not in document and not (
+        isinstance(scenes, list)
+        and any(
+            isinstance(scene, dict) and "openingImagePlacements" in scene
+            for scene in scenes
+        )
+    ):
+        return None
+    validated = normalize_studio_chat_images(document)
+    items = _read_objects(validated.get("chatImageItems", []), "chatImageItems")
+    if not items:
+        return None
+    files: set[UUID] = set()
+    blocks_by_item_id: dict[str, Types.ProductJsonObject] = {}
+    for item in items:
+        item_id = str(item["imageItemId"])
+        file_id = item["fileVersionId"]
+        if file_id is None:
+            raise ValueError("Studio chat images must be uploaded before publication.")
+        files.add(_read_uuid(file_id, "fileVersionId"))
+        blocks_by_item_id[item_id] = {
+            "type": "image",
+            "image_item_id": item_id,
+            "file_version_id": file_id,
+            "alt": item["alt"],
+        }
+
+    starts: dict[str, list[Types.ProductJsonValue]] = {}
+    for scene in _read_objects(validated.get("scenes", []), "scenes"):
+        opening = scene.get("opening", "")
+        scene_id = scene.get("id")
+        if not isinstance(opening, str) or not isinstance(scene_id, str):
+            raise ValueError("Invalid studio opening scene.")
+        placements: dict[int, list[Types.ProductJsonObject]] = {}
+        for placement in _read_objects(
+            scene.get("openingImagePlacements", []), "openingImagePlacements"
+        ):
+            position = placement["afterParagraph"]
+            assert isinstance(position, int), "Placement was normalized above."
+            placements.setdefault(position, []).append(
+                blocks_by_item_id[str(placement["imageItemId"])]
+            )
+        blocks: list[Types.ProductJsonValue] = [*placements.get(0, ())]
+        for position, paragraph in enumerate(_opening_paragraphs(opening), 1):
+            blocks.append({"type": "text", "text": paragraph})
+            blocks.extend(placements.get(position, ()))
+        starts[scene_id] = blocks
+    digest = hashlib.sha256(
+        json.dumps(
+            {"items": items, "starts": starts}, sort_keys=True, ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    return StudioImagePublicationDraftInfo(
+        tuple(items), tuple(sorted(files)), starts, digest
+    )

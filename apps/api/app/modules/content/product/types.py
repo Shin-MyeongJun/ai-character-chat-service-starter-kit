@@ -41,6 +41,9 @@ class ProductSnapshotData(TypedDict):
     replacement_policy: NotRequired[ProductJsonObject]
     content_digest: NotRequired[str]
     studio_start_options: NotRequired[ProductJsonObject]
+    chat_image_digest: NotRequired[str]
+    chat_image_items: NotRequired[list[ProductJsonObject]]
+    starts: NotRequired[list[ProductJsonObject]]
 
 
 class RevenueValues(TypedDict):
@@ -607,9 +610,20 @@ class VersionAvailabilityCommand:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class StudioPublicationImagesInfo:
+    items: tuple[ProductJsonObject, ...]
+    start_blocks_by_entry_id: dict[UUID, list[ProductJsonValue]]
+    character_ids_by_local_id: dict[str, UUID]
+    lore_entry_ids_by_local_id: dict[str, UUID]
+    lorebook_id: UUID
+    digest: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class BuildPublicationCommand:
     product_id: UUID
     owner_id: UUID
+    studio_images: StudioPublicationImagesInfo | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -656,6 +670,7 @@ class PublishCommand:
     product_id: UUID
     owner_id: UUID
     value: ReleaseNoteCommand
+    studio_images: StudioPublicationImagesInfo | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

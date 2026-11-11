@@ -30,6 +30,13 @@
 - `save_studio_draft`는 advisory → product → draft 잠금 아래 revision 확인 후 이전·새 파일 UUID의 합집합을 오름차순으로 잠근다. `(kind="draft", reference_id=product_id)`로 새 문서에 남는 ready 파일을 보존하고, 마지막 항목에서 제거된 파일만 해제한다. 동일 문서 재전송은 기존 revision을 돌려주며 참조 실패와 CAS 충돌은 초안 및 참조 쓰기를 함께 롤백한다. a2 업로드는 별도로 커밋되어 재시도할 수 있다.
 - 삭제된 수집 항목 ID의 재사용을 막는 목록은 초안 JSONB의 서버 관리 키에 저장한다. HTTP 초안 응답과 작성 문서 digest에는 이 키를 포함하지 않는다. a4는 잠긴 초안 revision의 항목과 장면 배치를 읽고 같은 작품의 ready 파일을 검증한 뒤 스냅샷 참조를 같은 발행 트랜잭션에서 보존한다.
 
+## U19 a4 이미지 발행 동결
+
+- `lock_ready_product_file_version`은 작품 소유권을 확인한 호출자의 트랜잭션에서 파일 행을 잠그고, 해당 작품의 ready 파일 Info를 반환한다. 참조 등록은 같은 ready 검사와 행 잠금을 사용한다.
+- 스튜디오 발행의 `PublishCommand.studio_images`는 검증된 항목, 원본 ID 매핑, 시작 블록과 이미지 digest를 전달한다. 발행 builder는 새 버전의 캐릭터 슬롯, 로어 스냅샷과 항목, 시작 세트 ID를 사용해 `snapshot_data.chat_image_items`와 `snapshot_data.starts`를 동결한다. 이미지가 없는 버전은 두 필드를 생략하며 조회자는 빈 카탈로그와 기존 시작 텍스트를 사용한다.
+- `chat_image_digest`는 정규화한 카탈로그와 순서 있는 시작 블록을 비교한다. 파일·조건·배치만 바뀐 발행도 기존 릴리스 분류에서 콘텐츠 변경으로 처리한다. 발행 시 발급한 UUID는 이 해시에 포함하지 않는다.
+- 파일마다 `kind="snapshot"`과 스냅샷 UUID로 참조를 보존한다. 카탈로그·시작 블록·파일 참조·최신 포인터·릴리스·스튜디오 영수증은 한 트랜잭션에서 확정한다. 이전 발행본의 파일 참조는 초안 편집, 교체 발행과 버전 만료 후에도 유지한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 미사용 dependencies.py와 통계 조회 재노출 service/statistics.py를 제거했다.
