@@ -1,5 +1,12 @@
 # Conversation 모듈
 
+## U19 a7 실행 이미지 후보 문맥
+
+`ConversationRuntimeView.chat_image_items`는 현재 생성에 고정된 발행 카탈로그를 별도
+내부 필드로 전달한다. `RuntimeLorebook.snapshot_id`는 활성 항목을 정확한 로어 발행본과
+결합하기 위한 선택 필드다. 일반 프롬프트 settings에는 두 이미지 카탈로그/시작 블록을
+계속 제외하며, 후보 필터·예산·선택은 chat이 맡는다. 기존 생성자의 기본값은 빈 목록/None이다.
+
 ## U19 a6 첫 장면 이미지
 
 - 방 생성은 선택한 시작 옵션의 동결 블록에서 이미지 항목을 추출하고 a5 해금 서비스를

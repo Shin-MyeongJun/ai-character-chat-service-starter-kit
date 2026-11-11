@@ -7,6 +7,7 @@ from app.db.models.chat import Message, MessageRequest
 from app.db.models.product_usage import AnswerRecoveryAttempt, ProductGeneration
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.mapper import content_blocks as ContentBlocksMapper
 from app.modules.chatting.chat.types import GenerationInfo
 
 
@@ -35,6 +36,9 @@ def message_entity_to_info(entity: Message | None) -> Types.MessageInfo | None:
         generation_id=entity.generation_id,
         generated_by_ai=entity.generated_by_ai,
         model_id=entity.model_id,
+        content_blocks=ContentBlocksMapper.content_blocks_json_to_info(
+            entity.content_blocks
+        ),
     )
 
 

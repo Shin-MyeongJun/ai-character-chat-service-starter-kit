@@ -33,7 +33,7 @@ def _assert_existing_schema(name, actual, baseline):
         assert "tags" in actual["properties"]
         assert "tags" not in actual.get("required", [])
         actual["properties"].pop("tags")
-    additions = {"ProductInfoResponseDto": {"has_publication"}, "ListProductsRequestDto": {"search"}, "GenerateAnswerRequestDto": {"manual_entry_ids"}, "MessagePageResponseDto": {"history_revision", "sync_cursor"}}
+    additions = {"MessageResponseDto": {"content_blocks"}, "ProductInfoResponseDto": {"has_publication"}, "ListProductsRequestDto": {"search"}, "GenerateAnswerRequestDto": {"manual_entry_ids"}, "MessagePageResponseDto": {"history_revision", "sync_cursor"}}
     if name in additions:
         actual = {**actual, "properties": dict(actual["properties"])}
         for field in additions[name]:
@@ -302,6 +302,7 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
         "/conversations/{conversation_id}/start/blocks/{block_index}/content",
+        "/conversations/{conversation_id}/messages/{message_id}/revisions/{revision}/blocks/{block_index}/content",
         "/characters/{character_id}/media/uploads",
         "/characters/media/{media_id}/content",
         "/products/{product_id}/versions/{snapshot_id}/media/{media_id}/content",

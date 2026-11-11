@@ -20,7 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.transaction import use_case_transaction
 from app.db.types import SessionFactory
 from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.mapper import content_blocks as ContentBlocksMapper
 from app.modules.chatting.chat.mapper import prompt as PromptMapper
+from app.modules.chatting.chat.service import answer_images as AnswerImagesService
 from app.modules.chatting.chat.service.command import (
     answer_recovery as AnswerRecoveryCommandService,
 )
@@ -335,6 +337,9 @@ class AnswerOrchestrator:
             "response_tokens": config.response_tokens,
             "token_estimator": TOKEN_ESTIMATOR,
         }
+        candidates = AnswerImagesService.select_answer_image_candidates(
+            runtime, command.product_character_id, uuid4().hex
+        )
         started = monotonic()
         usage = LLMTypes.TokenUsageInfo()
         prompt = None
@@ -382,6 +387,9 @@ class AnswerOrchestrator:
                         "Rendered prompt exceeds model context window.",
                         summary_required=False,
                     )
+                prompt, candidates = AnswerImagesService.build_image_selection_prompt(
+                    prompt, candidates, maximum - config.response_tokens
+                )
                 metadata.update(
                     phase="reserved",
                     prompt_digest=hashlib.sha256(
@@ -610,10 +618,17 @@ class AnswerOrchestrator:
                 ):
                     raise _InvalidAnswerResultError("invalid_result")
                 _validate_result(result)
+                content, blocks = AnswerImagesService.resolve_answer_image_blocks(
+                    result.content, candidates
+                )
+                _validate_result(replace(result, content=content))
                 metadata = {
                     **metadata,
                     "phase": "result_ready",
-                    "content": result.content,
+                    "content": content,
+                    "content_blocks": ContentBlocksMapper.content_blocks_to_json(
+                        blocks
+                    ),
                     "usage": asdict(usage),
                     "response_id": result.response_id,
                     "outcome": "succeeded",
@@ -932,6 +947,9 @@ class AnswerOrchestrator:
                     Types.GeneratedMessage(
                         UUID(stored["identity"]["product_character_id"]),
                         stored["content"],
+                        ContentBlocksMapper.content_blocks_json_to_info(
+                            metadata.get("content_blocks")
+                        ),
                     ),
                 )
                 if stored["outcome"] == "succeeded"

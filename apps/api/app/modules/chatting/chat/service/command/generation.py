@@ -16,6 +16,7 @@ from app.db.idempotency import lock_key
 from app.db.transaction import use_case_transaction
 from app.modules.chatting.chat import repository as Repository
 from app.modules.chatting.chat import types as Types
+from app.modules.chatting.chat.mapper import content_blocks as ContentBlocksMapper
 from app.modules.chatting.chat.mapper import persistence as PersistenceMapper
 from app.modules.chatting.chat.mapper.persistence import (
     generation_record_to_info,
@@ -30,6 +31,9 @@ from app.modules.chatting.conversation.service import (
 from app.modules.commerce.billing import service as BillingService
 from app.modules.commerce.billing import types as BillingTypes
 from app.modules.content.product import types as ProductTypes
+from app.modules.content.product.service.command import (
+    album as ProductAlbumCommandService,
+)
 from app.modules.content.product.service.command.statistics_queue import (
     mark_statistics_dirty,
 )
@@ -60,8 +64,23 @@ def result_digest(value: Types.GenerationResult) -> str:
         raise ValueError("Successful output needs 1–100 messages; failures have none.")
     if any(not m.content.strip() or len(m.content) > 200000 for m in value.messages):
         raise ValueError("Invalid generated message.")
+    for output in value.messages:
+        if (
+            output.content_blocks is not None
+            and "".join(
+                block.text
+                for block in output.content_blocks
+                if isinstance(block, ProductTypes.TextContentBlockInfo)
+            )
+            != output.content
+        ):
+            raise ValueError("Content blocks must preserve the answer text.")
+    payload = asdict(value)
+    for output in payload["messages"]:
+        if output["content_blocks"] is None:
+            del output["content_blocks"]
     return hashlib.sha256(
-        json.dumps(asdict(value), sort_keys=True, default=str).encode()
+        json.dumps(payload, sort_keys=True, default=str).encode()
     ).hexdigest()
 
 
@@ -266,8 +285,27 @@ async def _finish_locked_generation(
                         "Output character is not in the generation version."
                     )
                 await Repository.add_generation_message(
-                    session, run, output, characters[output.product_character_id]
+                    session,
+                    run,
+                    output,
+                    characters[output.product_character_id],
+                    content_blocks=ContentBlocksMapper.content_blocks_to_json(
+                        output.content_blocks
+                    ),
                 )
+            await ProductAlbumCommandService.unlock_product_images(
+                session,
+                ProductTypes.UnlockProductImagesCommand(
+                    account_id=user_id,
+                    product_id=run.product_id,
+                    image_item_ids=tuple(
+                        block.image_item_id
+                        for output in value.messages
+                        for block in output.content_blocks or ()
+                        if isinstance(block, ProductTypes.ImageContentBlockInfo)
+                    ),
+                ),
+            )
         now = datetime.now(UTC)
         await BillingService.record_usage(
             session,

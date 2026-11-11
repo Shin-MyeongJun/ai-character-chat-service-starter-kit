@@ -300,6 +300,7 @@ async def replace_message(
         .where(Message.id == message_id)
         .values(
             content=content,
+            content_blocks=None,
             revision=Message.revision + 1,
             generation_id=None,
             generated_by_ai=False,
@@ -515,6 +516,7 @@ async def add_generation_message(
     run: Types.GenerationStateInfo,
     output: Types.GeneratedMessage,
     character_id: UUID | None,
+    content_blocks: list[Types.AnswerJsonValue] | None = None,
 ) -> None:
     session.add(
         Message(
@@ -525,6 +527,7 @@ async def add_generation_message(
             character_id=character_id,
             sender_type="character",
             content=output.content,
+            content_blocks=content_blocks,
             model_id=run.model_id,
             generated_by_ai=True,
         )

@@ -2,6 +2,7 @@
 from dataclasses import asdict
 from uuid import UUID
 
+from app.http.content_blocks import content_blocks_to_response
 from app.modules.chatting.chat import types as Types
 from app.modules.chatting.chat.schemas import messages as Schemas
 
@@ -63,7 +64,16 @@ def rewind_messages_request_to_command(
 
 
 def message_info_to_response(info: Types.MessageInfo) -> Schemas.MessageResponseDto:
-    return Schemas.MessageResponseDto(**asdict(info))
+    fields = asdict(info)
+    fields["content_blocks"] = (
+        content_blocks_to_response(
+            info.content_blocks,
+            f"/conversations/{info.conversation_id}/messages/{info.id}/revisions/{info.revision}",
+        )
+        if info.content_blocks is not None
+        else None
+    )
+    return Schemas.MessageResponseDto(**fields)
 
 
 def message_page_info_to_response(

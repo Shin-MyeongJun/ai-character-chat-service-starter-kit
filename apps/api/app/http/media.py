@@ -18,6 +18,10 @@ from starlette.types import Receive, Scope, Send
 from app.http.character_dependencies import get_current_owner_id
 from app.http.dependencies import Owner, Session
 from app.modules.asset_storage import types as AssetStorageTypes
+from app.modules.chatting.chat import types as ChatTypes
+from app.modules.chatting.chat.service.query import (
+    image_blocks as ChatImageBlocksQueryService,
+)
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.conversation.service import views as ConversationViewsService
 from app.modules.content.character import types as CharacterTypes
@@ -327,4 +331,31 @@ async def read_owned_product_file_version(
                 product_id=product_id, file_version_id=file_version_id, owner_id=owner
             )
         )
+    return MediaStreamingResponse(opened)
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages/{message_id}/revisions/{revision}/blocks/{block_index}/content"
+)
+async def read_message_image_block(
+    conversation_id: UUID,
+    message_id: UUID,
+    revision: int,
+    block_index: int,
+    session: Session,
+    owner: Owner,
+    service: ProductFileVersions,
+) -> MediaStreamingResponse:
+    with media_errors():
+        reference = await ChatImageBlocksQueryService.authorize_message_image_block(
+            session,
+            ChatTypes.ReadMessageBlockCommand(
+                conversation_id=conversation_id,
+                user_id=owner,
+                message_id=message_id,
+                revision=revision,
+                block_index=block_index,
+            ),
+        )
+        opened = await service.read_referenced_product_file_version(reference)
     return MediaStreamingResponse(opened)

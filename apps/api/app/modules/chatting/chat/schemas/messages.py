@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.http.content_blocks import ContentBlockResponseDto
+
 
 class CreateMessageRequestDto(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -31,6 +33,7 @@ class MessageResponseDto(BaseModel):
     generation_id: UUID | None
     generated_by_ai: bool
     model_id: UUID | None
+    content_blocks: list[ContentBlockResponseDto] | None = None
 
 
 class MessagePageResponseDto(BaseModel):

@@ -115,6 +115,7 @@ def conversation_snapshot_infos_to_runtime_view(
     return Types.ConversationRuntimeView(
         execution=execution,
         product_snapshot_id=str(snapshot.id),
+        chat_image_items=tuple(snapshot.snapshot_data.get("chat_image_items", [])),
         settings={
             key: value
             for key, value in snapshot_data.items()
@@ -148,6 +149,7 @@ def conversation_snapshot_infos_to_runtime_view(
                     if target.product_lorebook_id == lorebook.id
                 ],
                 entries=active_entries[lorebook.lorebook_snapshot_id],
+                snapshot_id=str(lorebook.lorebook_snapshot_id),
             )
             for lorebook in runtime.composition.books
         ],

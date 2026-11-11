@@ -20,6 +20,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -127,6 +128,10 @@ class ConversationCharacter(UuidPkMixin, Base):
 class Message(UuidPkMixin, Base):
     __tablename__ = "messages"
     __table_args__ = (
+        CheckConstraint(
+            "content_blocks IS NULL OR jsonb_typeof(content_blocks) = 'array'",
+            name="ck_messages_content_blocks_array",
+        ),
         UniqueConstraint("conversation_id", "position", name="uq_message_position"),
         ForeignKeyConstraint(
             ["generation_id", "product_snapshot_id"],
@@ -164,6 +169,9 @@ class Message(UuidPkMixin, Base):
         ForeignKey("characters.id", ondelete="SET NULL"),
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_blocks: Mapped[list[dict[str, object]] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     position: Mapped[int] = mapped_column(BigInteger, Identity(), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     generation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))

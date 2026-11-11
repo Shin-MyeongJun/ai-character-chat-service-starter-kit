@@ -58,6 +58,7 @@ class RuntimeLorebook:
     scope: str
     targets: list[str]
     entries: list[LorebookTypes.LorebookSnapshotEntryData]
+    snapshot_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +70,7 @@ class ConversationRuntimeView:
     characters: list[RuntimeCharacter]
     lorebooks: list[RuntimeLorebook]
     opening_message: str | None = None
+    chat_image_items: tuple[ProductTypes.ProductJsonObject, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

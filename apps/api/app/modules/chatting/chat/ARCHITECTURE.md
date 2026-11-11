@@ -1,5 +1,39 @@
 # Chat 모듈
 
+## U19 a7 답변 이미지 선택·저장·복구
+
+- `service/answer_images.py`는 생성에 고정된 runtime 이미지 카탈로그에서 답변 캐릭터와
+  활성 `(lorebook_snapshot_id, lore_entry_id)`에 속한 후보를 발행 순서로 최대 24개 고른다.
+  로어의 캐릭터 대상 범위도 기존 프롬프트와 동일하게 적용한다. 후보 키는 요청별로 격리한다.
+- 기존 nonstream 답변 경로에 선택적인 JSON 출력 envelope를 지원한다. 서버의 출력 지시만
+  system에 두고 후보 키·종류·태그·설명은 user 참조 데이터로 전달한다. 이미지/파일 UUID나
+  URL은 모델에 보내지 않는다. 최종 입력 예산에서 뒤쪽 후보부터 제거하며 후보가 없으면
+  기존 텍스트 요청을 그대로 실행한다. 외부 모델이 envelope를 사용하지 않으면 텍스트로 보존한다.
+- 서버는 `(candidate_key, after_paragraph)`를 검증하고 잘못된 키·위치·bool을 무시한다.
+  빈 줄 기준 문단 뒤 위치를 안정 정렬해 최대 3개를 적용하며 같은 이미지 반복을 보존한다.
+  텍스트 블록의 연결은 원문과 정확히 같고 원문 이미지 문법/URL은 파일로 승격하지 않는다.
+- 검증된 순서 있는 블록을 `answer_metadata.content_blocks`의 result_ready에 내구 저장한다.
+  복구는 이 블록만 사용하며 공급자 호출·후보 선정·최신 파일 재해석을 반복하지 않는다.
+  `GeneratedMessage.content_blocks`는 선택 필드이며 미지정 구형 완료 digest는 그대로 유지한다.
+- `messages.content_blocks`(Alembic 0039/초기 SQL 029)는 현재 revision의 nullable JSONB다.
+  메시지 저장 뒤 a5 공개 해금 서비스를 같은 세션에서 호출하며 기존 usage·크레딧 정산·기억
+  예약과 한 트랜잭션으로 커밋한다. 실패·취소·stale와 terminal 재생에서는 해금하지 않는다.
+  구형 행/내부 텍스트 쓰기는 NULL이고 새 nonstream 텍스트 결과는 텍스트 블록 배열이다.
+- GET messages의 선택적 `content_blocks`는 a6의 공통 HTTP DTO/URL 변환을 재사용한다.
+  파일은 `/conversations/{conversation_id}/messages/{message_id}/revisions/{revision}/blocks/{block_index}/content`로 읽는다.
+  `service/query/image_blocks.authorize_message_image_block`이 방 소유권, 실제 생존 메시지,
+  정확한 revision과 이미지 위치를 검사한 뒤 a5 snapshot 보존 참조를 반환한다.
+  현재 앨범 해금·최신 버전·실행 만료는 과거 본문의 읽기 조건이 아니다.
+- 파일은 발행 시 등록한 snapshot 참조로 보존한다. 생성과 메시지의 snapshot FK 및 a4의
+  만료 후 참조 유지 정책을 재사용한다. 향후 발행본 물리 삭제/참조 해제를 구현할 때에는
+  result_ready·보존 메시지 참조가 남은 스냅샷의 파일 pin을 해제하면 안 된다.
+- 현재 이력은 단일 revision만 조회한다. 텍스트 교정은 content_blocks를 NULL로 바꾸고
+  revision을 올리며 되감기는 메시지를 삭제하므로 이전 발생 URL은 404다. 해금은 유지한다.
+  a8의 이력 복사/리롤/분기는 당시 `content_blocks`를 그대로 복사해야 하며 새 파일로 바꾸거나
+  후보를 재선정해서는 안 된다. 조회 가능한 revision 확장은 해당 이력 엔진의 책임이다.
+- a6와 담당 합의: 공통 ProductTypes 블록 값·`http/content_blocks.py`는 a6 소유로 재사용;
+  a7은 메시지 블록·발생 인가와 `http/media.py`의 메시지 endpoint만 확장한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 use_cases/conversation_directory.py 호환 연결을 제거했다. HTTP 목록은 chat 공개
@@ -178,7 +212,7 @@ version_changes는 메시지를 참조하는 컬럼이 없으며 conversation과
 
 ## 미연결 범위
 
-HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에, 기본 owner 훅을 identity의 쿠키·CSRF·사용자/세션 검증에 연결한다. `create_app(authenticate=...)`는 기존 명시적 주입 계약으로만 유지하며 기본 실행에 필요하지 않다. 개별 라우터만 조립하고 의존성을 연결하지 않으면 기존 503 훅이 적용된다. 비스트리밍 답변은 `app.http.answers` → `app.modules.chatting.chat.service.workflow.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI·이미지는 제외한다.
+HTTP는 기존 `app.http.dependencies`를 사용한다. `app.main`은 DB 세션을 실제 session factory에, 기본 owner 훅을 identity의 쿠키·CSRF·사용자/세션 검증에 연결한다. `create_app(authenticate=...)`는 기존 명시적 주입 계약으로만 유지하며 기본 실행에 필요하지 않다. 개별 라우터만 조립하고 의존성을 연결하지 않으면 기존 503 훅이 적용된다. 비스트리밍 답변은 `app.http.answers` → `app.modules.chatting.chat.service.workflow.answers`에서 조율한다. chat 자체는 외부 호출을 하지 않는다. 스트리밍·리롤 UI는 제외한다. 답변 이미지는 위 U19 a7 경계에서 제공한다.
 
 답변 키는 사용자 전체 범위이며 입력 ID/revision/대상 캐릭터를 비교한다. pending 재전송은 202, 성공 재전송은 저장된 metadata 답변, 이력 변경 후 재전송은 409다. 결과 staging 후 최상위 AnswerOrchestrator가 기존 finish·usage·memory 예약과 billing 확정/해제를 원자적으로 수행한다. lease 만료 복구는 저장된 결과만 재사용하며 호출 결과가 없으면 failed/cancelled 사실과 불확실성을 보존한다. 상세 오류와 원문은 로그에 출력하지 않는다. 기존 legacy pending(lease 없음)은 이번 복구 대상이 아니다.
 

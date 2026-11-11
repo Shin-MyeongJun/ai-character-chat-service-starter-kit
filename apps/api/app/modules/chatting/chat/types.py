@@ -12,6 +12,7 @@ from uuid import UUID
 
 from app.modules.chatting.conversation import types as ConversationTypes
 from app.modules.chatting.memory import types as MemoryTypes
+from app.modules.content.product import types as ProductTypes
 from app.modules.llm import types as LLMTypes
 from app.modules.llm.types import ExecutionView
 
@@ -168,6 +169,7 @@ class MessageInfo:
     generation_id: UUID | None
     generated_by_ai: bool
     model_id: UUID | None
+    content_blocks: tuple[ProductTypes.ContentBlockInfo, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,6 +298,7 @@ class GenerationStatisticsInfo:
 class GeneratedMessage:
     product_character_id: UUID
     content: str
+    content_blocks: tuple[ProductTypes.ContentBlockInfo, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -545,3 +548,20 @@ class AccountGenerationStatisticsInfo:
     failed: int
     cancelled: int
     stale: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReadMessageBlockCommand:
+    conversation_id: UUID
+    user_id: UUID
+    message_id: UUID
+    revision: int
+    block_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerImageCandidateInfo:
+    key: str
+    image: ProductTypes.ImageContentBlockInfo
+    kind: str
+    tags: tuple[str, ...]

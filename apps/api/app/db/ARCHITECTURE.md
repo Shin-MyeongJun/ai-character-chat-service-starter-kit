@@ -1,5 +1,12 @@
 # DB와 작업 실행 코드 읽기
 
+## U19 a7 메시지 이미지 블록
+
+Alembic 0039와 초기 SQL 029는 `messages.content_blocks` nullable JSONB 배열을 추가한다.
+기존 행은 SQL NULL로 유지한다. chat이 본문 원문과 순서 있는 블록을 함께 저장하고 수정 시
+블록을 지운다. ORM의 `none_as_null=True`로 JSON null과 SQL NULL을 구분한다.
+블록이 하나라도 저장된 상태의 downgrade는 손실을 막기 위해 거절한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 models/billing.py의 크레딧 모델 3개 재노출을 제거했다. 해당 모델/enum은

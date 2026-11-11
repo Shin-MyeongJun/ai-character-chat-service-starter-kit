@@ -70,7 +70,7 @@ def workflow(monkeypatch):
         uuid4(), "openai", "gpt-test", "none", False, None
     )
     current = SimpleNamespace(id=uuid4(), revision=1, content="현재 입력")
-    runtime = SimpleNamespace(execution=execution, product_snapshot_id=str(uuid4()))
+    runtime = SimpleNamespace(execution=execution, product_snapshot_id=str(uuid4()), lorebooks=[], chat_image_items=())
     prepared = (
         current,
         runtime,
