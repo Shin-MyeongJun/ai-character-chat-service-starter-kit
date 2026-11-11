@@ -2,6 +2,7 @@
 from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from typing import Literal, cast, overload
+from uuid import UUID
 
 from sqlalchemy import Row
 
@@ -33,6 +34,22 @@ from app.modules.content.product.types import (
     StatisticsMetricsInfo,
 )
 from app.modules.llm import types as LlmTypes
+
+
+def content_block_json_to_info(block: Types.ProductJsonValue) -> Types.ContentBlockInfo:
+    if isinstance(block, dict):
+        if block.get("type") == "text" and isinstance(text := block.get("text"), str):
+            return Types.TextContentBlockInfo(text=text)
+        if (
+            block.get("type") == "image"
+            and isinstance(item_id := block.get("image_item_id"), str)
+            and isinstance(file_id := block.get("file_version_id"), str)
+            and isinstance(alt := block.get("alt"), str)
+        ):
+            return Types.ImageContentBlockInfo(
+                image_item_id=UUID(item_id), file_version_id=UUID(file_id), alt=alt
+            )
+    raise ValueError("Invalid published start block.")
 
 
 @overload

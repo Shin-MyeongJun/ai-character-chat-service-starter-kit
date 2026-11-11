@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.http.content_blocks import ContentBlockResponseDto
 from app.http.schemas import ModelNoticeResponseDto, ResponseDto
 
 
@@ -86,3 +87,4 @@ class ConversationStartResponseDto(BaseModel):
     start: ConversationStartContentResponseDto | None
     participants: list[ConversationParticipantResponseDto]
     primary_product_character_id: UUID | None
+    content_blocks: list[ContentBlockResponseDto] | None = None

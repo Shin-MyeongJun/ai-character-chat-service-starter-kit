@@ -16,8 +16,10 @@ from starlette.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
 
 from app.http.character_dependencies import get_current_owner_id
-from app.http.dependencies import Owner
+from app.http.dependencies import Owner, Session
 from app.modules.asset_storage import types as AssetStorageTypes
+from app.modules.chatting.conversation import types as ConversationTypes
+from app.modules.chatting.conversation.service import views as ConversationViewsService
 from app.modules.content.character import types as CharacterTypes
 from app.modules.content.character.service.media import (
     MAX_MEDIA_BYTES,
@@ -293,6 +295,25 @@ async def read_product_album_file(
                 file_version_id=file_version_id,
             )
         )
+    return MediaStreamingResponse(opened)
+
+
+@router.get("/conversations/{conversation_id}/start/blocks/{block_index}/content")
+async def read_conversation_start_block(
+    conversation_id: UUID,
+    block_index: int,
+    session: Session,
+    owner: Owner,
+    service: ProductFileVersions,
+) -> MediaStreamingResponse:
+    with media_errors():
+        reference = await ConversationViewsService.authorize_conversation_start_block(
+            session,
+            ConversationTypes.ReadConversationStartBlockCommand(
+                conversation_id=conversation_id, user_id=owner, block_index=block_index
+            ),
+        )
+        opened = await service.read_referenced_product_file_version(reference)
     return MediaStreamingResponse(opened)
 
 

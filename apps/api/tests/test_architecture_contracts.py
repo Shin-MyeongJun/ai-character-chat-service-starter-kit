@@ -301,6 +301,7 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         "/account/credits/transactions",
         "/conversations/{conversation_id}/answers",
         "/conversations/{conversation_id}/start",
+        "/conversations/{conversation_id}/start/blocks/{block_index}/content",
         "/characters/{character_id}/media/uploads",
         "/characters/media/{media_id}/content",
         "/products/{product_id}/versions/{snapshot_id}/media/{media_id}/content",

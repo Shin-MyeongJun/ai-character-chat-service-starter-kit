@@ -10,6 +10,9 @@ from app.modules.chatting.conversation.service import query as QueryService
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service import views as ProductViewsService
+from app.modules.content.product.service.query.start_blocks import (
+    get_snapshot_start_blocks,
+)
 
 
 async def list_manual_lore(
@@ -87,6 +90,51 @@ async def get_conversation_start(
             participant.product_character_id for participant in participants
         }:
             primary_id = None
+    content_blocks = (
+        get_snapshot_start_blocks(initial, start.id)
+        if initial is not None
+        and start is not None
+        and conversation.opening_mode == "snapshot"
+        else None
+    )
     return PersistenceMapper.conversation_start_infos_to_view(
-        conversation, initial, start, participants, primary_id
+        conversation, initial, start, participants, primary_id, content_blocks
+    )
+
+
+async def authorize_conversation_start_block(
+    session: AsyncSession, command: Types.ReadConversationStartBlockCommand
+) -> ProductTypes.ProductFileReferenceCommand:
+    conversation = await QueryService.get_owned_conversation(
+        session,
+        Types.OwnedConversationCommand(
+            conversation_id=command.conversation_id, user_id=command.user_id
+        ),
+    )
+    if (
+        conversation.opening_mode != "snapshot"
+        or conversation.initial_snapshot_id is None
+        or conversation.start_set_id is None
+        or command.block_index < 0
+    ):
+        raise LookupError("Start image not found.")
+    snapshot = await ProductQueryService.get_product_snapshot(
+        session,
+        ProductTypes.ProductSnapshotCommand(
+            snapshot_id=conversation.initial_snapshot_id
+        ),
+    )
+    if snapshot.product_id != conversation.product_id:
+        raise LookupError("Start image not found.")
+    blocks = get_snapshot_start_blocks(snapshot, conversation.start_set_id)
+    if blocks is None or command.block_index >= len(blocks):
+        raise LookupError("Start image not found.")
+    block = blocks[command.block_index]
+    if not isinstance(block, ProductTypes.ImageContentBlockInfo):
+        raise LookupError("Start image not found.")
+    return ProductTypes.ProductFileReferenceCommand(
+        product_id=conversation.product_id,
+        file_version_id=block.file_version_id,
+        kind="snapshot",
+        reference_id=snapshot.id,
     )

@@ -174,6 +174,7 @@ def conversation_start_infos_to_view(
     start: ProductTypes.SnapshotStartInfo | None,
     participants: tuple[Types.ConversationCharacterInfo, ...],
     primary_id: UUID | None,
+    content_blocks: tuple[ProductTypes.ContentBlockInfo, ...] | None = None,
 ) -> Types.ConversationStartView:
     opening_message = None
     if initial is not None and conversation.opening_mode == "snapshot":
@@ -197,4 +198,5 @@ def conversation_start_infos_to_view(
         else None,
         participants=participants,
         primary_product_character_id=primary_id,
+        content_blocks=content_blocks,
     )

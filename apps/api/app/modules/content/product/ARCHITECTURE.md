@@ -37,6 +37,13 @@
 - `chat_image_digest`는 정규화한 카탈로그와 순서 있는 시작 블록을 비교한다. 파일·조건·배치만 바뀐 발행도 기존 릴리스 분류에서 콘텐츠 변경으로 처리한다. 발행 시 발급한 UUID는 이 해시에 포함하지 않는다.
 - 파일마다 `kind="snapshot"`과 스냅샷 UUID로 참조를 보존한다. 카탈로그·시작 블록·파일 참조·최신 포인터·릴리스·스튜디오 영수증은 한 트랜잭션에서 확정한다. 이전 발행본의 파일 참조는 초안 편집, 교체 발행과 버전 만료 후에도 유지한다.
 
+## U19 a6 동결 시작 블록 조회
+
+`service/query/start_blocks.py::get_snapshot_start_blocks(snapshot, start_set_id)`는 발행
+JSON에서 선택 옵션의 블록을 순서대로 읽어 공개 `ContentBlockInfo` 값으로 변환한다.
+블록 필드가 없는 발행본은 None으로 읽는다. 대화가 소유하는 위치 인가와 URL 조립은
+conversation 및 HTTP 경계가 맡는다. a7도 공용 블록 값 타입과 보존 참조 reader를 사용한다.
+
 ## U19 a5 작품 앨범과 해금
 
 - product가 `product_image_unlocks`를 소유한다. `repository/album.py`는

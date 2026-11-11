@@ -182,3 +182,11 @@ class ConversationStartView:
     start: RuntimeStart | None
     participants: tuple[ConversationCharacterInfo, ...]
     primary_product_character_id: UUID | None
+    content_blocks: tuple[ProductTypes.ContentBlockInfo, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ReadConversationStartBlockCommand:
+    conversation_id: UUID
+    user_id: UUID
+    block_index: int

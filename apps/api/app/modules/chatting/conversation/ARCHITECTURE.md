@@ -1,5 +1,20 @@
 # Conversation 모듈
 
+## U19 a6 첫 장면 이미지
+
+- 방 생성은 선택한 시작 옵션의 동결 블록에서 이미지 항목을 추출하고 a5 해금 서비스를
+  같은 세션과 트랜잭션에서 호출한다. 단일 옵션 자동 선택 규칙도 동일하게 적용된다.
+- GET `/conversations/{id}/start`는 최초 스냅샷과 선택 옵션의 순서 있는 `content_blocks`를
+  제공한다. 발행 블록이 없는 방과 legacy 방은 이 필드를 생략한다. 기존 첫 대사와 시작 옵션
+  필드는 그대로 제공한다.
+- `authorize_conversation_start_block`은 소유 방의 최초 스냅샷과 선택 옵션에서 정확한
+  이미지 위치를 확인해 보존 참조를 반환한다. 버전 전환, 만료, 앨범 상태와 독립적이다.
+  `app/http/media.py`에서 product의 보존 참조 reader와 기존 비공개 스트림을 조립한다.
+- a6가 a7 공용 `ProductTypes.ContentBlockInfo`와 `app/http/content_blocks.py`의 응답
+  DTO 및 위치 URL 변환을 추가한다. a7은 메시지 revision의 인가와 보존 참조 선택을 맡고
+  동일한 DTO 변환, product의 `read_referenced_product_file_version`, HTTP의
+  `MediaStreamingResponse`를 사용한다.
+
 ## U19 a4 발행 이미지와 실행 설정
 
 발행 스냅샷의 이미지 카탈로그, 시작 블록과 이미지 digest는 기존 프롬프트 설정에 전달하지 않는다.

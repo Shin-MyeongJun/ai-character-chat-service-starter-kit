@@ -77,6 +77,21 @@ class ProductAlbumInfo:
     items: tuple[LockedProductAlbumItemInfo | UnlockedProductAlbumItemInfo, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class TextContentBlockInfo:
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImageContentBlockInfo:
+    image_item_id: UUID
+    file_version_id: UUID
+    alt: str
+
+
+ContentBlockInfo: TypeAlias = TextContentBlockInfo | ImageContentBlockInfo
+
+
 class ProductSnapshotData(TypedDict):
     """Published profile fields; legacy omissions and extension data are retained."""
 

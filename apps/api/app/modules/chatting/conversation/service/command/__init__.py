@@ -9,8 +9,12 @@ from app.modules.chatting.conversation.mapper import persistence as PersistenceM
 from app.modules.content.product import types as ProductTypes
 from app.modules.content.product.service import query as ProductQueryService
 from app.modules.content.product.service import views as ProductViewsService
+from app.modules.content.product.service.command.album import unlock_product_images
 from app.modules.content.product.service.command.statistics_queue import (
     mark_statistics_dirty,
+)
+from app.modules.content.product.service.query.start_blocks import (
+    get_snapshot_start_blocks,
 )
 
 
@@ -58,6 +62,21 @@ async def start_conversation(
         )
         row = await Repository.create_conversation(session, create_command)
         conversation = PersistenceMapper.conversation_entity_to_info(row)
+        blocks = get_snapshot_start_blocks(snapshot, start_set_id)
+        image_item_ids = tuple(
+            block.image_item_id
+            for block in blocks or ()
+            if isinstance(block, ProductTypes.ImageContentBlockInfo)
+        )
+        if image_item_ids:
+            await unlock_product_images(
+                session,
+                ProductTypes.UnlockProductImagesCommand(
+                    account_id=user_id,
+                    product_id=product_id,
+                    image_item_ids=image_item_ids,
+                ),
+            )
         await mark_statistics_dirty(
             session,
             ProductTypes.MarkStatisticsDirtyCommand(

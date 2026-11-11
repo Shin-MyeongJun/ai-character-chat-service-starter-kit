@@ -1,6 +1,7 @@
 from dataclasses import asdict
 from uuid import UUID
 
+from app.http.content_blocks import content_blocks_to_response
 from app.modules.chatting.conversation import schemas as Schemas
 from app.modules.chatting.conversation import types as Types
 from app.modules.content.product import types as ProductTypes
@@ -58,6 +59,12 @@ class ConversationSchemaMapper:
 
     @staticmethod
     def conversation_start_view_to_response(
-        result: Types.ConversationStartView,
+        result: Types.ConversationStartView, conversation_id: UUID
     ) -> Schemas.ConversationStartResponseDto:
-        return Schemas.ConversationStartResponseDto(**asdict(result))
+        fields = asdict(result)
+        fields.pop("content_blocks")
+        if result.content_blocks is not None:
+            fields["content_blocks"] = content_blocks_to_response(
+                result.content_blocks, f"/conversations/{conversation_id}/start"
+            )
+        return Schemas.ConversationStartResponseDto(**fields)

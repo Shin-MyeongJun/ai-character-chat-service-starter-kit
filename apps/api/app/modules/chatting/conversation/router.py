@@ -82,7 +82,9 @@ async def switch(
 
 
 @router.get(
-    "/{conversation_id}/start", response_model=Schemas.ConversationStartResponseDto
+    "/{conversation_id}/start",
+    response_model=Schemas.ConversationStartResponseDto,
+    response_model_exclude_unset=True,
 )
 async def get_start(
     conversation_id: UUID, session: Session, owner: Owner
@@ -94,4 +96,4 @@ async def get_start(
                 conversation_id=conversation_id, user_id=owner
             ),
         )
-        return SchemaMapper.conversation_start_view_to_response(result)
+        return SchemaMapper.conversation_start_view_to_response(result, conversation_id)
