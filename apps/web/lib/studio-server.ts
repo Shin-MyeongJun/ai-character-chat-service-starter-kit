@@ -2,7 +2,9 @@ import { ApiError, getMe, request } from "./api";
 import { readStudioProject, type StudioProject } from "./studio-project";
 import type { WorkspaceWork } from "./studio-workspace";
 import { readImage } from "./studio-assets";
+import { resolveStudioImageUploads, studioDocument } from "./studio-product-images";
 
+type SavedStudioWork = { productId: string; revision: number; project: StudioProject };
 type StudioDraft = { product_id: string; revision: number; document: StudioProject & { clientWorkId?: string }; updated_at: string };
 type Product = { id: string };
 export type AvailableModel = { id: string; name: string; reasoning_efforts: string[] };
@@ -15,11 +17,11 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 const serialized = (project: StudioProject) => canonical({
-  ...project,
+  ...studioDocument(project),
   characters: project.characters.map(({ sourceId: _sourceId, ...character }) => ({...character, assets: character.assets.map(({mediaId: _mediaId, ...asset}) => asset)})),
   lorebooks: project.lorebooks.map(({ sourceId: _sourceId, ...lore }) => lore),
 });
-export const sameStudioProject = (a: StudioProject, b: StudioProject) => serialized(a) === serialized(b);
+export const sameStudioProject = (a: StudioProject, b: StudioProject) => !a.chatImageUploads?.length && !b.chatImageUploads?.length && serialized(a) === serialized(b);
 
 function readLink(ownerId: string, workId: string): Link | null {
   const raw = localStorage.getItem(key(ownerId, workId));
@@ -30,35 +32,65 @@ function readLink(ownerId: string, workId: string): Link | null {
   } catch { return null; }
 }
 
-/** CAS-save a document; callers retain browser originals if any later upload/save fails. */
-async function saveDocument(work: WorkspaceWork): Promise<{ productId: string; revision: number }> {
+export async function getStudioProductId(workId: string): Promise<string | null> {
   const owner = await getMe();
+  return readLink(owner.id, workId)?.productId ?? null;
+}
+
+async function saveDocument(work: WorkspaceWork): Promise<SavedStudioWork> {
+  const owner = await getMe();
+  const linkKey = key(owner.id, work.id);
   let link = readLink(owner.id, work.id);
   if (!link) {
     link = { productId: crypto.randomUUID(), revision: null, base: null };
-    // Save the server ID before the network request. A lost response can be retried safely.
-    localStorage.setItem(key(owner.id, work.id), JSON.stringify(link));
+    localStorage.setItem(linkKey, JSON.stringify(link));
   }
-  try {
-    const remote = await request<StudioDraft>(`/products/${link.productId}/studio-draft`);
+  const productId = link.productId;
+  const path = "/products/" + productId + "/studio-draft";
+
+  async function put(project: StudioProject, revision: number | null): Promise<StudioDraft> {
+    return request<StudioDraft>(path, {
+      method: "PUT",
+      body: JSON.stringify({ expected_revision: revision, document: { ...project, clientWorkId: work.id } }),
+    });
+  }
+
+  function acknowledge(draft: StudioDraft, project: StudioProject): SavedStudioWork {
+    const saved = readStudioProject(JSON.stringify(draft.document));
+    if (!saved) throw new Error("서버 초안의 형식을 읽을 수 없어요.");
+    localStorage.setItem(linkKey, JSON.stringify({ productId, revision: draft.revision, base: serialized(saved) }));
+    return { productId, revision: draft.revision, project };
+  }
+
+  let remote: StudioDraft | null;
+  try { remote = await request<StudioDraft>(path); }
+  catch (cause) {
+    if (!(cause instanceof ApiError && cause.status === 404 && link.revision === null)) throw cause;
+    remote = null;
+  }
+
+  if (work.project.chatImageUploads?.length && link.revision === null) {
+    // A new product needs a server ID before a2 can accept bytes. The same
+    // bootstrap document also lets us recover a lost creation response.
+    const { chatImageItems: _items, ...bootstrap } = studioDocument(work.project);
+    bootstrap.scenes = bootstrap.scenes.map(({ openingImagePlacements: _placements, ...scene }) => scene);
+    if (!remote) remote = await put(bootstrap, null);
+    const createdProject = readStudioProject(JSON.stringify(remote.document));
+    if (createdProject && serialized(createdProject) === serialized(bootstrap)) {
+      acknowledge(remote, bootstrap);
+      link = { productId, revision: remote.revision, base: serialized(bootstrap) };
+    }
+  }
+
+  const project = await resolveStudioImageUploads(owner.id, productId, work.project);
+  if (remote) {
     const remoteProject = readStudioProject(JSON.stringify(remote.document));
     if (!remoteProject) throw new Error("서버 초안의 형식을 읽을 수 없어요.");
     const current = serialized(remoteProject);
-    if (current === serialized(work.project)) {
-      localStorage.setItem(key(owner.id, work.id), JSON.stringify({ productId: link.productId, revision: remote.revision, base: current }));
-      return { productId: link.productId, revision: remote.revision };
-    }
+    if (current === serialized(project)) return acknowledge(remote, project);
     if (link.base !== current) throw new Error("서버 초안이 다른 기기에서 변경됐어요. 서버 초안을 확인한 뒤 다시 저장해 주세요.");
-    link = { ...link, revision: remote.revision };
-  } catch (cause) {
-    if (!(cause instanceof ApiError && cause.status === 404 && link.revision === null)) throw cause;
   }
-  const result = await request<StudioDraft>(`/products/${link.productId}/studio-draft`, {
-    method: "PUT",
-    body: JSON.stringify({ expected_revision: link.revision, document: { ...work.project, clientWorkId: work.id } }),
-  });
-  localStorage.setItem(key(owner.id, work.id), JSON.stringify({ productId: link.productId, revision: result.revision, base: serialized(work.project) }));
-  return { productId: link.productId, revision: result.revision };
+  return acknowledge(await put(project, remote?.revision ?? null), project);
 }
 
 type MediaLink = { requestId: string; mediaId?: string };
@@ -67,13 +99,13 @@ type MediaLink = { requestId: string; mediaId?: string };
  * Upload receipts are owner/product/character/asset/usage scoped and stored before I/O.
  * Failed final saves leave confirmed uploads reusable; existing snapshots never change.
  */
-export async function saveServerWork(work: WorkspaceWork): Promise<{ productId: string; revision: number }> {
+export async function saveServerWork(work: WorkspaceWork): Promise<SavedStudioWork> {
   const saved = await saveDocument(work);
   if (!work.project.characters.some(row => row.assets.length)) return saved;
   const owner = await getMe();
   const remote = await request<StudioDraft>(`/products/${saved.productId}/studio-draft`);
   const prepared = await request<{characters: Record<string, string>}>(`/products/${saved.productId}/studio-components`, {method: "POST", body: JSON.stringify({expected_revision: saved.revision})});
-  const project: StudioProject = structuredClone(work.project);
+  const project: StudioProject = structuredClone(saved.project);
   let uploaded = 0;
   try {
     for (const character of project.characters) {
@@ -99,7 +131,7 @@ export async function saveServerWork(work: WorkspaceWork): Promise<{ productId: 
     // Use the captured revision, not an automatic merge with another device's edit.
     const result = await request<StudioDraft>(`/products/${saved.productId}/studio-draft`, {method: "PUT", body: JSON.stringify({expected_revision: saved.revision, document: {...project, clientWorkId: work.id}})});
     localStorage.setItem(key(owner.id, work.id), JSON.stringify({productId: saved.productId, revision: result.revision, base: serialized(project)}));
-    return {productId: saved.productId, revision: result.revision};
+    return { productId: saved.productId, revision: result.revision, project };
   } catch (cause) {
     throw new Error(`이미지 연결을 완료하지 못했어요${uploaded ? ` (이번 업로드 ${uploaded}개 완료)` : ""}. 완료된 업로드는 재시도에 재사용돼요. ${cause instanceof Error ? cause.message : "다시 시도해 주세요."}`);
   }

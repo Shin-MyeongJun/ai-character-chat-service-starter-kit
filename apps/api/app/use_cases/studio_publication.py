@@ -289,6 +289,8 @@ async def publish_studio(
                 return await _record_publication_receipt(
                     session, command, draft, mapping, fingerprint, release
                 )
+        if draft.document.get("chatImageItems"):
+            raise ValueError("Studio chat image publication is not available yet.")
         characters, lorebooks, scenes, work = _publication_content(draft.document)
         # Prepare every lore/scene value before domain writes begin.
         values: list[tuple[str, LoreTypes.LorebookEntryCommandFields]] = []

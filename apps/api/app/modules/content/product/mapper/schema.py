@@ -1,4 +1,5 @@
 # DTO와 신뢰된 경로/owner 값을 Command로 변환하고 from_attributes로 응답을 만든다.
+from dataclasses import replace
 from typing import cast
 from uuid import UUID
 
@@ -53,7 +54,14 @@ class ProductSchemaMapper:
     def studio_draft_info_to_response(
         result: Types.StudioDraftInfo,
     ) -> Schemas.StudioDraftResponseDto:
-        return Schemas.StudioDraftResponseDto.model_validate(result)
+        document = {
+            key: value
+            for key, value in result.document.items()
+            if key != Types.RETIRED_STUDIO_IMAGE_ITEMS
+        }
+        return Schemas.StudioDraftResponseDto.model_validate(
+            replace(result, document=document)
+        )
 
     @staticmethod
     def product_list_request_to_command(

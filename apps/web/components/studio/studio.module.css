@@ -290,3 +290,6 @@
   .inline > .button { flex: 1; white-space: normal; }
   .assetCard .field select { font-size: 16px; }
 }
+
+.imageExample { max-width: 1200px; margin-inline: auto; }
+.imageExampleNav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }

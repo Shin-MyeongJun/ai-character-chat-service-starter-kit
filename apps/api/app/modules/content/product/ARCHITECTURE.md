@@ -24,6 +24,12 @@
 - a3/a4는 초안·스냅샷을 확정하는 동일 `use_case_transaction`에서 참조를 연결한다. `kind`는 `draft/snapshot/staged_answer/opening/message`이며, `reference_id`는 해당 소유 기록의 안정된 UUID다. a3은 작품 ID를 draft 참조 ID로, a4는 발행 스냅샷 ID를 사용한다. 여러 파일을 변경할 때 파일 UUID 순으로 잠근다. 두 서비스는 참조를 쓰기 전에 작품 소속을 확인하며 타 작품 파일 및 기존 캐릭터 미디어 ID를 거절한다.
 - 첫 참조를 연결하기 전에는 pending/ready 파일의 업로드 보호를 유지한다. 첫 참조 이후에는 살아 있는 참조가 하나라도 있으면 정리하지 않는다. 마지막 참조를 해제한 뒤 최소 24시간이 지나면 파일 잠금 아래 재검사하고 `deleting`을 커밋한다. 객체 삭제 실패는 같은 상태에서 재개하며 그동안 새 참조를 거절한다. 스냅샷 만료는 참조 해제 사유가 아니다. 미첨부 파일을 나이만으로 수거하는 작업은 a2에서 제공하지 않는다.
 
+## U19 a3 스튜디오 이미지 등록
+
+- `service/studio_images.py`는 선택적인 `chatImageItems`와 장면별 `openingImagePlacements`를 검증하고 UUID 및 항목별 태그를 정규화한다. 로어북은 상황 이미지만 허용한다. 위치 0은 본문 앞이며 양수는 빈 줄로 구분한 해당 문단 뒤다. 배치 대상은 같은 문서 안에서 해석한다. 구형 문서의 누락 필드는 빈 목록으로 취급하고 업로드 전에는 `fileVersionId: null`을 허용한다.
+- `save_studio_draft`는 advisory → product → draft 잠금 아래 revision 확인 후 이전·새 파일 UUID의 합집합을 오름차순으로 잠근다. `(kind="draft", reference_id=product_id)`로 새 문서에 남는 ready 파일을 보존하고, 마지막 항목에서 제거된 파일만 해제한다. 동일 문서 재전송은 기존 revision을 돌려주며 참조 실패와 CAS 충돌은 초안 및 참조 쓰기를 함께 롤백한다. a2 업로드는 별도로 커밋되어 재시도할 수 있다.
+- 삭제된 수집 항목 ID의 재사용을 막는 목록은 초안 JSONB의 서버 관리 키에 저장한다. HTTP 초안 응답과 작성 문서 digest에는 이 키를 포함하지 않는다. a4는 잠긴 초안 revision의 항목과 장면 배치를 읽고 같은 작품의 ready 파일을 검증한 뒤 스냅샷 참조를 같은 발행 트랜잭션에서 보존한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 미사용 dependencies.py와 통계 조회 재노출 service/statistics.py를 제거했다.

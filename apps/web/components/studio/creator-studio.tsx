@@ -5,11 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { useUserTheme } from "@/components/user-theme";
 import { BookOpen, Check, ChevronDown, ChevronLeft, FolderOpen, Moon, Plus, Search, Sun } from "lucide-react";
 import { createLoreEntry, type LoreEntry } from "@/lib/studio-data";
-import { createCharacter, createScene, duplicateScene, type StudioCharacter, type StudioProject } from "@/lib/studio-project";
+import { createCharacter, createScene, duplicateScene, type ChatImageUpload, type StudioCharacter, type StudioProject } from "@/lib/studio-project";
 import { createWork, linkSource, restoreTrash, trashEntity, updateProject, type TrashItem } from "@/lib/studio-workspace";
-import { listAvailableModels, loadServerWork, loadServerWorks, publishServerWork, sameStudioProject, saveServerWork, type AvailableModel } from "@/lib/studio-server";
+import { getStudioProductId, listAvailableModels, loadServerWork, loadServerWorks, publishServerWork, sameStudioProject, saveServerWork, type AvailableModel } from "@/lib/studio-server";
 import { ApiError } from "@/lib/api";
-import { readImage } from "@/lib/studio-assets";
+import { readImage, saveImages } from "@/lib/studio-assets";
+import { addChatImageItem, buildOpeningImagePreview, normalizeChatImageTags, validateChatImageDraft, validChatImageFile, type ChatImageKind, type ChatImageTarget } from "@/lib/studio-chat-images";
+import { studioImagePreviewUrl } from "@/lib/studio-product-images";
+import { ImageThumbnail, StudioAlbumPreview, StudioImageGroup, StudioOpeningImage } from "./studio-image-editor";
 import { CharacterEditor } from "./character-editor";
 import { WorkEditor, SceneEditor, type SceneTab } from "./project-editors";
 import { LoreEditor, type LoreTab } from "./lore-editor";
@@ -45,6 +48,8 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [notice, setNotice] = useState("");
   const [serverBusy, setServerBusy] = useState(false);
+  const [productLink, setProductLink] = useState<{ workId: string; productId: string }>();
+  const imageBusy = useRef(false);
   const [models, setModels] = useState<AvailableModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedEffort, setSelectedEffort] = useState("");
@@ -58,6 +63,36 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   const scene = route.kind === "work" && route.type === "scene" ? project?.scenes.find(s => s.id === route.id) : undefined;
   const previewScene = project?.scenes.find(s => s.id === (previewId ?? project.work.defaultSceneId)) ?? project?.scenes[0];
   const wide = !!character;
+  const workId = activeWork?.id;
+  useEffect(() => {
+    if (!workId) return;
+    let active = true;
+    void getStudioProductId(workId).then(productId => {
+      if (active && productId) setProductLink({ workId, productId });
+    }).catch(() => { /* Local work remains editable while signed out. */ });
+    return () => { active = false; };
+  }, [workId]);
+  const productId = productLink?.workId === workId ? productLink?.productId : undefined;
+  const images = (project?.chatImageItems ?? []).map(item => {
+    const upload = project?.chatImageUploads?.find(entry => entry.itemId === item.imageItemId);
+    return {
+      item,
+      pending: !!upload,
+      previewBlobId: upload?.kind === "upload" ? upload.requestId : undefined,
+      previewUrl: productId && item.fileVersionId ? studioImagePreviewUrl(productId, item.fileVersionId) : undefined,
+    };
+  });
+  const imagesById = new Map(images.map(image => [image.item.imageItemId, image]));
+  const openingPreview = previewScene?.openingImagePlacements?.length
+    ? buildOpeningImagePreview(previewScene.opening, previewScene.openingImagePlacements, new Set(imagesById.keys())).map((block, index) => {
+      if (block.type === "text") return <p key={index} className={styles.preserveLines}>{block.text}</p>;
+      const image = imagesById.get(block.imageItemId);
+      return image && <ImageThumbnail key={index} image={image} />;
+    })
+    : undefined;
+  const importOptions = [...new Map((project?.characters ?? []).flatMap(character =>
+    character.assets.flatMap(asset => asset.mediaId ? [[asset.mediaId, { id: asset.mediaId, label: character.name + " · " + asset.name }] as const] : []),
+  )).values()];
   useEffect(() => {
     if (!ready) return;
     if (route.kind === "work" && !activeWork) { setRoute({ kind: "library" }); setLibrary("works"); setPane("editor"); }
@@ -103,6 +138,58 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   function select(type: "overview" | Kind, id?: string) { if (!activeWork) return; setRoute({ kind: "work", workId: activeWork.id, type, id }); setTab("content"); setSceneTab("content"); setPane("editor"); if (type === "scene") { setPreviewId(id ?? null); setRunning(false); } else if (type === "overview") { setPreviewId(null); setRunning(false); } }
   function openSource(type: "character" | "lore", id: string) { setRoute({ kind: "source", type, id }); setPane("editor"); setTab("content"); setRunning(false); }
   function changeProject(change: (p: StudioProject) => StudioProject) { if (activeWork) { setPublishedId(null); commit(w => updateProject(w, activeWork.id, change)); } }
+  async function queueChatImage(target: ChatImageTarget, kind: ChatImageKind, source: File | string, itemId?: string) {
+    if (!activeWork || serverBusy || imageBusy.current) return;
+    if (typeof source !== "string" && !validChatImageFile(source)) {
+      setNotice("32 MiB 이하의 PNG·JPEG·WebP·GIF 이미지를 선택해 주세요.");
+      return;
+    }
+    imageBusy.current = true;
+    setServerBusy(true);
+    try {
+      const added = itemId ? undefined : addChatImageItem(target, kind);
+      const id = added?.imageItemId ?? itemId;
+      if (!id) return;
+      const requestId = crypto.randomUUID();
+      const upload: ChatImageUpload = typeof source === "string"
+        ? { itemId: id, requestId, kind: "import", mediaId: source }
+        : { itemId: id, requestId, kind: "upload", filename: source.name };
+      if (typeof source !== "string") await saveImages([{ id: requestId, file: source }]);
+      changeProject(current => {
+        const items = current.chatImageItems ?? [];
+        if (!added && !items.some(item => item.imageItemId === id)) return current;
+        return {
+          ...current,
+          chatImageItems: added ? [...items, added] : items,
+          chatImageUploads: [...(current.chatImageUploads ?? []).filter(entry => entry.itemId !== id), upload],
+        };
+      });
+      setNotice("이미지를 준비했어요. 서버에 저장하면 작품에 연결돼요.");
+    } catch (cause) { setNotice(serverError(cause)); }
+    finally { imageBusy.current = false; setServerBusy(false); }
+  }
+  function renderChatImageGroup(target: ChatImageTarget, kind: ChatImageKind) {
+    return <StudioImageGroup
+      key={kind}
+      category={kind}
+      images={images.filter(({ item }) => item.kind === kind && item.target.kind === target.kind && item.target.id === target.id)}
+      busy={serverBusy}
+      importOptions={importOptions}
+      onImport={mediaId => void queueChatImage(target, kind, mediaId)}
+      onAdd={file => void queueChatImage(target, kind, file)}
+      onReplace={(id, file) => void queueChatImage(target, kind, file, id)}
+      onMetadataChange={(id, patch) => changeProject(current => ({
+        ...current,
+        chatImageItems: (current.chatImageItems ?? []).map(item => item.imageItemId !== id ? item :
+          "tags" in patch ? { ...item, tags: normalizeChatImageTags(patch.tags) } : { ...item, alt: patch.alt }),
+      }))}
+      onRemove={id => changeProject(current => ({
+        ...current,
+        chatImageItems: (current.chatImageItems ?? []).filter(item => item.imageItemId !== id),
+        chatImageUploads: current.chatImageUploads?.filter(upload => upload.itemId !== id),
+      }))}
+    />;
+  }
   function editCharacter(patch: Partial<StudioCharacter>) {
     if (!character) return;
     if (route.kind === "source") commit(w => ({ ...w, characters: w.characters.map(c => c.id === character.id ? { ...c, ...patch } : c) }));
@@ -149,8 +236,10 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (!activeWork || serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      await saveServerWork(activeWork);
-      setNotice(activeWork.project.characters.some(row => row.assets.length)
+      const saved = await saveServerWork(activeWork);
+      setProductLink({ workId: activeWork.id, productId: saved.productId });
+      commit(current => updateProject(current, activeWork.id, project => project === activeWork.project ? saved.project : project));
+      setNotice(saved.project.chatImageItems?.length || saved.project.characters.some(row => row.assets.length)
         ? "작품 문서와 이미지를 서버에 저장했어요. 다른 기기에서도 서버 이미지를 복원할 수 있어요."
         : "서버에 저장했어요. 다른 기기에서 내 작업실의 서버 초안 가져오기로 복원할 수 있어요.");
     }
@@ -211,7 +300,8 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   const folders = [...new Set(filteredLore.map(l => l.folder))];
   const current = (type: Kind, id: string) => route.kind === "work" && route.type === type && route.id === id;
   const deletionImpact = deleting?.kind === "work" ? "이 작품과 작품 전용 자료를 휴지통에 보관합니다. 독립 원본은 유지됩니다." : deleting?.kind === "character" || deleting?.kind === "lore" ? `독립 원본을 휴지통으로 이동합니다. 연결된 작품 ${workspace.works.filter(w => (deleting.kind === "character" ? w.project.characters : w.project.lorebooks).some(row => row.sourceId === deleting.id)).length}개의 복사본은 현재 내용을 유지하고 작품 전용으로 전환됩니다.` : deleting?.kind === "scene" ? "시작 장면을 휴지통으로 이동합니다. 기본 장면이면 남은 첫 장면으로 변경하며, 마지막 장면이면 선택을 비웁니다." : `이 작품에서만 연결을 해제합니다. 원본과 다른 작품은 유지됩니다. 참조하는 장면 ${project?.scenes.filter(s => deleting?.kind === "work-character" ? s.characterId === deleting.id : s.placeId === deleting?.id).length ?? 0}개의 인물·장소 선택은 비워집니다.`;
-  const publishReady = !!project && !!project.scenes.length && !!project.characters.length && !!project.work.defaultSceneId &&
+  const imageValidation = project ? validateChatImageDraft(project) : [];
+  const publishReady = !images.length && !imageValidation.length && !!project && !!project.scenes.length && !!project.characters.length && !!project.work.defaultSceneId &&
     project.characters.every(c => !!c.name.trim() && !!c.persona.trim()) &&
     project.scenes.every(s => !!s.title.trim() && !!s.opening.trim() && !!s.characterId) &&
     project.lorebooks.every(l => !!l.title.trim() && !!l.content.trim() && (!l.enabled || l.activation !== "keyword" || !!l.keywords.length)) &&
@@ -239,7 +329,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       </aside>}
       <main className={styles.editor} id="studio-editor" tabIndex={-1}>
         {(storageWarning || notice) && <div className={styles.notice} role="status">{notice || storageWarning}{notice && <button aria-label="알림 닫기" onClick={() => setNotice("")}>×</button>}</div>}
-        <fieldset disabled={!ready} className={styles.editorFieldset}>
+        <fieldset disabled={!ready || serverBusy} className={styles.editorFieldset}>
           {route.kind === "library" && <>
             <div className={styles.editorTitle}><h1>내 작업실</h1><p>작품과 독립 원본 자료를 관리해요.</p></div>
             <div className={styles.libraryTabs} role="group" aria-label="보관함 선택">{(Object.keys(titles) as Library[]).map(key => <StudioButton key={key} primary={library === key} aria-pressed={library === key} onClick={() => setLibrary(key)}>{titles[key]}{key === "trash" && ` ${workspace.trash.length}`}</StudioButton>)}</div>
@@ -256,12 +346,15 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
           {route.kind === "source" && <div className={styles.editActions}><StudioButton onClick={() => home(route.type === "character" ? "characters" : "lore")}><ChevronLeft size={15} />보관함으로</StudioButton><StudioButton className={styles.dangerButton} onClick={() => setDeleting({ kind: route.type, id: route.id, label: character?.name || lore?.title || "자료" })}>원본 삭제</StudioButton></div>}
           {project && route.kind === "work" && <div className={styles.editActions}><span className={styles.help}>{route.type === "overview" ? "작품 전용 초안" : "이 작품에서만 적용"}</span><StudioButton className={styles.dangerButton} onClick={() => setDeleting(route.type === "overview" ? { kind: "work", id: activeWork.id, label: project.work.title } : { kind: route.type === "character" ? "work-character" : route.type === "lore" ? "work-lore" : "scene", id: route.id!, label: character?.name || lore?.title || scene?.title || "자료", workId: activeWork.id })}>{route.type === "overview" ? "작품 삭제" : route.type === "scene" ? "시작 장면 삭제" : "작품에서 연결 해제"}</StudioButton></div>}
           {project && route.kind === "work" && route.type === "overview" && <WorkEditor key={activeWork.id} project={project} update={patch => { if (patch.defaultSceneId !== undefined) setPreviewId(null); changeProject(p => ({ ...p, work: { ...p.work, ...patch } })); }} onCharacter={id => select("character", id)} onLore={id => select("lore", id)} onScene={id => select("scene", id)} onOptions={() => { if (previewScene) { select("scene", previewScene.id); setSceneTab("options"); } }} />}
-          {character && <CharacterEditor key={`${route.kind}-${activeWork?.id}-${character.id}`} character={character} scope={route.kind === "source" ? "source" : "work"} update={editCharacter} />}
-          {lore && <>{route.kind === "source" && <div className={styles.callout}><strong>원본 편집</strong><p className={styles.help}>보관함 원본을 저장해요. 기존 작품의 복사본은 바뀌지 않아요.</p></div>}<LoreEditor key={`${route.kind}-${activeWork?.id}-${lore.id}`} entry={lore} canTest={isWork && !!previewScene} tab={tab} setTab={setTab} update={editLore} onTest={isWork ? test : () => setNotice("원본을 작품에 연결하고 시작 장면을 만든 뒤 테스트해 주세요.")} /></>}
-          {scene && project && <SceneEditor key={scene.id} scene={scene} project={project} tab={sceneTab} setTab={setSceneTab} update={patch => changeProject(p => ({ ...p, scenes: p.scenes.map(s => s.id === scene.id ? { ...s, ...patch } : s) }))} onDuplicate={() => { const copy = duplicateScene(scene); changeProject(p => ({ ...p, scenes: [...p.scenes, copy] })); select("scene", copy.id); }} onTest={test} />}
+          {character && <CharacterEditor key={`${route.kind}-${activeWork?.id}-${character.id}`} character={character} scope={route.kind === "source" ? "source" : "work"} update={editCharacter} imageSection={isWork ? <div className={styles.editorFields}>
+            {renderChatImageGroup({ kind: "character", id: character.id }, "expression")}
+            {renderChatImageGroup({ kind: "character", id: character.id }, "situation")}
+          </div> : undefined} />}
+          {lore && <>{route.kind === "source" && <div className={styles.callout}><strong>원본 편집</strong><p className={styles.help}>보관함 원본을 저장해요. 기존 작품의 복사본은 바뀌지 않아요.</p></div>}<LoreEditor key={`${route.kind}-${activeWork?.id}-${lore.id}`} entry={lore} canTest={isWork && !!previewScene} tab={tab} setTab={setTab} update={editLore} imageSection={isWork ? renderChatImageGroup({ kind: "lore_entry", id: lore.id }, "situation") : undefined} onTest={isWork ? test : () => setNotice("원본을 작품에 연결하고 시작 장면을 만든 뒤 테스트해 주세요.")} /></>}
+          {scene && project && <SceneEditor key={scene.id} scene={scene} project={project} tab={sceneTab} setTab={setSceneTab} update={patch => changeProject(p => ({ ...p, scenes: p.scenes.map(s => s.id === scene.id ? { ...s, ...patch } : s) }))} onDuplicate={() => { const copy = duplicateScene(scene); changeProject(p => ({ ...p, scenes: [...p.scenes, copy] })); select("scene", copy.id); }} onTest={test} imageSection={<StudioOpeningImage images={images} opening={scene.opening} placements={scene.openingImagePlacements ?? []} onChange={openingImagePlacements => changeProject(p => ({ ...p, scenes: p.scenes.map(row => row.id === scene.id ? { ...row, openingImagePlacements } : row) }))} />} />}
         </fieldset>
       </main>
-      {project && <aside className={styles.preview} aria-label="작품 미리보기">{previewScene ? <StudioPreview key={`${activeWork.id}-${previewScene.id}-${previewScene.opening}-${previewScene.characterId}`} entries={project.lorebooks} scene={previewScene} character={project.characters.find(c => c.id === previewScene.characterId)} running={running} onRun={test} onSelect={id => select("lore", id)} onClose={() => setPane("editor")} /> : <><h2>미리보기</h2><p className={styles.help}>아직 시작 장면이 없어요. 자료 추가에서 첫 장면을 만들어 주세요.</p><StudioButton onClick={() => add("scene")}>시작 장면 추가</StudioButton></>}</aside>}
+      {project && <aside className={styles.preview} aria-label="작품 미리보기">{previewScene ? <StudioPreview key={`${activeWork.id}-${previewScene.id}-${previewScene.opening}-${previewScene.characterId}`} entries={project.lorebooks} scene={previewScene} openingPreview={openingPreview} character={project.characters.find(c => c.id === previewScene.characterId)} running={running} onRun={test} onSelect={id => select("lore", id)} onClose={() => setPane("editor")} /> : <><h2>미리보기</h2><p className={styles.help}>아직 시작 장면이 없어요. 자료 추가에서 첫 장면을 만들어 주세요.</p><StudioButton onClick={() => add("scene")}>시작 장면 추가</StudioButton></>}</aside>}
     </div>
     {isWork && <nav className={styles.mobileNav} aria-label="스튜디오 화면 전환">{([{ id: "resources", label: "자료" }, { id: "editor", label: "편집" }, { id: "preview", label: "미리보기" }] as const).map(item => <button key={item.id} className={pane === item.id ? styles.mobileActive : ""} aria-current={pane === item.id ? "page" : undefined} onClick={() => setPane(item.id)}><BookOpen size={19} />{item.label}</button>)}</nav>}
     {modal === "add" && project && <StudioDialog title="작품 자료 추가" onClose={() => setModal(null)}><p className={styles.help}>새 자료는 이 작품에만 저장됩니다. 독립 원본은 보관함에서 만들어 연결하세요.</p><StudioButton onClick={() => add("character")}>작품 전용 캐릭터 추가</StudioButton><StudioButton onClick={() => add("lore")}>작품 전용 로어 추가</StudioButton><StudioButton onClick={() => add("scene")}>시작 장면 추가</StudioButton><StudioButton onClick={() => { setConnectQuery(""); setModal("connect"); }}>보관함 원본 연결</StudioButton></StudioDialog>}
@@ -276,6 +369,15 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       {project.lorebooks.filter(l => !l.title.trim() || !l.content.trim() || (l.enabled && l.activation === "keyword" && !l.keywords.length)).map(l => <StudioButton key={l.id} onClick={() => { select("lore", l.id); setModal(null); }}>{l.title}: 제목·내용·키워드 확인</StudioButton>)}
       <label>실행 모델 <select value={selectedModel} onChange={event => { const id = event.target.value; setSelectedModel(id); setSelectedEffort(models.find(row => row.id === id)?.reasoning_efforts[0] ?? ""); }}><option value="">모델 선택</option>{models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
       <label>추론 수준 <select value={selectedEffort} onChange={event => setSelectedEffort(event.target.value)}><option value="">수준 선택</option>{models.find(model => model.id === selectedModel)?.reasoning_efforts.map(effort => <option key={effort} value={effort}>{effort}</option>)}</select></label>
+      {imageValidation.length > 0 && <ul>{imageValidation.map(error => <li key={error} className={styles.error}>{error}</li>)}</ul>}
+      {images.length > 0 && <>
+        <p className={styles.help}>이미지를 포함한 발행은 이미지 스냅샷 연결 후 사용할 수 있어요.</p>
+        <StudioAlbumPreview items={images.filter(({ item }) => !!item.fileVersionId).map(image => ({
+          image, sourceLabel: image.item.target.kind === "character"
+            ? project.characters.find(row => row.id === image.item.target.id)?.name ?? ""
+            : project.lorebooks.find(row => row.id === image.item.target.id)?.title ?? "",
+        }))} />
+      </>}
       <label>발행 요약 <input value={releaseSummary} maxLength={300} onChange={event => setReleaseSummary(event.target.value)} /></label>
       <label>발행 안내 <textarea value={releaseBody} maxLength={20000} onChange={event => setReleaseBody(event.target.value)} /></label>
       {notice && <p role="status">{notice}</p>}

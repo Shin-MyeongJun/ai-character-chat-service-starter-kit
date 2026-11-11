@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CharacterAsset, StudioCharacter } from "@/lib/studio-project";
 import { readImage, saveImages } from "@/lib/studio-assets";
 import { ChipEditor, ChoiceChips, StudioButton, StudioField } from "./studio-controls";
@@ -25,8 +25,8 @@ function AssetImage({ asset }: { asset: CharacterAsset }) {
   // Browser-local object URLs cannot use Next's remote image optimizer.
   return url ? <img className={styles.assetImage} src={url} alt={asset.name} /> : <span className={styles.help}>{missing ? "이미지를 다시 등록해 주세요." : "이미지 불러오는 중"}</span>;
 }
-export function CharacterEditor({ character, update, scope = "work" }: { character: StudioCharacter; update: (patch: Partial<StudioCharacter>) => void; scope?: "source" | "work" }) {
-  const [tab, setTab] = useState<"basic" | "relations" | "assets">("basic");
+export function CharacterEditor({ character, update, scope = "work", imageSection }: { character: StudioCharacter; update: (patch: Partial<StudioCharacter>) => void; scope?: "source" | "work"; imageSection?: ReactNode }) {
+  const [tab, setTab] = useState<"basic" | "relations" | "assets">(imageSection ? "assets" : "basic");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const portraitInput = useRef<HTMLInputElement>(null);
@@ -65,12 +65,12 @@ export function CharacterEditor({ character, update, scope = "work" }: { charact
           <StudioField label="인물 관계 · 비공개" help="다른 인물을 부르는 호칭, 알고 있는 사실, 관계를 적어요."><textarea rows={10} value={character.relationships} onChange={event => update({ relationships: event.target.value })} /></StudioField>
           <div className={styles.callout}><strong>장면별 변화는 시작 장면에서</strong><p className={styles.help}>시작 장면 → 초기 설정 → 인물 변형에서 이 장면에만 적용할 설정을 작성할 수 있어요.</p></div>
         </>}
-        {tab === "assets" && <>
+        {tab === "assets" && (imageSection ?? <>
           <div className={styles.callout}><strong>이미지 용도를 나누어 관리해요.</strong><p className={styles.help}>초상은 대표 이미지, 표정은 대화 중 모습, 장면 에셋은 배경과 소품에 사용해요. 파일은 이 브라우저에 보관됩니다.</p></div>
           <StudioButton disabled={busy} onClick={() => portraitInput.current?.click()}>초상 이미지 등록</StudioButton>
           <StudioButton disabled={busy} onClick={() => imagesInput.current?.click()}>표정·장면 이미지 일괄 등록</StudioButton>
           <p className={styles.help}>PNG·JPG·WebP · 파일당 8MB 이하 · 한 번에 20개까지</p>
-        </>}
+        </>)}
       </div>
       <aside className={styles.characterMedia} aria-label="캐릭터 이미지와 태그">
         <button type="button" className={styles.portrait} disabled={busy} aria-label="초상 이미지 등록" onClick={() => portraitInput.current?.click()}>{portrait ? <AssetImage key={portrait.id} asset={portrait} /> : <><span className={styles.portraitLetter}>{character.id === "erin" ? "E" : character.name.slice(0, 1) || "?"}</span><strong>{character.name || "새 캐릭터"} / {character.role || "역할 미설정"}</strong><small className={styles.help}>초상 이미지를 등록하세요.</small></>}</button>

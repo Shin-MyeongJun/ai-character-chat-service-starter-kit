@@ -28,6 +28,7 @@ ProductJsonValue: TypeAlias = (
     | dict[str, "ProductJsonValue"]
 )
 ProductJsonObject: TypeAlias = dict[str, ProductJsonValue]
+RETIRED_STUDIO_IMAGE_ITEMS = "_retiredChatImageItemIds"
 
 
 class ProductSnapshotData(TypedDict):

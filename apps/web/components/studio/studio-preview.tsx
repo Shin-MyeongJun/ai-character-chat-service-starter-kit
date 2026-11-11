@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Minus, Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { previewLore, type PreviewMessage, type LorePreviewResult } from "@/lib/studio-preview";
 import type { LoreEntry } from "@/lib/studio-data";
 import type { StudioCharacter, StudioScene } from "@/lib/studio-project";
@@ -9,7 +9,7 @@ import { ChoiceChips, StudioButton, StudioField } from "./studio-controls";
 import styles from "./studio.module.css";
 
 /** Show server selector diagnostics for unsaved content; stale checks never replace current results. */
-export function StudioPreview({ entries, scene, character, running, onRun, onSelect, onClose }: { entries: LoreEntry[]; scene: StudioScene; character?: StudioCharacter; running: boolean; onRun: () => void; onSelect: (id: string) => void; onClose?: () => void }) {
+export function StudioPreview({ entries, scene, character, running, onRun, onSelect, onClose, openingPreview }: { entries: LoreEntry[]; scene: StudioScene; character?: StudioCharacter; running: boolean; onRun: () => void; onSelect: (id: string) => void; onClose?: () => void; openingPreview?: ReactNode }) {
   const intro: PreviewMessage = { role: "character", text: scene.opening };
   const [narrative, ...dialogue] = scene.opening.split(/\n\s*\n/);
   const [tab, setTab] = useState<"chat" | "lore">("chat");
@@ -39,8 +39,10 @@ export function StudioPreview({ entries, scene, character, running, onRun, onSel
     <ChoiceChips label="미리보기 종류" value={tab} onChange={setTab} options={[{ value: "chat", label: "대화" }, { value: "lore", label: "적용 로어" }]} />
     {tab === "chat" ? <>
       <div className={styles.chips}><span className={styles.chip}>{scene.title || "이름 없는 장면"}</span><span className={styles.chip}>{scene.language}</span></div>
+      {openingPreview ?? <>
       <div className={styles.bubble}><strong>{scene.title || "이름 없는 장면"}</strong><p className={styles.preserveLines}>{narrative || "도입 대사를 작성해 주세요."}</p></div>
       <strong>{character?.name || "내레이션"}</strong>{dialogue.length > 0 && <div className={`${styles.bubble} ${styles.preserveLines}`}>{dialogue.join("\n\n")}</div>}
+      </>}
       {messages.slice(1).map((message, index) => <div key={index} className={styles.userBubble}>{message.text}</div>)}
       {!running && <p className={styles.help}>선택한 설정이 어떻게 보이는지<br />테스트로 확인해 보세요.</p>}
     </> : <>

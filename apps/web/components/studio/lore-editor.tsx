@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import type { LoreEntry } from "@/lib/studio-data";
 import { ChipEditor, ChoiceChips, StudioButton, StudioField } from "./studio-controls";
@@ -15,7 +15,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
   return <StudioField label={label}><input type="number" inputMode="numeric" min={min} max={max} value={draft} aria-invalid={!valid} onChange={event => { const next = event.target.value; setDraft(next); if (next && Number.isInteger(Number(next)) && Number(next) >= min && Number(next) <= max) onChange(Number(next)); }} onBlur={() => { if (!valid) setDraft(String(value)); }} />{!valid && <small className={styles.error}>{min}~{max} 사이의 정수를 입력해 주세요.</small>}</StudioField>;
 }
 
-export function LoreEditor({ entry, tab, setTab, update, onTest, canTest = true }: { entry: LoreEntry; tab: LoreTab; setTab: (tab: LoreTab) => void; update: (patch: Partial<LoreEntry>) => void; onTest: () => void; canTest?: boolean }) {
+export function LoreEditor({ entry, tab, setTab, update, onTest, canTest = true, imageSection }: { entry: LoreEntry; tab: LoreTab; setTab: (tab: LoreTab) => void; update: (patch: Partial<LoreEntry>) => void; onTest: () => void; canTest?: boolean; imageSection?: ReactNode }) {
   const tabs = [{ id: "content", label: "내용" }, { id: "conditions", label: "적용 조건" }, { id: "advanced", label: "고급 설정" }] as const;
   return <>
     <div className={styles.editorTitle}><h1>{entry.title || "이름 없는 로어"}</h1><p>{tab === "advanced" ? "필요할 때만, 필요한 만큼 설정을 전달해요." : entry.category === "장소" ? "장소가 등장할 때 필요한 배경을 전달해요." : "이야기에 필요한 설정을 정리하고 전달해요."}</p></div>
@@ -42,6 +42,7 @@ export function LoreEditor({ entry, tab, setTab, update, onTest, canTest = true 
           <small className={styles.help}>{entry.activation === "keyword" ? entry.match === "any" ? "대화에 등록한 문구가 등장하면 이 항목을 활성화해요. 분류 태그와 별개예요." : "대화에 등록한 문구가 모두 등장하면 이 항목을 활성화해요. 분류 태그와 별개예요." : entry.activation === "always" ? "매 대화에 이 설정을 포함해요." : "필요한 순간에 제작자가 선택해 적용하는 설정이에요."}</small>
         </div>
         <ChipEditor key={`${entry.id}-tags`} label="로어북 분류 태그 · 공개" reorderable values={entry.tags} onChange={tags => update({ tags })} help="로어북을 분류하는 공개 태그예요. 활성화 조건에는 영향을 주지 않아요." />
+        {imageSection}
         <button type="button" className={styles.fold} onClick={() => setTab("advanced")}><span><strong>고급 설정</strong><small>포함 우선도 · 검색 범위 · 문맥 예산</small></span><ChevronRight size={18} /></button>
         <div className={styles.inline}><button type="button" className={`${styles.statusToggle} ${entry.enabled ? styles.positive : ""}`} aria-pressed={entry.enabled} onClick={() => update({ enabled: !entry.enabled })}>{entry.enabled && <Check size={15} />}{entry.enabled ? "활성화됨" : "비활성화됨"}</button>{canTest && <StudioButton primary onClick={onTest}>다음: 테스트하기</StudioButton>}</div>
       </>}

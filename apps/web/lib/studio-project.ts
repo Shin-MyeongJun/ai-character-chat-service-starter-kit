@@ -1,15 +1,23 @@
 import { SAMPLE_LORE, readLoreDraft, type LoreEntry } from "./studio-data";
 
+import type { ChatImageItem, OpeningImagePlacement } from "./studio-chat-images";
+
+export type ChatImageUpload = { itemId: string; requestId: string } & (
+  | { kind: "upload"; filename: string }
+  | { kind: "import"; mediaId: string }
+);
+
 export const PROJECT_STORAGE_KEY = "chat-kit-studio-draft-v2";
 export type StudioCharacter = { id: string; sourceId?: string; name: string; role: string; introduction: string; persona: string; dialogue: string; tags: string[]; relationships: string; assets: CharacterAsset[] };
 export type CharacterAsset = { id: string; name: string; usage: "portrait" | "expression" | "scene"; mediaId?: string };
 export type StudioScene = {
   id: string; title: string; background: string; opening: string; characterId: string; placeId: string;
   initialNotes: string; language: "한국어" | "English" | "日本語"; storyTime: string;
+  openingImagePlacements?: OpeningImagePlacement[];
   perspective: "2인칭" | "1인칭" | "3인칭"; variants: string;
 };
 export type StudioWork = { title: string; introduction: string; tags: string[]; worldRules: string; visibility: "비공개" | "링크 공개" | "전체 공개"; defaultSceneId: string };
-export type StudioProject = { version: 2; work: StudioWork; characters: StudioCharacter[]; scenes: StudioScene[]; lorebooks: LoreEntry[] };
+export type StudioProject = { version: 2; work: StudioWork; characters: StudioCharacter[]; scenes: StudioScene[]; lorebooks: LoreEntry[]; chatImageItems?: ChatImageItem[]; chatImageUploads?: ChatImageUpload[] };
 export function createCharacter(): StudioCharacter {
   return { id: crypto.randomUUID(), name: "새 캐릭터", role: "", introduction: "", persona: "", dialogue: "", tags: [], relationships: "", assets: [] };
 }
@@ -38,6 +46,22 @@ export function sampleProject(lorebooks: LoreEntry[] = SAMPLE_LORE): StudioProje
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(item => typeof item === "string"); }
 function fields(value: Record<string, unknown>, names: string[]) { return names.every(name => typeof value[name] === "string"); }
+const uuid = (value: unknown): value is string =>
+  typeof value === "string" && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(value);
+function chatImageItem(value: unknown): value is ChatImageItem {
+  return record(value) && uuid(value.imageItemId) && (value.fileVersionId === null || uuid(value.fileVersionId))
+    && record(value.target) && typeof value.target.id === "string"
+    && (value.target.kind === "character" || value.target.kind === "lore_entry")
+    && (value.kind === "situation" || (value.kind === "expression" && value.target.kind === "character"))
+    && strings(value.tags) && typeof value.alt === "string";
+}
+function chatImageUpload(value: unknown): value is ChatImageUpload {
+  return record(value) && uuid(value.itemId) && uuid(value.requestId)
+    && ((value.kind === "upload" && typeof value.filename === "string") || (value.kind === "import" && uuid(value.mediaId)));
+}
+function openingPlacement(value: unknown): value is OpeningImagePlacement {
+  return record(value) && uuid(value.imageItemId) && Number.isInteger(value.afterParagraph);
+}
 function uniqueRows(value: unknown): value is Record<string, unknown>[] {
   return Array.isArray(value) && value.every(item => record(item) && typeof item.id === "string" && !!item.id) && new Set(value.map(item => item.id)).size === value.length;
 }
@@ -56,11 +80,18 @@ export function readStudioProject(raw: string | null): StudioProject | null {
       const assets = character.assets;
       if (!assets.every(asset => record(asset) && fields(asset, ["id", "name"]) && !!asset.id && ["portrait", "expression", "scene"].includes(asset.usage as string)) || new Set(assets.map(asset => asset.id)).size !== assets.length || assets.filter(asset => asset.usage === "portrait").length > 1) return null;
     }
+    const images = value.chatImageItems;
+    if (images !== undefined && (!Array.isArray(images) || !images.every(chatImageItem) ||
+      new Set(images.map(item => item.imageItemId)).size !== images.length)) return null;
+    const uploads = value.chatImageUploads;
+    if (uploads !== undefined && (!Array.isArray(uploads) || !uploads.every(chatImageUpload))) return null;
     for (const scene of value.scenes) {
+      if (scene.openingImagePlacements !== undefined &&
+        (!Array.isArray(scene.openingImagePlacements) || !scene.openingImagePlacements.every(openingPlacement))) return null;
       if (!fields(scene, ["title", "background", "opening", "characterId", "placeId", "initialNotes", "storyTime", "variants"]) || !["한국어", "English", "日本語"].includes(scene.language as string) || !["2인칭", "1인칭", "3인칭"].includes(scene.perspective as string)) return null;
       if ((scene.characterId !== "" && !value.characters.some(character => character.id === scene.characterId)) || (scene.placeId !== "" && !lore.some(entry => entry.id === scene.placeId && entry.category === "장소"))) return null;
     }
-    return { version: 2, work: work as StudioWork, characters: value.characters as StudioCharacter[], scenes: value.scenes as StudioScene[], lorebooks: lore };
+    return { version: 2, work: work as StudioWork, characters: value.characters as StudioCharacter[], scenes: value.scenes as StudioScene[], lorebooks: lore, ...(images === undefined ? {} : { chatImageItems: images }), ...(uploads === undefined ? {} : { chatImageUploads: uploads }) };
   } catch { return null; }
 }
 // Leave the old key intact, preserving existing lore and adding the new editable sample data.

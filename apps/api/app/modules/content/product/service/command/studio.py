@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,14 @@ from app.db.transaction import use_case_transaction
 from app.modules.content.product import repository as Repository
 from app.modules.content.product import types as Types
 from app.modules.content.product.mapper import persistence as PersistenceMapper
+from app.modules.content.product.service.command import (
+    file_versions as FileVersionsCommandService,
+)
+from app.modules.content.product.service.studio_images import (
+    get_retired_studio_image_ids,
+    get_studio_image_ids,
+    normalize_studio_chat_images,
+)
 from app.modules.content.product.service.studio_validation import (
     validate_studio_document_shape,
 )
@@ -27,6 +36,29 @@ def _read_studio_tag_names(value: object) -> tuple[str, ...]:
     return tuple(names)
 
 
+async def _sync_studio_file_references(
+    session: AsyncSession,
+    product_id: UUID,
+    previous: set[UUID],
+    current: set[UUID],
+) -> None:
+    for file_id in sorted(previous | current):
+        reference = Types.ProductFileReferenceCommand(
+            product_id=product_id,
+            file_version_id=file_id,
+            kind="draft",
+            reference_id=product_id,
+        )
+        if file_id in current:
+            await FileVersionsCommandService.retain_product_file_version(
+                session, reference
+            )
+        else:
+            await FileVersionsCommandService.release_product_file_version(
+                session, reference
+            )
+
+
 async def save_studio_draft(
     session: AsyncSession, command: Types.SaveStudioDraftCommand
 ) -> Types.StudioDraftInfo:
@@ -39,7 +71,12 @@ async def save_studio_draft(
     if command.expected_revision is not None and command.expected_revision < 1:
         raise ValueError("Invalid studio revision.")
     validate_studio_document_shape(command.document)
-    work = command.document.get("work")
+    document = normalize_studio_chat_images(command.document)
+    if document != command.document:
+        raw = json.dumps(
+            document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    work = document.get("work")
     if not isinstance(work, dict):
         raise ValueError("Studio work profile is required.")
     title = work.get("title")
@@ -59,7 +96,7 @@ async def save_studio_draft(
         or visibility is None
     ):
         raise ValueError("Invalid studio work profile.")
-    scenes = command.document.get("scenes")
+    scenes = document.get("scenes")
     if not isinstance(scenes, list):
         raise ValueError("Studio scenes are required.")
     default_scene = next(
@@ -102,6 +139,23 @@ async def save_studio_draft(
             return existing
         if (existing.revision if existing else None) != command.expected_revision:
             raise Types.StudioDraftConflictError("Studio draft changed on the server.")
+        previous_document = existing.document if existing else {}
+        previous_items = get_studio_image_ids(previous_document, "imageItemId")
+        current_items = get_studio_image_ids(document, "imageItemId")
+        retired = get_retired_studio_image_ids(previous_document)
+        if current_items & retired:
+            raise ValueError("A deleted studio image item ID cannot be reused.")
+        retired.update(previous_items - current_items)
+        if retired:
+            document[Types.RETIRED_STUDIO_IMAGE_ITEMS] = [
+                str(item_id) for item_id in sorted(retired)
+            ]
+        await _sync_studio_file_references(
+            session,
+            command.product_id,
+            get_studio_image_ids(previous_document, "fileVersionId"),
+            get_studio_image_ids(document, "fileVersionId"),
+        )
         if product is not None and product.latest_snapshot_id is None:
             await Repository.update_product(
                 session, command.product_id, command.owner_id, profile
@@ -122,7 +176,7 @@ async def save_studio_draft(
             command.product_id,
             (existing.revision + 1) if existing else 1,
             digest,
-            command.document,
+            document,
             existing_row,
         )
         result = PersistenceMapper.studio_draft_entity_to_info(row)

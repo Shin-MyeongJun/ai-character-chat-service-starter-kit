@@ -130,7 +130,7 @@ async def save_studio(
     """Preserve legacy copy identities before CAS-saving an edited document.
 
     One transaction owns advisory → product → draft locks, adoption and the write.
-    No files or external services are called; a conflict rolls back every write.
+    File references join the write transaction. A conflict rolls back every write.
     """
     validate_studio_document_shape(command.document)
     async with use_case_transaction(session):

@@ -85,7 +85,26 @@ export function trashEntity(w: StudioWorkspace, kind: TrashItem["kind"], id: str
     const detach = (p: StudioProject): StudioProject => ({ ...p, characters: p.characters.map(row => kind === "character" && row.sourceId === id ? withoutSource(row) : row), lorebooks: p.lorebooks.map(row => kind === "lore" && row.sourceId === id ? withoutSource(row) : row) });
     return { ...next, works: next.works.map(row => ({ ...row, project: detach(row.project) })), trash: next.trash.map(row => row.kind === "work" ? { ...row, data: { ...row.data, project: detach(row.data.project) } } : row) };
   }
-  return updateProject(next, workId!, p => ({ ...p, characters: kind === "work-character" ? p.characters.filter(row => row.id !== id) : p.characters, lorebooks: kind === "work-lore" ? p.lorebooks.filter(row => row.id !== id) : p.lorebooks, scenes: kind === "scene" ? p.scenes.filter(row => row.id !== id) : p.scenes }));
+  return updateProject(next, workId!, p => {
+    if (kind === "scene") return { ...p, scenes: p.scenes.filter(row => row.id !== id) };
+    const targetKind = kind === "work-character" ? "character" : "lore_entry";
+    const removed = new Set((p.chatImageItems ?? []).filter(item =>
+      item.target.kind === targetKind && item.target.id === id).map(item => item.imageItemId));
+    const project = {
+      ...p,
+      characters: kind === "work-character" ? p.characters.filter(row => row.id !== id) : p.characters,
+      lorebooks: kind === "work-lore" ? p.lorebooks.filter(row => row.id !== id) : p.lorebooks,
+    };
+    if (!removed.size) return project;
+    return {
+      ...project,
+      chatImageItems: project.chatImageItems?.filter(item => !removed.has(item.imageItemId)),
+      chatImageUploads: project.chatImageUploads?.filter(upload => !removed.has(upload.itemId)),
+      scenes: project.scenes.map(scene => ({
+        ...scene, openingImagePlacements: scene.openingImagePlacements?.filter(placement => !removed.has(placement.imageItemId)),
+      })),
+    };
+  });
 }
 function withoutSource<T extends { sourceId?: string }>(row: T): T { const copy = { ...row }; delete copy.sourceId; return copy; }
 export function restoreTrash(w: StudioWorkspace, trashId: string): StudioWorkspace {

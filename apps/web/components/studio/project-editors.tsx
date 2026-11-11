@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { StudioProject, StudioScene, StudioWork } from "@/lib/studio-project";
 import { ChipEditor, ChoiceChips, StudioButton, StudioField } from "./studio-controls";
 import styles from "./studio.module.css";
@@ -48,9 +48,9 @@ export function WorkEditor({ project, update, onCharacter, onLore, onScene, onOp
   </>;
 }
 export type SceneTab = "content" | "initial" | "options";
-export function SceneEditor({ scene, project, tab, setTab, update, onDuplicate, onTest }: {
+export function SceneEditor({ scene, project, tab, setTab, update, onDuplicate, onTest, testLabel = "이 장면으로 테스트", imageSection }: {
   scene: StudioScene; project: StudioProject; tab: SceneTab; setTab: (tab: SceneTab) => void;
-  update: (patch: Partial<StudioScene>) => void; onDuplicate: () => void; onTest: () => void;
+  update: (patch: Partial<StudioScene>) => void; onDuplicate?: () => void; onTest: () => void; testLabel?: string; imageSection?: ReactNode;
 }) {
   return <>
     <EditorHeading title={scene.title || "이름 없는 시작 장면"} description="독자가 처음 마주할 장면과 초기 설정을 정해요." />
@@ -64,6 +64,7 @@ export function SceneEditor({ scene, project, tab, setTab, update, onDuplicate, 
           <StudioField label="처음 등장할 인물"><select value={scene.characterId} onChange={event => update({ characterId: event.target.value })}><option value="">내레이션 · 인물 선택 안 함</option>{project.characters.map(character => <option key={character.id} value={character.id}>{character.name || "이름 없는 인물"}</option>)}</select></StudioField>
           <StudioField label="시작 장소"><select value={scene.placeId} onChange={event => update({ placeId: event.target.value })}><option value="">선택 안 함</option>{project.lorebooks.filter(entry => entry.category === "장소").map(entry => <option key={entry.id} value={entry.id}>{entry.title || "이름 없는 장소"}</option>)}</select></StudioField>
         </div>
+        {imageSection}
         <StudioFold title="초기 설정과 플레이 옵션" description="언어 · 작중 시점 · 인물 변형 선택" onClick={() => setTab("initial")} />
       </>}
       {tab === "initial" && <>
@@ -78,7 +79,7 @@ export function SceneEditor({ scene, project, tab, setTab, update, onDuplicate, 
         <StudioField label="서술 시점"><select value={scene.perspective} onChange={event => update({ perspective: event.target.value as StudioScene["perspective"] })}>{["2인칭", "1인칭", "3인칭"].map(value => <option key={value}>{value}</option>)}</select></StudioField>
         <p className={styles.help}>옵션은 초안에 저장됩니다. AI 생성에 적용하는 기능은 서버 연결 후 지원합니다.</p>
       </>}
-      <div className={styles.inline}><StudioButton onClick={onDuplicate}>장면 복제</StudioButton><StudioButton primary onClick={onTest}>이 장면으로 테스트</StudioButton></div>
+      <div className={styles.inline}>{onDuplicate && <StudioButton onClick={onDuplicate}>장면 복제</StudioButton>}<StudioButton primary onClick={onTest}>{testLabel}</StudioButton></div>
     </div>
   </>;
 }
