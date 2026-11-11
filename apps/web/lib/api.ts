@@ -15,7 +15,23 @@ export type CatalogItem = { id: string; title: string; description: string | nul
 export type CursorPage<T> = { items: T[]; next_cursor_created_at: string | null; next_cursor_id: string | null; total?: number };
 export type OwnedConversation = { id: string; product_id: string; title: string | null; created_at: string; last_activity_at?: string; last_message: string | null };
 export type CreditBalance = { balance_credit: number; reserved_credit: number; available_credit: number };
+export type ChatImage = {
+  image_item_id: string;
+  file_version_id: string;
+  alt: string;
+  content_url: string;
+};
+export type ContentBlock = { type: "text"; text: string } | ({ type: "image" } & ChatImage);
+export type AlbumItem = { status: "locked"; image_item_id: string } | ({ status: "unlocked"; unlocked_at: string } & ChatImage);
+export type ProductAlbum = {
+  product_id: string;
+  product_snapshot_id: string | null;
+  available: boolean;
+  items: AlbumItem[];
+};
+export type ManualLore = { id: string; title: string };
 export type ConversationStart = {
+  content_blocks?: ContentBlock[] | null;
   opening_mode: string;
   opening_message: string | null;
   start: { title: string; content: string } | null;
@@ -23,6 +39,7 @@ export type ConversationStart = {
   primary_product_character_id: string | null;
 };
 export type ChatMessage = {
+  content_blocks?: ContentBlock[] | null;
   id: string;
   conversation_id: string;
   sender_type: string;
@@ -166,6 +183,25 @@ export const listCatalog = (cursor?: { createdAt: string; id: string }, search =
 export const listCatalogTags = () => request<{ id: string; name: string }[]>("/products/catalog-tags");
 export const listOwnedConversations = (cursor?: { createdAt: string; id: string }) =>
   request<CursorPage<OwnedConversation>>(`/conversations/mine?${pageQuery(cursor)}`);
+export async function findConversationProduct(id: string, signal: AbortSignal): Promise<string | null> {
+  const seen = new Set<string>();
+  let cursor: { createdAt: string; id: string } | undefined;
+  do {
+    const query = pageQuery(cursor);
+    if (seen.has(query)) throw new Error("Conversation cursor did not advance.");
+    seen.add(query);
+    const page = await request<CursorPage<OwnedConversation>>(`/conversations/mine?${query}`, { signal });
+    const room = page.items.find(item => item.id === id.toLowerCase());
+    if (room) return room.product_id;
+    const { next_cursor_created_at: createdAt, next_cursor_id: nextId } = page;
+    cursor = createdAt && nextId ? { createdAt, id: nextId } : undefined;
+  } while (cursor);
+  return null;
+}
+export const getProductAlbum = (productId: string, signal: AbortSignal) =>
+  request<ProductAlbum>(`/products/${encodeURIComponent(productId)}/album`, { signal });
+export const getManualLore = (id: string, signal: AbortSignal) =>
+  request<{ items: ManualLore[] }>(`/conversations/${encodeURIComponent(id)}/manual-lore`, { signal });
 export const getCreditBalance = () => request<CreditBalance>("/account/credits");
 export const startConversation = (productId: string, startSetId: string | null) =>
   request<{ id: string }>("/conversations", { method: "POST", body: JSON.stringify({ product_id: productId, start_set_id: startSetId }) });

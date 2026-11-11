@@ -423,3 +423,28 @@ test("UUID route aliases still accept canonical message IDs and checkpoints", as
     assert.equal(scope.append(chatMessage(2, {conversation_id: canonical})).messages.length, 2);
   }
 });
+
+test("chat album resolves the authorized room across owned-conversation pages", async t => {
+  const { api } = setup(t);
+  const controller = new AbortController();
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (path, options) => {
+    assert.equal(options.signal, controller.signal);
+    const url = new URL(path, "https://test");
+    calls.push(url);
+    if (url.pathname.endsWith("/album")) {
+      return json({ product_id: "work", product_snapshot_id: "latest", available: true,
+        items: [{ image_item_id: "locked", status: "locked" }] });
+    }
+    return json(url.searchParams.has("cursor_id")
+      ? { items: [{ id: "room", product_id: "work" }] }
+      : { items: [{ id: "different", product_id: "other" }],
+        next_cursor_created_at: "2026-11-01", next_cursor_id: "different" });
+  });
+  const productId = await api.findConversationProduct("room", controller.signal);
+  const album = await api.getProductAlbum(productId, controller.signal);
+  assert.equal(calls[1].searchParams.get("cursor_created_at"), "2026-11-01");
+  assert.equal(calls[1].searchParams.get("cursor_id"), "different");
+  assert.equal(calls[2].pathname, "/backend/products/work/album");
+  assert.deepEqual(album.items, [{ image_item_id: "locked", status: "locked" }]);
+});
