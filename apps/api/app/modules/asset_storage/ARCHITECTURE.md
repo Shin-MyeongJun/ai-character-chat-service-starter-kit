@@ -1,5 +1,10 @@
 # asset_storage 모듈
 
+U19 a2에서 캐릭터 미디어와 작품 파일이 동일한 `AssetStorageService`와 저장소 설정을
+공유한다. 객체 키 공간과 메타데이터는 각 소유 모듈이 관리한다.
+`app.core.storage_io.settle_storage_operation`은 외부 I/O가 완료될 때까지 호출자의 잠금·스트림 수명을
+유지하고 취소가 있었다면 작업 결과를 회수한 뒤 취소를 전달한다.
+
 ## IEA-04 정상 반환 S3 reader의 취소·정리 수명 (2026-11-03)
 
 정상 반환된 reader는 호출자가 소유하며 HTTP에서는 MediaStreamingResponse가 종료를

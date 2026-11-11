@@ -36,6 +36,7 @@ timezone-aware 입력 검증과 서울 날짜의 UTC [시작, 다음 날 시작)
 | character.py, character_media.py | 원본 이미지/자산의 선택적 media_id. 캐릭터당 감정 태그 UNIQUE, 기본 이미지 부분 UNIQUE. 미디어 예약은 소유자/캐릭터 FK 없이 남음 |
 | lorebook.py | title/token_budget nullable, metadata JSON, 1536차원 벡터. entry_type에 start_set 포함 |
 | product.py | 편집 구성 링크·선택 대상·원본 시작 항목. 복합 FK로 같은 상품에 속한 링크만 연결 |
+| product_file_version.py | 작품의 불변 파일 버전과 멱등 요청 키. 파일 참조는 RESTRICT FK이며 파일 행 잠금으로 참조 변경과 정리를 직렬화 |
 | tag.py | 공용 tags 사전과 작품·캐릭터·로어북의 공개/내부 연결 6개. 정확한 이름 UNIQUE, 대상 CASCADE·사전 RESTRICT·부여 사용자 SET NULL FK. tags는 content/tag, 각 연결은 해당 콘텐츠 모듈 소유. normalized_name·kind·태그 snapshot·개수 제한 없음 |
 | snapshot/ | 원본별 version과 JSON schema version 구분. 원본 삭제 시 SET NULL, 참조된 구성요소 스냅샷은 RESTRICT |
 | chat.py | 현재 버전과 최초 버전 분리, 시작 FK는 최초 버전. 메시지 position은 전역 identity, revision은 메시지 변경 번호 |
@@ -77,6 +78,7 @@ timezone-aware 입력 검증과 서울 날짜의 UTC [시작, 다음 날 시작)
 | 0033 | chat_history_versions와 messages 변경 트리거. 초기 SQL 023과 대응하며 기존 원문/답변을 보존. pending 답변이 있으면 downgrade 거절 |
 | 0035 | 답변 lease 전체 인덱스를 leased pending 부분 인덱스로 교체. 초기 SQL 025와 대응. 기존 행/metadata/lease 값은 변경하지 않으며 downgrade는 전체 인덱스만 복원 |
 | 0036 | product_generations에 영속 복구 횟수/다음 시각/격리 시각과 chat 소유 answer_recovery_attempts 감사 테이블 추가. 초기 SQL 026과 대응. 기존 생성은 횟수 0, 사실/metadata/lease는 보존하며 복구 기록이 있으면 downgrade 거절 |
+| 0037 | product_file_versions와 product_file_references 추가. 초기 SQL 027과 동일하며 파일 예약·삭제 기록이 있으면 downgrade 거절 |
 
 초기 SQL 004는 0002–0014의 누적 변경을 포함한다. 007/008/009/010은 각각 0015/0017/0018/0019 대응이다. SQL 원문과 Python의 SQL 문자열은 이번에 변경하지 않았다. 생성 형태의 고정 DDL 설명은 이 문서에 모았다.
 

@@ -29,6 +29,7 @@ from app.db.models.moderation_review import (
     ModerationReport,
 )
 from app.db.models.product import Product, ProductCharacter, ProductLorebook
+from app.db.models.product_file_version import ProductFileReference, ProductFileVersion
 from app.db.models.product_release import ProductReleaseNote, ProductReleaseNoteRevision
 from app.db.models.product_statistics import (
     ProductDailyStats,
@@ -97,6 +98,8 @@ __all__ = [
     "Product",
     "ProductCharacter",
     "ProductDailyStats",
+    "ProductFileReference",
+    "ProductFileVersion",
     "ProductGeneration",
     "ProductInternalTag",
     "ProductLorebook",

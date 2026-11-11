@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.http.schemas import ModelNoticeResponseDto
+from app.modules.content.product.types import ProductFileVersionState
 
 Visibility = Literal["private", "public", "unlisted"]
 
@@ -17,6 +18,20 @@ class ResponseDto(BaseModel):
 
 class RequestDto(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class ImportProductFileVersionRequestDto(RequestDto):
+    media_id: UUID
+
+
+class ProductFileVersionResponseDto(ResponseDto):
+    product_id: UUID
+    file_version_id: UUID
+    state: ProductFileVersionState
+    content_url: str | None
+    content_type: str
+    size_bytes: int
+    original_filename: str
 
 
 class ListProductsRequestDto(RequestDto):

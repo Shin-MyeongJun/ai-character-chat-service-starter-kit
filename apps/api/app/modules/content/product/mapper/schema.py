@@ -10,6 +10,24 @@ class ProductSchemaMapper:
     """Convert HTTP DTOs and application types at the router boundary."""
 
     @staticmethod
+    def file_version_info_to_response(
+        info: Types.ProductFileVersionInfo,
+    ) -> Schemas.ProductFileVersionResponseDto:
+        return Schemas.ProductFileVersionResponseDto(
+            product_id=info.product_id,
+            file_version_id=info.file_version_id,
+            state=info.state,
+            content_url=(
+                f"/products/{info.product_id}/media/{info.file_version_id}/content"
+                if info.state == Types.ProductFileVersionState.READY
+                else None
+            ),
+            content_type=info.content_type,
+            size_bytes=info.size_bytes,
+            original_filename=info.original_filename,
+        )
+
+    @staticmethod
     def studio_draft_request_to_command(
         product_id: UUID, owner_id: UUID, request: Schemas.SaveStudioDraftRequestDto
     ) -> Types.SaveStudioDraftCommand:

@@ -41,6 +41,9 @@ from app.modules.commerce.billing.service.configuration import (
 )
 from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.product.service.views.media import ProductMediaService
+from app.modules.content.product.service.workflow.file_versions import (
+    ProductFileVersionWorkflow,
+)
 from app.modules.identity.adapters import GoogleOIDCVerifier, SMTPMailSender
 from app.modules.identity.dependencies import get_verified_user_id
 from app.modules.identity.http_security import (
@@ -144,6 +147,14 @@ def create_app(
             app.state.character_media_service = media
             app.state.product_media_service = ProductMediaService(
                 session_factory, media
+            )
+            app.state.product_file_version_workflow = ProductFileVersionWorkflow(
+                session_factory,
+                asset_storage,
+                media,
+                storage_kind=str(asset_settings.storage_kind),
+                storage_id=storage_settings.storage_id,
+                read_storages=read_storages,
             )
             adapters: list[TextGenerationAdapter] = []
             adapter: TextGenerationAdapter

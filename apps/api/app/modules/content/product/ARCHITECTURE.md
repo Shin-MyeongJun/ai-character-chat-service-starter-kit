@@ -1,5 +1,29 @@
 # Product 모듈
 
+## U19 a2 작품 이미지 파일 버전
+
+`product_file_versions`와 `product_file_references`는 product가 소유한다.
+`repository/file_versions.py`가 파일/참조를 저장하고 `mapper/file_versions.py`가
+내부 저장소 정보와 공개 `ProductFileVersionInfo`를 조립한다.
+`service/command/file_versions.py`는 소유권·상태·참조와 정리 조건을 확인한다.
+`service/workflow/file_versions.py`는 세션·저장소·캐릭터 미디어의 공개 reader를
+조합해 예약, 복사, 조회 및 정리의 트랜잭션과 I/O 수명을 관리한다.
+
+| 공개 서비스 | 입력 | 반환 |
+| --- | --- | --- |
+| `upload_product_file_version` | `UploadProductFileVersionCommand(product_id, owner_id, request_id, content, content_type, original_filename)` | `ProductFileVersionInfo(product_id, file_version_id, content_type, size_bytes, original_filename, state)` |
+| `import_product_file_version` | `ImportProductFileVersionCommand(product_id, owner_id, request_id, media_id)` | 같은 Info. 소유·ready 캐릭터 이미지의 MIME·크기·SHA-256을 확인해 작품 전용 객체로 복제한다. |
+| `read_owned_product_file_version` | `ReadOwnedProductFileVersionCommand(product_id, file_version_id, owner_id)` | 소유자 전용 `AssetReadInfo`. 호출자가 닫는다. |
+| `retain_product_file_version` / `release_product_file_version` | 호출자의 `AsyncSession`, `ProductFileReferenceCommand(product_id, file_version_id, kind, reference_id)` | retain은 같은 작품의 ready 파일 Info, release는 None. 같은 참조의 재등록·해제는 멱등이다. |
+| `read_referenced_product_file_version` | `ProductFileReferenceCommand` | 정확한 참조가 있는 ready 파일의 `AssetReadInfo`. 내부 호출자가 발생 위치 또는 앨범 권한을 먼저 검증하고 reader를 닫는다. |
+| `cleanup_product_file_version` | 내부 `GetProductFileVersionCommand(product_id, file_version_id)` | `CleanupProductFileVersionInfo(deleted, reason)`. 명시한 파일 하나를 정리한다. |
+
+- HTTP는 기존 인증 및 `MediaStreamingResponse`를 재사용한다. `POST /products/{product_id}/media/uploads`는 바이너리와 `Idempotency-Key` UUID, `Content-Type`, `X-Filename`을 받는다. PNG·JPEG·WebP·GIF, 최대 32 MiB를 허용한다. `POST /products/{product_id}/media/imports`는 같은 키 헤더와 `{"media_id":"…"}`만 받는다. 두 POST는 201에 Info 필드와 `content_url`을 반환한다. ready의 URL은 `GET /products/{product_id}/media/{file_version_id}/content`이며 인증된 작품 소유자에게 바이너리와 `private, no-store`를 돌려준다.
+- 같은 계정·작품·키는 업로드 종류(직접/가져오기), 원본 미디어 ID, 바이트 지문·MIME·파일명과 결합한다. 다른 유효 요청은 409다. 성공한 가져오기 재호출은 복제가 끝난 결과를 반환한다. 삭제된 버전의 동일 요청은 같은 ID와 `deleting` 또는 `deleted`, `content_url: null`을 반환한다. 새 파일을 만들 때는 새 키를 사용한다.
+- 작품 행을 잠가 예약을 커밋한 뒤 파일 행 잠금 아래 저장과 ready 전이를 수행한다. 저장 중 취소되어도 공급자 종료까지 잠금과 스트림을 유지한다. 실패한 pending은 같은 키로 재개하며 ready 객체의 파일 내용과 메타데이터는 다시 쓰지 않는다. 공급자 설정 전환 시 기존 객체는 기록된 저장소 ID로 조회한다.
+- a3/a4는 초안·스냅샷을 확정하는 동일 `use_case_transaction`에서 참조를 연결한다. `kind`는 `draft/snapshot/staged_answer/opening/message`이며, `reference_id`는 해당 소유 기록의 안정된 UUID다. a3은 작품 ID를 draft 참조 ID로, a4는 발행 스냅샷 ID를 사용한다. 여러 파일을 변경할 때 파일 UUID 순으로 잠근다. 두 서비스는 참조를 쓰기 전에 작품 소속을 확인하며 타 작품 파일 및 기존 캐릭터 미디어 ID를 거절한다.
+- 첫 참조를 연결하기 전에는 pending/ready 파일의 업로드 보호를 유지한다. 첫 참조 이후에는 살아 있는 참조가 하나라도 있으면 정리하지 않는다. 마지막 참조를 해제한 뒤 최소 24시간이 지나면 파일 잠금 아래 재검사하고 `deleting`을 커밋한다. 객체 삭제 실패는 같은 상태에서 재개하며 그동안 새 참조를 거절한다. 스냅샷 만료는 참조 해제 사유가 아니다. 미첨부 파일을 나이만으로 수거하는 작업은 a2에서 제공하지 않는다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 미사용 dependencies.py와 통계 조회 재노출 service/statistics.py를 제거했다.

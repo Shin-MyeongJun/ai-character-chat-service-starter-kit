@@ -5,7 +5,7 @@
 
 import asyncio
 from collections.abc import AsyncIterator, Iterator
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from tempfile import SpooledTemporaryFile
 from typing import Annotated, BinaryIO, cast
 from uuid import UUID
@@ -24,8 +24,15 @@ from app.modules.content.character.service.media import (
     MEDIA_CONTENT_TYPES,
 )
 from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
+from app.modules.content.product import schemas as ProductSchemas
 from app.modules.content.product import types as ProductTypes
+from app.modules.content.product.mapper.schema import ProductSchemaMapper
 from app.modules.content.product.service.views.media import ProductMediaService
+from app.modules.content.product.service.workflow.file_versions import (
+    MAX_PRODUCT_FILE_BYTES,
+    PRODUCT_IMAGE_CONTENT_TYPES,
+    ProductFileVersionWorkflow,
+)
 
 router = APIRouter(tags=["media"])
 CharacterOwner = Annotated[UUID, Depends(get_current_owner_id)]
@@ -51,6 +58,12 @@ def get_product_media_service(request: Request) -> ProductMediaService:
     return cast(ProductMediaService, request.app.state.product_media_service)
 
 
+def get_product_file_version_workflow(request: Request) -> ProductFileVersionWorkflow:
+    return cast(
+        ProductFileVersionWorkflow, request.app.state.product_file_version_workflow
+    )
+
+
 @contextmanager
 def media_errors() -> Iterator[None]:
     try:
@@ -61,10 +74,25 @@ def media_errors() -> Iterator[None]:
         raise HTTPException(503, "Recorded media storage is unavailable.") from exc
     except AssetStorageTypes.AssetStorageError as exc:
         raise HTTPException(503, "Media storage operation failed.") from exc
+    except ProductTypes.ProductFileVersionConflictError as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(
             422, "Invalid media input or conflicting upload request."
         ) from exc
+
+
+@asynccontextmanager
+async def spool_media_body(request: Request, max_bytes: int) -> AsyncIterator[BinaryIO]:
+    with SpooledTemporaryFile(max_size=1024 * 1024) as content:
+        size_bytes = 0
+        async for chunk in request.stream():
+            size_bytes += len(chunk)
+            if size_bytes > max_bytes:
+                raise HTTPException(413, "Media exceeds 32 MiB.")
+            content.write(chunk)
+        # The binary spool supports the BinaryIO operations the services use.
+        yield cast(BinaryIO, content)
 
 
 class MediaStreamingResponse(StreamingResponse):
@@ -123,26 +151,19 @@ async def upload_character_media(
     x_filename: Annotated[str, Header(min_length=1, max_length=255)],
     x_media_purpose: Annotated[str, Header(min_length=1, max_length=200)],
 ) -> UploadCharacterMediaResponseDto:
-    with media_errors(), SpooledTemporaryFile(max_size=1024 * 1024) as content:
-        size = 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > MAX_MEDIA_BYTES:
-                raise HTTPException(413, "Media exceeds 32 MiB.")
-            content.write(chunk)
-        info = await service.upload_character_media(
-            CharacterTypes.UploadCharacterMediaCommand(
-                character_id=character_id,
-                owner_id=owner,
-                request_id=idempotency_key,
-                # The default w+b spool implements the seek/read binary interface
-                # used by fingerprinting/storage; its stub is not nominal BinaryIO.
-                content=cast(BinaryIO, content),
-                content_type=content_type,
-                original_filename=x_filename,
-                purpose=x_media_purpose,
+    with media_errors():
+        async with spool_media_body(request, MAX_MEDIA_BYTES) as content:
+            info = await service.upload_character_media(
+                CharacterTypes.UploadCharacterMediaCommand(
+                    character_id=character_id,
+                    owner_id=owner,
+                    request_id=idempotency_key,
+                    content=content,
+                    content_type=content_type,
+                    original_filename=x_filename,
+                    purpose=x_media_purpose,
+                )
             )
-        )
     return UploadCharacterMediaResponseDto(
         media_id=info.id,
         content_url=info.content_url,
@@ -181,6 +202,86 @@ async def read_product_media(
                 snapshot_id=snapshot_id,
                 media_id=media_id,
                 user_id=owner,
+            )
+        )
+    return MediaStreamingResponse(opened)
+
+
+ProductFileVersions = Annotated[
+    ProductFileVersionWorkflow, Depends(get_product_file_version_workflow)
+]
+
+
+@router.post(
+    "/products/{product_id}/media/uploads",
+    response_model=ProductSchemas.ProductFileVersionResponseDto,
+    status_code=201,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                content_type: {"schema": {"type": "string", "format": "binary"}}
+                for content_type in sorted(PRODUCT_IMAGE_CONTENT_TYPES)
+            },
+        }
+    },
+)
+async def upload_product_file_version(
+    product_id: UUID,
+    request: Request,
+    owner: Owner,
+    service: ProductFileVersions,
+    idempotency_key: Annotated[UUID, Header()],
+    content_type: Annotated[str, Header()],
+    x_filename: Annotated[str, Header(min_length=1, max_length=255)],
+) -> ProductSchemas.ProductFileVersionResponseDto:
+    with media_errors():
+        async with spool_media_body(request, MAX_PRODUCT_FILE_BYTES) as content:
+            info = await service.upload_product_file_version(
+                ProductTypes.UploadProductFileVersionCommand(
+                    product_id=product_id,
+                    owner_id=owner,
+                    request_id=idempotency_key,
+                    content=content,
+                    content_type=content_type,
+                    original_filename=x_filename,
+                )
+            )
+    return ProductSchemaMapper.file_version_info_to_response(info)
+
+
+@router.post(
+    "/products/{product_id}/media/imports",
+    response_model=ProductSchemas.ProductFileVersionResponseDto,
+    status_code=201,
+)
+async def import_product_file_version(
+    product_id: UUID,
+    request: ProductSchemas.ImportProductFileVersionRequestDto,
+    owner: Owner,
+    service: ProductFileVersions,
+    idempotency_key: Annotated[UUID, Header()],
+) -> ProductSchemas.ProductFileVersionResponseDto:
+    with media_errors():
+        info = await service.import_product_file_version(
+            ProductTypes.ImportProductFileVersionCommand(
+                product_id=product_id,
+                owner_id=owner,
+                request_id=idempotency_key,
+                media_id=request.media_id,
+            )
+        )
+    return ProductSchemaMapper.file_version_info_to_response(info)
+
+
+@router.get("/products/{product_id}/media/{file_version_id}/content")
+async def read_owned_product_file_version(
+    product_id: UUID, file_version_id: UUID, owner: Owner, service: ProductFileVersions
+) -> MediaStreamingResponse:
+    with media_errors():
+        opened = await service.read_owned_product_file_version(
+            ProductTypes.ReadOwnedProductFileVersionCommand(
+                product_id=product_id, file_version_id=file_version_id, owner_id=owner
             )
         )
     return MediaStreamingResponse(opened)

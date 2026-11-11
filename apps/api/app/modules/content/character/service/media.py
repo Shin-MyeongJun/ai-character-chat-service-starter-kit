@@ -216,6 +216,13 @@ class CharacterMediaService:
     async def read_character_media(
         self, command: Types.ReadCharacterMediaCommand
     ) -> AssetStorageTypes.AssetReadInfo:
+        _, opened = await self.open_owned_character_media(command)
+        return opened
+
+    async def open_owned_character_media(
+        self, command: Types.ReadCharacterMediaCommand
+    ) -> tuple[Types.CharacterMediaInfo, AssetStorageTypes.AssetReadInfo]:
+        """Open owned, ready media with its recorded metadata for explicit copying."""
         async with self.sessions() as session, use_case_transaction(session):
             row = await MediaRepository.get_media(session, command.media_id)
             info = MediaPersistenceMapper.media_entity_to_info(row)
@@ -226,9 +233,10 @@ class CharacterMediaService:
             ):
                 raise LookupError("Media not found.")
             await _get_owned_character(session, info.character_id, command.owner_id)
-        return await self._storage_for_media(info).read_asset(
+        opened = await self._storage_for_media(info).read_asset(
             AssetStorageTypes.ReadAssetCommand(info.object_key)
         )
+        return info, opened
 
     # 호출자가 접근을 확인한 캐릭터 스냅샷에 실제 참조된 미디어만 읽는다. 원본 소유자 조회로 대체하지 않는다.
     async def read_snapshot_media(

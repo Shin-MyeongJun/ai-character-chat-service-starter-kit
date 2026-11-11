@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal, NotRequired, TypeAlias, TypedDict
+from enum import StrEnum
+from typing import BinaryIO, Literal, NotRequired, TypeAlias, TypedDict
 from uuid import UUID
 
 from app.modules.content.character.types import CharacterSnapshotInfo
@@ -78,6 +79,79 @@ class ReadProductMediaCommand:
     snapshot_id: UUID
     media_id: UUID
     user_id: UUID
+
+
+class ProductFileVersionState(StrEnum):
+    PENDING = "pending"
+    READY = "ready"
+    DELETING = "deleting"
+    DELETED = "deleted"
+
+
+class ProductFileVersionConflictError(ValueError):
+    """The request key is already bound to a different image or metadata."""
+
+
+@dataclass(frozen=True, slots=True)
+class UploadProductFileVersionCommand:
+    product_id: UUID
+    owner_id: UUID
+    request_id: UUID
+    content: BinaryIO = field(repr=False, compare=False)
+    content_type: str
+    original_filename: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImportProductFileVersionCommand:
+    product_id: UUID
+    owner_id: UUID
+    request_id: UUID
+    media_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class GetProductFileVersionCommand:
+    product_id: UUID
+    file_version_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ReadOwnedProductFileVersionCommand:
+    product_id: UUID
+    file_version_id: UUID
+    owner_id: UUID
+
+
+ProductFileReferenceKind = Literal[
+    "draft", "snapshot", "staged_answer", "opening", "message"
+]
+
+
+@dataclass(frozen=True, slots=True)
+class ProductFileReferenceCommand:
+    product_id: UUID
+    file_version_id: UUID
+    kind: ProductFileReferenceKind
+    reference_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ProductFileVersionInfo:
+    product_id: UUID
+    file_version_id: UUID
+    content_type: str
+    size_bytes: int
+    original_filename: str
+    state: ProductFileVersionState
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupProductFileVersionInfo:
+    deleted: bool
+    reason: Literal[
+        "deleted", "absent_or_deleted", "awaiting_attachment", "referenced", "retention"
+    ]
 
 
 @dataclass(frozen=True, slots=True)

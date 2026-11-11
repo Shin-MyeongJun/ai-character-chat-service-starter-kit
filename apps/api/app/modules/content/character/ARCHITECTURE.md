@@ -1,5 +1,10 @@
 # Character 모듈
 
+U19 a2의 `CharacterMediaService.open_owned_character_media(ReadCharacterMediaCommand)`는
+현재 캐릭터 소유권과 ready 상태를 검증한 뒤 `(CharacterMediaInfo, AssetReadInfo)`를
+반환한다. 작품 가져오기는 이 공개 서비스를 사용해 바이트를 독립 복제하며 reader를
+닫는다. 기존 `read_character_media`와 HTTP 조회는 같은 검사에서 reader만 반환한다.
+
 ## U27 호환 경로 정리 (2026-11-02)
 
 dependencies.py 재노출을 제거하고 router/tag_router 및 테스트가
