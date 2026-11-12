@@ -1,0 +1,5 @@
+{"chrome": "Chrome/157.0.8103.51", "viewport": 390}
+{"step": 1, "status": "PASS", "item": "9306fbac-3fb1-459c-82ef-69c88771c01a", "file": "758cd502-4d2e-4327-ba10-2ffaeaf249ea"}
+{"step": 2, "status": "PASS", "a": "9306fbac-3fb1-459c-82ef-69c88771c01a", "aPrimeFile": "62a6742e-ffb1-443b-8d80-ea2a8adcfad8", "b": "8908cb1e-fce7-47e5-b318-d0ac77b31fd3"}
+{"step": 3, "status": "PASS", "unlockedAt": "2026-11-12T01:56:05.540019Z", "locked": "8908cb1e-fce7-47e5-b318-d0ac77b31fd3"}
+{"step": 4, "status": "PASS", "openingMode": "snapshot", "b": "8908cb1e-fce7-47e5-b318-d0ac77b31fd3", "unlockedAt": "2026-11-12T01:56:12.251746Z"}

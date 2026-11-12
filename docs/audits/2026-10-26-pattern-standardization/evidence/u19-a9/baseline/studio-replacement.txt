@@ -1,0 +1,5 @@
+PASS 390 create and save studio draft
+PASS 390 register and save image
+BLOCKED 390 Studio image publication button disabled
+PASS 390 Studio A-prime replacement kept item ID, new B same tag distinct item
+PASS 390 studio flow

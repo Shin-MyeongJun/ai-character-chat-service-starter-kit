@@ -1,0 +1,12 @@
+TAP results (summary)
+not ok 10 - lost studio save response resumes by reading the same server document
+not ok 12 - restored studio copy detaches browser-only source links and saves without duplicating
+1..43
+# tests 43
+# suites 0
+# pass 41
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1675.5923

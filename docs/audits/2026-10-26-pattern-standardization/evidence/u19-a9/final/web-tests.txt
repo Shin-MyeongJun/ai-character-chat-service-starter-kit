@@ -1,0 +1,10 @@
+TAP results (summary)
+1..43
+# tests 43
+# suites 0
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1586.6466

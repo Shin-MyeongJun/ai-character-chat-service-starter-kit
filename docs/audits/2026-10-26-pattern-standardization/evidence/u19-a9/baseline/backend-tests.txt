@@ -1,0 +1,2 @@
+PostgreSQL regression result (summary)
+32 passed, 2 warnings in 27.81s

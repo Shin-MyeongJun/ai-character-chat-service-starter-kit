@@ -1,0 +1,5 @@
+Generated-answer requests (excerpt)
+MOCK_PROPOSAL B-locked after paragraph 1
+POST [test conversation]/answers HTTP/1.1 200
+MOCK_PROPOSAL B-locked after paragraph 1
+POST [test conversation]/answers HTTP/1.1 200
