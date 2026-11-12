@@ -19,6 +19,9 @@
   메시지 저장 뒤 a5 공개 해금 서비스를 같은 세션에서 호출하며 기존 usage·크레딧 정산·기억
   예약과 한 트랜잭션으로 커밋한다. 실패·취소·stale와 terminal 재생에서는 해금하지 않는다.
   구형 행/내부 텍스트 쓰기는 NULL이고 새 nonstream 텍스트 결과는 텍스트 블록 배열이다.
+- 성공한 nonstream 답변의 메시지 UUID를 같은 완료 트랜잭션의 `answer_metadata.message_id`에
+  기록한다. HTTP 성공 응답과 같은 키의 재호출은 기록된 `message_id`를 반환한다. 이력이
+  삭제되어도 응답 ID는 유지되며 해당 이력은 복원되지 않는다. 구형 완료나 실패에는 이 필드가 없다.
 - GET messages의 선택적 `content_blocks`는 a6의 공통 HTTP DTO/URL 변환을 재사용한다.
   파일은 `/conversations/{conversation_id}/messages/{message_id}/revisions/{revision}/blocks/{block_index}/content`로 읽는다.
   `service/query/image_blocks.authorize_message_image_block`이 방 소유권, 실제 생존 메시지,

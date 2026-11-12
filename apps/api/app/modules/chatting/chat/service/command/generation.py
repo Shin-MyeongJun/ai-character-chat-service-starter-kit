@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
@@ -243,7 +244,11 @@ async def finish_generation(
 
 
 async def _finish_locked_generation(
-    locked: _LockedGeneration, value: Types.GenerationResult, fingerprint: str
+    locked: _LockedGeneration,
+    value: Types.GenerationResult,
+    fingerprint: str,
+    *,
+    record_answer_message: bool = False,
 ) -> _GenerationCompletion:
     """Apply a validated result only within the module's active lock scope."""
     locked.require_active()
@@ -271,6 +276,7 @@ async def _finish_locked_generation(
                     )
                 except ValueError:
                     status = "stale"
+        message_id: UUID | None = None
         if status == "succeeded":
             participants = await list_conversation_characters(
                 session,
@@ -284,7 +290,7 @@ async def _finish_locked_generation(
                     raise ValueError(
                         "Output character is not in the generation version."
                     )
-                await Repository.add_generation_message(
+                message_id = await Repository.add_generation_message(
                     session,
                     run,
                     output,
@@ -331,6 +337,7 @@ async def _finish_locked_generation(
             fingerprint,
             now,
             len(value.messages) if status == "succeeded" else 0,
+            answer_message_id=message_id if record_answer_message else None,
         )
         locked.run = PersistenceMapper.generation_entity_to_state_info(
             generation_entity

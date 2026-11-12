@@ -105,6 +105,7 @@ class _StoredAnswer(TypedDict, total=False):
     retryable: bool
     uncertain: bool
     summary_through_position: int
+    message_id: str
 
 
 class AnswerOrchestrator:
@@ -958,7 +959,7 @@ class AnswerOrchestrator:
                 latency_ms=stored.get("latency_ms"),
             )
             finished = await _finish_locked_generation_and_schedule_memory(
-                locked, value
+                locked, value, record_answer_message=True
             )
             if billing is not None:
                 if finished.state.status == "succeeded":
@@ -1110,6 +1111,7 @@ def _answer_info(run: Types.GenerationStateInfo) -> Types.AnswerInfo:
     # v1/v2 writers own these response fields; preserve the existing billing guard.
     metadata = cast(_StoredAnswer, run.answer_metadata or {})
     billing = metadata.get("billing")
+    message_id = metadata.get("message_id")
     price_credit = billing.get("reserved_credit") if isinstance(billing, dict) else None
     return Types.AnswerInfo(
         run.id,
@@ -1120,6 +1122,9 @@ def _answer_info(run: Types.GenerationStateInfo) -> Types.AnswerInfo:
         metadata.get("retryable", False),
         metadata.get("uncertain", False),
         price_credit if isinstance(price_credit, int) and price_credit >= 0 else None,
+        message_id=UUID(message_id)
+        if run.status == "succeeded" and message_id
+        else None,
     )
 
 
@@ -1141,12 +1146,18 @@ async def finish_generation_and_schedule_memory(
 
 
 async def _finish_locked_generation_and_schedule_memory(
-    locked: GenerationCommandService._LockedGeneration, value: Types.GenerationResult
+    locked: GenerationCommandService._LockedGeneration,
+    value: Types.GenerationResult,
+    *,
+    record_answer_message: bool = False,
 ) -> GenerationCommandService._GenerationCompletion:
     locked.require_active()
     async with use_case_transaction(locked.session):
         completion = await GenerationCommandService._finish_locked_generation(
-            locked, value, GenerationCommandService.result_digest(value)
+            locked,
+            value,
+            GenerationCommandService.result_digest(value),
+            record_answer_message=record_answer_message,
         )
         if completion.state.status == "succeeded" and completion.transitioned:
             await MemoryService.schedule_memory_work(

@@ -24,3 +24,4 @@ class GenerateAnswerResponseDto(BaseModel):
     retryable: bool
     uncertain: bool
     price_credit: int | None = None
+    message_id: UUID | None = None

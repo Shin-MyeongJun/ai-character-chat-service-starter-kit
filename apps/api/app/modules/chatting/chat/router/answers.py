@@ -20,6 +20,7 @@ router = APIRouter()
 @router.post(
     "/conversations/{conversation_id}/answers",
     response_model=Schemas.GenerateAnswerResponseDto,
+    response_model_exclude_unset=True,
 )
 async def generate_answer(
     conversation_id: UUID,

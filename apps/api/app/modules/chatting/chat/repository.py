@@ -517,22 +517,22 @@ async def add_generation_message(
     output: Types.GeneratedMessage,
     character_id: UUID | None,
     content_blocks: list[Types.AnswerJsonValue] | None = None,
-) -> None:
-    session.add(
-        Message(
-            conversation_id=run.conversation_id,
-            product_snapshot_id=run.product_snapshot_id,
-            generation_id=run.id,
-            product_character_id=output.product_character_id,
-            character_id=character_id,
-            sender_type="character",
-            content=output.content,
-            content_blocks=content_blocks,
-            model_id=run.model_id,
-            generated_by_ai=True,
-        )
+) -> UUID:
+    message = Message(
+        conversation_id=run.conversation_id,
+        product_snapshot_id=run.product_snapshot_id,
+        generation_id=run.id,
+        product_character_id=output.product_character_id,
+        character_id=character_id,
+        sender_type="character",
+        content=output.content,
+        content_blocks=content_blocks,
+        model_id=run.model_id,
+        generated_by_ai=True,
     )
+    session.add(message)
     await session.flush()
+    return message.id
 
 
 async def finish_generation(
@@ -542,12 +542,19 @@ async def finish_generation(
     fingerprint: str,
     now: datetime,
     message_count: int,
+    *,
+    answer_message_id: UUID | None = None,
 ) -> ProductGeneration:
     run = await session.get(ProductGeneration, generation_id)
     # The owning command already checked and locked this generation.
     assert run is not None
     run.status, run.result_digest, run.finished_at = status, fingerprint, now
     run.message_count = message_count
+    if answer_message_id is not None:
+        run.answer_metadata = {
+            **(run.answer_metadata or {}),
+            "message_id": str(answer_message_id),
+        }
     # Lease is live execution ownership, not history. Clear it atomically with
     # every terminal outcome; rollback must retain the pending execution lease.
     run.answer_lease_until = None

@@ -415,6 +415,9 @@ async def test_studio_draft_to_first_answer_with_mock_provider(first_answer_app)
             "product_character_id": start["primary_product_character_id"],
         })
         assert answer["status"] == "succeeded" and answer["price_credit"] == 10
+        messages = (await request(client, "GET", f"/conversations/{cid}/messages"))["items"]
+        generated = next(row for row in messages if row["sender_type"] == "character")
+        assert answer["message_id"] == generated["id"]
         assert (await request(client, "GET", "/account/credits"))["available_credit"] == 10
 
 

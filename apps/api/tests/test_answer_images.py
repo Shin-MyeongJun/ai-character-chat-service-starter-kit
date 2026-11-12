@@ -319,6 +319,7 @@ async def test_staged_recovery_atomic_rollback_replay_and_one_charge(
             select(Message).where(Message.generated_by_ai.is_(True))
         )
         assert message.content_blocks == staged
+        assert first.message_id == message.id
         unlocks = (await db.scalars(select(ProductImageUnlock))).all()
         assert (
             len(unlocks) == 1

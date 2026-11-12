@@ -15,4 +15,7 @@ def answer_request_to_command(
 
 
 def answer_info_to_response(value: AnswerInfo) -> Schemas.GenerateAnswerResponseDto:
-    return Schemas.GenerateAnswerResponseDto(**asdict(value))
+    fields = asdict(value)
+    if value.message_id is None:
+        fields.pop("message_id")
+    return Schemas.GenerateAnswerResponseDto(**fields)
