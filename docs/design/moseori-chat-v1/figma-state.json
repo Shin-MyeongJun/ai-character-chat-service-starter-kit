@@ -1,0 +1,717 @@
+{
+  "fileKey": "hqIGvuF0ttkf7taGDVDLGe",
+  "sessionId": "fffff376-3b5e-4157-ba99-e8e87c58d7b8",
+  "scope": "대표 화면 4개 우선 리뷰. 나머지 상태는 후속 확장.",
+  "foundations": {
+    "createdNodeIds": [
+      "0:1",
+      "3:2"
+    ],
+    "pages": {
+      "review": "0:1",
+      "library": "3:2"
+    },
+    "colors": {
+      "Light": {
+        "canvas": "VariableID:3:22",
+        "subtle": "VariableID:3:23",
+        "surface": "VariableID:3:24",
+        "border": "VariableID:3:25",
+        "text": "VariableID:3:26",
+        "secondary": "VariableID:3:27",
+        "action": "VariableID:3:28",
+        "onAction": "VariableID:3:29",
+        "selection": "VariableID:3:30",
+        "disabled": "VariableID:3:31"
+      },
+      "Dark": {
+        "canvas": "VariableID:3:33",
+        "subtle": "VariableID:3:34",
+        "surface": "VariableID:3:35",
+        "border": "VariableID:3:36",
+        "text": "VariableID:3:37",
+        "secondary": "VariableID:3:38",
+        "action": "VariableID:3:39",
+        "onAction": "VariableID:3:40",
+        "selection": "VariableID:3:41",
+        "disabled": "VariableID:3:42"
+      }
+    },
+    "geometry": {
+      "space/0": "VariableID:3:44",
+      "space/4": "VariableID:3:45",
+      "space/8": "VariableID:3:46",
+      "space/12": "VariableID:3:47",
+      "space/16": "VariableID:3:48",
+      "space/20": "VariableID:3:49",
+      "space/24": "VariableID:3:50",
+      "space/32": "VariableID:3:51",
+      "space/40": "VariableID:3:52",
+      "space/48": "VariableID:3:53",
+      "radius/8": "VariableID:3:54",
+      "radius/12": "VariableID:3:55"
+    },
+    "styles": {
+      "Reading/Narration": "S:fa585fd39fbef4224708e56bac594a0eaf3e067c,",
+      "Reading/Dialogue": "S:177378ee2c622458c1eef840c1a9c9537fe6a4c7,",
+      "UI/Body": "S:8128f8648be5bf61ff6abf14582ab8a58d7bcdcc,",
+      "UI/Label": "S:2dc469fb72b66850b5bb9fef6941c72dfcc09fac,",
+      "UI/Caption": "S:80700c248629c7f05246d7063d824013fa5d5aaf,",
+      "UI/Title": "S:f0a23fa8cc863c2feea4428b5f3ae53c441ef364,",
+      "Review/Title": "S:38183b3e815dadb5e2de328f56f6f62a6de27173,"
+    },
+    "fontNames": [
+      {
+        "family": "Noto Sans KR",
+        "style": "Black"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "Bold"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "DemiLight"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "Light"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "Medium"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "Regular"
+      },
+      {
+        "family": "Noto Sans KR",
+        "style": "Thin"
+      }
+    ],
+    "collections": [
+      "VariableCollectionId:3:3",
+      "VariableCollectionId:3:43"
+    ],
+    "note": "Starter 1-mode limit: light and dark semantic collections are separate. Exact Studio neutral values retained."
+  },
+  "components": {
+    "createdNodeIds": [
+      "4:2",
+      "4:3",
+      "4:4",
+      "4:5",
+      "4:6",
+      "4:7",
+      "4:8",
+      "4:9",
+      "4:10",
+      "4:11",
+      "4:12",
+      "4:13",
+      "4:14",
+      "4:15",
+      "4:16",
+      "4:17",
+      "4:18",
+      "4:19",
+      "4:20",
+      "4:23",
+      "4:24",
+      "4:27",
+      "4:28",
+      "4:31",
+      "4:32",
+      "4:33",
+      "4:34",
+      "4:35",
+      "4:36",
+      "4:39",
+      "4:40",
+      "4:44",
+      "4:45",
+      "4:46",
+      "4:47",
+      "4:51",
+      "4:52",
+      "4:53",
+      "4:54",
+      "4:55",
+      "4:59",
+      "4:60",
+      "4:64",
+      "4:65",
+      "4:66",
+      "4:67",
+      "4:68",
+      "4:69",
+      "4:70",
+      "4:71",
+      "4:72",
+      "4:73",
+      "4:74",
+      "4:75",
+      "4:76",
+      "4:77",
+      "4:78",
+      "4:79",
+      "4:83",
+      "4:84",
+      "4:85",
+      "4:86",
+      "4:87",
+      "4:91",
+      "4:92",
+      "4:93",
+      "4:94",
+      "4:95",
+      "4:99",
+      "4:100",
+      "4:104",
+      "4:105",
+      "4:106",
+      "4:107",
+      "4:108",
+      "4:109",
+      "4:110",
+      "4:111",
+      "4:112",
+      "4:113",
+      "4:114",
+      "4:115",
+      "4:116",
+      "4:117",
+      "4:118",
+      "4:119",
+      "4:120",
+      "4:121",
+      "4:122",
+      "4:123",
+      "4:124",
+      "4:125",
+      "4:126",
+      "4:127",
+      "4:128",
+      "4:129",
+      "4:130",
+      "4:131",
+      "4:132",
+      "4:133",
+      "4:134",
+      "4:135",
+      "4:136",
+      "4:151",
+      "4:152",
+      "4:155",
+      "4:156",
+      "4:159",
+      "4:160",
+      "4:161",
+      "4:162",
+      "4:163",
+      "4:164",
+      "4:167",
+      "4:168",
+      "4:172",
+      "4:173",
+      "4:174",
+      "4:175",
+      "4:179",
+      "4:180",
+      "4:181",
+      "4:182",
+      "4:183",
+      "4:187",
+      "4:188",
+      "4:192",
+      "4:193",
+      "4:194",
+      "4:195",
+      "4:196",
+      "4:197",
+      "4:198",
+      "4:199",
+      "4:200",
+      "4:201",
+      "4:202",
+      "4:203",
+      "4:204",
+      "4:205",
+      "4:206",
+      "4:207",
+      "4:211",
+      "4:212",
+      "4:213",
+      "4:214",
+      "4:215",
+      "4:219",
+      "4:220",
+      "4:221",
+      "4:222",
+      "4:223",
+      "4:227",
+      "4:228",
+      "4:232",
+      "4:233",
+      "4:234",
+      "4:235",
+      "4:236",
+      "4:237",
+      "4:238",
+      "4:239",
+      "4:240",
+      "4:241",
+      "4:242",
+      "4:243",
+      "4:244",
+      "4:245",
+      "4:246",
+      "4:247",
+      "4:248"
+    ],
+    "components": {
+      "icons": {
+        "Light": {
+          "back": "4:2",
+          "settings": "4:5",
+          "tools": "4:10",
+          "send": "4:13",
+          "down": "4:16"
+        },
+        "Dark": {
+          "back": "4:118",
+          "settings": "4:121",
+          "tools": "4:126",
+          "send": "4:129",
+          "down": "4:132"
+        }
+      },
+      "buttons": {
+        "Light": {
+          "neutral": "4:19",
+          "disabled": "4:23",
+          "primary": "4:27"
+        },
+        "Dark": {
+          "neutral": "4:135",
+          "disabled": "4:151",
+          "primary": "4:155"
+        }
+      },
+      "headers": {
+        "LightMobile": "4:39",
+        "LightDesktop": "4:78",
+        "DarkMobile": "4:167",
+        "DarkDesktop": "4:206"
+      },
+      "composers": {
+        "LightMobile": "4:51",
+        "LightDesktop": "4:91",
+        "DarkMobile": "4:179",
+        "DarkDesktop": "4:219"
+      },
+      "characters": {
+        "LightMobile": "4:64",
+        "LightDesktop": "4:104",
+        "DarkMobile": "4:192",
+        "DarkDesktop": "4:232"
+      },
+      "users": {
+        "Light": "4:32",
+        "Dark": "4:160"
+      },
+      "latest": {
+        "Light": "4:34",
+        "Dark": "4:162"
+      }
+    },
+    "families": {
+      "Header": "4:246",
+      "Composer": "4:247",
+      "Character": "4:248"
+    },
+    "answerCharacters": 1068,
+    "characterBounds": {
+      "LightMobile": {
+        "width": 342,
+        "height": 1340
+      },
+      "LightDesktop": {
+        "width": 680,
+        "height": 794
+      },
+      "DarkMobile": {
+        "width": 342,
+        "height": 1340
+      },
+      "DarkDesktop": {
+        "width": 680,
+        "height": 794
+      }
+    },
+    "font": "Noto Sans KR"
+  },
+  "screens": {
+    "createdNodeIds": [
+      "5:2",
+      "5:3",
+      "5:4",
+      "5:5",
+      "5:6",
+      "5:7",
+      "5:8",
+      "5:9",
+      "5:10",
+      "5:11",
+      "5:35",
+      "5:36",
+      "5:37",
+      "5:38",
+      "5:39",
+      "5:40",
+      "5:41",
+      "5:43",
+      "5:57",
+      "5:58",
+      "5:59",
+      "5:60",
+      "5:81",
+      "5:82",
+      "5:90",
+      "5:91",
+      "5:92",
+      "5:115",
+      "5:116",
+      "5:117",
+      "5:118",
+      "5:119",
+      "5:120",
+      "5:121",
+      "5:123",
+      "5:137",
+      "5:138",
+      "5:139",
+      "5:140",
+      "5:159",
+      "5:160",
+      "5:166",
+      "5:167",
+      "5:168",
+      "5:169",
+      "5:170",
+      "5:171",
+      "5:172",
+      "5:196",
+      "5:197",
+      "5:198",
+      "5:199",
+      "5:200",
+      "5:201",
+      "5:202",
+      "5:204",
+      "5:218",
+      "5:219",
+      "5:220",
+      "5:221",
+      "5:242",
+      "5:243",
+      "5:251",
+      "5:252",
+      "5:253",
+      "5:276",
+      "5:277",
+      "5:278",
+      "5:279",
+      "5:280",
+      "5:281",
+      "5:282",
+      "5:284",
+      "5:298",
+      "5:299",
+      "5:300",
+      "5:301",
+      "5:320",
+      "5:321"
+    ],
+    "mutatedNodeIds": [
+      "0:1"
+    ],
+    "section": "5:2",
+    "screens": {
+      "LightMobile": "5:5",
+      "LightDesktop": "5:90",
+      "DarkMobile": "5:166",
+      "DarkDesktop": "5:251"
+    },
+    "scrollTargets": {
+      "LightMobile": "5:57",
+      "LightDesktop": "5:137",
+      "DarkMobile": "5:218",
+      "DarkDesktop": "5:298"
+    },
+    "diagnostics": [
+      {
+        "key": "LightMobile",
+        "id": "5:5",
+        "width": 390,
+        "height": 844,
+        "readingWidth": 342,
+        "viewportHeight": 649,
+        "contentHeight": 1537,
+        "footerHeight": 115,
+        "types": {
+          "FRAME": 17,
+          "TEXT": 24,
+          "INSTANCE": 14,
+          "VECTOR": 7
+        },
+        "images": [],
+        "fontFamilies": [
+          "Noto Sans KR"
+        ]
+      },
+      {
+        "key": "LightDesktop",
+        "id": "5:90",
+        "width": 1440,
+        "height": 960,
+        "readingWidth": 680,
+        "viewportHeight": 787,
+        "contentHeight": 969,
+        "footerHeight": 101,
+        "types": {
+          "INSTANCE": 14,
+          "FRAME": 15,
+          "VECTOR": 7,
+          "TEXT": 23
+        },
+        "images": [],
+        "fontFamilies": [
+          "Noto Sans KR"
+        ]
+      },
+      {
+        "key": "DarkMobile",
+        "id": "5:166",
+        "width": 390,
+        "height": 844,
+        "readingWidth": 342,
+        "viewportHeight": 649,
+        "contentHeight": 1537,
+        "footerHeight": 115,
+        "types": {
+          "FRAME": 17,
+          "TEXT": 24,
+          "INSTANCE": 14,
+          "VECTOR": 7
+        },
+        "images": [],
+        "fontFamilies": [
+          "Noto Sans KR"
+        ]
+      },
+      {
+        "key": "DarkDesktop",
+        "id": "5:251",
+        "width": 1440,
+        "height": 960,
+        "readingWidth": 680,
+        "viewportHeight": 787,
+        "contentHeight": 969,
+        "footerHeight": 101,
+        "types": {
+          "INSTANCE": 14,
+          "FRAME": 15,
+          "VECTOR": 7,
+          "TEXT": 23
+        },
+        "images": [],
+        "fontFamilies": [
+          "Noto Sans KR"
+        ]
+      }
+    ]
+  },
+  "revision2": {
+    "date": "2026-11-09",
+    "writing": {
+      "section": "18:1545",
+      "screens": {
+        "latest": "18:1549",
+        "described": "18:1628",
+        "slash": "18:1696",
+        "applied": "18:1766",
+        "appliedAlt": "18:1837",
+        "desktop": "18:1908",
+        "reroll": "18:1987",
+        "branch": "18:2054"
+      },
+      "representativeAudit": {
+        "LightMobile": {
+          "id": "5:5",
+          "footer": 151,
+          "actions": 53,
+          "notices": 0
+        },
+        "LightDesktop": {
+          "id": "5:90",
+          "footer": 137,
+          "actions": 53,
+          "notices": 0
+        },
+        "DarkMobile": {
+          "id": "5:166",
+          "footer": 151,
+          "actions": 53,
+          "notices": 0
+        },
+        "DarkDesktop": {
+          "id": "5:251",
+          "footer": 137,
+          "actions": 53,
+          "notices": 0
+        }
+      }
+    },
+    "settings": {
+      "section": "19:511",
+      "screens": {
+        "Mobilemenu": "19:515",
+        "Mobilenote": "19:629",
+        "Mobileoutput": "19:723",
+        "Mobilememory": "19:832",
+        "Desktopmenu": "19:946",
+        "Desktopnote": "19:1052",
+        "Desktopoutput": "19:1138",
+        "Desktopmemory": "19:1239"
+      },
+      "panels": [
+        {
+          "id": "19:515",
+          "width": 390,
+          "height": 844,
+          "panel": {
+            "id": "19:590",
+            "x": 0,
+            "y": 334,
+            "width": 390,
+            "height": 510
+          }
+        },
+        {
+          "id": "19:629",
+          "width": 390,
+          "height": 844,
+          "panel": {
+            "id": "19:704",
+            "x": 0,
+            "y": 542,
+            "width": 390,
+            "height": 302
+          }
+        },
+        {
+          "id": "19:723",
+          "width": 390,
+          "height": 844,
+          "panel": {
+            "id": "19:798",
+            "x": 0,
+            "y": 444,
+            "width": 390,
+            "height": 400
+          }
+        },
+        {
+          "id": "19:832",
+          "width": 390,
+          "height": 844,
+          "panel": {
+            "id": "19:907",
+            "x": 0,
+            "y": 480,
+            "width": 390,
+            "height": 364
+          }
+        },
+        {
+          "id": "19:946",
+          "width": 1440,
+          "height": 960,
+          "panel": {
+            "id": "19:1015",
+            "x": 1120,
+            "y": 72,
+            "width": 320,
+            "height": 888
+          }
+        },
+        {
+          "id": "19:1052",
+          "width": 1440,
+          "height": 960,
+          "panel": {
+            "id": "19:1121",
+            "x": 1120,
+            "y": 72,
+            "width": 320,
+            "height": 888
+          }
+        },
+        {
+          "id": "19:1138",
+          "width": 1440,
+          "height": 960,
+          "panel": {
+            "id": "19:1207",
+            "x": 1120,
+            "y": 72,
+            "width": 320,
+            "height": 888
+          }
+        },
+        {
+          "id": "19:1239",
+          "width": 1440,
+          "height": 960,
+          "panel": {
+            "id": "19:1308",
+            "x": 1120,
+            "y": 72,
+            "width": 320,
+            "height": 888
+          }
+        }
+      ]
+    },
+    "controls": {
+      "Light": {
+        "description": "17:248",
+        "slash": "17:250",
+        "lore": "17:252",
+        "reroll": "17:254",
+        "branch": "17:258"
+      },
+      "Dark": {
+        "description": "17:262",
+        "slash": "17:264",
+        "lore": "17:266",
+        "reroll": "17:268",
+        "branch": "17:272"
+      }
+    },
+    "remaining": "실제 서비스 연동과 나머지 운영 상태는 범위 밖. 빈 작성란 전용 시연 분기는 Figma Starter 호출 한도 때문에 미반영."
+  },
+  "validation": {
+    "font": "Noto Sans KR",
+    "imageNodes": 0,
+    "answerCharacters": 1068,
+    "readingWidths": [
+      342,
+      680
+    ],
+    "fixedLayoutHeights": true,
+    "remaining": "키보드/설정/대기/실패/크레딧/복구 상태와 입력·전송 프로토타입"
+  }
+}
