@@ -365,6 +365,12 @@ async def test_signup_to_first_answer_and_completed_replay(first_chat):
     assert chat.llm.await_args.kwargs["model"] == "gpt-test"
     # A first conversation has no compatible memories; real retrieval skips embedding.
     chat.embedding.assert_not_awaited()
+    await request(chat.client, "DELETE", f"{chat.messages_path}/{first['message_id']}")
+    replay = await request(chat.client, "POST", chat.answers_path, json=chat.body)
+    assert replay == {**first, "content": None}
+    history = await request(chat.client, "GET", chat.messages_path)
+    assert history["items"] == [chat.message]
+    chat.llm.assert_awaited_once()
 
 
 async def test_studio_draft_to_first_answer_with_mock_provider(first_answer_app):

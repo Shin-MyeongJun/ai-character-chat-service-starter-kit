@@ -174,7 +174,10 @@ class AnswerOrchestrator:
                 raise Types.MessageConflictError(
                     "Request key was used for different input or character."
                 )
-            if existing.history_invalidated_at is not None:
+            if existing.history_invalidated_at is not None and not (
+                existing.status == "succeeded"
+                and (existing.answer_metadata or {}).get("message_id")
+            ):
                 raise Types.MessageConflictError(
                     "The original answer history has been changed."
                 )
@@ -1116,7 +1119,9 @@ def _answer_info(run: Types.GenerationStateInfo) -> Types.AnswerInfo:
     return Types.AnswerInfo(
         run.id,
         run.status,
-        metadata.get("content") if run.status == "succeeded" else None,
+        metadata.get("content")
+        if run.status == "succeeded" and run.history_invalidated_at is None
+        else None,
         run.model_name,
         "stale" if run.status == "stale" else metadata.get("error_code"),
         metadata.get("retryable", False),
