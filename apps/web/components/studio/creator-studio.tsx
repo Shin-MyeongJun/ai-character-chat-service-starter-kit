@@ -301,7 +301,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   const current = (type: Kind, id: string) => route.kind === "work" && route.type === type && route.id === id;
   const deletionImpact = deleting?.kind === "work" ? "이 작품과 작품 전용 자료를 휴지통에 보관합니다. 독립 원본은 유지됩니다." : deleting?.kind === "character" || deleting?.kind === "lore" ? `독립 원본을 휴지통으로 이동합니다. 연결된 작품 ${workspace.works.filter(w => (deleting.kind === "character" ? w.project.characters : w.project.lorebooks).some(row => row.sourceId === deleting.id)).length}개의 복사본은 현재 내용을 유지하고 작품 전용으로 전환됩니다.` : deleting?.kind === "scene" ? "시작 장면을 휴지통으로 이동합니다. 기본 장면이면 남은 첫 장면으로 변경하며, 마지막 장면이면 선택을 비웁니다." : `이 작품에서만 연결을 해제합니다. 원본과 다른 작품은 유지됩니다. 참조하는 장면 ${project?.scenes.filter(s => deleting?.kind === "work-character" ? s.characterId === deleting.id : s.placeId === deleting?.id).length ?? 0}개의 인물·장소 선택은 비워집니다.`;
   const imageValidation = project ? validateChatImageDraft(project) : [];
-  const publishReady = !images.length && !imageValidation.length && !!project && !!project.scenes.length && !!project.characters.length && !!project.work.defaultSceneId &&
+  const publishReady = !imageValidation.length && !!project && !!project.scenes.length && !!project.characters.length && !!project.work.defaultSceneId &&
     project.characters.every(c => !!c.name.trim() && !!c.persona.trim()) &&
     project.scenes.every(s => !!s.title.trim() && !!s.opening.trim() && !!s.characterId) &&
     project.lorebooks.every(l => !!l.title.trim() && !!l.content.trim() && (!l.enabled || l.activation !== "keyword" || !!l.keywords.length)) &&
@@ -371,7 +371,6 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       <label>추론 수준 <select value={selectedEffort} onChange={event => setSelectedEffort(event.target.value)}><option value="">수준 선택</option>{models.find(model => model.id === selectedModel)?.reasoning_efforts.map(effort => <option key={effort} value={effort}>{effort}</option>)}</select></label>
       {imageValidation.length > 0 && <ul>{imageValidation.map(error => <li key={error} className={styles.error}>{error}</li>)}</ul>}
       {images.length > 0 && <>
-        <p className={styles.help}>이미지를 포함한 발행은 이미지 스냅샷 연결 후 사용할 수 있어요.</p>
         <StudioAlbumPreview items={images.filter(({ item }) => !!item.fileVersionId).map(image => ({
           image, sourceLabel: image.item.target.kind === "character"
             ? project.characters.find(row => row.id === image.item.target.id)?.name ?? ""

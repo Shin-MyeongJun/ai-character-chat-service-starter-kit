@@ -172,7 +172,7 @@ test("lost studio save response resumes by reading the same server document", as
     throw new Error(`Unexpected ${url}`);
   });
   await assert.rejects(studio.saveServerWork(work), /response lost/);
-  assert.deepEqual(await studio.saveServerWork(work), { productId: stored.product_id, revision: 1 });
+  assert.deepEqual(await studio.saveServerWork(work), { productId: stored.product_id, revision: 1, project: work.project });
   assert.equal(puts, 1);
 });
 
@@ -218,7 +218,7 @@ test("restored studio copy detaches browser-only source links and saves without 
   assert.equal(restored.id, "original-work");
   assert.equal(restored.project.characters[0].sourceId, undefined);
   assert.equal(restored.project.lorebooks[0].sourceId, undefined);
-  assert.deepEqual(await studio.saveServerWork(restored), { productId, revision: 3 });
+  assert.deepEqual(await studio.saveServerWork(restored), { productId, revision: 3, project: restored.project });
   assert.equal(puts, 0);
 });
 
