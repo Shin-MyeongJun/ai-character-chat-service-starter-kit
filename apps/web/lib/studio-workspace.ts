@@ -115,16 +115,27 @@ export function linkSource(w: StudioWorkspace, workId: string, kind: "character"
   const copy = { ...structuredClone(source), id: crypto.randomUUID(), sourceId };
   return updateProject(w, workId, p => kind === "character" ? { ...p, characters: [...p.characters, copy as StudioCharacter] } : { ...p, lorebooks: [...p.lorebooks, copy as LoreEntry] });
 }
+function updateTrashedScenes(w: StudioWorkspace, workId: string, edit: (scene: StudioScene) => StudioScene): StudioWorkspace {
+  return { ...w, trash: w.trash.map(entry => {
+    if (entry.kind !== "scene" || entry.workId !== workId) return entry;
+    const data = edit(entry.data);
+    return data === entry.data ? entry : { ...entry, data };
+  }) };
+}
 export function trashEntity(w: StudioWorkspace, kind: TrashItem["kind"], id: string, workId?: string): StudioWorkspace {
   const work = w.works.find(row => row.id === workId); const p = work?.project;
   const data = kind === "work" ? w.works.find(row => row.id === id) : kind === "character" ? w.characters.find(row => row.id === id) : kind === "lore" ? w.lorebooks.find(row => row.id === id) : kind === "work-character" ? p?.characters.find(row => row.id === id) : kind === "work-lore" ? p?.lorebooks.find(row => row.id === id) : p?.scenes.find(row => row.id === id);
   if (!data) return w;
   const label = "project" in data ? data.project.work.title : "name" in data ? data.name : data.title;
   const base = { id: crypto.randomUUID(), label, deletedAt: new Date().toISOString(), kind, data: structuredClone(data) };
-  const images = p && (kind === "work-character" || kind === "work-lore")
-    ? captureTrashedImages(p, { kind: kind === "work-character" ? "character" : "lore_entry", id }) : undefined;
-  const t = (kind === "scene" ? { ...base, workId, wasDefault: p?.work.defaultSceneId === id } : kind.startsWith("work-") ? {
-    ...base, workId, ...(images && { images }), sceneIds: p?.scenes.filter(s => kind === "work-character" ? s.characterId === id : s.placeId === id).map(s => s.id) ?? [],
+  const linkedEntity = kind === "work-character" || kind === "work-lore";
+  const field = kind === "work-character" ? "characterId" : "placeId";
+  const scenes = linkedEntity && p ? [...p.scenes, ...w.trash.flatMap(entry =>
+    entry.kind === "scene" && entry.workId === workId ? [entry.data] : [])] : [];
+  const images = p && linkedEntity
+    ? captureTrashedImages(p, { kind: kind === "work-character" ? "character" : "lore_entry", id }, scenes) : undefined;
+  const t = (kind === "scene" ? { ...base, workId, wasDefault: p?.work.defaultSceneId === id } : linkedEntity ? {
+    ...base, workId, ...(images && { images }), sceneIds: scenes.filter(s => s[field] === id).map(s => s.id),
   } : base) as TrashItem;
   let next = { ...w, trash: [...w.trash, t] };
   if (kind === "work") return { ...next, works: next.works.filter(row => row.id !== id) };
@@ -134,40 +145,49 @@ export function trashEntity(w: StudioWorkspace, kind: TrashItem["kind"], id: str
     const detach = (p: StudioProject): StudioProject => ({ ...p, characters: p.characters.map(row => kind === "character" && row.sourceId === id ? withoutSource(row) : row), lorebooks: p.lorebooks.map(row => kind === "lore" && row.sourceId === id ? withoutSource(row) : row) });
     return { ...next, works: next.works.map(row => ({ ...row, project: detach(row.project) })), trash: next.trash.map(row => row.kind === "work" ? { ...row, data: { ...row.data, project: detach(row.data.project) } } : row) };
   }
-  return updateProject(next, workId!, p => {
-    if (kind === "scene") return { ...p, scenes: p.scenes.filter(row => row.id !== id) };
-    const project = {
-      ...p,
-      characters: kind === "work-character" ? p.characters.filter(row => row.id !== id) : p.characters,
-      lorebooks: kind === "work-lore" ? p.lorebooks.filter(row => row.id !== id) : p.lorebooks,
-    };
-    if (!images) return project;
-    const removed = new Set(images.items.map(({ value }) => value.imageItemId));
-    return {
-      ...project,
-      chatImageItems: project.chatImageItems?.filter(item => !removed.has(item.imageItemId)),
-      ...(project.chatImageUploads && { chatImageUploads: project.chatImageUploads.filter(upload => !removed.has(upload.itemId)) }),
-      scenes: project.scenes.map(scene => scene.openingImagePlacements ? {
-        ...scene, openingImagePlacements: scene.openingImagePlacements.filter(placement => !removed.has(placement.imageItemId)),
-      } : scene),
-    };
-  });
+  if (kind === "scene") return updateProject(next, workId!, p => ({ ...p, scenes: p.scenes.filter(row => row.id !== id) }));
+  const removed = new Set(images?.items.map(({ value }) => value.imageItemId));
+  const unlinkScene = (scene: StudioScene): StudioScene => {
+    const detached = scene[field] === id ? { ...scene, [field]: "" } : scene;
+    const placements = scene.openingImagePlacements;
+    return placements?.some(row => removed.has(row.imageItemId))
+      ? { ...detached, openingImagePlacements: placements.filter(row => !removed.has(row.imageItemId)) } : detached;
+  };
+  next = updateTrashedScenes(next, workId!, unlinkScene);
+  return updateProject(next, workId!, p => ({
+    ...p,
+    characters: kind === "work-character" ? p.characters.filter(row => row.id !== id) : p.characters,
+    lorebooks: kind === "work-lore" ? p.lorebooks.filter(row => row.id !== id) : p.lorebooks,
+    ...(images && { chatImageItems: p.chatImageItems?.filter(item => !removed.has(item.imageItemId)) }),
+    ...(images && p.chatImageUploads && { chatImageUploads: p.chatImageUploads.filter(upload => !removed.has(upload.itemId)) }),
+    scenes: p.scenes.map(unlinkScene),
+  }));
 }
 function withoutSource<T extends { sourceId?: string }>(row: T): T { const copy = { ...row }; delete copy.sourceId; return copy; }
 export function restoreTrash(w: StudioWorkspace, trashId: string, retiredImageIds: ReadonlySet<string> = new Set()): StudioWorkspace {
   const t = w.trash.find(row => row.id === trashId); if (!t) return w;
-  if ("workId" in t && !w.works.some(row => row.id === t.workId)) return w;
   const next = { ...w, trash: w.trash.filter(row => row.id !== trashId) };
   const character = (row: StudioCharacter) => row.sourceId && !w.characters.some(c => c.id === row.sourceId) ? withoutSource(row) : row;
   const lore = (row: LoreEntry) => row.sourceId && !w.lorebooks.some(l => l.id === row.sourceId) ? withoutSource(row) : row;
   if (t.kind === "work") return { ...next, works: [...next.works, { ...t.data, project: repairProject({ ...t.data.project, characters: t.data.project.characters.map(character), lorebooks: t.data.project.lorebooks.map(lore) }) }] };
   if (t.kind === "character") return { ...next, characters: [...next.characters, withoutSource(t.data)] };
   if (t.kind === "lore") return { ...next, lorebooks: [...next.lorebooks, withoutSource(t.data)] };
-  return updateProject(next, t.workId, p => {
-    if (t.kind === "scene") return { ...p, scenes: [...p.scenes, t.data], work: { ...p.work, defaultSceneId: t.wasDefault && !p.work.defaultSceneId ? t.data.id : p.work.defaultSceneId } };
-    const restored = t.images ? restoreTrashedImages(p, t.images, retiredImageIds) : p;
-    const field = t.kind === "work-character" ? "characterId" : "placeId";
-    const scenes = restored.scenes.map(s => t.sceneIds.includes(s.id) && !s[field] ? { ...s, [field]: t.data.id } : s);
+  const work = w.works.find(row => row.id === t.workId);
+  if (!work) return w;
+  if (t.kind === "scene") return updateProject(next, t.workId, p => ({
+    ...p, scenes: [...p.scenes, t.data],
+    work: { ...p.work, defaultSceneId: t.wasDefault && !p.work.defaultSceneId ? t.data.id : p.work.defaultSceneId },
+  }));
+  const images = t.images && restoreTrashedImages(work.project, t.images, retiredImageIds);
+  const field = t.kind === "work-character" ? "characterId" : "placeId";
+  const relinkScene = (scene: StudioScene): StudioScene => {
+    const restored = images?.restorePlacements(scene) ?? scene;
+    return t.sceneIds.includes(scene.id) && !restored[field] ? { ...restored, [field]: t.data.id } : restored;
+  };
+  const withSceneLinks = updateTrashedScenes(next, t.workId, relinkScene);
+  return updateProject(withSceneLinks, t.workId, p => {
+    const restored = images?.project ?? p;
+    const scenes = p.scenes.map(relinkScene);
     if (t.kind === "work-character") {
       const characters = p.characters.some(c => c.id === t.data.id) ? p.characters : [...p.characters, character(t.data)];
       return { ...restored, scenes, characters };

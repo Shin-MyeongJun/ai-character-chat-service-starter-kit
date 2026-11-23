@@ -1,5 +1,5 @@
 import type { ChatImageItem, ChatImageTarget, OpeningImagePlacement } from "./studio-chat-images";
-import { chatImageItem, chatImageUpload, openingPlacement, type ChatImageUpload, type StudioProject } from "./studio-project";
+import { chatImageItem, chatImageUpload, openingPlacement, type ChatImageUpload, type StudioProject, type StudioScene } from "./studio-project";
 
 type Indexed<T> = { index: number; value: T };
 export type TrashedImages = {
@@ -12,14 +12,14 @@ function capture<T>(rows: T[] | undefined, matches: (row: T) => boolean): Indexe
   return (rows ?? []).flatMap((value, index) => matches(value) ? [{ index, value }] : []);
 }
 
-export function captureTrashedImages(project: StudioProject, target: ChatImageTarget): TrashedImages | undefined {
+export function captureTrashedImages(project: StudioProject, target: ChatImageTarget, scenes: StudioScene[]): TrashedImages | undefined {
   const items = capture(project.chatImageItems, item => item.target.kind === target.kind && item.target.id === target.id);
   if (!items.length) return undefined;
   const ids = new Set(items.map(({ value }) => value.imageItemId));
   return {
     items,
     uploads: capture(project.chatImageUploads, upload => ids.has(upload.itemId)),
-    scenes: project.scenes.flatMap(scene => {
+    scenes: scenes.flatMap(scene => {
       const placements = capture(scene.openingImagePlacements, placement => ids.has(placement.imageItemId));
       return placements.length ? [{ sceneId: scene.id, placements }] : [];
     }),
@@ -59,19 +59,24 @@ function reinsert<T>(current: T[] | undefined, removed: Indexed<T>[], include: (
   return merged;
 }
 
-export function restoreTrashedImages(project: StudioProject, images: TrashedImages, retired: ReadonlySet<string>): StudioProject {
+export function restoreTrashedImages(project: StudioProject, images: TrashedImages, retired: ReadonlySet<string>) {
   const existing = new Set(project.chatImageItems?.map(item => item.imageItemId));
-  const items = images.items.filter(({ value }) => !retired.has(value.imageItemId.toLowerCase()) && !existing.has(value.imageItemId));
-  if (!items.length) return project;
-  const ids = new Set(items.map(({ value }) => value.imageItemId));
+  const retiredIds = new Set(images.items.map(({ value }) => value.imageItemId).filter(id => retired.has(id.toLowerCase())));
+  const ids = new Set(images.items.map(({ value }) => value.imageItemId).filter(id => !retiredIds.has(id) && !existing.has(id)));
   const scenes = new Map(images.scenes.map(scene => [scene.sceneId, scene.placements]));
   return {
-    ...project,
-    chatImageItems: reinsert(project.chatImageItems, images.items, item => ids.has(item.imageItemId)),
-    ...(images.uploads.length > 0 && { chatImageUploads: reinsert(project.chatImageUploads, images.uploads, upload => ids.has(upload.itemId)) }),
-    scenes: project.scenes.map(scene => {
+    project: ids.size ? {
+      ...project,
+      chatImageItems: reinsert(project.chatImageItems, images.items, item => ids.has(item.imageItemId)),
+      ...(images.uploads.length > 0 && { chatImageUploads: reinsert(project.chatImageUploads, images.uploads, upload => ids.has(upload.itemId)) }),
+    } : project,
+    restorePlacements(scene: StudioScene): StudioScene {
+      // Older scene trash entries can still contain placements for a now-retired item.
+      let current = scene.openingImagePlacements;
+      if (current?.some(p => retiredIds.has(p.imageItemId))) current = current.filter(p => !retiredIds.has(p.imageItemId));
       const placements = scenes.get(scene.id);
-      return placements ? { ...scene, openingImagePlacements: reinsert(scene.openingImagePlacements, placements, p => ids.has(p.imageItemId)) } : scene;
-    }),
+      if (ids.size && placements) current = reinsert(current, placements, p => ids.has(p.imageItemId));
+      return current === scene.openingImagePlacements ? scene : { ...scene, openingImagePlacements: current };
+    },
   };
 }

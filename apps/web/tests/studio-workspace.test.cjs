@@ -75,6 +75,32 @@ test("last scene removal, restoration and deleted referenced entities never leav
   w = restoreTrash(w, sceneTrash); assert.equal(w.works[0].project.scenes[0].characterId, ""); assert.equal(w.works[0].project.work.defaultSceneId, s.id); roundtrip(w);
 });
 for (const kind of ["work-character", "work-lore"]) {
+  test(`${kind}: scene and linked images can be trashed and restored independently`, () => {
+    const { w, workId, s } = setup();
+    const target = kind === "work-character" ? { kind: "character", id: s.characterId } : { kind: "lore_entry", id: s.placeId };
+    const item = { imageItemId: crypto.randomUUID(), fileVersionId: crypto.randomUUID(), target,
+      kind: kind === "work-character" ? "expression" : "situation", alt: "", tags: [] };
+    const placement = { imageItemId: item.imageItemId, afterParagraph: 1 };
+    const original = { ...s, opening: "편집한 본문", openingImagePlacements: [placement, placement] };
+    const initial = updateProject(w, workId, p => ({ ...p, scenes: [original], chatImageItems: [item] }));
+    for (const sceneDeletedFirst of [false, true]) {
+      for (const sceneRestoredFirst of [false, true]) {
+        const removeScene = w => trashEntity(w, "scene", s.id, workId);
+        const unlink = w => trashEntity(w, kind, target.id, workId);
+        let state = sceneDeletedFirst ? unlink(removeScene(initial)) : removeScene(unlink(initial));
+        const restore = kind => {
+          state = readWorkspace(JSON.stringify(restoreTrash(state, state.trash.find(t => t.kind === kind).id)));
+          assert.ok(state);
+        };
+        restore(sceneRestoredFirst ? "scene" : kind);
+        if (sceneRestoredFirst) assert.deepEqual(state.works[0].project.scenes[0].openingImagePlacements, []);
+        else assert.deepEqual(state.works[0].project.scenes, []);
+        restore(sceneRestoredFirst ? kind : "scene");
+        assert.deepEqual(state.works[0].project.chatImageItems, [item]);
+        assert.deepEqual(state.works[0].project.scenes, [original]);
+      }
+    }
+  });
   test(`${kind}: reload restores file, pending request and ordered placements into the edited scenes`, () => {
     let { w, workId, s } = setup();
     const character = kind === "work-character";

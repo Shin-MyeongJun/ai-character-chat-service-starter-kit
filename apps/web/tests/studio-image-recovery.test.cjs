@@ -166,6 +166,44 @@ test("trash restore distinguishes committed retirements from local images, even 
   assert.ok(resaved.project.chatImageItems[0].fileVersionId);
 });
 
+test("restoring a deleted scene after a confirmed lore unlink keeps only unretired placements", async () => {
+  const client = setup().reopen();
+  const work = pendingWork(client);
+  const lore = work.project.lorebooks[0];
+  const target = { kind: "lore_entry", id: lore.id };
+  work.project.chatImageItems = work.project.chatImageItems.map(item => ({ ...item, kind: "situation", target }));
+  const saved = await client.saveServerWork(work);
+  const pending = client.addChatImageItem(target, "situation");
+  const upload = { ...work.project.chatImageUploads[0], itemId: pending.imageItemId, requestId: crypto.randomUUID() };
+  const placement = { imageItemId: pending.imageItemId, afterParagraph: 1 };
+  const scene = saved.project.scenes[0];
+  let state = { ...client.emptyWorkspace(), works: [{ ...work, project: {
+    ...saved.project, chatImageItems: [...saved.project.chatImageItems, pending], chatImageUploads: [upload],
+    scenes: [{ ...scene, openingImagePlacements: [...scene.openingImagePlacements, placement, placement] }],
+  } }] };
+  state = client.trashEntity(state, "scene", scene.id, work.id);
+  state = client.trashEntity(state, "work-lore", lore.id, work.id);
+  await client.saveServerWork(state.works[0]);
+  const retired = await client.getRetiredStudioImageIds(state.works[0]);
+  assert.deepEqual(retired, new Set(saved.project.chatImageItems.map(item => item.imageItemId)));
+  const [deletedScene, unlinkedLore] = state.trash;
+  // Older browsers left the scene's placements in its own trash record.
+  const legacy = structuredClone(state);
+  legacy.trash[0].data.openingImagePlacements = [...scene.openingImagePlacements, placement, placement];
+  legacy.trash[1].images.scenes = [];
+  const partial = client.restoreTrash(client.readWorkspace(JSON.stringify(legacy)), unlinkedLore.id, retired);
+  assert.deepEqual(client.restoreTrash(partial, deletedScene.id).works[0].project.scenes[0].openingImagePlacements, [placement, placement]);
+  state = client.restoreTrash(state, unlinkedLore.id, retired);
+  state = client.readWorkspace(JSON.stringify(client.restoreTrash(state, deletedScene.id)));
+  assert.deepEqual(state.works[0].project.chatImageItems, [pending]);
+  assert.deepEqual(state.works[0].project.chatImageUploads, [upload]);
+  assert.deepEqual(state.works[0].project.scenes[0].openingImagePlacements, [placement, placement]);
+  const resaved = await client.saveServerWork(state.works[0]);
+  assert.deepEqual(resaved.project.chatImageItems.map(item => item.imageItemId), [pending.imageItemId]);
+  assert.ok(resaved.project.chatImageItems[0].fileVersionId);
+  assert.deepEqual(resaved.project.scenes[0].openingImagePlacements, [placement, placement]);
+});
+
 test("partial upload, lost CAS response and reconnect preserve ready results and the saved placement", async () => {
   const server = setup();
   let client = server.reopen();
