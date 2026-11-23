@@ -24,6 +24,8 @@ from app.modules.content.product.service.command import (
 )
 from app.modules.content.product.service.command.publication_images import (
     _freeze_studio_publication_images,
+    _inherit_publication_images,
+    _retain_publication_files,
 )
 from app.modules.llm import types as LlmTypes
 from app.modules.llm.service import query as LlmQueryService
@@ -132,7 +134,7 @@ async def _build_publication(
     )
     snapshot = PersistenceMapper.product_snapshot_entity_to_info(created_snapshot_row)
     character_snapshot_ids_by_source_id: dict[UUID, UUID] = {}
-    lorebook_snapshot_ids_by_source_id: dict[UUID, UUID] = {}
+    lorebooks_by_source_id: dict[UUID, LorebookTypes.LorebookSnapshotInfo] = {}
     canonical_characters: list[_CanonicalCharacterData] = []
     canonical_lorebooks: list[_CanonicalLorebookData] = []
     scene_options: Types.ProductJsonObject = {}
@@ -166,9 +168,7 @@ async def _build_publication(
                 lorebook_id=lorebook_link.lorebook_id, owner_id=owner_id
             ),
         )
-        lorebook_snapshot_ids_by_source_id[lorebook_link.lorebook_id] = (
-            lorebook_snapshot.id
-        )
+        lorebooks_by_source_id[lorebook_link.lorebook_id] = lorebook_snapshot
         canonical_lorebooks.append(
             {
                 "source_id": str(lorebook_link.lorebook_id),
@@ -189,7 +189,7 @@ async def _build_publication(
         snapshot.id,
         composition,
         character_snapshot_ids_by_source_id,
-        lorebook_snapshot_ids_by_source_id,
+        {source_id: book.id for source_id, book in lorebooks_by_source_id.items()},
         starts,
         settings.entries_by_id,
     )
@@ -213,21 +213,30 @@ async def _build_publication(
     final_data = data.copy()
     if scene_options:
         final_data["studio_start_options"] = scene_options
+    character_slot_ids, start_set_ids = snapshot_slot_ids
+    images = None
     if command.studio_images is not None:
-        character_slot_ids, start_set_ids = snapshot_slot_ids
-        image_items, opening_starts = await _freeze_studio_publication_images(
-            session,
-            product_id,
-            snapshot.id,
+        images = _freeze_studio_publication_images(
             command.studio_images,
             character_slot_ids,
             start_set_ids,
-            lorebook_snapshot_ids_by_source_id[command.studio_images.lorebook_id],
+            lorebooks_by_source_id[command.studio_images.lorebook_id].id,
         )
-        final_data["chat_image_items"] = image_items
-        final_data["starts"] = opening_starts
-        final_data["chat_image_digest"] = command.studio_images.digest
-        canonical["chat_image_digest"] = command.studio_images.digest
+    elif command.previous_image_snapshot is not None:
+        images = await _inherit_publication_images(
+            session,
+            command.previous_image_snapshot,
+            character_slot_ids,
+            lorebooks_by_source_id,
+            start_set_ids,
+            final_data,
+        )
+    if images is not None:
+        await _retain_publication_files(session, product_id, snapshot.id, images)
+        final_data["chat_image_items"] = images.items
+        final_data["starts"] = images.starts
+        final_data["chat_image_digest"] = images.digest
+        canonical["chat_image_digest"] = images.digest
     final_data["content_digest"] = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()

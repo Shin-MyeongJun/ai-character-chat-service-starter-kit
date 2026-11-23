@@ -685,6 +685,7 @@ class BuildPublicationCommand:
     product_id: UUID
     owner_id: UUID
     studio_images: StudioPublicationImagesInfo | None = None
+    previous_image_snapshot: ProductSnapshotInfo | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -731,7 +732,8 @@ class PublishCommand:
     product_id: UUID
     owner_id: UUID
     value: ReleaseNoteCommand
-    studio_images: StudioPublicationImagesInfo | None = None
+    # A Studio publication supplies the entire catalog, including an empty one.
+    studio_images: StudioPublicationImagesInfo | None | Literal["inherit"] = "inherit"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

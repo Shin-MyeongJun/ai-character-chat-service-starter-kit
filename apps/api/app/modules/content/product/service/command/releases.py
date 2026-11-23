@@ -59,12 +59,19 @@ async def publish_product(
             if product.latest_snapshot_id
             else None
         )
+        studio_images = command.studio_images
+        previous_image_snapshot = None
+        if studio_images == "inherit":
+            studio_images = None
+            if previous is not None and previous.snapshot_data.get("chat_image_items"):
+                previous_image_snapshot = previous
         snapshot = await _build_publication(
             session,
             Types.BuildPublicationCommand(
                 product_id=product_id,
                 owner_id=owner_id,
-                studio_images=command.studio_images,
+                studio_images=studio_images,
+                previous_image_snapshot=previous_image_snapshot,
             ),
         )
         kind = "initial"
