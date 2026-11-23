@@ -48,18 +48,18 @@ function strings(value: unknown): value is string[] { return Array.isArray(value
 function fields(value: Record<string, unknown>, names: string[]) { return names.every(name => typeof value[name] === "string"); }
 const uuid = (value: unknown): value is string =>
   typeof value === "string" && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(value);
-function chatImageItem(value: unknown): value is ChatImageItem {
+export function chatImageItem(value: unknown): value is ChatImageItem {
   return record(value) && uuid(value.imageItemId) && (value.fileVersionId === null || uuid(value.fileVersionId))
     && record(value.target) && typeof value.target.id === "string"
     && (value.target.kind === "character" || value.target.kind === "lore_entry")
     && (value.kind === "situation" || (value.kind === "expression" && value.target.kind === "character"))
     && strings(value.tags) && typeof value.alt === "string";
 }
-function chatImageUpload(value: unknown): value is ChatImageUpload {
+export function chatImageUpload(value: unknown): value is ChatImageUpload {
   return record(value) && uuid(value.itemId) && uuid(value.requestId)
     && ((value.kind === "upload" && typeof value.filename === "string") || (value.kind === "import" && uuid(value.mediaId)));
 }
-function openingPlacement(value: unknown): value is OpeningImagePlacement {
+export function openingPlacement(value: unknown): value is OpeningImagePlacement {
   return record(value) && uuid(value.imageItemId) && Number.isInteger(value.afterParagraph);
 }
 function uniqueRows(value: unknown): value is Record<string, unknown>[] {

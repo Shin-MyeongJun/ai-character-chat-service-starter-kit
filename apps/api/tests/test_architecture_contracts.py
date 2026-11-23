@@ -290,6 +290,7 @@ def test_assembled_routes_preserve_the_same_openapi_contract():
         "/products/mine/count",
         "/conversations/{conversation_id}/manual-lore",
         "/products/{product_id}/studio-draft",
+        "/products/{product_id}/studio-draft/image-retirements",
         "/conversations/mine",
         "/products/catalog/{product_id}",
         "/models/available",

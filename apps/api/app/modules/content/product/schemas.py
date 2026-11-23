@@ -87,6 +87,11 @@ class StudioDraftResponseDto(ResponseDto):
     updated_at: datetime
 
 
+class StudioImageRetirementsResponseDto(ResponseDto):
+    revision: int
+    retired_image_item_ids: list[UUID]
+
+
 class ProductStatisticsRequestDto(RequestDto):
     date_from: date
     date_to: date

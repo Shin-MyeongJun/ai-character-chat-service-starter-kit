@@ -292,3 +292,27 @@ async def test_studio_image_http_draft_survives_partial_upload_and_reconnect(
         preview = await client.get(replay.json()["content_url"])
         assert preview.content == b"workshop"
         assert preview.headers["cache-control"] == "private, no-store"
+        retirements_path = f"{path}/studio-draft/image-retirements"
+        assert (await client.get(retirements_path)).json() == {
+            "revision": saved.json()["revision"],
+            "retired_image_item_ids": [],
+        }
+        removed = await client.put(
+            f"{path}/studio-draft",
+            json={"expected_revision": saved.json()["revision"], "document": legacy},
+        )
+        assert removed.status_code == 200, removed.text
+        assert (await client.get(retirements_path)).json() == {
+            "revision": removed.json()["revision"],
+            "retired_image_item_ids": [item["imageItemId"]],
+        }
+        reuse = await client.put(
+            f"{path}/studio-draft",
+            json={
+                "expected_revision": removed.json()["revision"],
+                "document": authored,
+            },
+        )
+        assert reuse.status_code == 422, reuse.text
+        app.dependency_overrides[dependencies.get_current_owner_id] = uuid4
+        assert (await client.get(retirements_path)).status_code == 404

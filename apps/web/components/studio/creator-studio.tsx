@@ -6,8 +6,8 @@ import { useUserTheme } from "@/components/user-theme";
 import { BookOpen, Check, ChevronDown, ChevronLeft, FolderOpen, Moon, Plus, Search, Sun } from "lucide-react";
 import { createLoreEntry, type LoreEntry } from "@/lib/studio-data";
 import { createCharacter, createScene, duplicateScene, type ChatImageUpload, type StudioCharacter, type StudioProject } from "@/lib/studio-project";
-import { createWork, linkSource, restoreTrash, trashEntity, updateProject, type TrashItem } from "@/lib/studio-workspace";
-import { getStudioProductId, listAvailableModels, loadServerWork, loadServerWorks, publishServerWork, sameStudioProject, saveServerWork, type AvailableModel } from "@/lib/studio-server";
+import { applySavedStudioWork, createWork, linkSource, restoreTrash, trashEntity, updateProject, type TrashItem, type WorkspaceWork } from "@/lib/studio-workspace";
+import { getRetiredStudioImageIds, getStudioProductId, listAvailableModels, loadServerWork, loadServerWorks, publishServerWork, sameStudioProject, saveServerWork, serverError, type AvailableModel, type SavedStudioWork } from "@/lib/studio-server";
 import { ApiError } from "@/lib/api";
 import { readImage, saveImages } from "@/lib/studio-assets";
 import { addChatImageItem, buildOpeningImagePreview, normalizeChatImageTags, validateChatImageDraft, validChatImageFile, type ChatImageKind, type ChatImageTarget } from "@/lib/studio-chat-images";
@@ -30,7 +30,6 @@ type Route = { kind: "library" } | { kind: "source"; type: "character" | "lore";
 type DeleteTarget = { kind: TrashItem["kind"]; id: string; label: string; workId?: string };
 const titles: Record<Library, string> = { works: "작품", characters: "캐릭터", lore: "로어북", trash: "휴지통" };
 const matches = (q: string, values: string[]) => values.join(" ").toLocaleLowerCase().includes(q.trim().toLocaleLowerCase());
-const serverError = (cause: unknown) => cause instanceof ApiError && cause.status === 401 ? "로그인한 뒤 다시 시도해 주세요." : cause instanceof ApiError && cause.status === 409 ? cause.message.includes("Published studio") || cause.message.includes("updates") ? "이미 발행한 작품의 후속 버전은 현재 스튜디오에서 저장·발행할 수 없어요." : "서버 초안이 바뀌었어요. 서버 초안을 확인한 뒤 다시 시도해 주세요." : cause instanceof Error ? cause.message : "서버 요청에 실패했어요. 다시 시도해 주세요.";
 
 export function CreatorStudio({ initialWorkId, initialProductId }: { initialWorkId?: string; initialProductId?: string } = {}) {
   const draft = useStudioDraft(); const { workspace, ready, status, storageWarning, commit } = draft;
@@ -228,17 +227,37 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     else select("overview");
     setNotice("휴지통으로 이동했어요. 내 작업실 → 휴지통에서 복구할 수 있어요.");
   }
-  function restore(id: string) { commit(w => restoreTrash(w, id)); setNotice("복구했어요. 원본 삭제로 해제된 연결은 자동으로 다시 연결하지 않습니다."); }
+  async function restore(item: TrashItem) {
+    if (serverBusy) return;
+    setServerBusy(true);
+    try {
+      let retired = new Set<string>();
+      let skipped = 0;
+      if ((item.kind === "work-character" || item.kind === "work-lore") && item.images) {
+        const work = workspace.works.find(row => row.id === item.workId);
+        if (!work) return;
+        retired = await getRetiredStudioImageIds(work);
+        skipped = item.images.items.filter(({ value }) => retired.has(value.imageItemId.toLowerCase())).length;
+        if (skipped && !window.confirm(`서버 초안에서 삭제가 확정된 이미지 ${skipped}개는 기존 수집 항목 ID로 복구할 수 없어요. 해당 이미지와 그 배치를 제외하고 나머지를 복구할까요?`)) return;
+      }
+      commit(w => restoreTrash(w, item.id, retired));
+      setNotice(skipped ? `자료를 복구했어요. 서버에서 삭제된 이미지 ${skipped}개와 그 배치는 제외했어요.` :
+        item.kind === "character" || item.kind === "lore" ? "원본을 복구했어요. 기존 작품의 출처 연결은 해제된 상태예요." : "복구했어요.");
+    } catch (cause) {
+      setNotice(`이미지 삭제 여부를 확인하지 못해 자료를 휴지통에 보관했어요. ${serverError(cause)}`);
+    } finally { setServerBusy(false); }
+  }
   function exportData(value: unknown, name: string) { const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); setNotice("JSON 내보내기를 요청했어요. 이미지 파일은 별도로 보관해 주세요."); }
   function test() { if (previewScene) { setRunning(true); setPane("preview"); } }
-  /** Save document and verified media together at the UI boundary; retain browser data on partial failures. */
+  function acknowledgeServerSave(work: WorkspaceWork, saved: SavedStudioWork) {
+    commit(current => applySavedStudioWork(current, work, saved.project));
+    setProductLink({ workId: work.id, productId: saved.productId });
+  }
   async function saveServer() {
     if (!activeWork || serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const saved = await saveServerWork(activeWork);
-      setProductLink({ workId: activeWork.id, productId: saved.productId });
-      commit(current => updateProject(current, activeWork.id, project => project === activeWork.project ? saved.project : project));
+      const saved = await saveServerWork(activeWork, acknowledgeServerSave);
       setNotice(saved.project.chatImageItems?.length || saved.project.characters.some(row => row.assets.length)
         ? "작품 문서와 이미지를 서버에 저장했어요. 다른 기기에서도 서버 이미지를 복원할 수 있어요."
         : "서버에 저장했어요. 다른 기기에서 내 작업실의 서버 초안 가져오기로 복원할 수 있어요.");
@@ -261,7 +280,6 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     } catch (cause) { setNotice(serverError(cause)); }
     finally { setServerBusy(false); }
   }
-  /** Reuse the saved-revision release receipt when a publication response is lost. */
   /** Import available server originals while keeping browser and work copies independent. */
   async function importOriginals() {
     if (serverBusy) return;
@@ -287,7 +305,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (!activeWork || serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const result = await publishServerWork(activeWork, selectedModel, selectedEffort, releaseSummary, releaseBody);
+      const result = await publishServerWork(activeWork, selectedModel, selectedEffort, releaseSummary, releaseBody, acknowledgeServerSave);
       setPublishedId(result.productId);
       setNotice(`버전 ${result.release.version}을 발행했어요. 작품 상세에서 대화를 시작할 수 있어요.`);
     } catch (cause) { setNotice(serverError(cause)); }
@@ -299,6 +317,8 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   const filteredScenes = project?.scenes.filter(s => matches(treeQuery, [s.title, s.language])) ?? [];
   const folders = [...new Set(filteredLore.map(l => l.folder))];
   const current = (type: Kind, id: string) => route.kind === "work" && route.type === type && route.id === id;
+  const unlinkingImages = (deleting?.kind === "work-character" || deleting?.kind === "work-lore")
+    && project?.chatImageItems?.some(item => item.target.id === deleting.id && item.target.kind === (deleting.kind === "work-character" ? "character" : "lore_entry"));
   const deletionImpact = deleting?.kind === "work" ? "이 작품과 작품 전용 자료를 휴지통에 보관합니다. 독립 원본은 유지됩니다." : deleting?.kind === "character" || deleting?.kind === "lore" ? `독립 원본을 휴지통으로 이동합니다. 연결된 작품 ${workspace.works.filter(w => (deleting.kind === "character" ? w.project.characters : w.project.lorebooks).some(row => row.sourceId === deleting.id)).length}개의 복사본은 현재 내용을 유지하고 작품 전용으로 전환됩니다.` : deleting?.kind === "scene" ? "시작 장면을 휴지통으로 이동합니다. 기본 장면이면 남은 첫 장면으로 변경하며, 마지막 장면이면 선택을 비웁니다." : `이 작품에서만 연결을 해제합니다. 원본과 다른 작품은 유지됩니다. 참조하는 장면 ${project?.scenes.filter(s => deleting?.kind === "work-character" ? s.characterId === deleting.id : s.placeId === deleting?.id).length ?? 0}개의 인물·장소 선택은 비워집니다.`;
   const imageValidation = project ? validateChatImageDraft(project) : [];
   const publishReady = !imageValidation.length && !!project && !!project.scenes.length && !!project.characters.length && !!project.work.defaultSceneId &&
@@ -340,7 +360,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
               {library === "works" && workspace.works.filter(w => matches(q, [w.project.work.title, ...w.project.work.tags])).map((w, index) => <WorkTile key={w.id} index={index} title={w.project.work.title} description={w.project.work.introduction} tags={w.project.work.tags} status={`브라우저 초안 · 캐릭터 ${w.project.characters.length} · 로어 ${w.project.lorebooks.length} · 장면 ${w.project.scenes.length}`}><StudioButton onClick={() => openWork(w.id)}>편집하기</StudioButton><StudioButton className={styles.dangerButton} aria-label={`${w.project.work.title} 작품 삭제`} onClick={() => setDeleting({ kind: "work", id: w.id, label: w.project.work.title })}>작품 삭제</StudioButton></WorkTile>)}
               {library === "characters" && workspace.characters.filter(c => matches(q, [c.name, c.role, ...c.tags])).map(c => <div className={styles.libraryItem} key={c.id}><button className={styles.libraryCard} onClick={() => openSource("character", c.id)}><span className={styles.chip}>독립 원본</span><strong>{c.name || "이름 없는 인물"}</strong><p>{c.introduction}</p><small>{c.tags.join(" · ")}</small></button><StudioButton className={styles.dangerButton} aria-label={`${c.name} 원본 삭제`} onClick={() => setDeleting({ kind: "character", id: c.id, label: c.name })}>원본 삭제</StudioButton></div>)}
               {library === "lore" && workspace.lorebooks.filter(l => matches(q, [l.title, l.folder, ...l.tags])).map(l => <div className={styles.libraryItem} key={l.id}><button className={styles.libraryCard} onClick={() => openSource("lore", l.id)}><span className={styles.chip}>독립 원본</span><strong>{l.title || "이름 없는 로어"}</strong><p>{l.content}</p><small>{l.tags.join(" · ")}</small></button><StudioButton className={styles.dangerButton} aria-label={`${l.title} 원본 삭제`} onClick={() => setDeleting({ kind: "lore", id: l.id, label: l.title })}>원본 삭제</StudioButton></div>)}
-              {library === "trash" && workspace.trash.filter(t => matches(q, [t.label])).map(t => <div className={styles.libraryCard} key={t.id}><strong>{t.label || "이름 없는 자료"}</strong><small>{t.kind === "work" ? "작품" : t.kind === "character" || t.kind === "lore" ? "독립 원본" : "작품 내부 자료"} · {new Date(t.deletedAt).toLocaleString("ko-KR")}</small><StudioButton aria-label={`${t.label} 복구`} disabled={"workId" in t && !workspace.works.some(w => w.id === t.workId)} onClick={() => restore(t.id)}>복구</StudioButton>{"workId" in t && !workspace.works.some(w => w.id === t.workId) && <p className={styles.help}>소속 작품을 먼저 복구하세요.</p>}</div>)}
+              {library === "trash" && workspace.trash.filter(t => matches(q, [t.label])).map(t => <div className={styles.libraryCard} key={t.id}><strong>{t.label || "이름 없는 자료"}</strong><small>{t.kind === "work" ? "작품" : t.kind === "character" || t.kind === "lore" ? "독립 원본" : "작품 내부 자료"} · {new Date(t.deletedAt).toLocaleString("ko-KR")}</small><StudioButton aria-label={`${t.label} 복구`} disabled={serverBusy || ("workId" in t && !workspace.works.some(w => w.id === t.workId))} onClick={() => void restore(t)}>복구</StudioButton>{"workId" in t && !workspace.works.some(w => w.id === t.workId) && <p className={styles.help}>소속 작품을 먼저 복구하세요.</p>}</div>)}
             </div>{resultsCount === 0 && <div className={styles.emptySmall}>{q ? "검색 결과가 없어요." : library === "trash" ? "휴지통이 비어 있어요." : "아직 등록한 자료가 없어요. 위의 추가 버튼으로 시작하세요."}</div>}
           </>}
           {route.kind === "source" && <div className={styles.editActions}><StudioButton onClick={() => home(route.type === "character" ? "characters" : "lore")}><ChevronLeft size={15} />보관함으로</StudioButton><StudioButton className={styles.dangerButton} onClick={() => setDeleting({ kind: route.type, id: route.id, label: character?.name || lore?.title || "자료" })}>원본 삭제</StudioButton></div>}
@@ -359,7 +379,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     {isWork && <nav className={styles.mobileNav} aria-label="스튜디오 화면 전환">{([{ id: "resources", label: "자료" }, { id: "editor", label: "편집" }, { id: "preview", label: "미리보기" }] as const).map(item => <button key={item.id} className={pane === item.id ? styles.mobileActive : ""} aria-current={pane === item.id ? "page" : undefined} onClick={() => setPane(item.id)}><BookOpen size={19} />{item.label}</button>)}</nav>}
     {modal === "add" && project && <StudioDialog title="작품 자료 추가" onClose={() => setModal(null)}><p className={styles.help}>새 자료는 이 작품에만 저장됩니다. 독립 원본은 보관함에서 만들어 연결하세요.</p><StudioButton onClick={() => add("character")}>작품 전용 캐릭터 추가</StudioButton><StudioButton onClick={() => add("lore")}>작품 전용 로어 추가</StudioButton><StudioButton onClick={() => add("scene")}>시작 장면 추가</StudioButton><StudioButton onClick={() => { setConnectQuery(""); setModal("connect"); }}>보관함 원본 연결</StudioButton></StudioDialog>}
     {modal === "connect" && project && <StudioDialog title="보관함 원본 연결" onClose={() => setModal(null)}><p className={styles.help}>원본의 현재 설정을 작품 전용 복사본으로 연결해요. 연결 후 각 작품과 원본은 따로 편집됩니다.</p><label className={styles.search}><Search size={16} /><input aria-label="연결할 원본 검색" placeholder="이름·제목·태그 검색" value={connectQuery} onChange={e => setConnectQuery(e.target.value)} /></label><h3>캐릭터</h3>{workspace.characters.filter(c => matches(connectQuery, [c.name, ...c.tags])).map(c => <StudioButton key={c.id} disabled={project.characters.some(row => row.sourceId === c.id)} onClick={() => connect("character", c.id)}>{c.name}{project.characters.some(row => row.sourceId === c.id) ? " · 연결됨" : " 연결"}</StudioButton>)}<h3>로어북</h3>{workspace.lorebooks.filter(l => matches(connectQuery, [l.title, ...l.tags])).map(l => <StudioButton key={l.id} disabled={project.lorebooks.some(row => row.sourceId === l.id)} onClick={() => connect("lore", l.id)}>{l.title}{project.lorebooks.some(row => row.sourceId === l.id) ? " · 연결됨" : " 연결"}</StudioButton>)}{!workspace.characters.length && !workspace.lorebooks.length && <p className={styles.help}>독립 원본이 없어요. 내 작업실의 캐릭터·로어북 보관함에서 먼저 만들어 주세요.</p>}</StudioDialog>}
-    {deleting && <StudioDialog title={deleting.kind.startsWith("work-") ? "작품에서 연결 해제" : "삭제 확인"} onClose={() => setDeleting(null)}><strong>{deleting.label}</strong><p>{deletionImpact}</p><p className={styles.help}>휴지통에서 복구할 수 있습니다. 원본을 복구해도 이미 해제된 작품 연결은 자동으로 복원하지 않습니다.</p><StudioButton onClick={() => setDeleting(null)}>취소</StudioButton><StudioButton className={styles.dangerButton} onClick={remove}>휴지통으로 이동</StudioButton></StudioDialog>}
+    {deleting && <StudioDialog title={deleting.kind.startsWith("work-") ? "작품에서 연결 해제" : "삭제 확인"} onClose={() => setDeleting(null)}><strong>{deleting.label}</strong><p>{deletionImpact}</p><p className={styles.help}>{unlinkingImages ? "연결된 채팅 이미지와 장면 배치도 휴지통으로 이동해요. 서버 초안에서 이미지 삭제가 확정되면 해당 수집 항목은 복구할 수 없어요." : "휴지통에서 복구할 수 있습니다. 원본을 복구해도 이미 해제된 작품 연결은 자동으로 복원하지 않습니다."}</p><StudioButton onClick={() => setDeleting(null)}>취소</StudioButton><StudioButton className={styles.dangerButton} disabled={serverBusy} onClick={remove}>휴지통으로 이동</StudioButton></StudioDialog>}
     {modal === "publish" && project && <StudioDialog title="초안 검토 및 발행" onClose={() => setModal(null)}>
       <strong>{project.work.title || "이름 없는 작품"}</strong><p>캐릭터 {project.characters.length} · 로어 {project.lorebooks.length} · 시작 장면 {project.scenes.length}</p>
       {!project.scenes.length && <p className={styles.error}>시작 장면을 추가해 주세요.</p>}

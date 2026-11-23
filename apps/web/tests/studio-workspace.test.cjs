@@ -74,6 +74,64 @@ test("last scene removal, restoration and deleted referenced entities never leav
   const sceneTrash = w.trash[0].id; w = trashEntity(w, "work-character", w.works[0].project.characters[0].id, workId);
   w = restoreTrash(w, sceneTrash); assert.equal(w.works[0].project.scenes[0].characterId, ""); assert.equal(w.works[0].project.work.defaultSceneId, s.id); roundtrip(w);
 });
+for (const kind of ["work-character", "work-lore"]) {
+  test(`${kind}: reload restores file, pending request and ordered placements into the edited scenes`, () => {
+    let { w, workId, s } = setup();
+    const character = kind === "work-character";
+    const target = character ? { kind: "character", id: s.characterId } : { kind: "lore_entry", id: s.placeId };
+    const item = { imageItemId: crypto.randomUUID(), fileVersionId: crypto.randomUUID(), target,
+      kind: character ? "expression" : "situation", alt: "설명", tags: ["장면"] };
+    const otherCharacter = createCharacter();
+    const other = { ...item, imageItemId: crypto.randomUUID(), target: { kind: "character", id: otherCharacter.id } };
+    const upload = { requestId: crypto.randomUUID(), itemId: item.imageItemId,
+      ...(character ? { kind: "upload", filename: "smile.png" } : { kind: "import", mediaId: crypto.randomUUID() }) };
+    const a = { imageItemId: item.imageItemId, afterParagraph: 0 };
+    const b = { imageItemId: other.imageItemId, afterParagraph: 0 };
+    const placements = [a, b, a, a, { ...a, afterParagraph: 1 }];
+    const otherScene = { ...createScene(otherCharacter.id, ""), opening: "다른 장면", openingImagePlacements: [a] };
+    w = updateProject(w, workId, p => ({ ...p, characters: [...p.characters, otherCharacter],
+      chatImageItems: [item, other], chatImageUploads: [upload],
+      scenes: [{ ...s, openingImagePlacements: placements }, otherScene] }));
+    const unlinked = readWorkspace(JSON.stringify(trashEntity(w, kind, target.id, workId)));
+    assert.deepEqual(unlinked.works[0].project.chatImageItems, [other]);
+    assert.deepEqual(unlinked.works[0].project.chatImageUploads, []);
+    assert.deepEqual(unlinked.works[0].project.scenes.map(scene => scene.openingImagePlacements), [[b], []]);
+    const newer = { ...other, imageItemId: crypto.randomUUID() };
+    const added = { imageItemId: newer.imageItemId, afterParagraph: 1 };
+    const edited = updateProject(unlinked, workId, p => ({ ...p,
+      characters: p.characters.map(c => c.id === otherCharacter.id ? { ...c, persona: "편집한 설정" } : c),
+      chatImageItems: [...p.chatImageItems, newer],
+      scenes: p.scenes.map(scene => ({ ...scene, opening: "새 본문", openingImagePlacements: [...scene.openingImagePlacements, added] })),
+    }));
+    const restored = readWorkspace(JSON.stringify(restoreTrash(edited, edited.trash[0].id)));
+    assert.deepEqual(restored.trash, []);
+    const result = restored.works[0].project;
+    assert.deepEqual(result.chatImageItems, [item, other, newer]);
+    assert.deepEqual(result.chatImageUploads, [upload]);
+    assert.deepEqual(result.scenes.map(scene => scene.openingImagePlacements), [[...placements, added], [a, added]]);
+    assert.deepEqual(result.scenes.map(scene => scene.opening), ["새 본문", "새 본문"]);
+    assert.equal(result.characters.find(c => c.id === otherCharacter.id).persona, "편집한 설정");
+    assert.equal(character ? result.scenes[0].characterId : result.scenes[0].placeId, target.id);
+    assert.deepEqual(restored.works[1], w.works[1]);
+
+    const legacy = structuredClone(unlinked);
+    delete legacy.trash[0].images;
+    const fromLegacy = restoreTrash(readWorkspace(JSON.stringify(legacy)), legacy.trash[0].id);
+    assert.ok(readWorkspace(JSON.stringify(fromLegacy)));
+    assert.equal((character ? fromLegacy.works[0].project.characters : fromLegacy.works[0].project.lorebooks).some(row => row.id === target.id), true);
+    assert.deepEqual(fromLegacy.works[0].project.chatImageItems, [other]);
+
+    for (const corrupt of [
+      images => { images.items[0].value.target.id = "unrelated"; },
+      images => { images.uploads[0].value.itemId = other.imageItemId; },
+      images => { images.scenes[0].placements[0].index = -1; },
+    ]) {
+      const invalid = structuredClone(unlinked);
+      corrupt(invalid.trash[0].images);
+      assert.equal(readWorkspace(JSON.stringify(invalid)), null);
+    }
+  });
+}
 test("stored schemas reject malformed trash, duplicate works and orphan source references", () => {
   const { w } = setup();
   for (const mutate of [

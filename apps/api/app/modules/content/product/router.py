@@ -56,6 +56,21 @@ async def read_studio_draft(
         )
 
 
+@router.get(
+    "/{product_id}/studio-draft/image-retirements",
+    response_model=Schemas.StudioImageRetirementsResponseDto,
+)
+async def read_studio_image_retirements(
+    product_id: UUID, response: Response, session: Session, owner: Owner
+) -> Schemas.StudioImageRetirementsResponseDto:
+    with errors():
+        draft = await get_studio_draft(
+            session, Types.GetStudioDraftCommand(product_id=product_id, owner_id=owner)
+        )
+    response.headers["Cache-Control"] = "private, no-store"
+    return SchemaMapper.studio_draft_info_to_image_retirements_response(draft)
+
+
 @router.get("/catalog", response_model=Schemas.CatalogPageResponseDto)
 async def catalog(
     session: Session,

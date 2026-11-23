@@ -1,5 +1,6 @@
 import { readLoreDraft, type LoreEntry } from "./studio-data";
 import { readStudioProject, restoreStudioProject, type StudioCharacter, type StudioProject, type StudioScene } from "./studio-project";
+import { captureTrashedImages, restoreTrashedImages, validTrashedImages, type TrashedImages } from "./studio-trash-images";
 
 export const WORKSPACE_STORAGE_KEY = "chat-kit-studio-workspace-v3";
 export type WorkspaceWork = { id: string; project: StudioProject };
@@ -7,8 +8,8 @@ export type TrashItem = { id: string; label: string; deletedAt: string } & (
   | { kind: "work"; data: WorkspaceWork }
   | { kind: "character"; data: StudioCharacter }
   | { kind: "lore"; data: LoreEntry }
-  | { kind: "work-character"; workId: string; data: StudioCharacter; sceneIds: string[] }
-  | { kind: "work-lore"; workId: string; data: LoreEntry; sceneIds: string[] }
+  | { kind: "work-character"; workId: string; data: StudioCharacter; sceneIds: string[]; images?: TrashedImages }
+  | { kind: "work-lore"; workId: string; data: LoreEntry; sceneIds: string[]; images?: TrashedImages }
   | { kind: "scene"; workId: string; data: StudioScene; wasDefault: boolean });
 export type StudioWorkspace = { version: 3; works: WorkspaceWork[]; characters: StudioCharacter[]; lorebooks: LoreEntry[]; trash: TrashItem[] };
 export const emptyWorkspace = (): StudioWorkspace => ({ version: 3, works: [], characters: [], lorebooks: [], trash: [] });
@@ -53,6 +54,9 @@ export function readWorkspace(raw: string): StudioWorkspace | null {
         if (typeof t.workId !== "string" || !t.workId) return null;
         if (t.kind === "scene") { if (!validScene(t.data) || typeof t.wasDefault !== "boolean") return null; }
         else if (!(t.kind === "work-character" ? validCharacter(t.data) : validLore(t.data)) || !Array.isArray(t.sceneIds) || !t.sceneIds.every(id => typeof id === "string")) return null;
+        else if (t.images !== undefined && !validTrashedImages(t.images, {
+          kind: t.kind === "work-character" ? "character" : "lore_entry", id: (t.data as StudioCharacter | LoreEntry).id,
+        })) return null;
       } else return null;
     }
     return v as StudioWorkspace;
@@ -63,6 +67,47 @@ export function repairProject(p: StudioProject): StudioProject {
 }
 export function updateProject(w: StudioWorkspace, id: string, change: (p: StudioProject) => StudioProject): StudioWorkspace {
   return { ...w, works: w.works.map(work => work.id === id ? { ...work, project: repairProject(change(work.project)) } : work) };
+}
+
+function mergeSavedCharacterMedia(current: StudioCharacter[], submitted: StudioCharacter[], saved: StudioCharacter[]): StudioCharacter[] {
+  if (submitted === saved) return current;
+  return current.map(character => {
+    const original = submitted.find(row => row.id === character.id);
+    const confirmed = saved.find(row => row.id === character.id);
+    if (!original || !confirmed || !character.assets.length) return character;
+    const assets = character.assets.map(asset => {
+      const before = original.assets.find(row => row.id === asset.id && row.usage === asset.usage);
+      const after = confirmed.assets.find(row => row.id === asset.id && row.usage === asset.usage);
+      return before && after?.mediaId && before.mediaId === asset.mediaId ? { ...asset, mediaId: after.mediaId } : asset;
+    });
+    return { ...character, assets };
+  });
+}
+
+export function applySavedStudioWork(workspace: StudioWorkspace, submitted: WorkspaceWork, saved: StudioProject): StudioWorkspace {
+  return updateProject(workspace, submitted.id, current => {
+    if (current === submitted.project) return saved;
+
+    // An item ID survives replacement. Only consume the request that produced this version.
+    const requests = new Map(submitted.project.chatImageUploads?.map(upload => [upload.itemId, upload.requestId]));
+    const versions = new Map(saved.chatImageItems?.map(item => [item.imageItemId, item.fileVersionId]));
+    const completed = new Map<string, string>();
+    const pending = current.chatImageUploads?.filter(upload => {
+      const version = versions.get(upload.itemId);
+      if (!version || requests.get(upload.itemId) !== upload.requestId) return true;
+      completed.set(upload.itemId, version);
+      return false;
+    });
+    return {
+      ...current,
+      chatImageItems: current.chatImageItems?.map(item => {
+        const fileVersionId = completed.get(item.imageItemId);
+        return fileVersionId ? { ...item, fileVersionId } : item;
+      }),
+      chatImageUploads: pending?.length ? pending : undefined,
+      characters: mergeSavedCharacterMedia(current.characters, submitted.project.characters, saved.characters),
+    };
+  });
 }
 export function linkSource(w: StudioWorkspace, workId: string, kind: "character" | "lore", sourceId: string): StudioWorkspace {
   const source = (kind === "character" ? w.characters : w.lorebooks).find(row => row.id === sourceId);
@@ -76,7 +121,11 @@ export function trashEntity(w: StudioWorkspace, kind: TrashItem["kind"], id: str
   if (!data) return w;
   const label = "project" in data ? data.project.work.title : "name" in data ? data.name : data.title;
   const base = { id: crypto.randomUUID(), label, deletedAt: new Date().toISOString(), kind, data: structuredClone(data) };
-  const t = (kind === "scene" ? { ...base, workId, wasDefault: p?.work.defaultSceneId === id } : kind.startsWith("work-") ? { ...base, workId, sceneIds: p?.scenes.filter(s => kind === "work-character" ? s.characterId === id : s.placeId === id).map(s => s.id) ?? [] } : base) as TrashItem;
+  const images = p && (kind === "work-character" || kind === "work-lore")
+    ? captureTrashedImages(p, { kind: kind === "work-character" ? "character" : "lore_entry", id }) : undefined;
+  const t = (kind === "scene" ? { ...base, workId, wasDefault: p?.work.defaultSceneId === id } : kind.startsWith("work-") ? {
+    ...base, workId, ...(images && { images }), sceneIds: p?.scenes.filter(s => kind === "work-character" ? s.characterId === id : s.placeId === id).map(s => s.id) ?? [],
+  } : base) as TrashItem;
   let next = { ...w, trash: [...w.trash, t] };
   if (kind === "work") return { ...next, works: next.works.filter(row => row.id !== id) };
   if (kind === "character" || kind === "lore") {
@@ -87,27 +136,25 @@ export function trashEntity(w: StudioWorkspace, kind: TrashItem["kind"], id: str
   }
   return updateProject(next, workId!, p => {
     if (kind === "scene") return { ...p, scenes: p.scenes.filter(row => row.id !== id) };
-    const targetKind = kind === "work-character" ? "character" : "lore_entry";
-    const removed = new Set((p.chatImageItems ?? []).filter(item =>
-      item.target.kind === targetKind && item.target.id === id).map(item => item.imageItemId));
     const project = {
       ...p,
       characters: kind === "work-character" ? p.characters.filter(row => row.id !== id) : p.characters,
       lorebooks: kind === "work-lore" ? p.lorebooks.filter(row => row.id !== id) : p.lorebooks,
     };
-    if (!removed.size) return project;
+    if (!images) return project;
+    const removed = new Set(images.items.map(({ value }) => value.imageItemId));
     return {
       ...project,
       chatImageItems: project.chatImageItems?.filter(item => !removed.has(item.imageItemId)),
-      chatImageUploads: project.chatImageUploads?.filter(upload => !removed.has(upload.itemId)),
-      scenes: project.scenes.map(scene => ({
-        ...scene, openingImagePlacements: scene.openingImagePlacements?.filter(placement => !removed.has(placement.imageItemId)),
-      })),
+      ...(project.chatImageUploads && { chatImageUploads: project.chatImageUploads.filter(upload => !removed.has(upload.itemId)) }),
+      scenes: project.scenes.map(scene => scene.openingImagePlacements ? {
+        ...scene, openingImagePlacements: scene.openingImagePlacements.filter(placement => !removed.has(placement.imageItemId)),
+      } : scene),
     };
   });
 }
 function withoutSource<T extends { sourceId?: string }>(row: T): T { const copy = { ...row }; delete copy.sourceId; return copy; }
-export function restoreTrash(w: StudioWorkspace, trashId: string): StudioWorkspace {
+export function restoreTrash(w: StudioWorkspace, trashId: string, retiredImageIds: ReadonlySet<string> = new Set()): StudioWorkspace {
   const t = w.trash.find(row => row.id === trashId); if (!t) return w;
   if ("workId" in t && !w.works.some(row => row.id === t.workId)) return w;
   const next = { ...w, trash: w.trash.filter(row => row.id !== trashId) };
@@ -118,7 +165,14 @@ export function restoreTrash(w: StudioWorkspace, trashId: string): StudioWorkspa
   if (t.kind === "lore") return { ...next, lorebooks: [...next.lorebooks, withoutSource(t.data)] };
   return updateProject(next, t.workId, p => {
     if (t.kind === "scene") return { ...p, scenes: [...p.scenes, t.data], work: { ...p.work, defaultSceneId: t.wasDefault && !p.work.defaultSceneId ? t.data.id : p.work.defaultSceneId } };
-    if (t.kind === "work-character") return { ...p, characters: [...p.characters, character(t.data)], scenes: p.scenes.map(s => t.sceneIds.includes(s.id) && !s.characterId ? { ...s, characterId: t.data.id } : s) };
-    return { ...p, lorebooks: [...p.lorebooks, lore(t.data)], scenes: p.scenes.map(s => t.sceneIds.includes(s.id) && !s.placeId ? { ...s, placeId: t.data.id } : s) };
+    const restored = t.images ? restoreTrashedImages(p, t.images, retiredImageIds) : p;
+    const field = t.kind === "work-character" ? "characterId" : "placeId";
+    const scenes = restored.scenes.map(s => t.sceneIds.includes(s.id) && !s[field] ? { ...s, [field]: t.data.id } : s);
+    if (t.kind === "work-character") {
+      const characters = p.characters.some(c => c.id === t.data.id) ? p.characters : [...p.characters, character(t.data)];
+      return { ...restored, scenes, characters };
+    }
+    const lorebooks = p.lorebooks.some(l => l.id === t.data.id) ? p.lorebooks : [...p.lorebooks, lore(t.data)];
+    return { ...restored, scenes, lorebooks };
   });
 }

@@ -30,6 +30,8 @@
 - `save_studio_draft`는 advisory → product → draft 잠금 아래 revision 확인 후 이전·새 파일 UUID의 합집합을 오름차순으로 잠근다. `(kind="draft", reference_id=product_id)`로 새 문서에 남는 ready 파일을 보존하고, 마지막 항목에서 제거된 파일만 해제한다. 동일 문서 재전송은 기존 revision을 돌려주며 참조 실패와 CAS 충돌은 초안 및 참조 쓰기를 함께 롤백한다. a2 업로드는 별도로 커밋되어 재시도할 수 있다.
 - 삭제된 수집 항목 ID의 재사용을 막는 목록은 초안 JSONB의 서버 관리 키에 저장한다. HTTP 초안 응답과 작성 문서 digest에는 이 키를 포함하지 않는다. a4는 잠긴 초안 revision의 항목과 장면 배치를 읽고 같은 작품의 ready 파일을 검증한 뒤 스냅샷 참조를 같은 발행 트랜잭션에서 보존한다.
 
+- 작품 소유자의 `GET /products/{product_id}/studio-draft/image-retirements`는 휴지통 복구 시 재사용할 수 없는 수집 항목 ID를 반환한다. 일반 초안에는 서버 관리 키를 노출하지 않으며 복구 조회는 파일 참조나 해금 기록을 변경하지 않는다.
+
 ## U19 a4 이미지 발행 동결
 
 - `lock_ready_product_file_version`은 작품 소유권을 확인한 호출자의 트랜잭션에서 파일 행을 잠그고, 해당 작품의 ready 파일 Info를 반환한다. 참조 등록은 같은 ready 검사와 행 잠금을 사용한다.

@@ -100,6 +100,19 @@ class ProductSchemaMapper:
         )
 
     @staticmethod
+    def studio_draft_info_to_image_retirements_response(
+        result: Types.StudioDraftInfo,
+    ) -> Schemas.StudioImageRetirementsResponseDto:
+        return Schemas.StudioImageRetirementsResponseDto.model_validate(
+            {
+                "revision": result.revision,
+                "retired_image_item_ids": result.document.get(
+                    Types.RETIRED_STUDIO_IMAGE_ITEMS, []
+                ),
+            }
+        )
+
+    @staticmethod
     def product_list_request_to_command(
         request: Schemas.ListProductsRequestDto,
     ) -> Types.ProductPaginationCommand:

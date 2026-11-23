@@ -294,6 +294,34 @@ def test_studio_response_keeps_nested_json_and_hides_receipt_fields(api, monkeyp
     )
 
 
+def test_studio_image_retirements_read_owner_draft_without_exposing_document(
+    api, monkeypatch
+):
+    client, _, session, owner_id = api
+    product_id, retired = uuid4(), uuid4()
+    document = {"version": 2}
+    service = AsyncMock(
+        return_value=types.StudioDraftInfo(
+            product_id=product_id,
+            revision=3,
+            document=document,
+            updated_at=datetime.now(UTC),
+        )
+    )
+    monkeypatch.setattr(Router, "get_studio_draft", service)
+    path = f"/products/{product_id}/studio-draft/image-retirements"
+    assert client.get(path).json() == {"revision": 3, "retired_image_item_ids": []}
+    document[types.RETIRED_STUDIO_IMAGE_ITEMS] = [str(retired)]
+    response = client.get(path)
+    assert response.json() == {"revision": 3, "retired_image_item_ids": [str(retired)]}
+    assert response.headers["cache-control"] == "private, no-store"
+    service.assert_awaited_with(
+        session, types.GetStudioDraftCommand(product_id=product_id, owner_id=owner_id)
+    )
+    service.side_effect = LookupError("Studio draft not found.")
+    assert client.get(path).status_code == 404
+
+
 def test_studio_save_keeps_json_values_and_uses_trusted_ids(api, monkeypatch):
     client, app, session, owner_id = api
     app.include_router(studio_publication.router)
