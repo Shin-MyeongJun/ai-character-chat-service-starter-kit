@@ -63,6 +63,7 @@ export type Answer = {
   retryable: boolean;
   uncertain: boolean;
   price_credit?: number | null;
+  message_id?: string;
 };
 
 export class ApiError extends Error {
