@@ -10,13 +10,13 @@ import { useUserTheme } from "@/components/user-theme";
 import { Dialog } from "@/components/account/account-ui";
 import { CreditShortageDialog } from "@/components/account/chat-settings";
 import accountStyles from "@/components/account/account.module.css";
-import { ChatImageFrame, useConversationAlbum } from "@/components/chat/chat-images";
+import { ChatBlocks } from "@/components/chat/chat-blocks";
+import { useConversationAlbum } from "@/components/chat/chat-images";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatReadingSettings, useReadingOptions } from "@/components/chat/chat-reading-settings";
 import { designCharacter, designMessages, designOpening, designTitle, previewReply, previewShortcuts, type PreviewModel, type PreviewShortcut } from "@/components/chat/chat-preview-data";
 import { useChatScroll, useChatViewport } from "@/components/chat/use-chat-viewport";
 import styles from "@/components/chat/chat.module.css";
-import { readChatText } from "@/lib/chat-text";
 import { ConversationHistorySession, type ConversationHistory } from "@/lib/chat-history";
 import { AUTH_CHANGED_KEY, readRecentChats, updateRecentChatMessage } from "@/lib/recent-chats";
 
@@ -52,28 +52,6 @@ const demoReplies = [
   "상대는 뜻밖이라는 듯 웃었다. ‘그 선택을 할 줄은 몰랐어요.’ 바로 다음 순간, 멀리서 작은 소리가 들려왔다.",
   "‘좋아요. 이번에는 당신이 정해주세요.’ 상대가 손을 내밀었다. 이야기는 아직 끝나지 않았다.",
 ];
-
-function ChatProse({ content, character = false }: { content: string; character?: boolean }) {
-  return <div className={styles.prose}>{readChatText(content, character).map((paragraph, index) =>
-    <p key={index} className={character && paragraph.every(part => !part.narration) ? styles.speechLine : undefined}>
-      {paragraph.map((part, partIndex) => <span key={partIndex} className={part.narration ? styles.narration : styles.speech}>{part.text}</span>)}
-    </p>,
-  )}</div>;
-}
-
-function ChatBlocks({ blocks, content, showImages, opening = false, character = false }: {
-  blocks?: ContentBlock[] | null;
-  content: string;
-  showImages: boolean;
-  opening?: boolean;
-  character?: boolean;
-}) {
-  const text = (value: string) => opening ? <p>{value}</p> : <ChatProse content={value} character={character} />;
-  if (blocks == null) return text(content);
-  return blocks.map((block, index) => block.type === "text"
-    ? <Fragment key={index}>{text(block.text)}</Fragment>
-    : showImages && <ChatImageFrame key={index} image={block} />);
-}
 
 function ChatContent({ id, preview, startChoice, fromAccount }: { id: string; preview: boolean; startChoice: string | null; fromAccount: boolean }) {
   const demo = isDemoWork(id) ? demoWorkById(id) : undefined;

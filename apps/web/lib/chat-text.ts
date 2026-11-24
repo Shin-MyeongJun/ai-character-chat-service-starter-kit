@@ -1,28 +1,56 @@
 export type ChatTextPart = { text: string; narration: boolean };
 
-/** Asterisks are story notation, not HTML or general Markdown. */
 export function readChatText(value: string, character = false): ChatTextPart[][] {
-  const paragraphs: ChatTextPart[][] = [[]];
+  return readChatTextBlocks([value], character)[0];
+}
+
+/** Match story notation across the reply, then return paragraphs at each original block position. */
+export function readChatTextBlocks(blocks: readonly string[], character = false): ChatTextPart[][][] {
+  const value = blocks.join("");
   const markers = [...value.matchAll(/(?<!\*)\*\*(?!\*)/gu)];
-  function append(text: string, narration: boolean) {
-    text.split(/\r?\n[ \t]*\r?\n/).forEach((line, index) => {
-      if (index > 0) paragraphs.push([]);
-      if (line) paragraphs[paragraphs.length - 1].push({ text: line, narration });
-    });
-  }
+  if (markers.length % 2 !== 0) markers.pop();
+
+  const paragraphs = value.split(/(\r?\n[ \t]*\r?\n)/);
+  const blockParagraphs: ChatTextPart[][][] = blocks.map(() => []);
+  let markerIndex = 0;
+  let blockIndex = 0;
+  let blockEnd = blocks[0]?.length ?? 0;
   let cursor = 0;
-  for (let i = 0; i + 1 < markers.length; i += 2) {
-    const start = markers[i].index;
-    const end = markers[i + 1].index;
-    append(value.slice(cursor, start), false);
-    append(value.slice(start + 2, end), true);
-    cursor = end + 2;
+
+  for (let i = 0; i < paragraphs.length; i += 2) {
+    const paragraph = paragraphs[i];
+    const paragraphEnd = cursor + paragraph.length;
+    // A closing marker still sets the style boundary when it starts a paragraph.
+    const hasNotation = markerIndex % 2 !== 0 || (markers[markerIndex]?.index ?? Infinity) < paragraphEnd;
+    let renderedParagraph: ChatTextPart[] | undefined;
+
+    while (cursor < paragraphEnd) {
+      const nextMarker = markers[markerIndex]?.index ?? Infinity;
+      if (cursor === nextMarker) {
+        cursor += 2;
+        markerIndex++;
+        continue;
+      }
+      if (cursor >= blockEnd) {
+        blockIndex++;
+        blockEnd += blocks[blockIndex].length;
+        renderedParagraph = undefined;
+        continue;
+      }
+      if (!renderedParagraph) {
+        renderedParagraph = [];
+        blockParagraphs[blockIndex].push(renderedParagraph);
+      }
+      const partEnd = Math.min(paragraphEnd, blockEnd, nextMarker);
+      const text = value.slice(cursor, partEnd);
+      const legacyNarration = character && !hasNotation && !/^\s*["“‘「『]/u.test(text);
+      renderedParagraph.push({ text, narration: legacyNarration || markerIndex % 2 !== 0 });
+      cursor = partEnd;
+    }
+    cursor = paragraphEnd + (paragraphs[i + 1]?.length ?? 0);
   }
-  append(value.slice(cursor), false);
-  return paragraphs.filter(parts => parts.length).map(parts => {
-    if (!character || parts.some(part => part.narration) || /^\s*["“‘「『]/u.test(parts[0].text)) return parts;
-    return parts.map(part => ({ ...part, narration: true }));
-  });
+
+  return blockParagraphs;
 }
 
 export function wrapChatNarration(value: string, start: number, end: number) {
