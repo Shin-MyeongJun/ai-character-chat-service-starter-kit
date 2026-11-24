@@ -2,6 +2,7 @@
 
 import { Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatDate } from "@/lib/account";
 import { findConversationProduct, getProductAlbum, type ChatImage, type ProductAlbum } from "@/lib/api";
 import styles from "./chat.module.css";
 
@@ -62,11 +63,14 @@ export function ChatAlbum({ album, onRefresh }: { album: ProductAlbum | null; on
     <ul className={styles.albumGrid}>
       {visible.map(item => <li key={item.image_item_id}>
         {item.status === "locked" ? <div className={styles.imageFrame}><span className={styles.imageFallback}><Lock size={16} aria-hidden="true" />잠김</span></div>
-          : <ChatImageFrame key={item.content_url} image={item} onError={() => {
-            if (failedUrls.current.has(item.content_url)) return;
-            failedUrls.current.add(item.content_url);
-            onRefresh();
-          }} />}
+          : <>
+            <ChatImageFrame key={item.content_url} image={item} onError={() => {
+              if (failedUrls.current.has(item.content_url)) return;
+              failedUrls.current.add(item.content_url);
+              onRefresh();
+            }} />
+            <div className={styles.albumUnlockDate}>해금 <time dateTime={item.unlocked_at}>{formatDate(item.unlocked_at)}</time></div>
+          </>}
       </li>)}
     </ul>
   </section>;

@@ -115,4 +115,5 @@
 .imageFallback { display: flex; position: absolute; inset: 0; align-items: center; justify-content: center; gap: 6px; padding: 8px; color: var(--secondary); text-align: center; overflow: auto; font-size: 13px; }
 .album { display: grid; gap: 12px; }
 .albumGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0; margin: 0; list-style: none; }
+.albumUnlockDate { margin-block-start: 4px; color: var(--secondary); font-size: 12px; overflow-wrap: anywhere; }
 .message > .imageFrame { margin-block: 12px; }

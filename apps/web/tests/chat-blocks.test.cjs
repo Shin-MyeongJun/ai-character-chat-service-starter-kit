@@ -16,10 +16,13 @@ function load(path, imports = {}) {
   return exports;
 }
 
-const styles = { prose: "prose", narration: "narration", speech: "speech", speechLine: "speechLine", imageFrame: "imageFrame" };
+const styles = { prose: "prose", narration: "narration", speech: "speech", speechLine: "speechLine", imageFrame: "imageFrame", albumUnlockDate: "albumUnlockDate" };
+const account = load("lib/account.ts", { "./api": {} });
+const chatImages = load("components/chat/chat-images.tsx", { "@/lib/account": account, "@/lib/api": {}, "./chat.module.css": styles });
+const { ChatAlbum } = chatImages;
 const { ChatBlocks } = load("components/chat/chat-blocks.tsx", {
   "@/lib/chat-text": load("lib/chat-text.ts"),
-  "./chat-images": load("components/chat/chat-images.tsx", { "@/lib/api": {}, "./chat.module.css": styles }),
+  "./chat-images": chatImages,
   "./chat.module.css": styles,
 });
 
@@ -30,6 +33,27 @@ const image = {
 const text = value => ({ type: "text", text: value });
 const render = props => renderToStaticMarkup(createElement(ChatBlocks, { character: true, showImages: true, ...props }));
 const spans = html => Array.from(html.matchAll(/<span class="(narration|speech)">(.*?)<\/span>/gs), match => match.slice(1));
+
+test("album cards show the Seoul unlock date for an unlocked item even after its image is replaced", () => {
+  const unlockedAt = "2026-11-23T16:05:00Z";
+  const original = { ...image, status: "unlocked", unlocked_at: unlockedAt };
+  const replacement = { ...original, file_version_id: "new-version", content_url: `${original.content_url}/new-version` };
+  const locked = { image_item_id: "locked-scene", status: "locked" };
+  const renderAlbum = item => renderToStaticMarkup(createElement(ChatAlbum, {
+    album: { product_id: "work", product_snapshot_id: "snapshot", available: true, items: [item, locked] },
+    onRefresh() {},
+  }));
+
+  assert.equal(account.formatDate(unlockedAt), "11. 24. 01:05");
+  for (const item of [original, replacement]) {
+    const cards = Array.from(renderAlbum(item).matchAll(/<li>(.*?)<\/li>/gs), match => match[1]);
+    assert.equal(cards.length, 2);
+    assert.ok(cards[0].includes(`src="/backend${item.content_url}"`));
+    assert.ok(cards[0].includes(`</figure><div class="albumUnlockDate">해금 <time dateTime="${unlockedAt}">11. 24. 01:05</time></div>`));
+    assert.match(cards[1], /잠김/);
+    assert.doesNotMatch(cards[1], /<time\b|<img\b|해금/);
+  }
+});
 
 test("narration crosses an image without changing text styles when the image is hidden", () => {
   for (const separator of ["", "\r\n\r\n"]) {
