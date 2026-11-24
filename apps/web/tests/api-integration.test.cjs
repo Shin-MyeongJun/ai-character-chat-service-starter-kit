@@ -424,9 +424,11 @@ test("UUID route aliases still accept canonical message IDs and checkpoints", as
   }
 });
 
-test("chat album resolves the authorized room across owned-conversation pages", async t => {
+test("chat album resolves UUID route aliases across owned-conversation pages", async t => {
   const { api } = setup(t);
   const controller = new AbortController();
+  const canonical = "abcdef12-3456-7890-abcd-ef1234567890";
+  const different = "abcdef12-3456-7890-abcd-ef1234567891";
   const calls = [];
   t.mock.method(globalThis, "fetch", async (path, options) => {
     assert.equal(options.signal, controller.signal);
@@ -436,15 +438,22 @@ test("chat album resolves the authorized room across owned-conversation pages", 
       return json({ product_id: "work", product_snapshot_id: "latest", available: true,
         items: [{ image_item_id: "locked", status: "locked" }] });
     }
+    assert.equal(url.pathname, "/backend/conversations/mine");
     return json(url.searchParams.has("cursor_id")
-      ? { items: [{ id: "room", product_id: "work" }] }
-      : { items: [{ id: "different", product_id: "other" }],
-        next_cursor_created_at: "2026-11-01", next_cursor_id: "different" });
+      ? { items: [{ id: canonical, product_id: "work" }], next_cursor_created_at: null, next_cursor_id: null }
+      : { items: [{ id: different, product_id: "other" }],
+        next_cursor_created_at: "2026-11-01", next_cursor_id: different });
   });
-  const productId = await api.findConversationProduct("room", controller.signal);
+  const productId = await api.findConversationProduct(canonical.replaceAll("-", ""), controller.signal);
+  assert.equal(productId, "work");
   const album = await api.getProductAlbum(productId, controller.signal);
   assert.equal(calls[1].searchParams.get("cursor_created_at"), "2026-11-01");
-  assert.equal(calls[1].searchParams.get("cursor_id"), "different");
+  assert.equal(calls[1].searchParams.get("cursor_id"), different);
   assert.equal(calls[2].pathname, "/backend/products/work/album");
   assert.deepEqual(album.items, [{ image_item_id: "locked", status: "locked" }]);
+
+  for (const id of [canonical, canonical.toUpperCase(), `{${canonical}}`, `urn:uuid:${canonical}`]) {
+    assert.equal(await api.findConversationProduct(id, controller.signal), "work");
+  }
+  assert.equal(await api.findConversationProduct("abcdef1234567890abcdef1234567892", controller.signal), null);
 });

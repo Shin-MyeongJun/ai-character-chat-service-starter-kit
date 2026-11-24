@@ -1,3 +1,4 @@
+import { conversationKey } from "./conversation-id";
 import { AUTH_CHANGED_KEY, setRecentChatOwner } from "./recent-chats";
 
 export type AuthUser = { id: string; email: string; email_verified: boolean };
@@ -184,6 +185,7 @@ export const listCatalogTags = () => request<{ id: string; name: string }[]>("/p
 export const listOwnedConversations = (cursor?: { createdAt: string; id: string }) =>
   request<CursorPage<OwnedConversation>>(`/conversations/mine?${pageQuery(cursor)}`);
 export async function findConversationProduct(id: string, signal: AbortSignal): Promise<string | null> {
+  const key = conversationKey(id);
   const seen = new Set<string>();
   let cursor: { createdAt: string; id: string } | undefined;
   do {
@@ -191,7 +193,7 @@ export async function findConversationProduct(id: string, signal: AbortSignal): 
     if (seen.has(query)) throw new Error("Conversation cursor did not advance.");
     seen.add(query);
     const page = await request<CursorPage<OwnedConversation>>(`/conversations/mine?${query}`, { signal });
-    const room = page.items.find(item => item.id === id.toLowerCase());
+    const room = page.items.find(item => conversationKey(item.id) === key);
     if (room) return room.product_id;
     const { next_cursor_created_at: createdAt, next_cursor_id: nextId } = page;
     cursor = createdAt && nextId ? { createdAt, id: nextId } : undefined;

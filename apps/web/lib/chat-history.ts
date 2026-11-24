@@ -1,4 +1,5 @@
 import { listMessages, type ChatMessage } from "./api";
+import { conversationKey } from "./conversation-id";
 
 export type ConversationHistory = {
   conversationId: string;
@@ -8,9 +9,6 @@ export type ConversationHistory = {
 };
 
 class HistoryChanged extends Error {}
-
-// Route UUIDs can use a different textual form from the canonical API value.
-const conversationKey = (id: string) => id.toLowerCase().replace(/^urn:uuid:/, "").replace(/[{}-]/g, "");
 
 function mergeMessages(previous: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
   const messages = new Map(previous.map(message => [message.id, message]));
