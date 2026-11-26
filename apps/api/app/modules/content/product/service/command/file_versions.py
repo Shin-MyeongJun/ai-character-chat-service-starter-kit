@@ -173,8 +173,8 @@ async def _complete_file_upload(
 async def _lock_ready_file_version(
     session: AsyncSession, command: Types.GetProductFileVersionCommand
 ) -> FileStorageInfo:
-    info = await _get_file_version(
-        session, command.product_id, command.file_version_id, lock=True
+    info = FileVersionsPersistenceMapper.file_entity_to_storage_info(
+        await FileVersionsRepository.lock_file_version_for_attachment(session, command)
     )
     if info is None or info.file.state != State.READY:
         raise LookupError("File version not found.")

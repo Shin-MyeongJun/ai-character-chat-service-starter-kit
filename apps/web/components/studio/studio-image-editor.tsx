@@ -5,6 +5,7 @@ import {
   CHAT_IMAGE_TYPES, splitOpeningParagraphs, validateOpeningPlacement,
   type ChatImageItem, type ChatImageKind, type OpeningImagePlacement,
 } from "@/lib/studio-chat-images";
+import { useStudioScope } from "./studio-session";
 import { readImage } from "@/lib/studio-assets";
 import { ChipEditor, StudioButton, StudioField } from "./studio-controls";
 import styles from "./studio.module.css";
@@ -64,18 +65,19 @@ function ImageFileButton({ label, imageLabel, disabled, onFile }: {
 export function ImageThumbnail({ image }: { image: StudioImage }) {
   const [local, setLocal] = useState<{ id: string; url: string }>();
   const [failed, setFailed] = useState<string>();
+  const scope = useStudioScope();
   const id = image.previewBlobId;
   useEffect(() => {
-    if (!id) return;
+    if (!id || !scope) return;
     let active = true;
     let url: string | undefined;
-    void readImage(id).then(blob => {
+    void readImage(scope, id).then(blob => {
       if (!active || !blob) return;
       url = URL.createObjectURL(blob);
       setLocal({ id, url });
     }).catch(() => { /* The server thumbnail or alt remains available. */ });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [id]);
+  }, [id, scope]);
   const src = local && local.id === id ? local.url : image.previewUrl;
   return src && failed !== src
     ? <img className={styles.assetImage} src={src} alt={image.item.alt} onError={() => setFailed(src)} />

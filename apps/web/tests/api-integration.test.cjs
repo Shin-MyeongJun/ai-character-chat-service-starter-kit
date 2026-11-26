@@ -29,7 +29,7 @@ function setup(t) {
     Object.defineProperty(globalThis, key, { configurable: true, value });
   }
   t.after(() => { for (const [key, descriptor] of originals) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; } });
-  return { api: load("api.ts"), history: load("chat-history.ts"), recent: load("recent-chats.ts"), studio: load("studio-server.ts"), workspace: load("studio-workspace.ts"), project: load("studio-project.ts"), data, newClient: () => { cache.clear(); return load("api.ts"); } };
+  return { api: load("api.ts"), history: load("chat-history.ts"), recent: load("recent-chats.ts"), studio: load("studio-server.ts"), scope: new (load("studio-scope.ts").StudioScope)("owner", ""), load, workspace: load("studio-workspace.ts"), project: load("studio-project.ts"), data, newClient: () => { cache.clear(); return load("api.ts"); } };
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
 const expired = () => json({ error: { code: "invalid_token" } }, 401);
@@ -156,7 +156,7 @@ test("recent conversation previews stay within their owner and legacy real rows 
 });
 
 test("lost studio save response resumes by reading the same server document", async t => {
-  const { studio, workspace } = setup(t);
+  const { studio, scope, workspace } = setup(t);
   const work = { id: "local-work", project: workspace.blankProject() };
   let stored = null, puts = 0;
   t.mock.method(globalThis, "fetch", async (url, options) => {
@@ -171,13 +171,13 @@ test("lost studio save response resumes by reading the same server document", as
     }
     throw new Error(`Unexpected ${url}`);
   });
-  await assert.rejects(studio.saveServerWork(work), /response lost/);
-  assert.deepEqual(await studio.saveServerWork(work), { productId: stored.product_id, revision: 1, project: work.project });
+  await assert.rejects(studio.saveServerWork(scope, work), /response lost/);
+  assert.deepEqual(await studio.saveServerWork(scope, work), { productId: stored.product_id, revision: 1, project: work.project });
   assert.equal(puts, 1);
 });
 
 test("studio save refuses to overwrite a different device's edits", async t => {
-  const { studio, workspace } = setup(t);
+  const { studio, scope, workspace } = setup(t);
   const work = { id: "local-work", project: workspace.blankProject() };
   let stored = null, puts = 0;
   t.mock.method(globalThis, "fetch", async (url, options) => {
@@ -191,15 +191,15 @@ test("studio save refuses to overwrite a different device's edits", async t => {
     }
     throw new Error(`Unexpected ${url}`);
   });
-  await studio.saveServerWork(work);
+  await studio.saveServerWork(scope, work);
   stored.document.work.title = "Edited elsewhere";
   stored.revision = 2;
-  await assert.rejects(studio.saveServerWork({ ...work, project: { ...work.project, work: { ...work.project.work, title: "Local edit" } } }), /다른 기기/);
+  await assert.rejects(studio.saveServerWork(scope, { ...work, project: { ...work.project, work: { ...work.project.work, title: "Local edit" } } }), /다른 기기/);
   assert.equal(puts, 1);
 });
 
 test("restored studio copy detaches browser-only source links and saves without duplicating", async t => {
-  const { studio, project } = setup(t);
+  const { studio, scope, project } = setup(t);
   const remoteProject = project.sampleProject();
   remoteProject.characters[0].sourceId = "browser-only-character";
   remoteProject.lorebooks[0].sourceId = "browser-only-lore";
@@ -214,11 +214,11 @@ test("restored studio copy detaches browser-only source links and saves without 
     if (options.method === "PUT") { puts++; throw new Error("Unexpected write"); }
     throw new Error(`Unexpected ${url}`);
   });
-  const [restored] = await studio.loadServerWorks([]);
+  const [restored] = await studio.loadServerWorks(scope, []);
   assert.equal(restored.id, "original-work");
   assert.equal(restored.project.characters[0].sourceId, undefined);
   assert.equal(restored.project.lorebooks[0].sourceId, undefined);
-  assert.deepEqual(await studio.saveServerWork(restored), { productId, revision: 3, project: restored.project });
+  assert.deepEqual(await studio.saveServerWork(scope, restored), { productId, revision: 3, project: restored.project });
   assert.equal(puts, 0);
 });
 
@@ -456,4 +456,105 @@ test("chat album resolves UUID route aliases across owned-conversation pages", a
     assert.equal(await api.findConversationProduct(id, controller.signal), "work");
   }
   assert.equal(await api.findConversationProduct("abcdef1234567890abcdef1234567892", controller.signal), null);
+});
+
+test("legacy workspace restores only the verified owner's base, without adopting shared edits, trash, sources or upload metadata", t => {
+  const { load, data, workspace, scope } = setup(t);
+  const { StudioScope } = load("studio-scope.ts");
+  const { readLocalWorkspace } = load("studio-local-workspace.ts");
+  const project = workspace.blankProject();
+  project.work.title = "owner's confirmed copy";
+  const key = workspace.WORKSPACE_STORAGE_KEY;
+  const legacy = { ...workspace.emptyWorkspace(), works: [
+    { id: "owned", project },
+    { id: "unconfirmed", project: { ...project, work: { ...project.work, worldRules: "unknown edit" } } },
+  ] };
+  legacy.trash.push({ kind: "work", id: "t", data: legacy.works[1], deletedAt: "2026-10-01", label: "unknown" });
+  data.set(key, JSON.stringify(legacy));
+  data.set(key + "-unreadable-backup-123", "private unreadable");
+  data.set("chat-kit-studio-draft-v2", JSON.stringify(project));
+  data.set("chat-kit-studio-draft-v1", "[]");
+  for (const id of ["owned", "unconfirmed"]) {
+    data.set("chat-kit-studio-server-v1:owner:" + id, JSON.stringify({ productId: id, revision: 1, base: JSON.stringify(project) }));
+  }
+  const before = new Map(data);
+  assert.deepEqual(readLocalWorkspace(scope).workspace, { ...workspace.emptyWorkspace(), works: [legacy.works[0]] });
+  for (const owner of [null, "other"]) {
+    assert.deepEqual(readLocalWorkspace(new StudioScope(owner, "")).workspace, workspace.emptyWorkspace());
+  }
+  assert.deepEqual(data, before);
+  data.set(scope.workspaceKey, "unreadable scoped document");
+  assert.deepEqual(readLocalWorkspace(scope), { workspace: null, raw: "unreadable scoped document" });
+});
+
+test("auth switch invalidates a delayed identity check and a Studio PUT still waiting for CSRF", async t => {
+  const { load, scope, data } = setup(t);
+  const auth = load("auth-boundary.ts");
+  const check = deferred(), csrf = deferred(), started = deferred();
+  const called = [];
+  t.mock.method(globalThis, "fetch", async url => {
+    called.push(url);
+    if (url.endsWith("/auth/me")) return check.promise;
+    if (url.endsWith("/auth/csrf")) { started.resolve(); return csrf.promise; }
+    assert.fail("stale write sent under new credentials");
+  });
+  const restore = load("studio-scope.ts").resolveStudioScope("");
+  const save = scope.request("/products/example/studio-draft", { method: "PUT", body: "{}" });
+  await started.promise;
+  data.set(auth.AUTH_CHANGED_KEY, "new-session");
+  check.resolve(json({ id: "owner" }));
+  csrf.resolve(json({ csrf_token: "csrf" }));
+  await assert.rejects(restore, /계정이 변경/);
+  await assert.rejects(save, /계정이 변경/);
+  assert.deepEqual(called.sort(), ["/backend/auth/csrf", "/backend/auth/me"]);
+});
+
+test("an old Studio import cannot record a comparison base after its response body completes", async t => {
+  const { studio, scope, project, data } = setup(t);
+  const reading = deferred(), body = deferred();
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.endsWith("/auth/me")) return json({ id: "owner" });
+    assert.match(url, /product-A\/studio-draft$/);
+    return { ok: true, status: 200, json: () => { reading.resolve(); return body.promise; } };
+  });
+  const imported = studio.loadServerWork(scope, "product-A");
+  await reading.promise;
+  data.set("moseori_auth_changed", "B-session");
+  body.resolve({ revision: 1, product_id: "product-A", document: project.sampleProject() });
+  await assert.rejects(imported, /계정이 변경/);
+  assert.deepEqual([...data.keys()], ["moseori_auth_changed"]);
+});
+
+test("readImage rejects an already fetched A Blob when its IndexedDB completion arrives under B", async t => {
+  const { scope, load, data } = setup(t);
+  const started = deferred();
+  const read = { result: new Blob(["A-private-bytes"]) };
+  const db = {
+    close() {},
+    transaction: () => ({ objectStore: () => ({ get(key) {
+      assert.deepEqual(key, ["user:owner", "same-id"]);
+      started.resolve();
+      return read;
+    } }) }),
+  };
+  const original = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+  Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: { open() {
+    const open = { result: db };
+    queueMicrotask(() => open.onsuccess());
+    return open;
+  } } });
+  t.after(() => original ? Object.defineProperty(globalThis, "indexedDB", original) : delete globalThis.indexedDB);
+  const image = load("studio-assets.ts").readImage(scope, "same-id");
+  await started.promise;
+  data.set("moseori_auth_changed", "B-session");
+  read.onsuccess();
+  await assert.rejects(image, /계정이 변경/);
+});
+
+test("a failed cross-tab invalidation cannot start a credential change", async t => {
+  const { api } = setup(t);
+  t.mock.method(localStorage, "setItem", () => { throw new Error("storage full"); });
+  const fetch = t.mock.method(globalThis, "fetch", () => assert.fail("credentials changed before invalidation"));
+  await assert.rejects(api.login("b@example.test", "password"), /storage full/);
+  assert.equal(fetch.mock.callCount(), 0);
 });

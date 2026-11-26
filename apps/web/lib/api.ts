@@ -1,5 +1,6 @@
 import { conversationKey } from "./conversation-id";
-import { AUTH_CHANGED_KEY, setRecentChatOwner } from "./recent-chats";
+import { announceAuthChange, authEpoch, changeAuth } from "./auth-boundary";
+import { setRecentChatOwner } from "./recent-chats";
 
 export type AuthUser = { id: string; email: string; email_verified: boolean };
 export type StartOption = { id: string; title: string };
@@ -89,11 +90,12 @@ export async function getCsrf(): Promise<string> {
   }
 }
 
-async function send<T>(path: string, options: RequestInit = {}, recoverCsrf = true): Promise<T> {
+async function send<T>(path: string, options: RequestInit = {}, recoverCsrf = true, guard?: () => void): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase();
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (!["GET", "HEAD"].includes(method)) headers.set("X-CSRF-Token", await getCsrf());
+  guard?.();
   const response = await fetch(`/backend${path}`, { ...options, headers, credentials: "include", cache: "no-store" });
   if (!response.ok) {
     let detail: unknown;
@@ -109,7 +111,7 @@ async function send<T>(path: string, options: RequestInit = {}, recoverCsrf = tr
     if (code === "csrf_failed") {
       // The server rejected this request before executing the mutation.
       csrfToken = null;
-      if (recoverCsrf) return send<T>(path, options, false);
+      if (recoverCsrf) return send<T>(path, options, false, guard);
     }
     throw new ApiError(response.status, code, message);
   }
@@ -149,20 +151,21 @@ async function refreshSession(): Promise<void> {
   finally { refreshPromise = null; }
 }
 
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  try { return await send<T>(path, options); }
+export async function request<T>(path: string, options: RequestInit = {}, guard?: () => void): Promise<T> {
+  const epoch = authEpoch();
+  try { return await send<T>(path, options, true, guard); }
   catch (cause) {
     // Credential errors and invalid/revoked sessions are not access expiry.
     if (cause instanceof ApiError && cause.status === 401 && cause.code === "invalid_token" && (!path.startsWith("/auth/") || path === "/auth/me")) {
       try {
         await refreshSession();
-        return await send<T>(path, options);
+        return await send<T>(path, options, true, guard);
       } catch (refreshError) {
-        setRecentChatOwner(null);
+        if (refreshError instanceof ApiError && refreshError.status === 401) observeOwner(epoch, null);
         throw refreshError;
       }
     }
-    if (cause instanceof ApiError && cause.status === 401) setRecentChatOwner(null);
+    if (cause instanceof ApiError && cause.status === 401 && !path.startsWith("/auth/")) observeOwner(epoch, null);
     throw cause;
   }
 }
@@ -229,17 +232,32 @@ export const createMessage = (id: string, content: string, requestKey: string) =
 export const generateAnswer = (id: string, message: ChatMessage, productCharacterId: string, requestKey: string, signal?: AbortSignal, manualEntryIds: string[] = []) =>
   request<Answer>(`/conversations/${encodeURIComponent(id)}/answers`, { method: "POST", signal, body: JSON.stringify({ request_key: requestKey, input_message_id: message.id, expected_revision: message.revision, product_character_id: productCharacterId, manual_entry_ids: manualEntryIds }) });
 export async function login(email: string, password: string): Promise<AuthUser> {
-  const user = await request<AuthUser>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-  localStorage.removeItem(REFRESH_UNCERTAIN_KEY);
-  setRecentChatOwner(user.id);
-  localStorage.setItem(AUTH_CHANGED_KEY, crypto.randomUUID());
-  window.dispatchEvent(new Event(AUTH_CHANGED_KEY));
-  return user;
+  return changeAuth(async () => {
+    const user = await request<AuthUser>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    localStorage.removeItem(REFRESH_UNCERTAIN_KEY);
+    setRecentChatOwner(user.id);
+    return user;
+  });
 }
+
+let observed: { epoch: string; owner: string | null } | undefined;
+function observeOwner(epoch: string, owner: string | null) {
+  if (authEpoch() !== epoch || epoch.startsWith("pending:")) return;
+  if (observed?.epoch === epoch && observed.owner !== owner) epoch = announceAuthChange();
+  observed = { epoch, owner };
+  setRecentChatOwner(owner);
+}
+
 export async function getMe(): Promise<AuthUser> {
-  const user = await request<AuthUser>("/auth/me");
-  setRecentChatOwner(user.id);
-  return user;
+  const epoch = authEpoch();
+  try {
+    const user = await request<AuthUser>("/auth/me");
+    observeOwner(epoch, user.id);
+    return user;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 401) observeOwner(epoch, null);
+    throw cause;
+  }
 }
 
 export const register = (email: string, password: string) =>
@@ -253,8 +271,8 @@ export const requestPasswordReset = (email: string) =>
 export const resetPassword = (token: string, password: string) =>
   request<void>("/auth/password/reset", { method: "POST", body: JSON.stringify({ token, password }) });
 export async function logout(): Promise<void> {
-  await request<void>("/auth/logout", { method: "POST" });
-  setRecentChatOwner(null);
-  localStorage.setItem(AUTH_CHANGED_KEY, crypto.randomUUID());
-  window.dispatchEvent(new Event(AUTH_CHANGED_KEY));
+  return changeAuth(async () => {
+    await request<void>("/auth/logout", { method: "POST" });
+    setRecentChatOwner(null);
+  });
 }

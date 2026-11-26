@@ -1,3 +1,5 @@
+import type { StudioScope } from "./studio-scope";
+
 const DATABASE = "chat-kit-studio-assets";
 const STORE = "images";
 function openDatabase(): Promise<IDBDatabase> {
@@ -9,25 +11,32 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onblocked = () => reject(new Error("Image storage is blocked"));
   });
 }
-export async function saveImages(images: { id: string; file: File }[]) {
+export async function saveImages(scope: StudioScope, images: { id: string; file: File }[]) {
+  scope.check();
   const database = await openDatabase();
   try {
+    scope.check();
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(STORE, "readwrite");
-      for (const image of images) transaction.objectStore(STORE).put(image.file, image.id);
+      for (const image of images) transaction.objectStore(STORE).put(image.file, [scope.namespace, image.id]);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
     });
+    scope.check();
   } finally { database.close(); }
 }
-export async function readImage(id: string): Promise<Blob | null> {
+export async function readImage(scope: StudioScope, id: string): Promise<Blob | null> {
+  scope.check();
   const database = await openDatabase();
   try {
-    return await new Promise((resolve, reject) => {
-      const request = database.transaction(STORE, "readonly").objectStore(STORE).get(id);
+    scope.check();
+    const blob = await new Promise<Blob | null>((resolve, reject) => {
+      const request = database.transaction(STORE, "readonly").objectStore(STORE).get([scope.namespace, id]);
       request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : null);
       request.onerror = () => reject(request.error);
     });
+    scope.check();
+    return blob;
   } finally { database.close(); }
 }

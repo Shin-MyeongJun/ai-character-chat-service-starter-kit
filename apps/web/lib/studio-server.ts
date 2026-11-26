@@ -1,6 +1,7 @@
-import { ApiError, getMe, request } from "./api";
+import { ApiError } from "./api";
 import { readStudioProject, type StudioProject } from "./studio-project";
 import type { WorkspaceWork } from "./studio-workspace";
+import type { StudioScope } from "./studio-scope";
 import { readImage } from "./studio-assets";
 import { resolveStudioImageUploads, studioDocument } from "./studio-product-images";
 
@@ -44,36 +45,38 @@ function readLink(ownerId: string, workId: string): Link | null {
   } catch { return null; }
 }
 
-export async function getStudioProductId(workId: string): Promise<string | null> {
-  const owner = await getMe();
-  return readLink(owner.id, workId)?.productId ?? null;
+/** The old shared row may contain edits or uploads from any account. Only its ID
+ * selects a candidate. Restore content exclusively from the owner's saved base. */
+export function legacyServerCopy(owner: string, work: WorkspaceWork): WorkspaceWork | null {
+  const base = readLink(owner, work.id)?.base;
+  const project = typeof base === "string" ? readStudioProject(base) : null;
+  if (!project || !sameStudioProject(project, work.project)) return null;
+  return { id: work.id, project };
 }
 
-export async function getRetiredStudioImageIds(work: WorkspaceWork): Promise<Set<string>> {
+export async function getStudioProductId(scope: StudioScope, workId: string): Promise<string | null> {
+  scope.check();
+  return scope.owner ? readLink(scope.owner, workId)?.productId ?? null : null;
+}
+
+export async function getRetiredStudioImageIds(scope: StudioScope, work: WorkspaceWork): Promise<Set<string>> {
   const workId = work.id;
   // Local-only works support offline undo. A link is written before the first draft PUT,
   // so a missing acknowledgement (including revision: null) still needs a server check.
   const serverId = workId.startsWith("server:") ? workId.slice("server:".length) : undefined;
-  let linked = false;
-  for (let index = 0; index < localStorage.length; index++) {
-    const name = localStorage.key(index);
-    if (name?.startsWith(linkPrefix) && name.slice(name.indexOf(":", linkPrefix.length) + 1) === workId) {
-      linked = true;
-      break;
-    }
-  }
-  if (!serverId && !linked) return new Set();
-  const owner = await getMe();
-  const link = readLink(owner.id, workId);
+  scope.check();
+  const link = scope.owner ? readLink(scope.owner, workId) : null;
+  if (!serverId && !link) return new Set();
+  const owner = await scope.confirmOwner();
   const productId = link?.productId ?? serverId;
   if (!productId) throw new Error("이 작품을 저장한 계정으로 로그인해 이미지 복구 여부를 확인해 주세요.");
   const path = `/products/${encodeURIComponent(productId)}/studio-draft`;
   try {
-    const result = await request<{ revision: number; retired_image_item_ids: string[] }>(`${path}/image-retirements`);
+    const result = await scope.request<{ revision: number; retired_image_item_ids: string[] }>(`${path}/image-retirements`);
     if (link && result.revision !== link.revision) {
       // A lost PUT response can leave the link behind the already-saved deletion.
       // Advance the base only for the exact pre-restore document, as on draft import.
-      const draft = await request<StudioDraft>(path);
+      const draft = await scope.request<StudioDraft>(path);
       if (draft.revision !== result.revision) throw new Error("확인 중에 서버 초안이 바뀌었어요. 다시 복구해 주세요.");
       const project = readStudioProject(JSON.stringify(draft.document));
       if (project && sameStudioProject(work.project, project)) {
@@ -84,15 +87,15 @@ export async function getRetiredStudioImageIds(work: WorkspaceWork): Promise<Set
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 404 && link?.revision === null) {
       // A reserved product ID may never have reached the server.
-      try { await request<StudioDraft>(path); }
+      try { await scope.request<StudioDraft>(path); }
       catch (error) { if (error instanceof ApiError && error.status === 404) return new Set(); throw error; }
     }
     throw cause;
   }
 }
 
-async function saveDocument(work: WorkspaceWork): Promise<SavedStudioWork> {
-  const owner = await getMe();
+async function saveDocument(scope: StudioScope, work: WorkspaceWork): Promise<SavedStudioWork> {
+  const owner = await scope.confirmOwner();
   const linkKey = key(owner.id, work.id);
   let link = readLink(owner.id, work.id);
   if (!link) {
@@ -103,13 +106,14 @@ async function saveDocument(work: WorkspaceWork): Promise<SavedStudioWork> {
   const path = "/products/" + productId + "/studio-draft";
 
   async function put(project: StudioProject, revision: number | null): Promise<StudioDraft> {
-    return request<StudioDraft>(path, {
+    return scope.request<StudioDraft>(path, {
       method: "PUT",
       body: JSON.stringify({ expected_revision: revision, document: { ...project, clientWorkId: work.id } }),
     });
   }
 
   function acknowledge(draft: StudioDraft, project: StudioProject): SavedStudioWork {
+    scope.check();
     const saved = readStudioProject(JSON.stringify(draft.document));
     if (!saved) throw new Error("서버 초안의 형식을 읽을 수 없어요.");
     localStorage.setItem(linkKey, JSON.stringify({ productId, revision: draft.revision, base: serialized(saved) }));
@@ -117,7 +121,7 @@ async function saveDocument(work: WorkspaceWork): Promise<SavedStudioWork> {
   }
 
   let remote: StudioDraft | null;
-  try { remote = await request<StudioDraft>(path); }
+  try { remote = await scope.request<StudioDraft>(path); }
   catch (cause) {
     if (!(cause instanceof ApiError && cause.status === 404 && link.revision === null)) throw cause;
     remote = null;
@@ -136,7 +140,7 @@ async function saveDocument(work: WorkspaceWork): Promise<SavedStudioWork> {
     }
   }
 
-  const project = await resolveStudioImageUploads(owner.id, productId, work.project);
+  const project = await resolveStudioImageUploads(scope, productId, work.project);
   if (remote) {
     const remoteProject = readStudioProject(JSON.stringify(remote.document));
     if (!remoteProject) throw new Error("서버 초안의 형식을 읽을 수 없어요.");
@@ -153,13 +157,13 @@ type MediaLink = { requestId: string; mediaId?: string };
  * Upload receipts are owner/product/character/asset/usage scoped and stored before I/O.
  * Failed final saves leave confirmed uploads reusable; existing snapshots never change.
  */
-export async function saveServerWork(work: WorkspaceWork, onSaved?: OnDraftSaved): Promise<SavedStudioWork> {
-  const saved = await saveDocument(work);
+export async function saveServerWork(scope: StudioScope, work: WorkspaceWork, onSaved?: OnDraftSaved): Promise<SavedStudioWork> {
+  const saved = await saveDocument(scope, work);
   onSaved?.(work, saved);
   if (!work.project.characters.some(row => row.assets.length)) return saved;
-  const owner = await getMe();
-  const remote = await request<StudioDraft>(`/products/${saved.productId}/studio-draft`);
-  const prepared = await request<{characters: Record<string, string>}>(`/products/${saved.productId}/studio-components`, {method: "POST", body: JSON.stringify({expected_revision: saved.revision})});
+  const owner = await scope.confirmOwner();
+  const remote = await scope.request<StudioDraft>(`/products/${saved.productId}/studio-draft`);
+  const prepared = await scope.request<{characters: Record<string, string>}>(`/products/${saved.productId}/studio-components`, {method: "POST", body: JSON.stringify({expected_revision: saved.revision})});
   const project: StudioProject = structuredClone(saved.project);
   let uploaded = 0;
   try {
@@ -173,9 +177,9 @@ export async function saveServerWork(work: WorkspaceWork, onSaved?: OnDraftSaved
         const link: MediaLink = JSON.parse(localStorage.getItem(storageKey) ?? "null") ?? {requestId: crypto.randomUUID()};
         localStorage.setItem(storageKey, JSON.stringify(link));
         if (!link.mediaId) {
-          const file = await readImage(asset.id);
+          const file = await readImage(scope, asset.id);
           if (!file) throw new Error(`${asset.name}: 이 브라우저에 이미지 원본이 없어요. 다시 등록해 주세요.`);
-          const result = await request<{media_id: string}>(`/characters/${characterId}/media/uploads`, {method: "POST", body: file, headers: {"Content-Type": file.type, "Idempotency-Key": link.requestId, "X-Filename": encodeURIComponent(asset.name), "X-Media-Purpose": `studio:${asset.id}:${asset.usage}`}});
+          const result = await scope.request<{media_id: string}>(`/characters/${characterId}/media/uploads`, {method: "POST", body: file, headers: {"Content-Type": file.type, "Idempotency-Key": link.requestId, "X-Filename": encodeURIComponent(asset.name), "X-Media-Purpose": `studio:${asset.id}:${asset.usage}`}});
           link.mediaId = result.media_id;
           localStorage.setItem(storageKey, JSON.stringify(link));
           uploaded++;
@@ -184,7 +188,7 @@ export async function saveServerWork(work: WorkspaceWork, onSaved?: OnDraftSaved
       }
     }
     // Use the captured revision, not an automatic merge with another device's edit.
-    const result = await request<StudioDraft>(`/products/${saved.productId}/studio-draft`, {method: "PUT", body: JSON.stringify({expected_revision: saved.revision, document: {...project, clientWorkId: work.id}})});
+    const result = await scope.request<StudioDraft>(`/products/${saved.productId}/studio-draft`, {method: "PUT", body: JSON.stringify({expected_revision: saved.revision, document: {...project, clientWorkId: work.id}})});
     localStorage.setItem(key(owner.id, work.id), JSON.stringify({productId: saved.productId, revision: result.revision, base: serialized(project)}));
     const linked = { productId: saved.productId, revision: result.revision, project };
     onSaved?.(work, linked);
@@ -194,14 +198,14 @@ export async function saveServerWork(work: WorkspaceWork, onSaved?: OnDraftSaved
   }
 }
 
-export async function loadServerWorks(localWorks: WorkspaceWork[]): Promise<WorkspaceWork[]> {
-  const owner = await getMe();
+export async function loadServerWorks(scope: StudioScope, localWorks: WorkspaceWork[]): Promise<WorkspaceWork[]> {
+  const owner = await scope.confirmOwner();
   const works: WorkspaceWork[] = [];
   for (let offset = 0; ; offset += 100) {
-    const page = await request<Product[]>(`/products/mine?offset=${offset}&limit=100`);
+    const page = await scope.request<Product[]>(`/products/mine?offset=${offset}&limit=100`);
     for (const item of page) {
       let draft: StudioDraft;
-      try { draft = await request<StudioDraft>(`/products/${item.id}/studio-draft`); }
+      try { draft = await scope.request<StudioDraft>(`/products/${item.id}/studio-draft`); }
       catch (cause) { if (cause instanceof ApiError && cause.status === 404) continue; throw cause; }
       const project = readStudioProject(JSON.stringify(draft.document));
       if (!project) continue;
@@ -223,11 +227,11 @@ export async function loadServerWorks(localWorks: WorkspaceWork[]): Promise<Work
   return works;
 }
 
-export const listAvailableModels = () => request<AvailableModel[]>("/models/available");
+export const listAvailableModels = (scope: StudioScope) => scope.request<AvailableModel[]>("/models/available");
 
-export async function loadServerWork(productId: string): Promise<WorkspaceWork> {
-  const owner = await getMe();
-  const draft = await request<StudioDraft>(`/products/${encodeURIComponent(productId)}/studio-draft`);
+export async function loadServerWork(scope: StudioScope, productId: string): Promise<WorkspaceWork> {
+  const owner = await scope.confirmOwner();
+  const draft = await scope.request<StudioDraft>(`/products/${encodeURIComponent(productId)}/studio-draft`);
   const project = readStudioProject(JSON.stringify(draft.document));
   if (!project) throw new Error("이 작품의 스튜디오 초안 형식을 읽을 수 없어요.");
   // A dedicated server ID avoids replacing a browser draft with a coincident clientWorkId.
@@ -238,12 +242,12 @@ export async function loadServerWork(productId: string): Promise<WorkspaceWork> 
 }
 
 export async function publishServerWork(
-  work: WorkspaceWork, modelId: string, reasoningEffort: string, summary: string, body: string,
+  scope: StudioScope,  work: WorkspaceWork, modelId: string, reasoningEffort: string, summary: string, body: string,
   onSaved: OnDraftSaved,
 ): Promise<{ productId: string; release: StudioRelease }> {
-  const saved = await saveServerWork(work, onSaved);
+  const saved = await saveServerWork(scope, work, onSaved);
   try {
-    const release = await request<StudioRelease>(`/products/${saved.productId}/studio-publication`, {
+    const release = await scope.request<StudioRelease>(`/products/${saved.productId}/studio-publication`, {
       method: "POST",
       body: JSON.stringify({ expected_revision: saved.revision, model_id: modelId, reasoning_effort: reasoningEffort, summary, body }),
     });

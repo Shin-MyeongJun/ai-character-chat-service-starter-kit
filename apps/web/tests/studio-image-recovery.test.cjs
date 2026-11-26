@@ -89,7 +89,7 @@ function setup() {
       modules.set(name, module.exports);
       return module.exports;
     }
-    return { ...load("studio-server"), ...load("studio-project"), ...load("studio-chat-images"), ...load("studio-workspace") };
+    return { scope: new (load("studio-scope").StudioScope)("owner", ""), ...load("studio-server"), ...load("studio-project"), ...load("studio-chat-images"), ...load("studio-workspace") };
   }
   return {
     reopen, uploads, uploaded, writes, draftReads, publications, api,
@@ -123,10 +123,10 @@ test("trash restore distinguishes committed retirements from local images, even 
   const work = pendingWork(client);
   let workspace = { ...client.emptyWorkspace(), works: [work] };
   const owner = t.mock.method(server.api, "getMe");
-  assert.deepEqual(await client.getRetiredStudioImageIds(work), new Set());
+  assert.deepEqual(await client.getRetiredStudioImageIds(client.scope, work), new Set());
   assert.equal(owner.mock.callCount(), 0);
 
-  const saved = await client.saveServerWork(work);
+  const saved = await client.saveServerWork(client.scope, work);
   const local = client.addChatImageItem(saved.project.chatImageItems[0].target, "expression");
   const pending = { ...work.project.chatImageUploads[0], itemId: local.imageItemId, requestId: crypto.randomUUID() };
   const placement = { imageItemId: local.imageItemId, afterParagraph: 0 };
@@ -138,7 +138,7 @@ test("trash restore distinguishes committed retirements from local images, even 
   workspace = client.trashEntity(workspace, "work-character", local.target.id, work.id);
   const trash = workspace.trash[0].id;
   async function restore(client) {
-    const ids = await client.getRetiredStudioImageIds(workspace.works[0]);
+    const ids = await client.getRetiredStudioImageIds(client.scope, workspace.works[0]);
     return client.readWorkspace(JSON.stringify(client.restoreTrash(workspace, trash, ids))).works[0].project;
   }
   const unsaved = await restore(client);
@@ -150,7 +150,7 @@ test("trash restore distinguishes committed retirements from local images, even 
   assert.equal(workspace.trash[0].id, trash);
 
   server.loseSaveResponse();
-  await assert.rejects(client.saveServerWork(workspace.works[0]), /save response lost/);
+  await assert.rejects(client.saveServerWork(client.scope, workspace.works[0]), /save response lost/);
   const reopened = server.reopen();
   const restored = await restore(reopened);
   assert.deepEqual(restored.chatImageItems, [local]);
@@ -161,7 +161,7 @@ test("trash restore distinguishes committed retirements from local images, even 
   // A second check against the acknowledged revision makes the same decision.
   const confirmed = await restore(reopened);
   assert.deepEqual(confirmed, restored);
-  const resaved = await reopened.saveServerWork({ ...work, project: confirmed });
+  const resaved = await reopened.saveServerWork(reopened.scope, { ...work, project: confirmed });
   assert.deepEqual(resaved.project.chatImageItems.map(item => item.imageItemId), [local.imageItemId]);
   assert.ok(resaved.project.chatImageItems[0].fileVersionId);
 });
@@ -172,7 +172,7 @@ test("restoring a deleted scene after a confirmed lore unlink keeps only unretir
   const lore = work.project.lorebooks[0];
   const target = { kind: "lore_entry", id: lore.id };
   work.project.chatImageItems = work.project.chatImageItems.map(item => ({ ...item, kind: "situation", target }));
-  const saved = await client.saveServerWork(work);
+  const saved = await client.saveServerWork(client.scope, work);
   const pending = client.addChatImageItem(target, "situation");
   const upload = { ...work.project.chatImageUploads[0], itemId: pending.imageItemId, requestId: crypto.randomUUID() };
   const placement = { imageItemId: pending.imageItemId, afterParagraph: 1 };
@@ -183,8 +183,8 @@ test("restoring a deleted scene after a confirmed lore unlink keeps only unretir
   } }] };
   state = client.trashEntity(state, "scene", scene.id, work.id);
   state = client.trashEntity(state, "work-lore", lore.id, work.id);
-  await client.saveServerWork(state.works[0]);
-  const retired = await client.getRetiredStudioImageIds(state.works[0]);
+  await client.saveServerWork(client.scope, state.works[0]);
+  const retired = await client.getRetiredStudioImageIds(client.scope, state.works[0]);
   assert.deepEqual(retired, new Set(saved.project.chatImageItems.map(item => item.imageItemId)));
   const [deletedScene, unlinkedLore] = state.trash;
   // Older browsers left the scene's placements in its own trash record.
@@ -198,7 +198,7 @@ test("restoring a deleted scene after a confirmed lore unlink keeps only unretir
   assert.deepEqual(state.works[0].project.chatImageItems, [pending]);
   assert.deepEqual(state.works[0].project.chatImageUploads, [upload]);
   assert.deepEqual(state.works[0].project.scenes[0].openingImagePlacements, [placement, placement]);
-  const resaved = await client.saveServerWork(state.works[0]);
+  const resaved = await client.saveServerWork(client.scope, state.works[0]);
   assert.deepEqual(resaved.project.chatImageItems.map(item => item.imageItemId), [pending.imageItemId]);
   assert.ok(resaved.project.chatImageItems[0].fileVersionId);
   assert.deepEqual(resaved.project.scenes[0].openingImagePlacements, [placement, placement]);
@@ -210,28 +210,28 @@ test("partial upload, lost CAS response and reconnect preserve ready results and
   const work = pendingWork(client);
   const [upload, imported] = work.project.chatImageUploads;
   server.loseUploadResponse();
-  await assert.rejects(client.saveServerWork(work), /upload response lost/);
+  await assert.rejects(client.saveServerWork(client.scope, work), /upload response lost/);
   assert.equal(server.writes.length, 1);
   assert.equal(server.uploaded.size, 1);
 
   client = server.reopen();
   server.failImport(true);
-  await assert.rejects(client.saveServerWork({ ...work, project: client.readStudioProject(JSON.stringify(work.project)) }), /import interrupted/);
+  await assert.rejects(client.saveServerWork(client.scope, { ...work, project: client.readStudioProject(JSON.stringify(work.project)) }), /import interrupted/);
   assert.equal(server.writes.length, 1);
   assert.deepEqual(server.uploads, [upload.requestId, upload.requestId, imported.requestId]);
   assert.equal(server.uploaded.size, 1);
 
   server.failImport(false);
   server.loseSaveResponse();
-  await assert.rejects(client.saveServerWork(work), /save response lost/);
+  await assert.rejects(client.saveServerWork(client.scope, work), /save response lost/);
   assert.equal(server.writes.length, 2);
   const committed = server.writes[1];
   client = server.reopen();
-  const replay = await client.saveServerWork(work);
+  const replay = await client.saveServerWork(client.scope, work);
   assert.equal(replay.revision, committed.revision);
   assert.deepEqual(server.uploads, [upload.requestId, upload.requestId, imported.requestId, imported.requestId]);
   assert.equal(server.writes.length, 2);
-  const reopened = await client.loadServerWork(committed.product_id);
+  const reopened = await client.loadServerWork(client.scope, committed.product_id);
   assert.deepEqual(reopened.project.chatImageItems.map(item => item.imageItemId), work.project.chatImageItems.map(item => item.imageItemId));
   assert.deepEqual(reopened.project.scenes[0].openingImagePlacements, work.project.scenes[0].openingImagePlacements);
   assert.equal(reopened.project.chatImageItems[0].fileVersionId, server.uploaded.get(upload.requestId));
@@ -239,7 +239,7 @@ test("partial upload, lost CAS response and reconnect preserve ready results and
   const previous = reopened.project.chatImageItems[0];
   const replacement = { ...upload, requestId: crypto.randomUUID() };
   reopened.project.chatImageUploads = [replacement];
-  const replaced = await client.saveServerWork(reopened);
+  const replaced = await client.saveServerWork(client.scope, reopened);
   assert.equal(replaced.project.chatImageItems[0].imageItemId, previous.imageItemId);
   assert.notEqual(replaced.project.chatImageItems[0].fileVersionId, previous.fileVersionId);
 });
@@ -249,16 +249,16 @@ test("a concurrent draft save preserves both the remote draft and the completed 
   let client = server.reopen();
   const work = pendingWork(client);
   server.failImport(true);
-  await assert.rejects(client.saveServerWork(work), /import interrupted/);
+  await assert.rejects(client.saveServerWork(client.scope, work), /import interrupted/);
   server.failImport(false);
   server.remoteEdit();
-  await assert.rejects(client.saveServerWork(work), /다른 기기/);
+  await assert.rejects(client.saveServerWork(client.scope, work), /다른 기기/);
   assert.equal(server.writes.length, 1);
   assert.equal(server.uploaded.size, 2);
   client = server.reopen();
-  await assert.rejects(client.saveServerWork(work), /다른 기기/);
+  await assert.rejects(client.saveServerWork(client.scope, work), /다른 기기/);
   assert.equal(server.uploads.length, 3);
-  const reopened = await client.loadServerWork(server.writes[0].product_id);
+  const reopened = await client.loadServerWork(client.scope, server.writes[0].product_id);
   assert.equal(reopened.project.work.title, "Concurrent editor");
   assert.equal(reopened.project.chatImageItems, undefined);
 });
@@ -275,14 +275,14 @@ async function replacementWorkspace() {
   function acknowledge(submitted, saved) {
     workspace = client.applySavedStudioWork(workspace, submitted, saved.project);
   }
-  const { productId } = await client.saveServerWork(work, acknowledge);
+  const { productId } = await client.saveServerWork(client.scope, work, acknowledge);
   function edit(change) { workspace = client.updateProject(workspace, work.id, change); }
   edit(project => ({ ...project, chatImageUploads: [replacement] }));
   return {
     server, client, productId, versionA, replacement, secondReplacement, edit,
     get workspace() { return workspace; },
     get project() { return workspace.works[0].project; },
-    publish: () => client.publishServerWork(workspace.works[0], "model", "low", "첫 발행", "안내", acknowledge),
+    publish: () => client.publishServerWork(client.scope, workspace.works[0], "model", "low", "첫 발행", "안내", acknowledge),
   };
 }
 
@@ -308,7 +308,7 @@ test("direct publication acknowledges the replacement in the workspace before po
   assert.deepEqual(server.uploads, [replacement.requestId]);
   const reopened = server.reopen();
   assertReplacementSaved(reopened.readWorkspace(JSON.stringify(tab.workspace)).works[0].project, replacement.itemId, versionB);
-  assertReplacementSaved((await reopened.loadServerWork(productId)).project, replacement.itemId, versionB);
+  assertReplacementSaved((await reopened.loadServerWork(reopened.scope, productId)).project, replacement.itemId, versionB);
 });
 
 for (const lost of [false, true]) {
@@ -324,7 +324,7 @@ for (const lost of [false, true]) {
     await assert.rejects(tab.publish(), lost ? /초안을 서버에 저장.*발행 결과를 확인할 수 없/ : /초안을 서버에 저장.*발행에 실패/);
     const versionB = server.uploaded.get(replacement.requestId);
     assertReplacementSaved(tab.project, replacement.itemId, versionB);
-    assertReplacementSaved((await tab.client.loadServerWork(tab.productId)).project, replacement.itemId, versionB);
+    assertReplacementSaved((await tab.client.loadServerWork(tab.client.scope, tab.productId)).project, replacement.itemId, versionB);
     const writes = server.writes.length;
     assert.deepEqual((await tab.publish()).release, release);
     assert.equal(server.publications.length, 2);
@@ -353,7 +353,7 @@ test("save acknowledgement merges into newer text, image metadata and replacemen
   assert.equal(tab.project.chatImageItems[0].fileVersionId, server.uploaded.get(replacement.requestId));
   assert.deepEqual(tab.project.chatImageUploads, [newer]);
   assert.equal(tab.workspace.works[1], otherWork);
-  const remote = await tab.client.loadServerWork(tab.productId);
+  const remote = await tab.client.loadServerWork(tab.client.scope, tab.productId);
   assert.notEqual(remote.project.work.title, tab.project.work.title);
   assert.equal(remote.project.chatImageItems[1].fileVersionId, server.uploaded.get(secondReplacement.requestId));
 });

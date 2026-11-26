@@ -78,8 +78,10 @@ test("server work entry reads the selected product and detaches browser-only sou
   const project = loadLibrary("studio-project.ts").sampleProject();
   project.characters[0].sourceId = "private-browser-source";
   const calls = [];
-  const studio = loadLibrary("studio-server.ts", { "api.ts": { getMe: async () => ({ id: "owner" }), request: async path => { calls.push(path); return { product_id: "target", revision: 4, document: project }; } } });
-  const work = await studio.loadServerWork("target");
+  const overrides = { "api.ts": { getMe: async () => ({ id: "owner" }), request: async path => { calls.push(path); return { product_id: "target", revision: 4, document: project }; } } };
+  const studio = loadLibrary("studio-server.ts", overrides);
+  const scope = new (loadLibrary("studio-scope.ts", overrides).StudioScope)("owner", "");
+  const work = await studio.loadServerWork(scope, "target");
   assert.deepEqual(calls, ["/products/target/studio-draft"]);
   assert.equal(work.id, "server:target"); assert.equal(work.project.characters[0].sourceId, undefined);
   assert.equal(project.characters[0].sourceId, "private-browser-source");
@@ -87,6 +89,6 @@ test("server work entry reads the selected product and detaches browser-only sou
   const linkKey = [...data.keys()][0];
   const previous = { productId: "target", revision: 2, base: "earlier-server-base" };
   data.set(linkKey, JSON.stringify(previous));
-  await studio.loadServerWork("target");
+  await studio.loadServerWork(scope, "target");
   assert.deepEqual(JSON.parse(data.get(linkKey)), previous, "opening a link must preserve the conflict-detection baseline");
 });

@@ -13,7 +13,7 @@ export type RecentChat = {
 
 export const RECENT_CHATS_KEY = "moseori_recent_chats";
 export const RECENT_CHATS_EVENT = "moseori:recent-chats-updated";
-export const AUTH_CHANGED_KEY = "moseori_auth_changed";
+export { AUTH_CHANGED_KEY } from "./auth-boundary";
 let currentOwner: string | null = null;
 
 export function setRecentChatOwner(owner: string | null): void {

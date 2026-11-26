@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { StudioScopeContext, useAuthEpoch } from "./studio-session";
+import { StudioScope } from "@/lib/studio-scope";
 import { sampleProject } from "@/lib/studio-project";
 import { a1Arrival, a1ImageDraft, a1ImageItems } from "@/lib/studio-chat-image-example";
 import {
@@ -32,6 +34,12 @@ const initialPreviews = new Map([
 ]);
 
 export function StudioImageExample() {
+  const epoch = useAuthEpoch();
+  const scope = useMemo(() => new StudioScope(null, epoch), [epoch]);
+  return <StudioScopeContext.Provider key={epoch} value={scope}><ImageExample /></StudioScopeContext.Provider>;
+}
+
+function ImageExample() {
   const [editor, setEditor] = useState<Editor>("character");
   const [character, setCharacter] = useState(characterExample);
   const [lore, setLore] = useState(loreExample);

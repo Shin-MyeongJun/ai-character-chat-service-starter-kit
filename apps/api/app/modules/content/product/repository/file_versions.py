@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import delete, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.product import Product
 from app.db.models.product_file_version import ProductFileReference, ProductFileVersion
 from app.modules.content.product import types as Types
 
@@ -20,6 +21,30 @@ async def get_file_version(
             populate_existing=True
         )
     entity: ProductFileVersion | None = await session.scalar(statement)
+    return entity
+
+
+async def lock_file_version_for_attachment(
+    session: AsyncSession, command: Types.GetProductFileVersionCommand
+) -> ProductFileVersion | None:
+    # Studio and release workflows already hold the product lock. Standalone
+    # retain calls also need its owner to remain stable until the reference commits.
+    current_owner = (
+        select(Product.owner_id)
+        .where(Product.id == command.product_id)
+        .with_for_update(read=True)
+        .scalar_subquery()
+    )
+    entity: ProductFileVersion | None = await session.scalar(
+        select(ProductFileVersion)
+        .where(
+            ProductFileVersion.id == command.file_version_id,
+            ProductFileVersion.product_id == command.product_id,
+            ProductFileVersion.owner_id == current_owner,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     return entity
 
 

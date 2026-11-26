@@ -19,6 +19,8 @@ import { LoreEditor, type LoreTab } from "./lore-editor";
 import { StudioButton } from "./studio-controls";
 import { StudioDialog } from "./studio-dialog";
 import { StudioPreview } from "./studio-preview";
+import type { StudioScope } from "@/lib/studio-scope";
+import { StudioSession } from "./studio-session";
 import { useStudioDraft } from "./use-studio-draft";
 import { WorkTile } from "./work-tile";
 import styles from "./studio.module.css";
@@ -31,8 +33,14 @@ type DeleteTarget = { kind: TrashItem["kind"]; id: string; label: string; workId
 const titles: Record<Library, string> = { works: "작품", characters: "캐릭터", lore: "로어북", trash: "휴지통" };
 const matches = (q: string, values: string[]) => values.join(" ").toLocaleLowerCase().includes(q.trim().toLocaleLowerCase());
 
-export function CreatorStudio({ initialWorkId, initialProductId }: { initialWorkId?: string; initialProductId?: string } = {}) {
-  const draft = useStudioDraft(); const { workspace, ready, status, storageWarning, commit } = draft;
+type StudioProps = { initialWorkId?: string; initialProductId?: string };
+
+export function CreatorStudio(props: StudioProps = {}) {
+  return <StudioSession>{scope => <StudioEditor {...props} scope={scope} />}</StudioSession>;
+}
+
+function StudioEditor({ initialWorkId, initialProductId, scope }: StudioProps & { scope: StudioScope }) {
+  const draft = useStudioDraft(scope); const { workspace, ready, status, storageWarning, commit } = draft;
   const [route, setRoute] = useState<Route>({ kind: "library" });
   const [library, setLibrary] = useState<Library>("works");
   const [queries, setQueries] = useState<Record<Library, string>>({ works: "", characters: "", lore: "", trash: "" });
@@ -66,7 +74,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   useEffect(() => {
     if (!workId) return;
     let active = true;
-    void getStudioProductId(workId).then(productId => {
+    void getStudioProductId(scope, workId).then(productId => {
       if (active && productId) setProductLink({ workId, productId });
     }).catch(() => { /* Local work remains editable while signed out. */ });
     return () => { active = false; };
@@ -110,7 +118,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     }
     let active = true;
     setServerBusy(true);
-    void loadServerWork(initialProductId!).then(work => {
+    void loadServerWork(scope, initialProductId!).then(work => {
       if (!active) return;
       const existing = workspace.works.find(row => row.id === work.id);
       // A locally edited copy wins. Opening a link must never replace unsaved work.
@@ -124,7 +132,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
   useEffect(() => {
     if (modal !== "publish") return;
     let active = true;
-    void listAvailableModels().then(rows => {
+    void listAvailableModels(scope).then(rows => {
       if (!active) return;
       setModels(rows);
       setSelectedModel(rows[0]?.id ?? "");
@@ -153,7 +161,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       const upload: ChatImageUpload = typeof source === "string"
         ? { itemId: id, requestId, kind: "import", mediaId: source }
         : { itemId: id, requestId, kind: "upload", filename: source.name };
-      if (typeof source !== "string") await saveImages([{ id: requestId, file: source }]);
+      if (typeof source !== "string") await saveImages(scope, [{ id: requestId, file: source }]);
       changeProject(current => {
         const items = current.chatImageItems ?? [];
         if (!added && !items.some(item => item.imageItemId === id)) return current;
@@ -236,7 +244,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       if ((item.kind === "work-character" || item.kind === "work-lore") && item.images) {
         const work = workspace.works.find(row => row.id === item.workId);
         if (!work) return;
-        retired = await getRetiredStudioImageIds(work);
+        retired = await getRetiredStudioImageIds(scope, work);
         skipped = item.images.items.filter(({ value }) => retired.has(value.imageItemId.toLowerCase())).length;
         if (skipped && !window.confirm(`서버 초안에서 삭제가 확정된 이미지 ${skipped}개는 기존 수집 항목 ID로 복구할 수 없어요. 해당 이미지와 그 배치를 제외하고 나머지를 복구할까요?`)) return;
       }
@@ -247,7 +255,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
       setNotice(`이미지 삭제 여부를 확인하지 못해 자료를 휴지통에 보관했어요. ${serverError(cause)}`);
     } finally { setServerBusy(false); }
   }
-  function exportData(value: unknown, name: string) { const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); setNotice("JSON 내보내기를 요청했어요. 이미지 파일은 별도로 보관해 주세요."); }
+  function exportData(value: unknown, name: string) { if (!scope.current()) return; const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); setNotice("JSON 내보내기를 요청했어요. 이미지 파일은 별도로 보관해 주세요."); }
   function test() { if (previewScene) { setRunning(true); setPane("preview"); } }
   function acknowledgeServerSave(work: WorkspaceWork, saved: SavedStudioWork) {
     commit(current => applySavedStudioWork(current, work, saved.project));
@@ -257,7 +265,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (!activeWork || serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const saved = await saveServerWork(activeWork, acknowledgeServerSave);
+      const saved = await saveServerWork(scope, activeWork, acknowledgeServerSave);
       setNotice(saved.project.chatImageItems?.length || saved.project.characters.some(row => row.assets.length)
         ? "작품 문서와 이미지를 서버에 저장했어요. 다른 기기에서도 서버 이미지를 복원할 수 있어요."
         : "서버에 저장했어요. 다른 기기에서 내 작업실의 서버 초안 가져오기로 복원할 수 있어요.");
@@ -270,12 +278,12 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const incoming = await loadServerWorks(workspace.works);
+      const incoming = await loadServerWorks(scope, workspace.works);
       const additions = incoming.filter(row => !workspace.works.some(local => local.id === row.id));
       const conflicts = incoming.filter(row => workspace.works.some(local => local.id === row.id && !sameStudioProject(local.project, row.project)));
       if (additions.length) commit(current => ({ ...current, works: [...current.works, ...additions.filter(row => !current.works.some(existing => existing.id === row.id))] }));
       const assetIds = [...new Set(incoming.flatMap(row => row.project.characters.flatMap(character => character.assets.filter(asset => !asset.mediaId).map(asset => asset.id))))];
-      const missingImages = (await Promise.all(assetIds.map(async id => (await readImage(id).catch(() => null)) ? 0 : 1))).reduce<number>((sum, missing) => sum + missing, 0);
+      const missingImages = (await Promise.all(assetIds.map(async id => (await readImage(scope, id).catch(() => null)) ? 0 : 1))).reduce<number>((sum, missing) => sum + missing, 0);
       setNotice(`${additions.length}개 작품을 가져왔어요.${conflicts.length ? ` 다른 기기와 내용이 다른 ${conflicts.length}개 작품은 이 브라우저의 초안을 유지했어요.` : ""}${missingImages ? ` 이미지 원본 ${missingImages}개는 이 기기에 없어 표시·발행할 수 없습니다.` : ""}`);
     } catch (cause) { setNotice(serverError(cause)); }
     finally { setServerBusy(false); }
@@ -285,7 +293,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const incoming = await loadServerLibrary();
+      const incoming = await loadServerLibrary(scope);
       commit(current => ({...current, characters: [...current.characters, ...incoming.characters.filter(row => !current.characters.some(existing => existing.id === row.id))], lorebooks: [...current.lorebooks, ...incoming.lorebooks.filter(row => !current.lorebooks.some(existing => existing.id === row.id))]}));
       setNotice(`서버 원본 텍스트를 가져왔어요. 기존 브라우저 편집과 작품 복사본은 유지돼요.${incoming.skipped ? ` 편집기에서 표현할 수 없는 항목 ${incoming.skipped}개는 제외했어요.` : ""} 원본 이미지는 이 경로에서 가져오지 않습니다.`);
     } catch (cause) {setNotice(serverError(cause));}
@@ -297,7 +305,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     const source = route.type === "character" ? character : lore;
     if (!source) return;
     setServerBusy(true); setNotice("");
-    try {setNotice(await saveServerSource(route.type, source));}
+    try {setNotice(await saveServerSource(scope, route.type, source));}
     catch (cause) {setNotice(serverError(cause));}
     finally {setServerBusy(false);}
   }
@@ -305,7 +313,7 @@ export function CreatorStudio({ initialWorkId, initialProductId }: { initialWork
     if (!activeWork || serverBusy) return;
     setServerBusy(true); setNotice("");
     try {
-      const result = await publishServerWork(activeWork, selectedModel, selectedEffort, releaseSummary, releaseBody, acknowledgeServerSave);
+      const result = await publishServerWork(scope, activeWork, selectedModel, selectedEffort, releaseSummary, releaseBody, acknowledgeServerSave);
       setPublishedId(result.productId);
       setNotice(`버전 ${result.release.version}을 발행했어요. 작품 상세에서 대화를 시작할 수 있어요.`);
     } catch (cause) { setNotice(serverError(cause)); }

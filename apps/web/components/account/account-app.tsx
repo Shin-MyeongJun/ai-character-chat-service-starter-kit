@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useUserTheme } from "@/components/user-theme";
 import { logout } from "@/lib/api";
 import { filterOrders, formatCredit as n, formatDate, orderLabels, recheckPreviewOrder, type AccountPreview, type Order } from "@/lib/account";
-import { migrateWorkspace, WORKSPACE_STORAGE_KEY, type WorkspaceWork } from "@/lib/studio-workspace";
-import { PROJECT_STORAGE_KEY } from "@/lib/studio-project";
-import { STUDIO_STORAGE_KEY } from "@/lib/studio-data";
+import type { WorkspaceWork } from "@/lib/studio-workspace";
+import { StudioScope } from "@/lib/studio-scope";
+import { readLocalWorkspace } from "@/lib/studio-local-workspace";
+import { useAuthEpoch } from "@/components/studio/studio-session";
 import { ActionLink, Button, Card, ChoiceGroup, Dialog, Empty, Field, Section, StatusRow } from "./account-ui";
 import { ChatSettings, CreditShortageDialog } from "./chat-settings";
 import { useAccount } from "./use-account";
@@ -17,7 +18,15 @@ import styles from "./account.module.css";
 import { useOwnedProducts } from "./use-owned-products";
 
 /** Present server publication, search, activity and ledger contracts with explicit partial failures. */
-export function AccountApp({ section, preview }: { section: string[]; preview?: AccountPreview }) {
+type AccountProps = { section: string[]; preview?: AccountPreview };
+
+export function AccountApp(props: AccountProps) {
+  const epoch = useAuthEpoch();
+  if (!props.preview && epoch.startsWith("pending:")) return <p role="status">계정을 확인하고 있어요.</p>;
+  return <AccountView key={props.preview ? "preview" : epoch} {...props} epoch={epoch} />;
+}
+
+function AccountView({ section, preview, epoch }: AccountProps & { epoch: string }) {
   const account = useAccount(preview);
   const router = useRouter();
   const { theme, preference, toggleTheme, setTheme } = useUserTheme();
@@ -49,13 +58,21 @@ export function AccountApp({ section, preview }: { section: string[]; preview?: 
   const purchaseSummary = preview?.state === "loading" ? "구매 내역을 불러오는 중…" : preview?.state === "error" ? "구매 내역을 불러오지 못했어요." : `전체 ${purchaseOrders.length}건 · 완료 ${purchaseOrders.filter(o => o.status === "succeeded").length}건 / 확인 중 ${purchaseOrders.filter(o => ["pending", "uncertain"].includes(o.status)).length}건 / 실패 ${purchaseOrders.filter(o => o.status === "failed").length}건`;
   useEffect(() => { setFilter("전체"); setPeriod("전체 기간"); setNotice(""); setModal(preview?.state === "credit" && current === "chat" ? "credit" : null); }, [current, preview?.state]);
   useEffect(() => {
-    if (current !== "works" || preview) return;
-    try {
-      const workspace = migrateWorkspace(localStorage.getItem(WORKSPACE_STORAGE_KEY), localStorage.getItem(PROJECT_STORAGE_KEY), localStorage.getItem(STUDIO_STORAGE_KEY));
-      if (!workspace) setLocalError("이 브라우저의 작업실을 읽지 못했어요. 스튜디오에서 저장 데이터를 확인해 주세요.");
-      else setLocalWorks(workspace.works);
-    } catch { setLocalError("브라우저 저장소를 사용할 수 없어요."); }
-  }, [current, preview]);
+    setLocalWorks([]); setLocalError("");
+    if (current !== "works" || preview || (account.session !== "ready" && account.session !== "guest")) return;
+    const scope = new StudioScope(account.user?.id ?? null, epoch);
+    function refresh() {
+      try {
+        const { workspace } = readLocalWorkspace(scope);
+        setLocalWorks(workspace?.works ?? []);
+        setLocalError(workspace ? "" : "이 브라우저의 작업실을 읽지 못했어요.");
+      } catch { setLocalWorks([]); setLocalError("브라우저 저장소를 사용할 수 없어요."); }
+    }
+    refresh();
+    const sync = (event: StorageEvent) => { if (event.key === scope.workspaceKey) refresh(); };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, [current, preview, epoch, account.session, account.user?.id]);
   async function signOut() {
     if (busy || preview) return;
     setBusy(true); setNotice("");

@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CharacterAsset, StudioCharacter } from "@/lib/studio-project";
+import { useStudioScope } from "./studio-session";
 import { readImage, saveImages } from "@/lib/studio-assets";
 import { ChipEditor, ChoiceChips, StudioButton, StudioField } from "./studio-controls";
 import { EditorHeading, StudioFold } from "./project-editors";
 import styles from "./studio.module.css";
 
 function AssetImage({ asset }: { asset: CharacterAsset }) {
+  const storage = useStudioScope();
   // Managed IDs restore across devices; browser IDs continue to address IndexedDB only.
   const [url, setUrl] = useState("");
   const [missing, setMissing] = useState(false);
@@ -15,17 +17,19 @@ function AssetImage({ asset }: { asset: CharacterAsset }) {
     if (asset.mediaId) { setUrl(`/backend/characters/media/${encodeURIComponent(asset.mediaId)}/content`); setMissing(false); return; }
     let disposed = false;
     let objectUrl = "";
-    readImage(asset.id).then(blob => {
+    if (!storage) { setMissing(true); return; }
+    readImage(storage, asset.id).then(blob => {
       if (disposed) return;
       if (!blob) { setMissing(true); return; }
       objectUrl = URL.createObjectURL(blob); setUrl(objectUrl);
     }).catch(() => { if (!disposed) setMissing(true); });
     return () => { disposed = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [asset.id, asset.mediaId]);
+  }, [asset.id, asset.mediaId, storage]);
   // Browser-local object URLs cannot use Next's remote image optimizer.
   return url ? <img className={styles.assetImage} src={url} alt={asset.name} /> : <span className={styles.help}>{missing ? "이미지를 다시 등록해 주세요." : "이미지 불러오는 중"}</span>;
 }
 export function CharacterEditor({ character, update, scope = "work", imageSection }: { character: StudioCharacter; update: (patch: Partial<StudioCharacter>) => void; scope?: "source" | "work"; imageSection?: ReactNode }) {
+  const storage = useStudioScope();
   const [tab, setTab] = useState<"basic" | "relations" | "assets">(imageSection ? "assets" : "basic");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +46,8 @@ export function CharacterEditor({ character, update, scope = "work", imageSectio
     setBusy(true); setError("");
     try {
       const images = incoming.map(file => ({ id: crypto.randomUUID(), file }));
-      await saveImages(images);
+      if (!storage) throw new Error("작업실에 연결되지 않았어요.");
+      await saveImages(storage, images);
       update({ assets: [...character.assets.filter(asset => usage !== "portrait" || asset.usage !== "portrait"), ...images.map(image => ({ id: image.id, name: image.file.name, usage }))] });
     } catch { setError("이미지를 저장하지 못했어요. 브라우저 저장 공간과 권한을 확인해 주세요."); }
     finally { setBusy(false); }

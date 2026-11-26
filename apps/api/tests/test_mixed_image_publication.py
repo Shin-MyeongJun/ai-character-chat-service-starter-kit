@@ -1,5 +1,6 @@
 """Exercise owner publication and reader image access across both HTTP routes."""
 
+from copy import deepcopy
 from uuid import UUID, uuid4
 
 import httpx
@@ -13,8 +14,13 @@ from test_studio_image_publication import image_document
 from test_studio_publication_db import http_app, request, save
 
 from app.db.models.lorebook import LorebookEntry
-from app.db.models.product import Product, ProductCharacter, ProductStartSet
-from app.db.models.product_file_version import ProductFileReference
+from app.db.models.product import (
+    Product,
+    ProductCharacter,
+    ProductStartSet,
+    ProductStudioDraft,
+)
+from app.db.models.product_file_version import ProductFileReference, ProductFileVersion
 from app.db.models.product_release import ProductReleaseNote
 from app.db.models.snapshot.product import (
     ProductSnapshot,
@@ -25,6 +31,192 @@ from app.http.media import router as media_router
 from app.modules.chatting.conversation.router import router as conversation_router
 from app.modules.content.character.service.workflow.media import CharacterMediaWorkflow
 from app.modules.content.product.router import router as product_router
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("already_linked", [False, True])
+async def test_draft_requires_current_file_owner(
+    db: AsyncSession,
+    media: CharacterMediaWorkflow,  # noqa: F811 - parametrized storage fixture
+    already_linked: bool,
+) -> None:
+    owner, _, _ = await seed(db)
+    former, _, _ = await seed(db)
+    product_id = await product_for(db, owner.id)
+    files = workflow(media)
+    # The valid reference sorts first, so replacing it exercises rollback of a release.
+    valid, stale = sorted(
+        [
+            (
+                await files.upload_product_file_version(
+                    image_upload(product_id, owner.id)
+                )
+            ).file_version_id
+            for _ in range(2)
+        ]
+    )
+    original = image_document(stale if already_linked else valid, uuid4(), uuid4())
+    app = http_app(db, owner.id)
+    app.include_router(product_router)
+    app.include_router(media_router)
+    app.state.product_file_version_workflow = files
+    base = f"/products/{product_id}"
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        revision = await save(client, product_id, None, original)
+        async with db.begin():
+            # Model a retained ready row from an earlier incarnation of this product UUID.
+            file = await db.get(ProductFileVersion, stale)
+            assert (
+                file is not None
+                and file.product_id == product_id
+                and file.state == "ready"
+            )
+            file.owner_id = former.id
+            draft = await db.get(ProductStudioDraft, product_id)
+            assert draft is not None
+            saved_document, digest = deepcopy(draft.document), draft.content_digest
+        preview = await client.get(f"{base}/media/{stale}/content")
+        assert (
+            preview.status_code == 404
+            and preview.json()["detail"] == "Media not found."
+        )
+        changed = deepcopy(original)
+        changed["work"]["title"] = "Changed title"
+        for item in changed["chatImageItems"]:
+            item["fileVersionId"] = str(stale)
+        denied = await client.put(
+            f"{base}/studio-draft",
+            json={"expected_revision": revision, "document": changed},
+        )
+        assert (
+            denied.status_code == 404
+            and denied.json()["detail"] == "File version not found."
+        )
+
+    async with AsyncSession(db.bind) as observed:
+        draft = await observed.get(ProductStudioDraft, product_id)
+        assert draft is not None
+        assert (draft.revision, draft.content_digest, draft.document) == (
+            revision,
+            digest,
+            saved_document,
+        )
+        refs = (
+            await observed.execute(
+                select(
+                    ProductFileReference.file_version_id,
+                    ProductFileReference.kind,
+                    ProductFileReference.reference_id,
+                )
+            )
+        ).all()
+        assert refs == [(stale if already_linked else valid, "draft", product_id)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("regular_release", [False, True], ids=["studio", "inherited"])
+async def test_publication_requires_current_file_owner(
+    db: AsyncSession,
+    media: CharacterMediaWorkflow,  # noqa: F811 - parametrized storage fixture
+    regular_release: bool,
+) -> None:
+    owner, _, _, _, model, _ = await ready_product(db)
+    former, _, _ = await seed(db)
+    product_id = await product_for(db, owner.id)
+    file = await workflow(media).upload_product_file_version(
+        image_upload(product_id, owner.id)
+    )
+    app = http_app(db, owner.id)
+    app.include_router(product_router)
+    base = f"/products/{product_id}"
+    initial_snapshot = None
+    expected_refs = {("draft", product_id, file.file_version_id)}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        revision = await save(
+            client,
+            product_id,
+            None,
+            image_document(file.file_version_id, uuid4(), uuid4()),
+        )
+        publish_request = request(revision, model.id)
+        if regular_release:
+            initial = await client.post(
+                f"{base}/studio-publication", json=publish_request
+            )
+            assert initial.status_code == 200
+            initial_snapshot = UUID(initial.json()["snapshot_id"])
+            expected_refs.add(("snapshot", initial_snapshot, file.file_version_id))
+        # Give the draft (and, for inheritance, the latest snapshot) an existing
+        # inconsistent reference without depending on a failing draft PUT.
+        async with db.begin():
+            row = await db.get(ProductFileVersion, file.file_version_id)
+            assert (
+                row is not None
+                and row.product_id == product_id
+                and row.state == "ready"
+            )
+            row.owner_id = former.id
+            draft = await db.get(ProductStudioDraft, product_id)
+            assert draft is not None
+            receipt, publication_digest = (
+                deepcopy(draft.publication_release),
+                draft.publication_digest,
+            )
+        if regular_release:
+            replay = await client.post(
+                f"{base}/studio-publication", json=publish_request
+            )
+            assert replay.status_code == 200 and replay.json() == initial.json()
+            denied = await client.post(
+                f"{base}/releases", json={"summary": "Next", "body": "Next release"}
+            )
+        else:
+            denied = await client.post(
+                f"{base}/studio-publication", json=publish_request
+            )
+        assert (
+            denied.status_code == 404
+            and denied.json()["detail"] == "File version not found."
+        )
+
+    async with AsyncSession(db.bind) as observed:
+        product = await observed.get(Product, product_id)
+        assert product is not None and product.latest_snapshot_id == initial_snapshot
+        draft = await observed.get(ProductStudioDraft, product_id)
+        assert draft is not None and draft.revision == revision
+        assert (draft.publication_release, draft.publication_digest) == (
+            receipt,
+            publication_digest,
+        )
+        expected_snapshots = [initial_snapshot] if regular_release else []
+        assert (
+            await observed.scalars(
+                select(ProductSnapshot.id).where(
+                    ProductSnapshot.product_id == product_id
+                )
+            )
+        ).all() == expected_snapshots
+        assert (
+            await observed.scalars(select(ProductReleaseNote.product_snapshot_id))
+        ).all() == expected_snapshots
+        assert (
+            set(
+                (
+                    await observed.execute(
+                        select(
+                            ProductFileReference.kind,
+                            ProductFileReference.reference_id,
+                            ProductFileReference.file_version_id,
+                        )
+                    )
+                ).all()
+            )
+            == expected_refs
+        )
 
 
 @pytest.mark.asyncio
